@@ -1,6 +1,6 @@
 /**
  * ------------------------------------------------------------------
- * COPYRIGHT (c) 2024 ESTÚDIO CRIA
+ * COPYRIGHT (c) 2026 ESTÚDIO CRIA
  * DIRETOR: PAULO GABRIEL DE L. S.
  * PROJETO: VITAL RUSH - PROTOCOLO APEX
  * ------------------------------------------------------------------
