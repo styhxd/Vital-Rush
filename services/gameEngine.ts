@@ -4,12 +4,13 @@
  * DIRETOR: PAULO GABRIEL DE L. S.
  * ------------------------------------------------------------------
  * 
- * A BESTA (GAME ENGINE) - PROTOCOLO DE CORREÇÃO "TITAN"
+ * A BESTA (GAME ENGINE) - PROTOCOLO FINAL "ARQUITETO"
  * 
- * CORREÇÕES CRÍTICAS:
- * 1. RESTAURAÇÃO DE STATS: Inimigos voltaram ao tamanho e HP corretos (chega de formigas).
- * 2. CORTE DE SPAWN: Inimigos param de nascer EXATAMENTE quando o tempo acaba.
- * 3. PROTOCOLO MERCY: Se a wave bugar, o jogo força o fim após 10s de tolerância.
+ * CORREÇÕES DE SEGURANÇA (FAILSAFES & FAILCHECKS):
+ * 1. REAPER CHECK: Verifica morte no final de todo frame. Vida < 0.5 = Morte.
+ * 2. BLACK HOLE: Inimigos mortos são banidos para x=-10000.
+ * 3. TIMER CLAMP: Invulnerabilidade nunca buga negativa ou infinita.
+ * 4. HARD SPAWN STOP: O tempo acabou? A torneira de monstros fecha.
  */
 
 import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette, Language } from '../types';
@@ -173,13 +174,14 @@ export class GameEngine {
       });
   }
 
-  // --- CORREÇÃO DE STATS: INIMIGOS VOLTARAM A SER GRANDES E FORTES ---
   public spawnEnemy(config: WaveConfig) {
+      // FAILCHECK: Se a wave acabou, proíbe spawns imediatamente.
+      if (this.waveTimer >= config.duration) return;
+
       const type = config.enemyTypes[Math.floor(Math.random() * config.enemyTypes.length)];
       const y = Math.random() * (CANVAS_HEIGHT - 100) + 50;
       const strain = this.patient.strain;
       
-      // Valores BASE restaurados (Bactéria 35, Vírus 20, Parasita 120)
       let hp = 35;
       let dmg = 10;
       let speed = 0.6;
@@ -195,17 +197,15 @@ export class GameEngine {
           hp = 120; dmg = 25; radius = 55; color = this.colors.PARASITE; val = 30; speed = 0.25;
       }
 
-      // Modificadores de Strain
       if (strain === ViralStrain.TITAN) { hp *= 2.0; radius *= 1.2; speed *= 0.7; val *= 1.5; }
       if (strain === ViralStrain.SWARM) { hp *= 0.6; speed *= 1.1; val = Math.max(1, Math.floor(val * 0.7)); }
       if (strain === ViralStrain.VOLATILE) { speed *= 1.3; dmg *= 1.5; }
 
-      // Modificadores de Dificuldade e Wave (Scaling)
       hp *= this.difficultyMods.hp;
       dmg *= this.difficultyMods.dmg;
       val *= this.difficultyMods.score;
       
-      const isElite = Math.random() < 0.12; // 12% chance de elite
+      const isElite = Math.random() < 0.12; 
       if (isElite) {
           hp *= 3.5;
           dmg *= 2;
@@ -214,7 +214,6 @@ export class GameEngine {
           speed *= 0.85;
       }
 
-      // Scaling Progressivo da Onda
       hp *= (1 + this.currentWaveIndex * 0.35);
 
       this.entities.push({
@@ -274,7 +273,7 @@ export class GameEngine {
 
       target.health -= finalDamage;
       target.hitFlash = 5;
-      target.pos.x += 2; // Knockback visual pequeno
+      target.pos.x += 2; 
 
       if (isCrit && stats.lifesteal > 0) {
           this.player.health = Math.min(this.player.health + 2, this.player.maxHealth);
@@ -369,7 +368,9 @@ export class GameEngine {
           achievementManager.track('die_10', 1);
           
           if (this.lives === 0) {
+              // FAILSAFE DE MORTE: Desativa tudo imediatamente
               this.player.active = false;
+              this.waveActive = false; // Para a onda
               for(let i=0; i<30; i++) {
                    this.particles.push({
                       id: 'p_death', type: EntityType.PARTICLE,
@@ -385,21 +386,23 @@ export class GameEngine {
           } else {
               this.player.health = this.player.maxHealth;
               this.energy = 0;
-              this.invulnerabilityTimer = 3.0; 
+              this.invulnerabilityTimer = 3.0; // Restaura invul
               this.spawnText(this.player.pos, this.t('MSG_RESTORED'), '#0ff', 40);
               this.screenShake = {x: 20, y: 0};
               this.shakeIntensity = 20;
               
-              // Mata inimigos próximos ao renascer
+              // BLACK HOLE PROTOCOL: Limpa inimigos próximos com redundância
+              const killRadiusSq = 500 * 500;
               this.entities.forEach(e => {
-                  if ((this.isEnemy(e.type) || e.type === EntityType.BOSS) && distSq(this.player.pos, e.pos) < 300*300) {
-                      e.health = 0;
+                  if ((this.isEnemy(e.type) || e.type === EntityType.BOSS) && distSq(this.player.pos, e.pos) < killRadiusSq) {
+                      e.health = -9999;
                       e.active = false;
+                      e.pos.x = -10000; // Banido para o reino das sombras
                       for(let i=0; i<5; i++) {
                           this.particles.push({ 
-                              id: 'force_kill', type: EntityType.PARTICLE, pos: {...e.pos}, 
-                              vel: {x: (Math.random()-0.5)*10, y: (Math.random()-0.5)*10},
-                              radius: 3, health:1, maxHealth:1, color: e.color, damage:0, active:true, ttl: 15
+                              id: 'force_kill', type: EntityType.PARTICLE, pos: {...this.player.pos}, // Partícula no player pra garantir visual
+                              vel: {x: (Math.random()-0.5)*20, y: (Math.random()-0.5)*20},
+                              radius: 3, health:1, maxHealth:1, color: e.color, damage:0, active:true, ttl: 20
                           });
                       }
                   }
@@ -529,17 +532,18 @@ export class GameEngine {
       return candidates;
   }
 
-  // PROTOCOLO MERCY: Limpeza forçada de inimigos
+  // FAILSAFE 2: BLACK HOLE PROTOCOL
+  // Força inimigos a desaparecerem de vez.
   private killAllEnemies() {
       this.entities.forEach(e => {
           if (this.isEnemy(e.type) || e.type === EntityType.BOSS) {
-              e.health = 0; 
+              e.health = -999; 
               e.active = false;
-              // Visual de morte instantânea para o jogador saber que não foi bug, foi feature
+              e.pos.x = -10000; // Banimento geográfico
               for(let i=0; i<5; i++) {
                   this.particles.push({
-                      id: 'force_kill', type: EntityType.PARTICLE, pos: {...e.pos}, 
-                      vel: {x: (Math.random()-0.5)*10, y: (Math.random()-0.5)*10},
+                      id: 'force_kill', type: EntityType.PARTICLE, pos: {x: CANVAS_WIDTH/2 + (Math.random()-0.5)*CANVAS_WIDTH, y: CANVAS_HEIGHT/2}, // Efeito global
+                      vel: {x: 0, y: -5},
                       radius: 3, health:1, maxHealth:1, color: e.color, damage:0, active:true, ttl: 15
                   });
               }
@@ -591,7 +595,25 @@ export class GameEngine {
     const dtSeconds = safeDt / 1000;
     
     if (this.waveActive) this.sessionStats.timePlayed += dtSeconds;
-    if (this.invulnerabilityTimer > 0) this.invulnerabilityTimer -= (dt/1000);
+    
+    // FAILCHECK 3: Timer de invulnerabilidade saneado
+    if (this.invulnerabilityTimer > 0) {
+        this.invulnerabilityTimer -= dtSeconds;
+        if (this.invulnerabilityTimer > 5) this.invulnerabilityTimer = 3; // Clamp max
+    } else {
+        this.invulnerabilityTimer = 0; // Clamp min
+    }
+
+    // FAILSAFE 1: REAPER PROTOCOL
+    // Verifica explicitamente se o jogador deveria estar morto, independentemente da lógica de colisão.
+    // Margem de 0.5 para evitar erros de float (0.000001 de vida).
+    if (this.player.active && this.player.health <= 0.5) {
+        this.handlePlayerDeath(onGameOver);
+        return; // Interrompe o frame atual para o jogador
+    }
+    
+    // FAILCHECK: NaN Protection
+    if (isNaN(this.player.health)) this.player.health = 0;
 
     if (this.inputVector.x === 0 && this.inputVector.y === 0 && this.waveActive) {
         this.sessionStats.idleTime += dtSeconds;
@@ -661,7 +683,8 @@ export class GameEngine {
       if (this.patient.strain === ViralStrain.SWARM) spawnRateMod = 0.5; 
       if (this.patient.strain === ViralStrain.TITAN) spawnRateMod = 1.5; 
 
-      // CORREÇÃO DE SPAWN: Só spawna se o tempo da wave NÃO acabou
+      // FAILCHECK 4: HARD SPAWN STOP
+      // O spawn é bloqueado rigidamente pelo timer.
       if (this.waveTimer < config.duration) {
           this.spawnTimer += safeDt;
           if (this.spawnTimer >= (config.spawnRate * spawnRateMod) && this.entities.length < this.maxEntities) {
@@ -912,6 +935,7 @@ export class GameEngine {
               }
 
               const pSum = e.radius + this.player.radius;
+              // Failcheck de invulnerabilidade na colisão também
               const isInvulnerable = this.isDashing || this.invulnerabilityTimer > 0; 
               
               if (dMag < pSum * 0.8 && !isInvulnerable) {
@@ -933,6 +957,7 @@ export class GameEngine {
                      e.vel.x = -5; 
                  }
 
+                 // Check de morte normal
                  if (this.player.health <= 0) this.handlePlayerDeath(onGameOver);
               }
           }
