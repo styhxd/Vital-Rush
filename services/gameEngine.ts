@@ -1366,10 +1366,14 @@ export class GameEngine {
           this.ctx.roundRect(-e.radius, -e.radius/2, e.radius*2, e.radius, 10);
         } else if (e.type === EntityType.VIRUS) {
            const r = e.radius;
-           this.ctx.moveTo(r, 0); // Correção para polígono
+           // CORREÇÃO: Removido moveTo(r,0) que causava glitch visual "triângulo cortado".
+           // O loop agora desenha o polígono corretamente baseando-se na rotação.
            for(let i=0; i<6; i++) {
              const a = (i/6)*Math.PI*2 + (this.time/200);
-             this.ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+             const vx = Math.cos(a)*r;
+             const vy = Math.sin(a)*r;
+             if (i === 0) this.ctx.moveTo(vx, vy);
+             else this.ctx.lineTo(vx, vy);
            }
            this.ctx.closePath();
         } else {

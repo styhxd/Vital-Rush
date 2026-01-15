@@ -142,6 +142,7 @@ export const Game: React.FC = () => {
   });
   
   const [isMobile, setIsMobile] = useState(false);
+  const [isPortrait, setIsPortrait] = useState(false); // NOVO: Controle de orientação
   const [patient, setPatient] = useState<PatientProfile | null>(null);
   const [audioSettings, setAudioSettings] = useState(audioManager.settings);
   const [isMuted, setIsMuted] = useState(false);
@@ -154,14 +155,21 @@ export const Game: React.FC = () => {
   const t = (key: string) => TEXTS[language][key] || key;
 
   useEffect(() => {
-    const checkMobile = () => {
+    const checkLayout = () => {
       const hasTouch = window.matchMedia('(pointer: coarse)').matches;
       const multiTouch = navigator.maxTouchPoints > 0;
       setIsMobile(hasTouch || multiTouch);
+      
+      // Verifica se está em modo retrato (Altura > Largura)
+      if (window.innerHeight > window.innerWidth) {
+          setIsPortrait(true);
+      } else {
+          setIsPortrait(false);
+      }
     };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
+    checkLayout();
+    window.addEventListener('resize', checkLayout);
+    return () => window.removeEventListener('resize', checkLayout);
   }, []);
 
   useEffect(() => {
@@ -516,6 +524,30 @@ export const Game: React.FC = () => {
           setGameState(GameState.PLAYING);
           if (!isPaused) setIsPaused(true); 
       }
+  }
+
+  // --- OVERLAY DE ORIENTAÇÃO (MODO RETRATO BLOQUEADO) ---
+  if (isPortrait) {
+      return (
+          <div className="w-full h-screen bg-[#0f0505] flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
+              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
+              <div className="scanlines"></div>
+              <div className="vignette"></div>
+              
+              <div className="z-10 animate-pulse mb-8">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-24 w-24 text-red-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <div className="text-4xl text-red-600 font-bold tracking-widest animate-bounce" style={{transform: 'rotate(90deg)'}}>⟳</div>
+              </div>
+              
+              <h2 className="text-2xl text-red-500 font-bold tracking-[0.2em] mb-4 z-10 uppercase">System Malfunction</h2>
+              <p className="text-gray-400 font-mono text-sm max-w-xs z-10 uppercase border-t border-b border-white/10 py-4">
+                  Optical sensors require landscape orientation.<br/>
+                  Rotate device to initiate sequence.
+              </p>
+          </div>
+      )
   }
 
   return (
