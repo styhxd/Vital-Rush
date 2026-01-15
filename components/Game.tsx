@@ -487,8 +487,8 @@ export const Game: React.FC = () => {
                   <div className="text-4xl animate-bounce">{activeAchievement.icon}</div>
                   <div>
                       <div className={`text-xs font-bold tracking-widest mb-1 ${isPlatinum ? 'text-amber-400' : 'text-cyan-400'}`}>{t('ACHIEVEMENTS')} UNLOCKED</div>
-                      <div className="text-lg font-bold text-white">{activeAchievement.title}</div>
-                      <div className="text-xs text-gray-400">{activeAchievement.desc}</div>
+                      <div className="text-lg font-bold text-white">{t(activeAchievement.titleKey)}</div>
+                      <div className="text-xs text-gray-400">{t(activeAchievement.descKey)}</div>
                   </div>
               </div>
           )}
@@ -678,8 +678,8 @@ export const Game: React.FC = () => {
                                       <div className="flex items-start gap-6 z-10 relative h-full">
                                           <div className="text-4xl filter drop-shadow-md pt-1">{ach.icon}</div>
                                           <div className="flex-1 flex flex-col h-full">
-                                              <h4 className={`font-bold text-lg mb-2 ${isLocked ? 'text-gray-500' : 'text-white'}`}>{ach.title}</h4>
-                                              <p className={`text-sm mb-4 leading-relaxed flex-1 ${isLocked ? 'text-gray-600' : 'text-gray-300'}`}>{ach.desc}</p>
+                                              <h4 className={`font-bold text-lg mb-2 ${isLocked ? 'text-gray-500' : 'text-white'}`}>{t(ach.titleKey)}</h4>
+                                              <p className={`text-sm mb-4 leading-relaxed flex-1 ${isLocked ? 'text-gray-600' : 'text-gray-300'}`}>{t(ach.descKey)}</p>
                                               
                                               <div className="mt-auto w-full">
                                                   {ach.isCumulative && !progress.unlocked && (

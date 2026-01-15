@@ -173,8 +173,8 @@ export interface WaveConfig {
 export interface Achievement {
   id: string;
   icon: string; // Emoji ou char
-  title: string;
-  desc: string;
+  titleKey: string; // Chave de tradução
+  descKey: string;  // Chave de tradução
   targetValue: number; // Meta (ex: 1000 kills)
   isCumulative: boolean; // true = acumula entre runs, false = tem que fazer numa só vida
   secret?: boolean; // Shhh
