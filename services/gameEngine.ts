@@ -6,11 +6,12 @@
  * 
  * A BESTA (GAME ENGINE) - PROTOCOLO "NEON LITE" (GRADIENT EDITION)
  * 
- * ATUALIZAÇÃO V4.6: EVOLUÇÃO HOSTIL & NERF HAMMER
+ * ATUALIZAÇÃO V4.7: A TROCA VISUAL (THE GREAT SWAP)
  * 
- * Introduzido inimigo FUNGI que atira.
- * Biomassa redesenhada para melhor visibilidade.
- * Lógica de projéteis inimigos implementada.
+ * - Biomassa agora é uma Estrela (menor).
+ * - Bombas (Minas) agora são Losangos/Diamantes.
+ * - Projéteis inimigos agora são Espinhos.
+ * - Fungi reduzido de tamanho.
  */
 
 import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette, Language } from '../types';
@@ -225,8 +226,9 @@ export class GameEngine {
       } else if (type === EntityType.PARASITE) {
           hp = 120; dmg = 25; radius = 55; color = this.colors.PARASITE; val = 30; speed = 0.25;
       } else if (type === EntityType.FUNGI) {
-          hp = 90; dmg = 15; radius = 40; color = this.colors.FUNGI; val = 45; speed = 0.15; // Muito lento
-          shootTimer = 2.0; // Começa a atirar após 2s
+          hp = 90; dmg = 15; radius = 28; // MENOR (era 40)
+          color = this.colors.FUNGI; val = 45; speed = 0.15;
+          shootTimer = 2.0; 
       }
 
       if (strain === ViralStrain.TITAN) { hp *= 2.0; radius *= 1.2; speed *= 0.7; val *= 1.5; }
@@ -260,7 +262,7 @@ export class GameEngine {
           active: true,
           value: Math.floor(val),
           isElite,
-          drag: type === EntityType.FUNGI ? 0.2 : 0.1, // Fungi é mais "pesado"
+          drag: type === EntityType.FUNGI ? 0.2 : 0.1, 
           hitFlash: 0,
           shootTimer
       });
@@ -384,7 +386,7 @@ export class GameEngine {
               type: EntityType.DNA_FRAGMENT,
               pos: { ...target.pos },
               vel: { x: (Math.random()-0.5)*8, y: (Math.random()-0.5)*8 },
-              radius: 12,
+              radius: 6, // MENOR (era 12)
               health: 1, maxHealth: 1,
               color: this.colors.DNA,
               damage: 0, active: true,
@@ -1341,13 +1343,13 @@ export class GameEngine {
              this.ctx.lineTo(tailX, tailY);
         }
         else if (e.type === EntityType.ENEMY_PROJECTILE) {
-            // Desenha projétil inimigo (Espinho laranja)
+            // NEW: ESPINHOS (Antiga Mina) para projéteis inimigos
             this.ctx.fillStyle = e.color;
             this.ctx.beginPath();
-            const spikes = 5;
+            const spikes = 8; // Mais pontas
             for(let i=0; i<spikes*2; i++) {
                 const r = i % 2 === 0 ? e.radius : e.radius * 0.5;
-                const angle = (i / (spikes*2)) * Math.PI * 2 + (this.time/100);
+                const angle = (i / (spikes*2)) * Math.PI * 2 + (this.time/50); // Gira mais rápido
                 this.ctx.lineTo(e.pos.x + Math.cos(angle)*r, e.pos.y + Math.sin(angle)*r);
             }
             this.ctx.closePath();
@@ -1383,13 +1385,10 @@ export class GameEngine {
              this.ctx.fill();
         }
         else if (e.type === EntityType.ACID_POOL) {
-            // POÇA DE ÁCIDO: VISUAL REFORMULADO (CAVEIRA)
-            // Desenha a poça base
             this.ctx.fillStyle = this.colors.ACID_POOL;
             this.ctx.globalAlpha = 0.3 + Math.sin(this.time/200)*0.1;
             this.ctx.beginPath();
             
-            // Borda irregular
             const r = e.radius;
             const segments = 12;
             for(let i=0; i<=segments; i++) {
@@ -1403,15 +1402,12 @@ export class GameEngine {
             this.ctx.closePath();
             this.ctx.fill();
             
-            // Anel de Aviso
             this.ctx.strokeStyle = '#ffff00';
             this.ctx.lineWidth = 2;
-            this.ctx.globalAlpha = 0.6 + Math.sin(this.time/100)*0.4; // Pisca rápido
+            this.ctx.globalAlpha = 0.6 + Math.sin(this.time/100)*0.4; 
             this.ctx.stroke();
             
-            // Caveira no Centro
             this.ctx.globalAlpha = 0.8;
-            // UPDATE: DOBREI O TAMANHO (0.8 -> 1.6)
             this.ctx.font = `${e.radius * 1.6}px var(--font-tech)`; 
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
@@ -1420,45 +1416,26 @@ export class GameEngine {
             this.ctx.globalAlpha = 1.0;
         }
         else if (e.type === EntityType.BIO_MINE) {
-            const grad = this.ctx.createRadialGradient(e.pos.x, e.pos.y, e.radius * 0.2, e.pos.x, e.pos.y, e.radius * 2.0);
-            grad.addColorStop(0, hexToRgba(this.colors.BIO_MINE, 0.5));
-            grad.addColorStop(1, 'rgba(0,0,0,0)');
-
-            this.ctx.globalCompositeOperation = 'screen';
-            this.ctx.fillStyle = grad;
-            this.ctx.beginPath();
-            this.ctx.arc(e.pos.x, e.pos.y, e.radius * 2, 0, Math.PI*2);
-            this.ctx.fill();
-            this.ctx.globalCompositeOperation = 'source-over';
-
-            this.ctx.fillStyle = this.colors.BIO_MINE;
-            this.ctx.beginPath();
-            const spikes = 8;
-            for(let i=0; i<spikes*2; i++) {
-                const r = i % 2 === 0 ? e.radius : e.radius * 0.6;
-                const angleIdx = ((i / (spikes*2)) * 360 + (this.time/3)) % 360; 
-                this.ctx.lineTo(e.pos.x + getCos(angleIdx)*r, e.pos.y + getSin(angleIdx)*r);
-            }
-            this.ctx.closePath();
-            this.ctx.fill();
-        }
-        else if (e.type === EntityType.DNA_FRAGMENT) {
-            // BIOMASSA REDESENHADA: Losango Pulsante Brilhante
+            // NEW: BIO-MINE AGORA É UM DIAMANTE/LOSANGO PULSANTE (Antiga Biomassa)
             this.ctx.save();
             this.ctx.translate(e.pos.x, e.pos.y);
             
             // Halo de Luz (Screen)
             this.ctx.globalCompositeOperation = 'screen';
-            const pulse = 1 + Math.sin(this.time / 100) * 0.3;
-            this.ctx.fillStyle = e.isElite ? 'rgba(255, 215, 0, 0.5)' : 'rgba(0, 255, 204, 0.4)';
+            const pulse = 1 + Math.sin(this.time / 50) * 0.4; // Pulsa rápido, é uma bomba
+            const grad = this.ctx.createRadialGradient(0, 0, e.radius * 0.2, 0, 0, e.radius * 2.0);
+            grad.addColorStop(0, hexToRgba(this.colors.BIO_MINE, 0.8));
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+            
+            this.ctx.fillStyle = grad;
             this.ctx.beginPath();
             this.ctx.arc(0, 0, e.radius * 2 * pulse, 0, Math.PI*2);
             this.ctx.fill();
             
             // Corpo Principal (Losango Giratório)
             this.ctx.globalCompositeOperation = 'source-over';
-            this.ctx.rotate(this.time / 100);
-            this.ctx.fillStyle = e.isElite ? this.colors.ELITE_GLOW : this.colors.DNA;
+            this.ctx.rotate(this.time / 50); // Gira rápido
+            this.ctx.fillStyle = this.colors.BIO_MINE;
             this.ctx.beginPath();
             this.ctx.moveTo(0, -e.radius);
             this.ctx.lineTo(e.radius, 0);
@@ -1467,10 +1444,43 @@ export class GameEngine {
             this.ctx.closePath();
             this.ctx.fill();
             
-            // Borda Branca Fina
+            // Borda de Alerta
             this.ctx.strokeStyle = '#fff';
-            this.ctx.lineWidth = 1;
+            this.ctx.lineWidth = 2;
             this.ctx.stroke();
+            
+            this.ctx.restore();
+        }
+        else if (e.type === EntityType.DNA_FRAGMENT) {
+            // NEW: BIOMASSA AGORA É UMA ESTRELA (Menor)
+            this.ctx.save();
+            this.ctx.translate(e.pos.x, e.pos.y);
+            
+            this.ctx.globalCompositeOperation = 'screen';
+            // Brilho
+            this.ctx.fillStyle = e.isElite ? 'rgba(255, 215, 0, 0.6)' : 'rgba(0, 255, 204, 0.5)';
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, e.radius * 3, 0, Math.PI*2);
+            this.ctx.fill();
+            
+            this.ctx.globalCompositeOperation = 'source-over';
+            this.ctx.rotate(this.time / 150); // Gira suave
+            
+            // Desenha Estrela
+            const spikes = 5;
+            const outerRadius = e.radius;
+            const innerRadius = e.radius * 0.4;
+            
+            this.ctx.beginPath();
+            this.ctx.fillStyle = e.isElite ? this.colors.ELITE_GLOW : this.colors.DNA;
+            
+            for(let i=0; i<spikes*2; i++) {
+                const r = i % 2 === 0 ? outerRadius : innerRadius;
+                const a = (i / (spikes*2)) * Math.PI * 2;
+                this.ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
+            }
+            this.ctx.closePath();
+            this.ctx.fill();
             
             this.ctx.restore();
         }

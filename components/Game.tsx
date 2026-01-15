@@ -1060,6 +1060,8 @@ export const Game: React.FC = () => {
                           <DatabaseCard title="BACTERIA" desc={t('MANUAL_BAC_DESC')} color={COLORS_DEFAULT.BACTERIA} />
                           <DatabaseCard title="VIRUS" desc={t('MANUAL_VIR_DESC')} color={COLORS_DEFAULT.VIRUS} />
                           <DatabaseCard title="PARASITE" desc={t('MANUAL_PAR_DESC')} color={COLORS_DEFAULT.PARASITE} />
+                          {/* ADDED FUNGI CARD */}
+                          <DatabaseCard title="FUNGI" desc={t('MANUAL_FUNGI_DESC')} color={COLORS_DEFAULT.FUNGI} />
                           <DatabaseCard title="BOSS" desc={t('MANUAL_BOSS_DESC')} color={COLORS_DEFAULT.BOSS} />
                       </div>
                   </section>

@@ -207,6 +207,7 @@ export const TEXTS: TranslationMap = {
     MANUAL_BAC_DESC: "Standard pathogen. Common, predictable movement.",
     MANUAL_VIR_DESC: "Fast attacker. Low HP but swarms quickly.",
     MANUAL_PAR_DESC: "Heavy tank. Slow, high HP, absorbs damage.",
+    MANUAL_FUNGI_DESC: "Stationary turret. Shoots tracking spikes.", // NEW
     MANUAL_BOSS_DESC: "Massive anomaly. Requires extreme firepower.",
     MANUAL_MECH_DASH_TITLE: "Evasive Dash",
     MANUAL_MECH_DASH_DESC: "Grants momentary invulnerability. Use to pass through enemies.",
@@ -261,7 +262,7 @@ export const TEXTS: TranslationMap = {
     UP_ENERGY_NAME: "MITOCHONDRIA BOOST",
     UP_ENERGY_DESC: "Surge & Dash recharge 8% faster",
     UP_GIGA_NAME: "CYTOKINE STORM",
-    UP_GIGA_DESC: "+1 Proj, +20% Dmg, Full Heal", // Nerfed
+    UP_GIGA_DESC: "+1 Proj, +20% Dmg, Full Heal", 
     UP_ORBITAL_NAME: "NANO-GUARDIANS",
     UP_ORBITAL_DESC: "Adds +1 Autonomous Defensive Drone",
     UP_DASH_NAME: "PLASMA TRAIL",
@@ -397,6 +398,7 @@ export const TEXTS: TranslationMap = {
     MANUAL_BAC_DESC: "Patógeno padrão. Movimento comum e previsível.",
     MANUAL_VIR_DESC: "Atacante rápido. Pouca vida, mas ataca em enxame.",
     MANUAL_PAR_DESC: "Tanque pesado. Lento, muita vida, absorve dano.",
+    MANUAL_FUNGI_DESC: "Torreta estacionária. Dispara espinhos teleguiados.", // NEW
     MANUAL_BOSS_DESC: "Anomalia massiva. Requer poder de fogo extremo.",
     MANUAL_MECH_DASH_TITLE: "Esquiva (Dash)",
     MANUAL_MECH_DASH_DESC: "Concede invulnerabilidade momentânea. Use para atravessar inimigos.",
@@ -451,7 +453,7 @@ export const TEXTS: TranslationMap = {
     UP_ENERGY_NAME: "IMPULSO MITOCONDRIAL",
     UP_ENERGY_DESC: "Surto e Esquiva recarregam 8% mais rápido",
     UP_GIGA_NAME: "TEMPESTADE CITOCINA",
-    UP_GIGA_DESC: "+1 Proj, +20% Dano, Cura Total", // Nerfado
+    UP_GIGA_DESC: "+1 Proj, +20% Dano, Cura Total", 
     UP_ORBITAL_NAME: "NANO-GUARDIÕES",
     UP_ORBITAL_DESC: "Adiciona +1 Drone de Defesa Autônomo",
     UP_DASH_NAME: "RASTRO DE PLASMA",
@@ -587,6 +589,7 @@ export const TEXTS: TranslationMap = {
     MANUAL_BAC_DESC: "Patógeno estándar. Movimiento común y predecible.",
     MANUAL_VIR_DESC: "Atacante rápido. Poca vida, pero ataca en enjambre.",
     MANUAL_PAR_DESC: "Tanque pesado. Lento, mucha vida, absorve daño.",
+    MANUAL_FUNGI_DESC: "Torreta estacionaria. Dispara espinas teledirigidas.", // NEW
     MANUAL_BOSS_DESC: "Anomalia masiva. Requiere potencia de fuego extrema.",
     MANUAL_MECH_DASH_TITLE: "Evasión (Dash)",
     MANUAL_MECH_DASH_DESC: "Otorga invulnerabilidad momentánea. Úsalo para atravesar enemigos.",
