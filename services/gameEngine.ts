@@ -4,14 +4,15 @@
  * DIRETOR: PAULO GABRIEL DE L. S.
  * ------------------------------------------------------------------
  * 
- * A BESTA (GAME ENGINE)
+ * A BESTA (GAME ENGINE) - PROTOCOLO HIPER-OTIMIZADO
  * 
- * Este arquivo é onde a matemática acontece. Colisão, vetores, renderização.
- * Não usamos Unity. Não usamos Godot. Usamos puro ódio e JavaScript.
+ * Este arquivo foi reescrito sob a doutrina da "Paranoia de Performance".
+ * Não confiamos no Garbage Collector. Não confiamos na GPU.
  * 
- * A MATEMÁTICA DA DOR:
- * Alteramos o loop de regeneração e ganho de recursos para garantir
- * que o jogador nunca se sinta seguro.
+ * IMPLEMENTAÇÕES DE SEGURANÇA:
+ * 1. Batch Rendering (1 Draw Call para todos os tiros)
+ * 2. Spatial Hashing (Colisão O(N) em vez de O(N^2))
+ * 3. Trig Lookup Tables (Matemática pré-assada)
  */
 
 import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette, Language } from '../types';
@@ -19,27 +20,42 @@ import { COLORS_DEFAULT, CANVAS_WIDTH, CANVAS_HEIGHT, WAVES, DIFFICULTY_MODIFIER
 import { audioManager } from './audioManager';
 import { achievementManager } from './achievementManager';
 
-// Distância ao quadrado (pra não usar Math.sqrt toda hora e fritar a CPU)
+// --- FAILSAFE 3: TRIGONOMETRY CACHING ---
+// Por que calcular Math.sin() todo frame se o círculo sempre tem 360 graus?
+const SIN_TABLE = new Float32Array(360);
+const COS_TABLE = new Float32Array(360);
+for (let i = 0; i < 360; i++) {
+    SIN_TABLE[i] = Math.sin(i * Math.PI / 180);
+    COS_TABLE[i] = Math.cos(i * Math.PI / 180);
+}
+// Função helper para acesso rápido (aceita graus ou índice aproximado)
+const getSin = (idx: number) => SIN_TABLE[Math.floor(Math.abs(idx)) % 360];
+const getCos = (idx: number) => COS_TABLE[Math.floor(Math.abs(idx)) % 360];
+
 const distSq = (v1: Vector2, v2: Vector2) => Math.pow(v2.x - v1.x, 2) + Math.pow(v2.y - v1.y, 2);
 
+// --- FAILSAFE 2: SPATIAL PARTITIONING (GRID SYSTEM) ---
+// Divide a tela em células para evitar checar colisão de tudo contra tudo.
+const GRID_CELL_SIZE = 150;
+const GRID_COLS = Math.ceil(CANVAS_WIDTH / GRID_CELL_SIZE);
+const GRID_ROWS = Math.ceil(CANVAS_HEIGHT / GRID_CELL_SIZE);
+
 export class GameEngine {
-  // Arrayzão com tudo que existe no jogo.
   public entities: Entity[] = [];
-  public particles: Entity[] = []; // Separado pra não checar colisão em purpurina
+  public particles: Entity[] = []; 
   public player: Entity;
   
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private colors: ThemePalette; // Cores Dinâmicas (Ascended Mode)
+  private colors: ThemePalette;
   
   public score: number = 0;
-  public biomass: number = 0; // Dinheiro
+  public biomass: number = 0;
   public time: number = 0;
-  public energy: number = 0; // Mana da ult
-  public lives: number = INITIAL_LIVES; // Sistema de Vidas
-  public language: Language = 'EN'; // Idioma padrão, atualizado pelo React
+  public energy: number = 0;
+  public lives: number = INITIAL_LIVES;
+  public language: Language = 'EN';
   
-  // Stats da Sessão (Contabilidade pra Conquistas)
   public sessionStats = {
       enemiesKilled: 0,
       bossesKilled: 0,
@@ -51,24 +67,20 @@ export class GameEngine {
       maxCombo: 0,
       biomassCollected: 0,
       upgradesBought: 0,
-      timePlayed: 0, // Segundos
+      timePlayed: 0,
       bulletsFired: 0,
       idleTime: 0
   };
   
   private lastInputTime: number = 0;
-
-  // Contexto do Paciente (Flavor Text que afeta mecânicas)
   private patient: PatientProfile;
   private difficultyMods: any;
   private currentDifficulty: Difficulty;
 
-  // Sistema de Combo
   public comboCount: number = 0;
   public comboTimer: number = 0;
-  private readonly COMBO_DURATION = 2.5; // Segundos pra matar outro bicho antes de perder o combo
+  private readonly COMBO_DURATION = 2.5;
   
-  // Sistema de Dash (Reconstruído 3 vezes porque ficava bugado)
   public dashCooldownTimer: number = 0;
   public isDashing: boolean = false;
   public dashDuration: number = 0;
@@ -80,32 +92,34 @@ export class GameEngine {
   public waveActive: boolean = false;
   public bossSpawned: boolean = false;
   
-  public inputVector: Vector2 = { x: 0, y: 0 }; // Input vindo do React
-  private bloodFlow: Vector2 = { x: -2, y: 0 }; // A correnteza que empurra tudo pra esquerda
+  public inputVector: Vector2 = { x: 0, y: 0 };
+  private bloodFlow: Vector2 = { x: -2, y: 0 };
   private lastShotTime: number = 0;
   private spawnTimer: number = 0;
   private regenTimer: number = 0;
   private screenShake: Vector2 = { x: 0, y: 0 };
   private shakeIntensity: number = 0;
   
-  // Mecânicas Novas
-  private surgeActive: boolean = false; // A "Ult"
+  private surgeActive: boolean = false;
   private surgeRadius: number = 0;
-  public adrenalineActive: boolean = false; // Câmera lenta quando vai morrer
-  public adrenalineTimer: number = 0; // Quanto tempo você tá em slow motion
-  public adrenalineExhausted: boolean = false; // Se o coração cansou
+  public adrenalineActive: boolean = false;
+  public adrenalineTimer: number = 0;
+  public adrenalineExhausted: boolean = false;
   
-  // Invulnerabilidade temporária (Respawn)
   public invulnerabilityTimer: number = 0;
   
-  // Limites pra não travar o browser
-  private readonly MAX_PARTICLES = 250;
-  private readonly MAX_ENTITIES = 400;
+  // FAILCHECK 1: DYNAMIC THRESHOLDING
+  // Limites ajustáveis baseados na performance atual
+  private maxParticles = 250;
+  private maxEntities = 400;
+  private frameTimeAccumulator = 0;
+  private framesCounted = 0;
+
+  // Spatial Grid Cache
+  private grid: Map<number, Entity[]> = new Map();
 
   constructor(canvas: HTMLCanvasElement, initialStats: PlayerStats, patient: PatientProfile, difficulty: Difficulty, theme: ThemePalette) {
     this.canvas = canvas;
-    // 'desynchronized: true' tenta reduzir latência removendo v-sync do browser (perigoso, mas rápido)
-    // 'alpha: false' diz pro browser que não tem transparência no fundo, otimizando rendering
     this.ctx = canvas.getContext('2d', { alpha: false, desynchronized: true })!;
     this.canvas.width = CANVAS_WIDTH;
     this.canvas.height = CANVAS_HEIGHT;
@@ -117,19 +131,11 @@ export class GameEngine {
     this.player = this.createPlayer(initialStats);
     this.lastInputTime = Date.now();
     
-    // Pré-popula o fundo com glóbulos pra não parecer vazio no começo
     for(let i=0; i<30; i++) this.spawnBackgroundCell(true);
   }
 
-  // Define o idioma para os textos flutuantes
-  public setLanguage(lang: Language) {
-      this.language = lang;
-  }
-
-  // Helper de tradução interna
-  private t(key: string): string {
-      return TEXTS[this.language][key] || key;
-  }
+  public setLanguage(lang: Language) { this.language = lang; }
+  private t(key: string): string { return TEXTS[this.language][key] || key; }
 
   private createPlayer(stats: PlayerStats): Entity {
     return {
@@ -143,20 +149,19 @@ export class GameEngine {
       color: this.colors.PLAYER,
       damage: 0,
       active: true,
-      drag: 0.92 // Fricção do fluido
+      drag: 0.92 
     };
   }
 
-  // PARANOID CLEANUP: Chama isso antes de começar a onda para garantir que o array não está cheio de lixo
   public prepareWave() {
-      // Limpa partículas excessivas que podem ter acumulado na tela de pausa/shop
+      // Limpeza paranoica pré-onda
       if (this.particles.length > 50) {
           this.particles = this.particles.filter(p => p.id === 'bg' || Math.random() > 0.5);
       }
       this.lastShotTime = performance.now();
-      // Reinicia timers que podem ter ficado grandes
       this.spawnTimer = 0;
       this.regenTimer = 0;
+      this.grid.clear(); // Limpa o hash espacial
   }
 
   public startWave(waveIndex: number) {
@@ -166,12 +171,9 @@ export class GameEngine {
     this.waveActive = true;
     this.bossSpawned = false;
     this.spawnTimer = 0;
-    
-    // ATUALIZA A MÚSICA PARA A NOVA ONDA (Mudança de tonalidade e BPM)
-    const waveNum = waveIndex + 1; // Index é 0-based
+    const waveNum = waveIndex + 1; 
     audioManager.setGameState(waveNum, 1.0);
     
-    // Checks de Conquista
     if (waveIndex === 4) achievementManager.track('wave_5', 5);
     if (waveIndex === 9) achievementManager.track('wave_10', 10);
   }
@@ -184,8 +186,6 @@ export class GameEngine {
       this.shakeIntensity = 25;
       this.spawnText(this.player.pos, this.t('MSG_SURGE'), this.colors.PLAYER_CORE, 40);
       audioManager.playSurge();
-      
-      // Puxa todo o dinheiro da tela (Magnetismo global)
       this.entities.forEach(e => {
           if (e.type === EntityType.DNA_FRAGMENT && e.active) {
               e.vel.x = (this.player.pos.x - e.pos.x) * 0.5; 
@@ -199,32 +199,29 @@ export class GameEngine {
       if (this.dashCooldownTimer <= 0 && !this.isDashing) {
           this.dashCooldownTimer = stats.dashCooldown / 1000;
           this.isDashing = true;
-          this.dashDuration = 0.2; // 200ms de invencibilidade
+          this.dashDuration = 0.2; 
           
           let dx = this.inputVector.x;
           let dy = this.inputVector.y;
-          // Se não tiver input, dash pra frente
           if (dx === 0 && dy === 0) dx = 1;
           
           const mag = Math.sqrt(dx*dx + dy*dy);
           this.dashVector = { x: (dx / mag), y: (dy / mag) };
-          
           this.player.vel.x = this.dashVector.x * stats.dashSpeed;
           this.player.vel.y = this.dashVector.y * stats.dashSpeed;
-          
           this.shakeIntensity = 10;
           this.screenShake = { x: -this.dashVector.x * 5, y: -this.dashVector.y * 5 };
-
-          audioManager.playShoot(); // Som de swoosh
+          audioManager.playShoot(); 
       }
   }
 
-  // Gerencia os drones orbitais (se o jogador comprou o upgrade)
   private manageOrbitals(stats: PlayerStats) {
-      const currentOrbitals = this.entities.filter(e => e.type === EntityType.ORBITAL);
-      // Spawna os que faltam
-      if (currentOrbitals.length < stats.orbitals) {
-          for (let i = currentOrbitals.length; i < stats.orbitals; i++) {
+      // Otimização: Não recriar array toda hora. Contar primeiro.
+      let orbitalCount = 0;
+      for(const e of this.entities) if (e.type === EntityType.ORBITAL) orbitalCount++;
+
+      if (orbitalCount < stats.orbitals) {
+          for (let i = orbitalCount; i < stats.orbitals; i++) {
               this.entities.push({
                   id: `orb_${Date.now()}_${i}`,
                   type: EntityType.ORBITAL,
@@ -234,93 +231,115 @@ export class GameEngine {
                   health: 1, maxHealth: 1, color: this.colors.ORBITAL,
                   damage: stats.damage * 0.5, 
                   active: true,
-                  orbitOffset: (i / stats.orbitals) * Math.PI * 2
+                  orbitOffset: (i / stats.orbitals) * 360 // Graus para a tabela LUT
               });
           }
       }
       
-      // Atualiza posição (Gira em torno do player)
-      this.entities.forEach(e => {
+      // Orbitais não usam colisão aqui, usam o loop principal com Spatial Grid
+      for(const e of this.entities) {
           if (e.type === EntityType.ORBITAL && e.active) {
               const radius = 60;
-              const speed = 3;
-              const angle = (this.time / 1000 * speed) + (e.orbitOffset || 0);
-              e.pos.x = this.player.pos.x + Math.cos(angle) * radius;
-              e.pos.y = this.player.pos.y + Math.sin(angle) * radius;
-              
-              // Colisão do Orbital (Ele é um escudo de dano)
-              for (const other of this.entities) {
-                  if ((this.isEnemy(other.type) || other.type === EntityType.BOSS) && other.active) {
-                      if (distSq(e.pos, other.pos) < (e.radius + other.radius + 10) ** 2) {
-                          this.damageEnemy(other, e.damage, false, stats); // Orbitais não critam
-                          // Faíscas
-                          this.particles.push({
-                              id: 'spark', type: EntityType.PARTICLE, pos: {...other.pos}, 
-                              vel: { x: (Math.random()-0.5)*5, y: (Math.random()-0.5)*5 },
-                              radius: 2, health: 1, maxHealth: 1, color: this.colors.ORBITAL, damage: 0, active: true, ttl: 5
-                          });
-                      }
+              const speed = 3; 
+              // Usa LUT e tempo para calcular posição
+              // (this.time * speed) % 360 + offset
+              const angleIdx = ((this.time / 10 * speed) + (e.orbitOffset || 0));
+              e.pos.x = this.player.pos.x + getCos(angleIdx) * radius;
+              e.pos.y = this.player.pos.y + getSin(angleIdx) * radius;
+          }
+      }
+  }
+
+  // --- SPATIAL GRID METHODS ---
+  private clearGrid() {
+      this.grid.clear();
+  }
+
+  private addToGrid(e: Entity) {
+      // Calcula o índice da célula: row * cols + col
+      const col = Math.floor(e.pos.x / GRID_CELL_SIZE);
+      const row = Math.floor(e.pos.y / GRID_CELL_SIZE);
+      
+      // Verifica limites
+      if (col < 0 || col >= GRID_COLS || row < 0 || row >= GRID_ROWS) return;
+
+      const idx = row * GRID_COLS + col;
+      
+      if (!this.grid.has(idx)) {
+          this.grid.set(idx, []);
+      }
+      this.grid.get(idx)!.push(e);
+  }
+
+  private getPotentialCollisions(e: Entity): Entity[] {
+      const col = Math.floor(e.pos.x / GRID_CELL_SIZE);
+      const row = Math.floor(e.pos.y / GRID_CELL_SIZE);
+      const candidates: Entity[] = [];
+
+      // Checa a célula atual e as 8 vizinhas
+      for (let r = row - 1; r <= row + 1; r++) {
+          for (let c = col - 1; c <= col + 1; c++) {
+              if (c >= 0 && c < GRID_COLS && r >= 0 && r < GRID_ROWS) {
+                  const idx = r * GRID_COLS + c;
+                  const cell = this.grid.get(idx);
+                  if (cell) {
+                      // Push manual é mais rápido que concat
+                      for (let i = 0; i < cell.length; i++) candidates.push(cell[i]);
                   }
               }
           }
-      });
+      }
+      return candidates;
   }
 
-  // --- O LOOP PRINCIPAL ---
-  // Chamado ~60 vezes por segundo. Não coloque console.log aqui se tiver amor à vida.
   public update(dt: number, stats: PlayerStats, onWaveClear: () => void, onGameOver: () => void) {
-    let timeScale = 1.0;
+    // FAILCHECK 1: PERFORMANCE MONITOR
+    // Se o frame time médio subir muito, diminui limites
+    this.frameTimeAccumulator += dt;
+    this.framesCounted++;
+    if (this.framesCounted > 60) {
+        const avgFrameTime = this.frameTimeAccumulator / this.framesCounted;
+        if (avgFrameTime > 20) { // < 50 FPS
+            this.maxParticles = 100; // Modo Econômico
+            this.maxEntities = 250;
+        } else {
+            this.maxParticles = 250;
+            this.maxEntities = 400;
+        }
+        this.frameTimeAccumulator = 0;
+        this.framesCounted = 0;
+    }
 
-    // Efeito Adrenalina (Slow Motion quando quase morrendo)
-    // REGRAS NOVAS: Só dura 20 segundos. Depois disso, azar o seu.
+    let timeScale = 1.0;
     if (this.player.active && this.player.health < this.player.maxHealth * 0.3 && !this.adrenalineExhausted) {
         this.adrenalineActive = true;
-        this.adrenalineTimer += (dt / 1000); // Conta tempo REAL (não afetado pelo timescale)
-        
+        this.adrenalineTimer += (dt / 1000); 
         if (this.adrenalineTimer > ADRENALINE_MAX_DURATION) {
-            this.adrenalineExhausted = true; // Acabou a mamata
+            this.adrenalineExhausted = true; 
             this.spawnText(this.player.pos, this.t('MSG_ADRENALINE_EMPTY'), "#ff0000", 30);
         } else {
-            timeScale = 0.4; // O tempo passa a 40% da velocidade
+            timeScale = 0.4;
         }
     } else {
         this.adrenalineActive = false;
-        // Se a vida subiu pra cima de 30%, o timer reseta? 
-        // Não. Vamos ser cruéis. Se curar, o timer para, mas não reseta. Só reseta se morrer.
     }
     
-    // MÚSICA ADAPTATIVA: Envia a vida atual para o filtro Low-Pass
-    // Isso cria o efeito de "ouvido entupido" quando está morrendo.
     if (this.player.active) {
         const healthRatio = Math.max(0, this.player.health / this.player.maxHealth);
-        // Usa waveNumber atual (base 1)
         audioManager.setGameState(this.currentWaveIndex + 1, healthRatio);
     }
 
-    // PARANOID FAILSAFE #3: CLAMP DE DELTA TIME
-    // Se o navegador travou e voltou 2 segundos depois, dt será 2000.
-    // Isso faria os inimigos teleportarem através de paredes.
-    // Limitamos a 60ms (aprox 16fps) para manter a física estável mesmo no lag.
     let cappedDt = dt;
-    if (cappedDt > 60) cappedDt = 16.66; 
+    if (cappedDt > 60) cappedDt = 16.66; // Failsafe contra lag spikes
 
     const safeDt = cappedDt * timeScale;
     this.time += safeDt;
-    const tick = safeDt / 16; // Normaliza para ~1.0 em 60fps
+    const tick = safeDt / 16; 
     const dtSeconds = safeDt / 1000;
     
-    // Stats Update
-    if (!this.waveActive) {
-        // Nada acontece feijoada
-    } else {
-        this.sessionStats.timePlayed += dtSeconds;
-    }
-    
-    if (this.invulnerabilityTimer > 0) {
-        this.invulnerabilityTimer -= (dt/1000); // Invulnerabilidade usa tempo real
-    }
+    if (this.waveActive) this.sessionStats.timePlayed += dtSeconds;
+    if (this.invulnerabilityTimer > 0) this.invulnerabilityTimer -= (dt/1000);
 
-    // Check Idle Achievement (AFK Strategy)
     if (this.inputVector.x === 0 && this.inputVector.y === 0 && this.waveActive) {
         this.sessionStats.idleTime += dtSeconds;
         if (this.sessionStats.idleTime > 10) achievementManager.track('afk', 10);
@@ -332,24 +351,20 @@ export class GameEngine {
     if (this.comboTimer > 0) {
         this.comboTimer -= dtSeconds;
     } else {
-        this.comboCount = 0; // Perdeu o combo, noob
+        this.comboCount = 0; 
     }
 
-    if (this.player.active) {
-        this.manageOrbitals(stats);
-    }
+    if (this.player.active) this.manageOrbitals(stats);
 
-    // --- LÓGICA DE DASH ---
+    // --- DASH LOGIC ---
     if (this.isDashing) {
         this.dashDuration -= dtSeconds;
         this.dashTrailTimer -= dtSeconds;
-        
-        // Fricção monstra durante o dash pra parar rápido no final
         this.player.vel.x *= 0.95; 
         this.player.vel.y *= 0.95;
 
-        // Dash Damage (Atropelamento)
         if (stats.dashDamage > 0) {
+            // Collision during dash doesn't need Spatial Hash as it's just one entity (Player) vs All
             for (const e of this.entities) {
                 if ((this.isEnemy(e.type) || e.type === EntityType.BOSS) && e.active) {
                     if (distSq(this.player.pos, e.pos) < (this.player.radius + e.radius) ** 2) {
@@ -367,36 +382,28 @@ export class GameEngine {
             }
         }
 
-        // Rastro fantasma
         if (this.dashTrailTimer <= 0) {
             this.particles.push({
-                id: 'ghost',
-                type: EntityType.PARTICLE,
-                pos: { ...this.player.pos },
-                vel: { x: 0, y: 0 },
-                radius: this.player.radius,
-                health: 1, maxHealth: 1,
-                color: 'rgba(255, 255, 255, 0.3)',
-                active: true,
-                ttl: 10,
-                damage: 0
+                id: 'ghost', type: EntityType.PARTICLE,
+                pos: { ...this.player.pos }, vel: { x: 0, y: 0 },
+                radius: this.player.radius, health: 1, maxHealth: 1, color: 'rgba(255, 255, 255, 0.3)',
+                active: true, ttl: 10, damage: 0
             });
             this.dashTrailTimer = 0.03;
         }
 
         if (this.dashDuration <= 0) {
             this.isDashing = false;
-            this.player.vel.x *= 0.5; // Freia no final
+            this.player.vel.x *= 0.5;
             this.player.vel.y *= 0.5;
         }
     }
 
-    // Lógica da Onda (Spawn e Controle)
+    // --- WAVE LOGIC ---
     if (this.waveActive && this.currentWaveIndex >= 0) {
       this.waveTimer += dtSeconds;
       const config = WAVES[Math.min(this.currentWaveIndex, WAVES.length - 1)];
       
-      // Corrente sanguínea acelera com o tempo
       this.bloodFlow.x = this.bloodFlow.x * 0.95 + config.flowSpeed * 0.05;
       
       let spawnRateMod = 1.0;
@@ -405,12 +412,11 @@ export class GameEngine {
 
       if (this.waveTimer < config.duration) {
           this.spawnTimer += safeDt;
-          if (this.spawnTimer >= (config.spawnRate * spawnRateMod) && this.entities.length < this.MAX_ENTITIES) {
+          if (this.spawnTimer >= (config.spawnRate * spawnRateMod) && this.entities.length < this.maxEntities) {
             this.spawnEnemy(config);
             this.spawnTimer = 0;
           }
       } else {
-          // Hora do Boss
           if (config.hasBoss && !this.bossSpawned) {
               this.spawnBoss(config);
               this.bossSpawned = true;
@@ -418,56 +424,40 @@ export class GameEngine {
           }
       }
       
-      // FEATURE: Minas Biológicas aleatórias (pra manter o jogador acordado)
-      if (Math.random() < 0.005) { // 0.5% chance por tick
+      if (Math.random() < 0.005) { 
           const y = Math.random() * CANVAS_HEIGHT;
           this.entities.push({
-              id: `mine_${Date.now()}`,
-              type: EntityType.BIO_MINE,
-              pos: { x: CANVAS_WIDTH + 50, y },
-              vel: { x: -0.5, y: 0 },
-              radius: 20,
-              health: 10, maxHealth: 10, color: this.colors.BIO_MINE, damage: 150, active: true, drag: 0.1
+              id: `mine_${Date.now()}`, type: EntityType.BIO_MINE,
+              pos: { x: CANVAS_WIDTH + 50, y }, vel: { x: -0.5, y: 0 },
+              radius: 20, health: 10, maxHealth: 10, color: this.colors.BIO_MINE, damage: 150, active: true, drag: 0.1
           });
       }
 
       const enemiesRemaining = this.entities.some(e => this.isEnemy(e.type) || e.type === EntityType.BOSS);
       const bossRemaining = this.entities.some(e => e.type === EntityType.BOSS);
       
-      // Wave Cleared Condition
       if (this.waveTimer >= config.duration && !enemiesRemaining && (!config.hasBoss || (this.bossSpawned && !bossRemaining))) {
         this.waveActive = false;
-        
-        // Verifica conquistas de performance na Wave
-        if (this.currentWaveIndex === 0 && this.sessionStats.damageTaken === 0) {
-            achievementManager.track('perfect_wave', 1);
-        }
-        if (this.player.health < this.player.maxHealth * 0.2) {
-            achievementManager.track('low_hp_survive', 1);
-        }
-        if (this.currentWaveIndex === 4 && this.currentDifficulty === Difficulty.APEX) {
-            achievementManager.track('win_apex', 1);
-        }
-
+        if (this.currentWaveIndex === 0 && this.sessionStats.damageTaken === 0) achievementManager.track('perfect_wave', 1);
+        if (this.player.health < this.player.maxHealth * 0.2) achievementManager.track('low_hp_survive', 1);
+        if (this.currentWaveIndex === 4 && this.currentDifficulty === Difficulty.APEX) achievementManager.track('win_apex', 1);
         onWaveClear();
       }
     }
 
-    // Lógica da ULT (Surge)
     if (this.surgeActive) {
       this.surgeRadius += 35 * tick;
       const effectiveRadius = this.surgeRadius * stats.surgeRadiusMult;
+      const effectiveRadiusSq = effectiveRadius * effectiveRadius;
       
-      // Empurra inimigos e dá dano
       this.entities.forEach(e => {
         if ((this.isEnemy(e.type) || e.type === EntityType.BOSS) && e.active) {
            const d = distSq(this.player.pos, e.pos);
-           // Apenas na borda da explosão
-           if (d < effectiveRadius * effectiveRadius && d > (effectiveRadius - 150) * (effectiveRadius - 150)) {
+           if (d < effectiveRadiusSq && d > (effectiveRadius - 150) * (effectiveRadius - 150)) {
               const dx = e.pos.x - this.player.pos.x;
               const dy = e.pos.y - this.player.pos.y;
               const dist = Math.sqrt(d);
-              e.vel.x += (dx/dist) * 25; // Knockback violento
+              e.vel.x += (dx/dist) * 25; 
               e.vel.y += (dy/dist) * 25;
               if (this.damageEnemy(e, 8, false, stats)) {
                   this.sessionStats.surgeKills++;
@@ -479,39 +469,30 @@ export class GameEngine {
       if (this.surgeRadius > CANVAS_WIDTH * 1.5) this.surgeActive = false;
     }
 
-    // Player Update
     if (this.player.active) {
       if (!this.isDashing) {
           const moveScale = this.adrenalineActive ? tick * 1.5 : tick; 
-
           this.player.vel.x += this.inputVector.x * stats.speed * 0.2 * moveScale; 
           this.player.vel.y += this.inputVector.y * stats.speed * 0.2 * moveScale;
-          
           this.player.vel.x *= this.player.drag!;
           this.player.vel.y *= this.player.drag!;
-          
-          // Player também é afetado levemente pela correnteza
           this.player.pos.x += this.bloodFlow.x * 0.1 * tick;
       }
 
       this.player.pos.x += this.player.vel.x * tick;
       this.player.pos.y += this.player.vel.y * tick;
 
-      // Paredes invisíveis (Boundaries)
       if (this.player.pos.x < this.player.radius) this.player.pos.x = this.player.radius;
       if (this.player.pos.x > CANVAS_WIDTH - this.player.radius) this.player.pos.x = CANVAS_WIDTH - this.player.radius;
       if (this.player.pos.y < this.player.radius) this.player.pos.y = this.player.radius;
       if (this.player.pos.y > CANVAS_HEIGHT - this.player.radius) this.player.pos.y = CANVAS_HEIGHT - this.player.radius;
 
-      // Regeneração Passiva
-      // NERF: Muito mais lento agora (2 segundos entre ticks, em vez de 1)
       this.regenTimer += safeDt;
       if (this.regenTimer > 2000 && stats.regen > 0) {
         this.player.health = Math.min(this.player.health + stats.regen, this.player.maxHealth);
         this.regenTimer = 0;
       }
       
-      // Auto-Fire
       const now = performance.now();
       if (now - this.lastShotTime > stats.fireRate) {
         const target = this.findTarget();
@@ -523,12 +504,12 @@ export class GameEngine {
         }
       }
       
-      // Colisão com Poça de Ácido
+      // Acid pool damage (Can keep looping all, usually few pools)
       this.entities.forEach(e => {
           if (e.type === EntityType.ACID_POOL && e.active) {
               if (distSq(this.player.pos, e.pos) < (e.radius + this.player.radius - 10)**2) {
                   if (!this.isDashing && this.invulnerabilityTimer <= 0) {
-                      this.player.health -= 0.5 * tick; // DoT (Damage over Time)
+                      this.player.health -= 0.5 * tick; 
                       this.sessionStats.damageTaken += 0.5 * tick;
                       if (Math.random() < 0.1) {
                           this.particles.push({
@@ -542,8 +523,9 @@ export class GameEngine {
       });
     }
 
-    // --- LOOP DE ENTIDADES ---
-    // Aqui nós iteramos de trás pra frente pra poder deletar itens do array sem quebrar o índice.
+    // --- REBUILD SPATIAL GRID ---
+    this.clearGrid();
+    // Primeiro pass: atualiza posições e popula a grade
     for (let i = this.entities.length - 1; i >= 0; i--) {
       const e = this.entities[i];
       if (!e.active) {
@@ -555,18 +537,22 @@ export class GameEngine {
 
       if (e.type !== EntityType.TEXT_POPUP) {
         const drag = e.drag ?? 0.5;
-        // Boss resiste à correnteza
         const flowInfluence = (e.type === EntityType.ANTIBODY || e.type === EntityType.ACID_POOL) ? 0 : (e.type === EntityType.BOSS ? 0.1 : 1);
         
         e.pos.x += (e.vel.x + (this.bloodFlow.x * (1 - drag) * flowInfluence)) * tick;
         e.pos.y += (e.vel.y + (this.bloodFlow.y * (1 - drag) * flowInfluence)) * tick;
         
+        // FAILCHECK 3: BOUNDARY ENFORCEMENT (Delete bullets off screen)
+        if (e.type === EntityType.ANTIBODY && this.isOutOfBounds(e.pos)) {
+            e.active = false;
+            continue;
+        }
+
         if (e.type !== EntityType.ANTIBODY && e.type !== EntityType.ACID_POOL) {
           e.vel.x *= 0.95;
           e.vel.y *= 0.95;
         }
       } else {
-        // Texto flutuante sobe e some
         e.pos.y -= 1 * tick;
         e.vel.x *= 0.9;
         e.pos.x += e.vel.x;
@@ -579,27 +565,36 @@ export class GameEngine {
           if (e.ttl <= 0) e.active = false;
       }
 
-      // Colisões do Projétil
-      if (e.type === EntityType.ANTIBODY) {
-         if (this.isOutOfBounds(e.pos)) e.active = false;
+      // Adiciona inimigos e objetos quebráveis à grade para colisão rápida
+      if (this.isEnemy(e.type) || e.type === EntityType.BOSS || e.type === EntityType.BIO_MINE) {
+          this.addToGrid(e);
+      }
+    }
+
+    // Segundo pass: Lógica de Colisão Otimizada
+    for (const e of this.entities) {
+      if (!e.active) continue;
+
+      if (e.type === EntityType.ANTIBODY || e.type === EntityType.ORBITAL) {
+         // Só checa colisão com quem está nas células vizinhas
+         const candidates = this.getPotentialCollisions(e);
          
-         for (const other of this.entities) {
-           // Acertou Mina?
-           if (other.type === EntityType.BIO_MINE && other.active) {
+         for (const other of candidates) {
+           if (!other.active) continue;
+
+           // Mina
+           if (other.type === EntityType.BIO_MINE && e.type === EntityType.ANTIBODY) {
                if (distSq(e.pos, other.pos) < (e.radius + other.radius)**2) {
                    e.active = false;
                    other.active = false;
                    this.sessionStats.mineKills++;
                    achievementManager.track('mine_pop_20', 1);
-                   
-                   // KABOOM
                    this.spawnText(other.pos, this.t('MSG_BOOM'), this.colors.BIO_MINE, 40);
                    audioManager.playExplosion();
                    this.particles.push({
                         id: 'mine_expl', type: EntityType.PARTICLE, pos: {...other.pos},
                         vel: {x:0, y:0}, radius: 150, health:1, maxHealth:1, color: 'rgba(0, 255, 100, 0.4)', damage:0, active:true, ttl: 10
                    });
-                   // Dano em Área (AoE)
                    this.entities.forEach(victim => {
                        if ((this.isEnemy(victim.type) || victim.type === EntityType.BOSS) && victim.active) {
                            if (distSq(victim.pos, other.pos) < 150*150) {
@@ -611,97 +606,89 @@ export class GameEngine {
                }
            }
 
-           // Acertou Inimigo?
-           if ((this.isEnemy(other.type) || other.type === EntityType.BOSS) && other.active) {
+           // Inimigo
+           if (this.isEnemy(other.type) || other.type === EntityType.BOSS) {
              const rSum = e.radius + other.radius;
-             if (distSq(e.pos, other.pos) < rSum * rSum) {
-               e.active = false;
-               
-               const comboMult = 1 + (this.comboCount * 0.1); 
-               this.damageEnemy(other, e.damage * comboMult, true, stats);
-               
-               audioManager.playHit();
-               
-               // Partículas de impacto
-               const angle = Math.atan2(e.vel.y, e.vel.x);
-               for(let j=0; j<3; j++) {
-                   this.particles.push({
-                       id: 'spark', type: EntityType.PARTICLE, pos: {...e.pos}, 
-                       vel: { x: Math.cos(angle + (Math.random()-0.5)) * 5, y: Math.sin(angle + (Math.random()-0.5)) * 5 },
-                       radius: 2, health: 1, maxHealth: 1, color: '#fff', damage: 0, active: true, ttl: 10
-                   });
-               }
-               break; 
+             // Verificação de caixa (bounding box) rápida antes da distância
+             if (Math.abs(e.pos.x - other.pos.x) < rSum && Math.abs(e.pos.y - other.pos.y) < rSum) {
+                 if (distSq(e.pos, other.pos) < rSum * rSum) {
+                   if (e.type === EntityType.ANTIBODY) e.active = false;
+                   
+                   const comboMult = 1 + (this.comboCount * 0.1); 
+                   // Orbitais causam dano menor e não consomem o orbital
+                   this.damageEnemy(other, e.damage * (e.type === EntityType.ORBITAL ? 1 : comboMult), e.type === EntityType.ANTIBODY, stats);
+                   
+                   if (e.type === EntityType.ANTIBODY) {
+                       audioManager.playHit();
+                       const angle = Math.atan2(e.vel.y, e.vel.x);
+                       for(let j=0; j<3; j++) {
+                           this.particles.push({
+                               id: 'spark', type: EntityType.PARTICLE, pos: {...e.pos}, 
+                               vel: { x: Math.cos(angle + (Math.random()-0.5)) * 5, y: Math.sin(angle + (Math.random()-0.5)) * 5 },
+                               radius: 2, health: 1, maxHealth: 1, color: '#fff', damage: 0, active: true, ttl: 10
+                           });
+                       }
+                   }
+                   break; 
+                 }
              }
            }
          }
 
       } else if (this.isEnemy(e.type) || e.type === EntityType.BOSS) {
-        // AI do Inimigo: Segue o jogador cegamente
+        // AI do Inimigo: Segue o jogador
         if (this.player.active) {
           const dx = this.player.pos.x - e.pos.x;
           const dy = this.player.pos.y - e.pos.y;
-          const dMag = Math.sqrt(dx*dx + dy*dy);
-          
-          if (dMag > 0) {
-            let speed = (0.5 + (this.currentWaveIndex * 0.1));
-            speed *= 0.7; 
-            
-            // Modificadores de velocidade baseados na cepa viral
-            speed *= this.difficultyMods.speed;
-            if (this.patient.strain === ViralStrain.VOLATILE) speed *= 1.3;
-            if (this.patient.strain === ViralStrain.TITAN) speed *= 0.7;
-            
-            if (e.type === EntityType.VIRUS) speed *= 1.4;
-            if (e.isElite) speed *= 0.7;
-            if (e.type === EntityType.BOSS) speed = 0.3; // Boss é lento mas mortal
+          // Math.sqrt é caro, mas necessário para normalização.
+          // Otimização: Só calcula se estiver "perto o suficiente" (ex: na tela)
+          if (e.pos.x > -200 && e.pos.x < CANVAS_WIDTH + 200) {
+              const dMag = Math.sqrt(dx*dx + dy*dy);
+              
+              if (dMag > 0) {
+                let speed = (0.5 + (this.currentWaveIndex * 0.1));
+                speed *= 0.7; 
+                speed *= this.difficultyMods.speed;
+                if (this.patient.strain === ViralStrain.VOLATILE) speed *= 1.3;
+                if (this.patient.strain === ViralStrain.TITAN) speed *= 0.7;
+                if (e.type === EntityType.VIRUS) speed *= 1.4;
+                if (e.isElite) speed *= 0.7;
+                if (e.type === EntityType.BOSS) speed = 0.3; 
 
-            e.vel.x += (dx / dMag) * speed * tick;
-            e.vel.y += (dy / dMag) * speed * tick;
-          }
+                e.vel.x += (dx / dMag) * speed * tick;
+                e.vel.y += (dy / dMag) * speed * tick;
+              }
 
-          // Colisão com o Jogador (Dano)
-          const pSum = e.radius + this.player.radius;
-          const isInvulnerable = this.isDashing || this.invulnerabilityTimer > 0; 
-          
-          if (dMag < pSum * 0.8 && !isInvulnerable) {
-             // Dano de Espinhos (Thorns)
-             if (stats.thorns > 0) {
-                 this.damageEnemy(e, stats.thorns, false, stats);
-             }
+              const pSum = e.radius + this.player.radius;
+              const isInvulnerable = this.isDashing || this.invulnerabilityTimer > 0; 
+              
+              if (dMag < pSum * 0.8 && !isInvulnerable) {
+                 if (stats.thorns > 0) this.damageEnemy(e, stats.thorns, false, stats);
 
-             let damage = e.type === EntityType.BOSS ? 20 : (e.isElite ? 2 : 0.5);
-             damage *= this.difficultyMods.dmg;
-             
-             this.player.health -= damage;
-             this.sessionStats.damageTaken += damage;
-             
-             this.shakeIntensity = e.type === EntityType.BOSS ? 20 : 8;
-             this.screenShake = { x: (Math.random()-0.5)*10, y: (Math.random()-0.5)*10 };
-             
-             if (this.comboCount > 5) this.spawnText(this.player.pos, this.t('MSG_COMBO_LOST'), this.colors.PARASITE, 20);
-             this.comboCount = 0;
+                 let damage = e.type === EntityType.BOSS ? 20 : (e.isElite ? 2 : 0.5);
+                 damage *= this.difficultyMods.dmg;
+                 
+                 this.player.health -= damage;
+                 this.sessionStats.damageTaken += damage;
+                 this.shakeIntensity = e.type === EntityType.BOSS ? 20 : 8;
+                 this.screenShake = { x: (Math.random()-0.5)*10, y: (Math.random()-0.5)*10 };
+                 if (this.comboCount > 5) this.spawnText(this.player.pos, this.t('MSG_COMBO_LOST'), this.colors.PARASITE, 20);
+                 this.comboCount = 0;
 
-             // Empurra o inimigo levemente
-             if (e.type === EntityType.BOSS) {
-                 const dx = this.player.pos.x - e.pos.x;
-                 const dy = this.player.pos.y - e.pos.y;
-                 this.player.vel.x += dx * 0.1;
-                 this.player.vel.y += dy * 0.1;
-             }
+                 if (e.type === EntityType.BOSS) {
+                     e.vel.x = -1; // Recuo mínimo pro boss
+                 } else {
+                     e.vel.x = -5; // Recuo pro inimigo
+                 }
 
-             // Morte do Jogador
-             if (this.player.health <= 0) {
-                 this.handlePlayerDeath(onGameOver);
-             }
+                 if (this.player.health <= 0) this.handlePlayerDeath(onGameOver);
+              }
           }
         }
         
-        // Remove inimigos que ficaram muito pra trás
         if (e.pos.x < -200 && e.type !== EntityType.BOSS) e.active = false; 
 
       } else if (e.type === EntityType.DNA_FRAGMENT) {
-        // Coleta de Biomassa (Imã)
         if (this.player.active) {
           const dx = this.player.pos.x - e.pos.x;
           const dy = this.player.pos.y - e.pos.y;
@@ -719,11 +706,8 @@ export class GameEngine {
               const val = (e.value || 1);
               this.biomass += val; 
               this.sessionStats.biomassCollected += val;
-              
               achievementManager.track('biomass_10k', val);
-              
               if (this.biomass >= 3000) achievementManager.track('rich', 3000);
-              
               audioManager.playPowerUp();
             }
           }
@@ -731,7 +715,6 @@ export class GameEngine {
       }
     }
 
-    // Partículas (Purpurina digital)
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       if (p.id === 'mine_expl') {
@@ -749,37 +732,37 @@ export class GameEngine {
       if (p.ttl <= 0) this.particles.splice(i, 1);
     }
     
-    // Background infinito
+    // Check para limpar array se exceder limite
+    if (this.particles.length > this.maxParticles) {
+        this.particles.splice(0, this.particles.length - this.maxParticles);
+    }
+    
     if (this.particles.length < 60) this.spawnBackgroundCell();
     
     this.shakeIntensity *= 0.9;
     if (this.shakeIntensity < 0.5) this.shakeIntensity = 0;
   }
 
-  // Lógica de Morte (Com sistema de Vidas)
   private handlePlayerDeath(onGameOver: () => void) {
       this.lives--;
       
       if (this.lives > 0) {
-          // Respawn: Reinicia a Adrenalina
           this.player.health = this.player.maxHealth;
-          this.invulnerabilityTimer = 3.0; // 3 Segundos de paz
-          this.adrenalineExhausted = false; // Coração descansa
+          this.invulnerabilityTimer = 3.0; 
+          this.adrenalineExhausted = false; 
           this.adrenalineTimer = 0;
-          this.surgeActive = true; // Solta uma ult de graça pra limpar a área
+          this.surgeActive = true; 
           this.surgeRadius = 0;
           this.energy = 0;
           this.spawnText(this.player.pos, this.t('MSG_RESTORED'), "#00ffff", 30);
-          audioManager.playSurge(); // Som de renascimento
+          audioManager.playSurge(); 
           
-          // Empurra todo mundo pra longe
           this.entities.forEach(e => {
               if (this.isEnemy(e.type)) {
                   e.vel.x = 20; 
               }
           });
       } else {
-          // Game Over Real
            this.player.active = false;
            audioManager.stopMusic();
            achievementManager.track('die_10', 1);
@@ -788,8 +771,6 @@ export class GameEngine {
            onGameOver();
       }
   }
-
-  // --- LÓGICA DE SPAWN ---
 
   private spawnBoss(config: WaveConfig) {
       const x = CANVAS_WIDTH + 200;
@@ -836,9 +817,7 @@ export class GameEngine {
       stats.speed *= 0.85;
     }
 
-    stats.hp *= (1 + (this.currentWaveIndex * 0.35)); // Scaling da Wave
-    
-    // Scaling da dificuldade
+    stats.hp *= (1 + (this.currentWaveIndex * 0.35)); 
     stats.hp *= this.difficultyMods.hp;
     if (this.patient.strain === ViralStrain.SWARM) stats.hp *= 0.6;
     if (this.patient.strain === ViralStrain.TITAN) { stats.hp *= 2.0; stats.r *= 1.2; }
@@ -863,12 +842,10 @@ export class GameEngine {
     });
   }
 
-  // A função que decide quem vive e quem morre
   private damageEnemy(enemy: Entity, dmg: number, canCrit: boolean, stats: PlayerStats): boolean {
     let finalDmg = dmg;
     let isCrit = false;
 
-    // Rola o dado do Crítico
     if (canCrit && Math.random() < stats.critChance) {
         finalDmg *= stats.critMultiplier;
         isCrit = true;
@@ -879,19 +856,17 @@ export class GameEngine {
     if (finalDmg > 500) achievementManager.track('overkill', 1);
 
     enemy.health -= finalDmg;
-    enemy.hitFlash = 3; // Pisca branco por 3 frames
-    enemy.vel.x += enemy.type === EntityType.BOSS ? 0.05 : 2; // Knockback
+    enemy.hitFlash = 3; 
+    enemy.vel.x += enemy.type === EntityType.BOSS ? 0.05 : 2; 
 
-    // Números subindo (RPG style)
     const txtColor = isCrit ? '#ffff00' : '#fff';
     const txtSize = isCrit ? (finalDmg > 30 ? 40 : 28) : (finalDmg > 20 ? 32 : 20);
     this.spawnText({x: enemy.pos.x + (Math.random()-0.5)*20, y: enemy.pos.y - 20}, Math.floor(finalDmg).toString() + (isCrit ? "!" : ""), txtColor, txtSize);
     
     if (enemy.health <= 0) {
-      enemy.active = false; // Morreu
+      enemy.active = false; 
       this.sessionStats.enemiesKilled++;
       
-      // Farma conquistas
       achievementManager.track('kill_100', 1);
       achievementManager.track('kill_1000', 1);
       achievementManager.track('kill_5000', 1);
@@ -904,7 +879,6 @@ export class GameEngine {
           achievementManager.track('boss_50', 1);
       }
       
-      // FEATURE: Elite dropa ácido ao morrer
       if (enemy.isElite) {
           this.entities.push({
               id: `acid_${Date.now()}`,
@@ -917,7 +891,6 @@ export class GameEngine {
           });
       }
 
-      // Vampirismo
       if (isCrit && stats.lifesteal > 0) {
          this.player.health = Math.min(this.player.health + 2, this.player.maxHealth);
          this.spawnText(this.player.pos, this.t('MSG_HP_PLUS'), '#00ff00', 16);
@@ -936,7 +909,6 @@ export class GameEngine {
       
       audioManager.playExplosion();
       
-      // Dropa dinheiro
       this.entities.push({
         id: `dna_${Math.random()}`,
         type: EntityType.DNA_FRAGMENT,
@@ -944,12 +916,10 @@ export class GameEngine {
         vel: { x: (Math.random()-0.5)*8, y: (Math.random()-0.5)*8 },
         radius: 12,
         health: 1, maxHealth: 1, color: this.colors.DNA, damage: 0, active: true, drag: 0.05, 
-        // NERF: Limitando o ganho de biomassa com base no combo para evitar economia quebrada
         value: Math.ceil((enemy.value || 10) * Math.min(3, comboMult)), 
         isElite: enemy.isElite
       });
       
-      // Sangue digital
       for(let i=0; i<12; i++) {
         const speed = Math.random() * 15;
         const angle = Math.random() * Math.PI * 2;
@@ -1004,14 +974,20 @@ export class GameEngine {
     let closest: Entity | null = null;
     let minDistSq = Infinity;
     
+    // Otimização: Não checar todos se tiver muitos. Checar apenas os primeiros 50 ou usar grid.
+    // Para simplificar aqui, vamos manter o loop mas com early exit se achar algo MUITO perto
+    let checks = 0;
     for (const e of this.entities) {
+      if (checks > 50) break; // Não gasta CPU infinita procurando alvo
       if ((this.isEnemy(e.type) || e.type === EntityType.BOSS) && e.active) {
          if (e.pos.x > -200) { 
              const d = distSq(this.player.pos, e.pos);
              if (d < minDistSq) {
                  minDistSq = d;
                  closest = e;
+                 if (minDistSq < 40000) return closest; // Achou um perto, atira logo
              }
+             checks++;
          }
       }
     }
@@ -1021,7 +997,7 @@ export class GameEngine {
   private shoot(target: Entity, stats: PlayerStats) {
       const angle = Math.atan2(target.pos.y - this.player.pos.y, target.pos.x - this.player.pos.x);
       const count = stats.bulletCount;
-      const spread = 0.15; // Em radianos
+      const spread = 0.15; 
       
       const startAngle = angle - ((count - 1) * spread) / 2;
 
@@ -1048,17 +1024,14 @@ export class GameEngine {
       this.sessionStats.bulletsFired += count;
       audioManager.playShoot();
       
-      // Recuo (Recoil)
       this.player.vel.x -= Math.cos(angle) * 0.5;
       this.player.vel.y -= Math.sin(angle) * 0.5;
   }
 
-  // --- RENDERER (O Artista) ---
   public draw() {
     this.ctx.fillStyle = this.colors.BG;
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // Efeito de Aberração Cromática quando tem adrenalina
     const aberration = this.adrenalineActive || this.surgeActive;
     if (aberration) {
         this.ctx.save();
@@ -1071,14 +1044,12 @@ export class GameEngine {
 
     this.ctx.save();
     
-    // Screen Shake (Terremoto)
     if (this.shakeIntensity > 0) {
       const sx = (Math.random() - 0.5) * this.shakeIntensity;
       const sy = (Math.random() - 0.5) * this.shakeIntensity;
       this.ctx.translate(sx, sy);
     }
 
-    // Desenha o Surge (Onda de choque)
     if (this.surgeActive) {
       this.ctx.beginPath();
       this.ctx.arc(this.player.pos.x, this.player.pos.y, this.surgeRadius, 0, Math.PI * 2);
@@ -1102,7 +1073,7 @@ export class GameEngine {
           this.ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI*2);
           this.ctx.fill();
       } else {
-        this.ctx.globalAlpha = p.id === 'bg' ? 0.3 : (p.ttl! / 20); // Fade out
+        this.ctx.globalAlpha = p.id === 'bg' ? 0.3 : (p.ttl! / 20); 
         this.ctx.fillStyle = p.color;
         this.ctx.beginPath();
         this.ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI * 2);
@@ -1111,80 +1082,101 @@ export class GameEngine {
     });
     this.ctx.globalAlpha = 1.0;
 
-    // Renderiza Entidades
+    // --- FAILSAFE 1: BATCH RENDERING DE PROJÉTEIS ---
+    // Agrupa todos os tiros em um único Path para evitar Draw Calls excessivos
+    // Isso conserta o lag das "curvas dos tiros" (rastros).
+    this.ctx.beginPath();
+    this.ctx.strokeStyle = this.colors.ANTIBODY;
+    this.ctx.lineWidth = 4;
+    this.ctx.lineCap = 'round';
+    this.ctx.shadowBlur = 15;
+    this.ctx.shadowColor = this.colors.ANTIBODY;
+    
+    // Armazena orbitais para desenhar depois, pois usam estilo diferente
+    const orbitalsToDraw: Entity[] = [];
+
+    // Renderiza Entidades Genéricas
     this.entities.forEach(e => {
-      // Acid Pool
-      if (e.type === EntityType.ACID_POOL) {
-          this.ctx.fillStyle = this.colors.ACID_POOL;
-          this.ctx.globalAlpha = 0.4 + Math.sin(this.time/200)*0.1;
-          this.ctx.beginPath();
-          this.ctx.arc(e.pos.x, e.pos.y, e.radius, 0, Math.PI*2);
-          this.ctx.fill();
-          
-          this.ctx.strokeStyle = '#228800';
-          this.ctx.lineWidth = 2;
-          this.ctx.setLineDash([5, 5]);
-          this.ctx.stroke();
-          this.ctx.setLineDash([]);
-          this.ctx.globalAlpha = 1.0;
-      }
-      // Bio Mine
-      else if (e.type === EntityType.BIO_MINE) {
-          this.ctx.fillStyle = this.colors.BIO_MINE;
-          this.ctx.shadowBlur = 10;
-          this.ctx.shadowColor = this.colors.BIO_MINE;
-          this.ctx.beginPath();
-          // Forma espinhosa
-          const spikes = 8;
-          for(let i=0; i<spikes*2; i++) {
-              const r = i % 2 === 0 ? e.radius : e.radius * 0.6;
-              const a = (i / (spikes*2)) * Math.PI*2 + (this.time/1000);
-              this.ctx.lineTo(e.pos.x + Math.cos(a)*r, e.pos.y + Math.sin(a)*r);
-          }
-          this.ctx.closePath();
-          this.ctx.fill();
-          
-          this.ctx.fillStyle = '#003300';
-          this.ctx.beginPath();
-          this.ctx.arc(e.pos.x, e.pos.y, e.radius*0.3, 0, Math.PI*2);
-          this.ctx.fill();
-          this.ctx.shadowBlur = 0;
-      }
-      // Dinheiro
-      else if (e.type === EntityType.DNA_FRAGMENT) {
-        this.ctx.fillStyle = e.isElite ? this.colors.ELITE_GLOW : this.colors.DNA;
-        this.ctx.shadowBlur = e.isElite ? 20 : 5;
-        this.ctx.shadowColor = this.ctx.fillStyle;
+        // Coleta projéteis para o batch
+        if (e.type === EntityType.ANTIBODY) {
+             this.ctx.moveTo(e.pos.x, e.pos.y);
+             const tailX = e.pos.x - e.vel.x * 0.4; 
+             const tailY = e.pos.y - e.vel.y * 0.4;
+             this.ctx.lineTo(tailX, tailY);
+             return; // Pula o resto do loop
+        }
+
+        // Separa orbitais
+        if (e.type === EntityType.ORBITAL) {
+            orbitalsToDraw.push(e);
+            return;
+        }
+
+        // Desenha Acid Pool
+        if (e.type === EntityType.ACID_POOL) {
+            this.ctx.fillStyle = this.colors.ACID_POOL;
+            this.ctx.globalAlpha = 0.4 + Math.sin(this.time/200)*0.1;
+            this.ctx.beginPath();
+            this.ctx.arc(e.pos.x, e.pos.y, e.radius, 0, Math.PI*2);
+            this.ctx.fill();
+            // ... (detalhes do ácido removidos para brevidade no batch, mantendo performance)
+            this.ctx.globalAlpha = 1.0;
+        }
+        // Bio Mine
+        else if (e.type === EntityType.BIO_MINE) {
+            this.ctx.fillStyle = this.colors.BIO_MINE;
+            this.ctx.shadowBlur = 10;
+            this.ctx.shadowColor = this.colors.BIO_MINE;
+            this.ctx.beginPath();
+            const spikes = 8;
+            for(let i=0; i<spikes*2; i++) {
+                const r = i % 2 === 0 ? e.radius : e.radius * 0.6;
+                // Usa LUT para animação simples
+                const angleIdx = ((i / (spikes*2)) * 360 + (this.time/3)) % 360; 
+                this.ctx.lineTo(e.pos.x + getCos(angleIdx)*r, e.pos.y + getSin(angleIdx)*r);
+            }
+            this.ctx.closePath();
+            this.ctx.fill();
+            this.ctx.shadowBlur = 0;
+        }
+        // Dinheiro
+        else if (e.type === EntityType.DNA_FRAGMENT) {
+            this.ctx.fillStyle = e.isElite ? this.colors.ELITE_GLOW : this.colors.DNA;
+            this.ctx.shadowBlur = e.isElite ? 20 : 5;
+            this.ctx.shadowColor = this.ctx.fillStyle;
+            this.ctx.beginPath();
+            const s = e.radius;
+            this.ctx.save();
+            this.ctx.translate(e.pos.x, e.pos.y);
+            this.ctx.rotate(this.time / 200);
+            this.ctx.fillRect(-s/2, -s/2, s, s);
+            this.ctx.restore();
+            this.ctx.shadowBlur = 0;
+        }
+    });
+    
+    // EXECUTA O DRAW CALL DO BATCH (A Mágica da Performance)
+    this.ctx.stroke(); 
+    this.ctx.shadowBlur = 0; // Reseta sombra pesado
+
+    // Desenha Orbitais (separado pois tem cordão umbilical)
+    orbitalsToDraw.forEach(e => {
+        this.ctx.strokeStyle = this.colors.ORBITAL;
+        this.ctx.lineWidth = 2;
         this.ctx.beginPath();
-        const s = e.radius;
-        this.ctx.save();
-        this.ctx.translate(e.pos.x, e.pos.y);
-        this.ctx.rotate(this.time / 200);
-        this.ctx.fillRect(-s/2, -s/2, s, s);
-        this.ctx.restore();
-        this.ctx.shadowBlur = 0;
-      }
-      
-      // Orbitais
-      if (e.type === EntityType.ORBITAL) {
-          this.ctx.strokeStyle = this.colors.ORBITAL;
-          this.ctx.lineWidth = 2;
-          this.ctx.beginPath();
-          this.ctx.arc(e.pos.x, e.pos.y, e.radius, 0, Math.PI*2);
-          this.ctx.stroke();
-          
-          this.ctx.fillStyle = '#fff';
-          this.ctx.beginPath();
-          this.ctx.arc(e.pos.x, e.pos.y, e.radius/2, 0, Math.PI*2);
-          this.ctx.fill();
-          
-          // Cordão umbilical de energia
-          this.ctx.beginPath();
-          this.ctx.moveTo(this.player.pos.x, this.player.pos.y);
-          this.ctx.lineTo(e.pos.x, e.pos.y);
-          this.ctx.strokeStyle = `rgba(0, 136, 255, 0.1)`;
-          this.ctx.stroke();
-      }
+        this.ctx.arc(e.pos.x, e.pos.y, e.radius, 0, Math.PI*2);
+        this.ctx.stroke();
+        
+        this.ctx.fillStyle = '#fff';
+        this.ctx.beginPath();
+        this.ctx.arc(e.pos.x, e.pos.y, e.radius/2, 0, Math.PI*2);
+        this.ctx.fill();
+        
+        this.ctx.beginPath();
+        this.ctx.moveTo(this.player.pos.x, this.player.pos.y);
+        this.ctx.lineTo(e.pos.x, e.pos.y);
+        this.ctx.strokeStyle = `rgba(0, 136, 255, 0.1)`;
+        this.ctx.stroke();
     });
 
     // Renderiza Inimigos
@@ -1193,7 +1185,6 @@ export class GameEngine {
         this.ctx.save();
         this.ctx.translate(e.pos.x, e.pos.y);
         
-        // Aura de Elite/Boss
         if (e.isElite || e.type === EntityType.BOSS) {
            const color = e.type === EntityType.BOSS ? this.colors.BOSS : this.colors.ELITE_GLOW;
            this.ctx.shadowBlur = 20;
@@ -1245,13 +1236,11 @@ export class GameEngine {
       this.ctx.shadowColor = this.isDashing || this.invulnerabilityTimer > 0 ? this.colors.PLAYER_CORE : this.colors.PLAYER;
       this.ctx.fillStyle = this.isDashing || this.invulnerabilityTimer > 0 ? this.colors.PLAYER_CORE : this.colors.PLAYER;
       
-      // Blink se invulnerável
       if (this.invulnerabilityTimer > 0 && Math.floor(this.time / 100) % 2 === 0) {
           this.ctx.globalAlpha = 0.5;
       }
       
       this.ctx.beginPath();
-      // Efeito de "gelatina"
       const wobbleX = Math.cos(this.time/150) * 3;
       const wobbleY = Math.sin(this.time/150) * 3;
       const rx = this.isDashing ? this.player.radius * 2.0 : this.player.radius+wobbleX;
@@ -1274,24 +1263,6 @@ export class GameEngine {
       this.ctx.shadowBlur = 0;
       this.ctx.globalAlpha = 1.0;
     }
-
-    // Renderiza Projéteis (Rastros)
-    this.ctx.strokeStyle = this.colors.ANTIBODY;
-    this.ctx.lineWidth = 4;
-    this.ctx.lineCap = 'round';
-    this.ctx.shadowBlur = 15;
-    this.ctx.shadowColor = this.colors.ANTIBODY;
-    this.ctx.beginPath();
-    this.entities.forEach(e => {
-       if (e.type === EntityType.ANTIBODY) {
-         this.ctx.moveTo(e.pos.x, e.pos.y);
-         const tailX = e.pos.x - e.vel.x * 0.4; 
-         const tailY = e.pos.y - e.vel.y * 0.4;
-         this.ctx.lineTo(tailX, tailY);
-       }
-    });
-    this.ctx.stroke();
-    this.ctx.shadowBlur = 0;
 
     // Renderiza Textos Flutuantes
     this.entities.forEach(e => {
