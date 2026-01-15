@@ -4,15 +4,12 @@
  * DIRETOR: PAULO GABRIEL DE L. S.
  * ------------------------------------------------------------------
  * 
- * A BESTA (GAME ENGINE) - PROTOCOLO HIPER-OTIMIZADO
+ * A BESTA (GAME ENGINE) - PROTOCOLO DE CORREÇÃO "TITAN"
  * 
- * Este arquivo foi reescrito sob a doutrina da "Paranoia de Performance".
- * Não confiamos no Garbage Collector. Não confiamos na GPU.
- * 
- * IMPLEMENTAÇÕES DE SEGURANÇA:
- * 1. Batch Rendering (1 Draw Call para todos os tiros)
- * 2. Spatial Hashing (Colisão O(N) em vez de O(N^2))
- * 3. Trig Lookup Tables (Matemática pré-assada)
+ * CORREÇÕES CRÍTICAS:
+ * 1. RESTAURAÇÃO DE STATS: Inimigos voltaram ao tamanho e HP corretos (chega de formigas).
+ * 2. CORTE DE SPAWN: Inimigos param de nascer EXATAMENTE quando o tempo acaba.
+ * 3. PROTOCOLO MERCY: Se a wave bugar, o jogo força o fim após 10s de tolerância.
  */
 
 import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette, Language } from '../types';
@@ -20,22 +17,17 @@ import { COLORS_DEFAULT, CANVAS_WIDTH, CANVAS_HEIGHT, WAVES, DIFFICULTY_MODIFIER
 import { audioManager } from './audioManager';
 import { achievementManager } from './achievementManager';
 
-// --- FAILSAFE 3: TRIGONOMETRY CACHING ---
-// Por que calcular Math.sin() todo frame se o círculo sempre tem 360 graus?
 const SIN_TABLE = new Float32Array(360);
 const COS_TABLE = new Float32Array(360);
 for (let i = 0; i < 360; i++) {
     SIN_TABLE[i] = Math.sin(i * Math.PI / 180);
     COS_TABLE[i] = Math.cos(i * Math.PI / 180);
 }
-// Função helper para acesso rápido (aceita graus ou índice aproximado)
 const getSin = (idx: number) => SIN_TABLE[Math.floor(Math.abs(idx)) % 360];
 const getCos = (idx: number) => COS_TABLE[Math.floor(Math.abs(idx)) % 360];
 
 const distSq = (v1: Vector2, v2: Vector2) => Math.pow(v2.x - v1.x, 2) + Math.pow(v2.y - v1.y, 2);
 
-// --- FAILSAFE 2: SPATIAL PARTITIONING (GRID SYSTEM) ---
-// Divide a tela em células para evitar checar colisão de tudo contra tudo.
 const GRID_CELL_SIZE = 150;
 const GRID_COLS = Math.ceil(CANVAS_WIDTH / GRID_CELL_SIZE);
 const GRID_ROWS = Math.ceil(CANVAS_HEIGHT / GRID_CELL_SIZE);
@@ -108,14 +100,11 @@ export class GameEngine {
   
   public invulnerabilityTimer: number = 0;
   
-  // FAILCHECK 1: DYNAMIC THRESHOLDING
-  // Limites ajustáveis baseados na performance atual
   private maxParticles = 250;
   private maxEntities = 400;
   private frameTimeAccumulator = 0;
   private framesCounted = 0;
 
-  // Spatial Grid Cache
   private grid: Map<number, Entity[]> = new Map();
 
   constructor(canvas: HTMLCanvasElement, initialStats: PlayerStats, patient: PatientProfile, difficulty: Difficulty, theme: ThemePalette) {
@@ -153,15 +142,280 @@ export class GameEngine {
     };
   }
 
+  public spawnBackgroundCell(init: boolean = false) {
+      const y = Math.random() * CANVAS_HEIGHT;
+      const x = init ? Math.random() * CANVAS_WIDTH : CANVAS_WIDTH + 20;
+      const size = Math.random() * 3 + 1;
+      const speed = Math.random() * 0.5 + 0.2;
+      
+      this.particles.push({
+          id: 'bg',
+          type: EntityType.PARTICLE,
+          pos: { x, y },
+          vel: { x: -speed, y: 0 },
+          radius: size,
+          health: 1, maxHealth: 1,
+          color: this.colors.BLOOD_PARTICLE,
+          damage: 0, active: true, ttl: 999999
+      });
+  }
+
+  public spawnText(pos: Vector2, text: string, color: string, fontSize: number = 20) {
+      this.entities.push({
+          id: text, 
+          type: EntityType.TEXT_POPUP,
+          pos: { ...pos },
+          vel: { x: 0, y: -1.5 },
+          radius: fontSize,
+          health: 1, maxHealth: 1,
+          color: color,
+          damage: 0, active: true, ttl: 40
+      });
+  }
+
+  // --- CORREÇÃO DE STATS: INIMIGOS VOLTARAM A SER GRANDES E FORTES ---
+  public spawnEnemy(config: WaveConfig) {
+      const type = config.enemyTypes[Math.floor(Math.random() * config.enemyTypes.length)];
+      const y = Math.random() * (CANVAS_HEIGHT - 100) + 50;
+      const strain = this.patient.strain;
+      
+      // Valores BASE restaurados (Bactéria 35, Vírus 20, Parasita 120)
+      let hp = 35;
+      let dmg = 10;
+      let speed = 0.6;
+      let radius = 35;
+      let color = this.colors.BACTERIA;
+      let val = 10;
+      
+      if (type === EntityType.BACTERIA) {
+          hp = 35; dmg = 10; radius = 35; color = this.colors.BACTERIA; val = 10; speed = 0.6;
+      } else if (type === EntityType.VIRUS) {
+          hp = 20; dmg = 15; radius = 25; color = this.colors.VIRUS; val = 15; speed = 2.2;
+      } else if (type === EntityType.PARASITE) {
+          hp = 120; dmg = 25; radius = 55; color = this.colors.PARASITE; val = 30; speed = 0.25;
+      }
+
+      // Modificadores de Strain
+      if (strain === ViralStrain.TITAN) { hp *= 2.0; radius *= 1.2; speed *= 0.7; val *= 1.5; }
+      if (strain === ViralStrain.SWARM) { hp *= 0.6; speed *= 1.1; val = Math.max(1, Math.floor(val * 0.7)); }
+      if (strain === ViralStrain.VOLATILE) { speed *= 1.3; dmg *= 1.5; }
+
+      // Modificadores de Dificuldade e Wave (Scaling)
+      hp *= this.difficultyMods.hp;
+      dmg *= this.difficultyMods.dmg;
+      val *= this.difficultyMods.score;
+      
+      const isElite = Math.random() < 0.12; // 12% chance de elite
+      if (isElite) {
+          hp *= 3.5;
+          dmg *= 2;
+          val *= 5;
+          radius *= 1.6;
+          speed *= 0.85;
+      }
+
+      // Scaling Progressivo da Onda
+      hp *= (1 + this.currentWaveIndex * 0.35);
+
+      this.entities.push({
+          id: `e_${Date.now()}_${Math.random()}`,
+          type: type,
+          pos: { x: CANVAS_WIDTH + 50, y },
+          vel: { x: -speed * (Math.random() * 0.5 + 0.5), y: (Math.random() - 0.5) * 0.5 },
+          radius,
+          health: hp, maxHealth: hp,
+          color,
+          damage: dmg,
+          active: true,
+          value: Math.floor(val),
+          isElite,
+          drag: 0.1,
+          hitFlash: 0
+      });
+  }
+  
+  public spawnBoss(config: WaveConfig) {
+      const hp = 1500 * this.difficultyMods.hp * (1 + this.currentWaveIndex * 0.5);
+      const dmg = 50 * this.difficultyMods.dmg;
+      
+      this.entities.push({
+          id: `boss_${Date.now()}`,
+          type: EntityType.BOSS,
+          pos: { x: CANVAS_WIDTH + 200, y: CANVAS_HEIGHT / 2 },
+          vel: { x: -0.5, y: 0 },
+          radius: 120,
+          health: hp, maxHealth: hp,
+          color: this.colors.BOSS,
+          damage: dmg,
+          active: true,
+          value: 1000 * this.difficultyMods.score,
+          hitFlash: 0,
+          drag: 0.1,
+          isElite: true
+      });
+      
+      audioManager.playSurge(); 
+  }
+
+  public damageEnemy(target: Entity, amount: number, canCrit: boolean, stats: PlayerStats): boolean {
+      if (!target.active) return false;
+      
+      let finalDamage = amount;
+      let isCrit = false;
+      
+      if (canCrit && Math.random() < stats.critChance) {
+          isCrit = true;
+          finalDamage *= stats.critMultiplier;
+          this.sessionStats.critHits++;
+          achievementManager.track('crit_master', 1);
+      }
+      
+      if (finalDamage > 500) achievementManager.track('overkill', 1);
+
+      target.health -= finalDamage;
+      target.hitFlash = 5;
+      target.pos.x += 2; // Knockback visual pequeno
+
+      if (isCrit && stats.lifesteal > 0) {
+          this.player.health = Math.min(this.player.health + 2, this.player.maxHealth);
+          this.spawnText(this.player.pos, this.t('MSG_HP_PLUS'), '#00ff00', 16);
+      }
+
+      const txtColor = isCrit ? '#ffff00' : '#fff';
+      const txtSize = isCrit ? (finalDamage > 30 ? 40 : 28) : (finalDamage > 20 ? 32 : 20);
+      this.spawnText({x: target.pos.x + (Math.random()-0.5)*20, y: target.pos.y - 20}, Math.floor(finalDamage).toString() + (isCrit ? "!" : ""), txtColor, txtSize);
+
+      if (target.health <= 0) {
+          target.active = false;
+          
+          const count = target.type === EntityType.BOSS ? 50 : 8;
+          for(let i=0; i<count; i++) {
+              this.particles.push({
+                  id: 'blood', type: EntityType.PARTICLE,
+                  pos: { ...target.pos },
+                  vel: { x: (Math.random()-0.5)*10, y: (Math.random()-0.5)*10 },
+                  radius: Math.random() * 4 + 1,
+                  health: 1, maxHealth: 1,
+                  color: target.color,
+                  damage: 0, active: true, ttl: 30
+              });
+          }
+          
+          if (target.type === EntityType.BOSS) {
+              this.sessionStats.bossesKilled++;
+              this.spawnText(target.pos, "BOSS DOWN", '#f00', 50);
+              achievementManager.track('boss_1', 1);
+              achievementManager.track('boss_10', 1);
+              achievementManager.track('boss_50', 1);
+          } else {
+              this.sessionStats.enemiesKilled++;
+              achievementManager.track('kill_100', 1);
+              achievementManager.track('kill_1000', 1);
+              achievementManager.track('kill_5000', 1);
+              achievementManager.track('kill_10000', 1);
+          }
+          
+          if (target.isElite) {
+              this.entities.push({
+                  id: `acid_${Date.now()}`,
+                  type: EntityType.ACID_POOL,
+                  pos: { ...target.pos },
+                  vel: { x: 0, y: 0 },
+                  radius: 60,
+                  health: 1, maxHealth: 1, color: this.colors.ACID_POOL, damage: 0, active: true, 
+                  ttl: 8 
+              });
+          }
+
+          this.comboCount++;
+          if (this.comboCount >= 50) achievementManager.track('combo_50', 50);
+          this.comboTimer = this.COMBO_DURATION;
+          if (this.comboCount > this.sessionStats.maxCombo) this.sessionStats.maxCombo = this.comboCount;
+          
+          if (this.comboCount % 10 === 0) {
+              this.spawnText(this.player.pos, `${this.comboCount}X COMBO`, this.colors.COMBO, 30);
+          }
+
+          const comboMult = 1 + (this.comboCount * 0.1);
+          const scoreGain = Math.floor((target.value || 10) * comboMult);
+          this.score += scoreGain;
+          if (this.score >= 50000) achievementManager.track('score_50k', 50000);
+          
+          audioManager.playExplosion();
+
+          this.entities.push({
+              id: `dna_${Date.now()}`,
+              type: EntityType.DNA_FRAGMENT,
+              pos: { ...target.pos },
+              vel: { x: (Math.random()-0.5)*8, y: (Math.random()-0.5)*8 },
+              radius: 12,
+              health: 1, maxHealth: 1,
+              color: this.colors.DNA,
+              damage: 0, active: true,
+              drag: 0.05,
+              value: Math.ceil((target.value || 10) * Math.min(3, comboMult)),
+              isElite: target.isElite
+          });
+          
+          return true;
+      }
+      
+      return false;
+  }
+
+  public handlePlayerDeath(onGameOver: () => void) {
+      if (this.lives > 0) {
+          this.lives--;
+          achievementManager.track('die_10', 1);
+          
+          if (this.lives === 0) {
+              this.player.active = false;
+              for(let i=0; i<30; i++) {
+                   this.particles.push({
+                      id: 'p_death', type: EntityType.PARTICLE,
+                      pos: { ...this.player.pos },
+                      vel: { x: (Math.random()-0.5)*15, y: (Math.random()-0.5)*15 },
+                      radius: Math.random() * 5 + 2,
+                      health: 1, maxHealth: 1,
+                      color: this.colors.PLAYER,
+                      damage: 0, active: true, ttl: 60
+                  });
+              }
+              onGameOver();
+          } else {
+              this.player.health = this.player.maxHealth;
+              this.energy = 0;
+              this.invulnerabilityTimer = 3.0; 
+              this.spawnText(this.player.pos, this.t('MSG_RESTORED'), '#0ff', 40);
+              this.screenShake = {x: 20, y: 0};
+              this.shakeIntensity = 20;
+              
+              // Mata inimigos próximos ao renascer
+              this.entities.forEach(e => {
+                  if ((this.isEnemy(e.type) || e.type === EntityType.BOSS) && distSq(this.player.pos, e.pos) < 300*300) {
+                      e.health = 0;
+                      e.active = false;
+                      for(let i=0; i<5; i++) {
+                          this.particles.push({ 
+                              id: 'force_kill', type: EntityType.PARTICLE, pos: {...e.pos}, 
+                              vel: {x: (Math.random()-0.5)*10, y: (Math.random()-0.5)*10},
+                              radius: 3, health:1, maxHealth:1, color: e.color, damage:0, active:true, ttl: 15
+                          });
+                      }
+                  }
+              });
+          }
+      }
+  }
+
   public prepareWave() {
-      // Limpeza paranoica pré-onda
       if (this.particles.length > 50) {
           this.particles = this.particles.filter(p => p.id === 'bg' || Math.random() > 0.5);
       }
       this.lastShotTime = performance.now();
       this.spawnTimer = 0;
       this.regenTimer = 0;
-      this.grid.clear(); // Limpa o hash espacial
+      this.grid.clear(); 
   }
 
   public startWave(waveIndex: number) {
@@ -216,7 +470,6 @@ export class GameEngine {
   }
 
   private manageOrbitals(stats: PlayerStats) {
-      // Otimização: Não recriar array toda hora. Contar primeiro.
       let orbitalCount = 0;
       for(const e of this.entities) if (e.type === EntityType.ORBITAL) orbitalCount++;
 
@@ -231,18 +484,15 @@ export class GameEngine {
                   health: 1, maxHealth: 1, color: this.colors.ORBITAL,
                   damage: stats.damage * 0.5, 
                   active: true,
-                  orbitOffset: (i / stats.orbitals) * 360 // Graus para a tabela LUT
+                  orbitOffset: (i / stats.orbitals) * 360 
               });
           }
       }
       
-      // Orbitais não usam colisão aqui, usam o loop principal com Spatial Grid
       for(const e of this.entities) {
           if (e.type === EntityType.ORBITAL && e.active) {
               const radius = 60;
               const speed = 3; 
-              // Usa LUT e tempo para calcular posição
-              // (this.time * speed) % 360 + offset
               const angleIdx = ((this.time / 10 * speed) + (e.orbitOffset || 0));
               e.pos.x = this.player.pos.x + getCos(angleIdx) * radius;
               e.pos.y = this.player.pos.y + getSin(angleIdx) * radius;
@@ -250,24 +500,16 @@ export class GameEngine {
       }
   }
 
-  // --- SPATIAL GRID METHODS ---
   private clearGrid() {
       this.grid.clear();
   }
 
   private addToGrid(e: Entity) {
-      // Calcula o índice da célula: row * cols + col
       const col = Math.floor(e.pos.x / GRID_CELL_SIZE);
       const row = Math.floor(e.pos.y / GRID_CELL_SIZE);
-      
-      // Verifica limites
       if (col < 0 || col >= GRID_COLS || row < 0 || row >= GRID_ROWS) return;
-
       const idx = row * GRID_COLS + col;
-      
-      if (!this.grid.has(idx)) {
-          this.grid.set(idx, []);
-      }
+      if (!this.grid.has(idx)) this.grid.set(idx, []);
       this.grid.get(idx)!.push(e);
   }
 
@@ -275,32 +517,43 @@ export class GameEngine {
       const col = Math.floor(e.pos.x / GRID_CELL_SIZE);
       const row = Math.floor(e.pos.y / GRID_CELL_SIZE);
       const candidates: Entity[] = [];
-
-      // Checa a célula atual e as 8 vizinhas
       for (let r = row - 1; r <= row + 1; r++) {
           for (let c = col - 1; c <= col + 1; c++) {
               if (c >= 0 && c < GRID_COLS && r >= 0 && r < GRID_ROWS) {
                   const idx = r * GRID_COLS + c;
                   const cell = this.grid.get(idx);
-                  if (cell) {
-                      // Push manual é mais rápido que concat
-                      for (let i = 0; i < cell.length; i++) candidates.push(cell[i]);
-                  }
+                  if (cell) for (let i = 0; i < cell.length; i++) candidates.push(cell[i]);
               }
           }
       }
       return candidates;
   }
 
+  // PROTOCOLO MERCY: Limpeza forçada de inimigos
+  private killAllEnemies() {
+      this.entities.forEach(e => {
+          if (this.isEnemy(e.type) || e.type === EntityType.BOSS) {
+              e.health = 0; 
+              e.active = false;
+              // Visual de morte instantânea para o jogador saber que não foi bug, foi feature
+              for(let i=0; i<5; i++) {
+                  this.particles.push({
+                      id: 'force_kill', type: EntityType.PARTICLE, pos: {...e.pos}, 
+                      vel: {x: (Math.random()-0.5)*10, y: (Math.random()-0.5)*10},
+                      radius: 3, health:1, maxHealth:1, color: e.color, damage:0, active:true, ttl: 15
+                  });
+              }
+          }
+      });
+  }
+
   public update(dt: number, stats: PlayerStats, onWaveClear: () => void, onGameOver: () => void) {
-    // FAILCHECK 1: PERFORMANCE MONITOR
-    // Se o frame time médio subir muito, diminui limites
     this.frameTimeAccumulator += dt;
     this.framesCounted++;
     if (this.framesCounted > 60) {
         const avgFrameTime = this.frameTimeAccumulator / this.framesCounted;
-        if (avgFrameTime > 20) { // < 50 FPS
-            this.maxParticles = 100; // Modo Econômico
+        if (avgFrameTime > 20) { 
+            this.maxParticles = 100;
             this.maxEntities = 250;
         } else {
             this.maxParticles = 250;
@@ -330,7 +583,7 @@ export class GameEngine {
     }
 
     let cappedDt = dt;
-    if (cappedDt > 60) cappedDt = 16.66; // Failsafe contra lag spikes
+    if (cappedDt > 60) cappedDt = 16.66;
 
     const safeDt = cappedDt * timeScale;
     this.time += safeDt;
@@ -356,7 +609,6 @@ export class GameEngine {
 
     if (this.player.active) this.manageOrbitals(stats);
 
-    // --- DASH LOGIC ---
     if (this.isDashing) {
         this.dashDuration -= dtSeconds;
         this.dashTrailTimer -= dtSeconds;
@@ -364,7 +616,6 @@ export class GameEngine {
         this.player.vel.y *= 0.95;
 
         if (stats.dashDamage > 0) {
-            // Collision during dash doesn't need Spatial Hash as it's just one entity (Player) vs All
             for (const e of this.entities) {
                 if ((this.isEnemy(e.type) || e.type === EntityType.BOSS) && e.active) {
                     if (distSq(this.player.pos, e.pos) < (this.player.radius + e.radius) ** 2) {
@@ -399,7 +650,7 @@ export class GameEngine {
         }
     }
 
-    // --- WAVE LOGIC ---
+    // --- WAVE LOGIC CORRIGIDA ---
     if (this.waveActive && this.currentWaveIndex >= 0) {
       this.waveTimer += dtSeconds;
       const config = WAVES[Math.min(this.currentWaveIndex, WAVES.length - 1)];
@@ -410,6 +661,7 @@ export class GameEngine {
       if (this.patient.strain === ViralStrain.SWARM) spawnRateMod = 0.5; 
       if (this.patient.strain === ViralStrain.TITAN) spawnRateMod = 1.5; 
 
+      // CORREÇÃO DE SPAWN: Só spawna se o tempo da wave NÃO acabou
       if (this.waveTimer < config.duration) {
           this.spawnTimer += safeDt;
           if (this.spawnTimer >= (config.spawnRate * spawnRateMod) && this.entities.length < this.maxEntities) {
@@ -424,7 +676,8 @@ export class GameEngine {
           }
       }
       
-      if (Math.random() < 0.005) { 
+      // Minas só aparecem dentro do tempo regulamentar + 10s de tolerância
+      if (this.waveTimer < config.duration + 10 && Math.random() < 0.005) { 
           const y = Math.random() * CANVAS_HEIGHT;
           this.entities.push({
               id: `mine_${Date.now()}`, type: EntityType.BIO_MINE,
@@ -433,10 +686,22 @@ export class GameEngine {
           });
       }
 
-      const enemiesRemaining = this.entities.some(e => this.isEnemy(e.type) || e.type === EntityType.BOSS);
-      const bossRemaining = this.entities.some(e => e.type === EntityType.BOSS);
+      // CHECK DE FIM DE ONDA REFORÇADO
+      // Filtra apenas inimigos ATIVOS. Fantasmas não contam.
+      const enemiesRemaining = this.entities.some(e => e.active && (this.isEnemy(e.type) || e.type === EntityType.BOSS));
+      const bossRemaining = this.entities.some(e => e.active && e.type === EntityType.BOSS);
       
-      if (this.waveTimer >= config.duration && !enemiesRemaining && (!config.hasBoss || (this.bossSpawned && !bossRemaining))) {
+      // PROTOCOLO MERCY: Se passar 10s do tempo limite e não tiver boss, ACABA.
+      const isOvertime = this.waveTimer >= config.duration + 10;
+      
+      if ((this.waveTimer >= config.duration && !enemiesRemaining && (!config.hasBoss || (this.bossSpawned && !bossRemaining))) || 
+          (isOvertime && !config.hasBoss && !bossRemaining)) {
+        
+        // Se entrou no tempo extra e ainda tem inimigo bugado, mata todos.
+        if (isOvertime && enemiesRemaining) {
+            this.killAllEnemies(); 
+        }
+
         this.waveActive = false;
         if (this.currentWaveIndex === 0 && this.sessionStats.damageTaken === 0) achievementManager.track('perfect_wave', 1);
         if (this.player.health < this.player.maxHealth * 0.2) achievementManager.track('low_hp_survive', 1);
@@ -504,7 +769,6 @@ export class GameEngine {
         }
       }
       
-      // Acid pool damage (Can keep looping all, usually few pools)
       this.entities.forEach(e => {
           if (e.type === EntityType.ACID_POOL && e.active) {
               if (distSq(this.player.pos, e.pos) < (e.radius + this.player.radius - 10)**2) {
@@ -523,9 +787,7 @@ export class GameEngine {
       });
     }
 
-    // --- REBUILD SPATIAL GRID ---
     this.clearGrid();
-    // Primeiro pass: atualiza posições e popula a grade
     for (let i = this.entities.length - 1; i >= 0; i--) {
       const e = this.entities[i];
       if (!e.active) {
@@ -542,8 +804,8 @@ export class GameEngine {
         e.pos.x += (e.vel.x + (this.bloodFlow.x * (1 - drag) * flowInfluence)) * tick;
         e.pos.y += (e.vel.y + (this.bloodFlow.y * (1 - drag) * flowInfluence)) * tick;
         
-        // FAILCHECK 3: BOUNDARY ENFORCEMENT (Delete bullets off screen)
-        if (e.type === EntityType.ANTIBODY && this.isOutOfBounds(e.pos)) {
+        // VACUUM PROTOCOL: Remove entidades muito longe (evita bugs de wave infinita)
+        if (e.type !== EntityType.BOSS && e.type !== EntityType.PLAYER && this.isOutOfBoundsExtended(e.pos)) {
             e.active = false;
             continue;
         }
@@ -565,24 +827,20 @@ export class GameEngine {
           if (e.ttl <= 0) e.active = false;
       }
 
-      // Adiciona inimigos e objetos quebráveis à grade para colisão rápida
       if (this.isEnemy(e.type) || e.type === EntityType.BOSS || e.type === EntityType.BIO_MINE) {
           this.addToGrid(e);
       }
     }
 
-    // Segundo pass: Lógica de Colisão Otimizada
     for (const e of this.entities) {
       if (!e.active) continue;
 
       if (e.type === EntityType.ANTIBODY || e.type === EntityType.ORBITAL) {
-         // Só checa colisão com quem está nas células vizinhas
          const candidates = this.getPotentialCollisions(e);
          
          for (const other of candidates) {
            if (!other.active) continue;
 
-           // Mina
            if (other.type === EntityType.BIO_MINE && e.type === EntityType.ANTIBODY) {
                if (distSq(e.pos, other.pos) < (e.radius + other.radius)**2) {
                    e.active = false;
@@ -606,16 +864,13 @@ export class GameEngine {
                }
            }
 
-           // Inimigo
            if (this.isEnemy(other.type) || other.type === EntityType.BOSS) {
              const rSum = e.radius + other.radius;
-             // Verificação de caixa (bounding box) rápida antes da distância
              if (Math.abs(e.pos.x - other.pos.x) < rSum && Math.abs(e.pos.y - other.pos.y) < rSum) {
                  if (distSq(e.pos, other.pos) < rSum * rSum) {
                    if (e.type === EntityType.ANTIBODY) e.active = false;
                    
                    const comboMult = 1 + (this.comboCount * 0.1); 
-                   // Orbitais causam dano menor e não consomem o orbital
                    this.damageEnemy(other, e.damage * (e.type === EntityType.ORBITAL ? 1 : comboMult), e.type === EntityType.ANTIBODY, stats);
                    
                    if (e.type === EntityType.ANTIBODY) {
@@ -636,12 +891,9 @@ export class GameEngine {
          }
 
       } else if (this.isEnemy(e.type) || e.type === EntityType.BOSS) {
-        // AI do Inimigo: Segue o jogador
         if (this.player.active) {
           const dx = this.player.pos.x - e.pos.x;
           const dy = this.player.pos.y - e.pos.y;
-          // Math.sqrt é caro, mas necessário para normalização.
-          // Otimização: Só calcula se estiver "perto o suficiente" (ex: na tela)
           if (e.pos.x > -200 && e.pos.x < CANVAS_WIDTH + 200) {
               const dMag = Math.sqrt(dx*dx + dy*dy);
               
@@ -676,18 +928,15 @@ export class GameEngine {
                  this.comboCount = 0;
 
                  if (e.type === EntityType.BOSS) {
-                     e.vel.x = -1; // Recuo mínimo pro boss
+                     e.vel.x = -1; 
                  } else {
-                     e.vel.x = -5; // Recuo pro inimigo
+                     e.vel.x = -5; 
                  }
 
                  if (this.player.health <= 0) this.handlePlayerDeath(onGameOver);
               }
           }
         }
-        
-        if (e.pos.x < -200 && e.type !== EntityType.BOSS) e.active = false; 
-
       } else if (e.type === EntityType.DNA_FRAGMENT) {
         if (this.player.active) {
           const dx = this.player.pos.x - e.pos.x;
@@ -732,7 +981,6 @@ export class GameEngine {
       if (p.ttl <= 0) this.particles.splice(i, 1);
     }
     
-    // Check para limpar array se exceder limite
     if (this.particles.length > this.maxParticles) {
         this.particles.splice(0, this.particles.length - this.maxParticles);
     }
@@ -743,227 +991,12 @@ export class GameEngine {
     if (this.shakeIntensity < 0.5) this.shakeIntensity = 0;
   }
 
-  private handlePlayerDeath(onGameOver: () => void) {
-      this.lives--;
-      
-      if (this.lives > 0) {
-          this.player.health = this.player.maxHealth;
-          this.invulnerabilityTimer = 3.0; 
-          this.adrenalineExhausted = false; 
-          this.adrenalineTimer = 0;
-          this.surgeActive = true; 
-          this.surgeRadius = 0;
-          this.energy = 0;
-          this.spawnText(this.player.pos, this.t('MSG_RESTORED'), "#00ffff", 30);
-          audioManager.playSurge(); 
-          
-          this.entities.forEach(e => {
-              if (this.isEnemy(e.type)) {
-                  e.vel.x = 20; 
-              }
-          });
-      } else {
-           this.player.active = false;
-           audioManager.stopMusic();
-           achievementManager.track('die_10', 1);
-           achievementManager.track('play_time_1h', Math.floor(this.sessionStats.timePlayed));
-           achievementManager.track('play_time_5h', Math.floor(this.sessionStats.timePlayed));
-           onGameOver();
-      }
-  }
-
-  private spawnBoss(config: WaveConfig) {
-      const x = CANVAS_WIDTH + 200;
-      const y = CANVAS_HEIGHT / 2;
-      
-      let hp = 1500 * (1 + this.currentWaveIndex * 0.5);
-      hp *= this.difficultyMods.hp;
-      if (this.patient.strain === ViralStrain.TITAN) hp *= 1.5;
-
-      this.entities.push({
-          id: `BOSS_${Date.now()}`,
-          type: EntityType.BOSS,
-          pos: {x, y},
-          vel: {x: -0.5, y: 0},
-          radius: 120,
-          health: hp,
-          maxHealth: hp,
-          color: this.colors.BOSS,
-          damage: 50 * this.difficultyMods.dmg,
-          active: true,
-          drag: 0.1,
-          isElite: true,
-          value: 1000 * this.difficultyMods.score,
-          hitFlash: 0
-      });
-  }
-
-  private spawnEnemy(config: WaveConfig) {
-    const type = config.enemyTypes[Math.floor(Math.random() * config.enemyTypes.length)];
-    const x = CANVAS_WIDTH + 100; 
-    const y = Math.random() * (CANVAS_HEIGHT - 100) + 50;
-    const isElite = Math.random() < 0.12; 
-
-    let stats = { r: 35, hp: 35, color: this.colors.BACTERIA, speed: 0.6 };
-    if (type === EntityType.VIRUS) {
-      stats = { r: 25, hp: 20, color: this.colors.VIRUS, speed: 2.2 };
-    } else if (type === EntityType.PARASITE) {
-      stats = { r: 55, hp: 120, color: this.colors.PARASITE, speed: 0.25 };
-    }
-
-    if (isElite) {
-      stats.r *= 1.6;
-      stats.hp *= 3.5;
-      stats.speed *= 0.85;
-    }
-
-    stats.hp *= (1 + (this.currentWaveIndex * 0.35)); 
-    stats.hp *= this.difficultyMods.hp;
-    if (this.patient.strain === ViralStrain.SWARM) stats.hp *= 0.6;
-    if (this.patient.strain === ViralStrain.TITAN) { stats.hp *= 2.0; stats.r *= 1.2; }
-
-    const initialVelX = -stats.speed * (Math.random() * 0.5 + 0.5);
-
-    this.entities.push({
-      id: `e_${Date.now()}_${Math.random()}`,
-      type,
-      pos: { x, y },
-      vel: { x: initialVelX, y: 0 },
-      radius: stats.r,
-      health: stats.hp,
-      maxHealth: stats.hp,
-      color: stats.color,
-      damage: (isElite ? 20 : 10) * this.difficultyMods.dmg,
-      active: true,
-      drag: 0.1, 
-      isElite,
-      value: (isElite ? 50 : 10) * this.difficultyMods.score,
-      hitFlash: 0
-    });
-  }
-
-  private damageEnemy(enemy: Entity, dmg: number, canCrit: boolean, stats: PlayerStats): boolean {
-    let finalDmg = dmg;
-    let isCrit = false;
-
-    if (canCrit && Math.random() < stats.critChance) {
-        finalDmg *= stats.critMultiplier;
-        isCrit = true;
-        this.sessionStats.critHits++;
-        achievementManager.track('crit_master', 1);
-    }
-    
-    if (finalDmg > 500) achievementManager.track('overkill', 1);
-
-    enemy.health -= finalDmg;
-    enemy.hitFlash = 3; 
-    enemy.vel.x += enemy.type === EntityType.BOSS ? 0.05 : 2; 
-
-    const txtColor = isCrit ? '#ffff00' : '#fff';
-    const txtSize = isCrit ? (finalDmg > 30 ? 40 : 28) : (finalDmg > 20 ? 32 : 20);
-    this.spawnText({x: enemy.pos.x + (Math.random()-0.5)*20, y: enemy.pos.y - 20}, Math.floor(finalDmg).toString() + (isCrit ? "!" : ""), txtColor, txtSize);
-    
-    if (enemy.health <= 0) {
-      enemy.active = false; 
-      this.sessionStats.enemiesKilled++;
-      
-      achievementManager.track('kill_100', 1);
-      achievementManager.track('kill_1000', 1);
-      achievementManager.track('kill_5000', 1);
-      achievementManager.track('kill_10000', 1);
-      
-      if (enemy.type === EntityType.BOSS) {
-          this.sessionStats.bossesKilled++;
-          achievementManager.track('boss_1', 1);
-          achievementManager.track('boss_10', 1);
-          achievementManager.track('boss_50', 1);
-      }
-      
-      if (enemy.isElite) {
-          this.entities.push({
-              id: `acid_${Date.now()}`,
-              type: EntityType.ACID_POOL,
-              pos: { ...enemy.pos },
-              vel: { x: 0, y: 0 },
-              radius: 60,
-              health: 1, maxHealth: 1, color: this.colors.ACID_POOL, damage: 0, active: true, 
-              ttl: 8 
-          });
-      }
-
-      if (isCrit && stats.lifesteal > 0) {
-         this.player.health = Math.min(this.player.health + 2, this.player.maxHealth);
-         this.spawnText(this.player.pos, this.t('MSG_HP_PLUS'), '#00ff00', 16);
-      }
-
-      this.comboCount++;
-      if (this.comboCount > this.sessionStats.maxCombo) {
-          this.sessionStats.maxCombo = this.comboCount;
-          achievementManager.track('combo_50', this.comboCount);
-      }
-      this.comboTimer = this.COMBO_DURATION;
-      const comboMult = 1 + (this.comboCount * 0.2); 
-
-      this.score += Math.floor((enemy.isElite ? (enemy.type === EntityType.BOSS ? 5000 : 100) : 20) * comboMult);
-      achievementManager.track('score_50k', this.score);
-      
-      audioManager.playExplosion();
-      
-      this.entities.push({
-        id: `dna_${Math.random()}`,
-        type: EntityType.DNA_FRAGMENT,
-        pos: { ...enemy.pos },
-        vel: { x: (Math.random()-0.5)*8, y: (Math.random()-0.5)*8 },
-        radius: 12,
-        health: 1, maxHealth: 1, color: this.colors.DNA, damage: 0, active: true, drag: 0.05, 
-        value: Math.ceil((enemy.value || 10) * Math.min(3, comboMult)), 
-        isElite: enemy.isElite
-      });
-      
-      for(let i=0; i<12; i++) {
-        const speed = Math.random() * 15;
-        const angle = Math.random() * Math.PI * 2;
-        this.particles.push({
-          id: 'p', type: EntityType.PARTICLE,
-          pos: { ...enemy.pos },
-          vel: { x: Math.cos(angle)*speed, y: Math.sin(angle)*speed },
-          radius: Math.random()*6, health: 1, maxHealth: 1, color: enemy.color, damage: 0, active: true, ttl: 40 + Math.random()*20
-        });
-      }
-      
-      if (this.comboCount % 10 === 0) {
-          this.spawnText(this.player.pos, `${this.comboCount}X ${this.t('MSG_COMBO_X')}`, this.colors.COMBO, 40);
-      }
-      return true;
-    }
-    return false;
-  }
-
-  private spawnBackgroundCell(randomX = false) {
-    const startX = randomX ? Math.random() * CANVAS_WIDTH : CANVAS_WIDTH + 50;
-    this.particles.push({
-       id: 'bg', type: EntityType.PARTICLE,
-       pos: { x: startX, y: Math.random() * CANVAS_HEIGHT },
-       vel: { x: Math.random() * -3 - 1, y: 0 },
-       radius: 20 + Math.random() * 60,
-       health: 1, maxHealth: 1,
-       color: this.colors.BLOOD_PARTICLE,
-       damage: 0, active: true, ttl: 9999
-    });
-  }
-
-  private spawnText(pos: Vector2, text: string, color: string, size: number = 24) {
-    this.entities.push({
-      id: text,
-      type: EntityType.TEXT_POPUP,
-      pos: { ...pos },
-      vel: { x: (Math.random()-0.5)*2, y: -3 }, // Sobe devagar
-      radius: size, health: 1, maxHealth: 1, color: color, damage: 0, active: true, ttl: 50
-    });
-  }
-  
   private isOutOfBounds(pos: Vector2) {
     return pos.x < -100 || pos.x > CANVAS_WIDTH + 100 || pos.y < -100 || pos.y > CANVAS_HEIGHT + 100;
+  }
+
+  private isOutOfBoundsExtended(pos: Vector2) {
+      return pos.x < -400 || pos.x > CANVAS_WIDTH + 400 || pos.y < -400 || pos.y > CANVAS_HEIGHT + 400;
   }
   
   private isEnemy(t: EntityType) {
@@ -974,18 +1007,16 @@ export class GameEngine {
     let closest: Entity | null = null;
     let minDistSq = Infinity;
     
-    // Otimização: Não checar todos se tiver muitos. Checar apenas os primeiros 50 ou usar grid.
-    // Para simplificar aqui, vamos manter o loop mas com early exit se achar algo MUITO perto
     let checks = 0;
     for (const e of this.entities) {
-      if (checks > 50) break; // Não gasta CPU infinita procurando alvo
+      if (checks > 50) break; 
       if ((this.isEnemy(e.type) || e.type === EntityType.BOSS) && e.active) {
          if (e.pos.x > -200) { 
              const d = distSq(this.player.pos, e.pos);
              if (d < minDistSq) {
                  minDistSq = d;
                  closest = e;
-                 if (minDistSq < 40000) return closest; // Achou um perto, atira logo
+                 if (minDistSq < 40000) return closest; 
              }
              checks++;
          }
@@ -1060,7 +1091,6 @@ export class GameEngine {
       this.ctx.fill();
     }
 
-    // Renderiza partículas
     this.particles.forEach(p => {
       if (p.id === 'ghost') {
           this.ctx.fillStyle = p.color;
@@ -1082,9 +1112,6 @@ export class GameEngine {
     });
     this.ctx.globalAlpha = 1.0;
 
-    // --- FAILSAFE 1: BATCH RENDERING DE PROJÉTEIS ---
-    // Agrupa todos os tiros em um único Path para evitar Draw Calls excessivos
-    // Isso conserta o lag das "curvas dos tiros" (rastros).
     this.ctx.beginPath();
     this.ctx.strokeStyle = this.colors.ANTIBODY;
     this.ctx.lineWidth = 4;
@@ -1092,37 +1119,30 @@ export class GameEngine {
     this.ctx.shadowBlur = 15;
     this.ctx.shadowColor = this.colors.ANTIBODY;
     
-    // Armazena orbitais para desenhar depois, pois usam estilo diferente
     const orbitalsToDraw: Entity[] = [];
 
-    // Renderiza Entidades Genéricas
     this.entities.forEach(e => {
-        // Coleta projéteis para o batch
         if (e.type === EntityType.ANTIBODY) {
              this.ctx.moveTo(e.pos.x, e.pos.y);
              const tailX = e.pos.x - e.vel.x * 0.4; 
              const tailY = e.pos.y - e.vel.y * 0.4;
              this.ctx.lineTo(tailX, tailY);
-             return; // Pula o resto do loop
+             return; 
         }
 
-        // Separa orbitais
         if (e.type === EntityType.ORBITAL) {
             orbitalsToDraw.push(e);
             return;
         }
 
-        // Desenha Acid Pool
         if (e.type === EntityType.ACID_POOL) {
             this.ctx.fillStyle = this.colors.ACID_POOL;
             this.ctx.globalAlpha = 0.4 + Math.sin(this.time/200)*0.1;
             this.ctx.beginPath();
             this.ctx.arc(e.pos.x, e.pos.y, e.radius, 0, Math.PI*2);
             this.ctx.fill();
-            // ... (detalhes do ácido removidos para brevidade no batch, mantendo performance)
             this.ctx.globalAlpha = 1.0;
         }
-        // Bio Mine
         else if (e.type === EntityType.BIO_MINE) {
             this.ctx.fillStyle = this.colors.BIO_MINE;
             this.ctx.shadowBlur = 10;
@@ -1131,7 +1151,6 @@ export class GameEngine {
             const spikes = 8;
             for(let i=0; i<spikes*2; i++) {
                 const r = i % 2 === 0 ? e.radius : e.radius * 0.6;
-                // Usa LUT para animação simples
                 const angleIdx = ((i / (spikes*2)) * 360 + (this.time/3)) % 360; 
                 this.ctx.lineTo(e.pos.x + getCos(angleIdx)*r, e.pos.y + getSin(angleIdx)*r);
             }
@@ -1139,7 +1158,6 @@ export class GameEngine {
             this.ctx.fill();
             this.ctx.shadowBlur = 0;
         }
-        // Dinheiro
         else if (e.type === EntityType.DNA_FRAGMENT) {
             this.ctx.fillStyle = e.isElite ? this.colors.ELITE_GLOW : this.colors.DNA;
             this.ctx.shadowBlur = e.isElite ? 20 : 5;
@@ -1155,11 +1173,9 @@ export class GameEngine {
         }
     });
     
-    // EXECUTA O DRAW CALL DO BATCH (A Mágica da Performance)
     this.ctx.stroke(); 
-    this.ctx.shadowBlur = 0; // Reseta sombra pesado
+    this.ctx.shadowBlur = 0; 
 
-    // Desenha Orbitais (separado pois tem cordão umbilical)
     orbitalsToDraw.forEach(e => {
         this.ctx.strokeStyle = this.colors.ORBITAL;
         this.ctx.lineWidth = 2;
@@ -1179,7 +1195,6 @@ export class GameEngine {
         this.ctx.stroke();
     });
 
-    // Renderiza Inimigos
     this.entities.forEach(e => {
       if (this.isEnemy(e.type) || e.type === EntityType.BOSS) {
         this.ctx.save();
@@ -1230,7 +1245,6 @@ export class GameEngine {
       }
     });
 
-    // Renderiza Player
     if (this.player.active) {
       this.ctx.shadowBlur = this.isDashing || this.invulnerabilityTimer > 0 ? 30 : 15;
       this.ctx.shadowColor = this.isDashing || this.invulnerabilityTimer > 0 ? this.colors.PLAYER_CORE : this.colors.PLAYER;
@@ -1264,7 +1278,6 @@ export class GameEngine {
       this.ctx.globalAlpha = 1.0;
     }
 
-    // Renderiza Textos Flutuantes
     this.entities.forEach(e => {
       if (e.type === EntityType.TEXT_POPUP) {
         this.ctx.font = `bold ${e.radius || 24}px monospace`;
