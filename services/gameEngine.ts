@@ -869,7 +869,7 @@ export class GameEngine {
                       if (!this.isLowQuality && Math.random() < 0.1) {
                           this.particles.push({
                               id: 'acid_burn', type: EntityType.PARTICLE, pos: {...this.player.pos},
-                              vel: {x: 0, y: -2}, radius: 2, health: 1, maxHealth: 1, color: '#00ff00', damage: 0, active: true, ttl: 20
+                              vel: {x: 0, y: -2}, radius: 2, health: 1, maxHealth: 1, color: this.colors.ACID_POOL, damage: 0, active: true, ttl: 20
                           });
                       }
                   }
@@ -1102,6 +1102,8 @@ export class GameEngine {
         else this.particles.pop();
     }
     
+    // Adjusted particle spawning logic for background static mode
+    // We want fewer new particles if the background is static
     if (!this.isLowQuality && this.particles.length < 30) this.spawnBackgroundCell();
     
     this.shakeIntensity *= 0.9;
@@ -1294,11 +1296,39 @@ export class GameEngine {
              this.ctx.fill();
         }
         else if (e.type === EntityType.ACID_POOL) {
+            // POÇA DE ÁCIDO: VISUAL REFORMULADO (CAVEIRA)
+            // Desenha a poça base
             this.ctx.fillStyle = this.colors.ACID_POOL;
-            this.ctx.globalAlpha = 0.4 + Math.sin(this.time/200)*0.1;
+            this.ctx.globalAlpha = 0.3 + Math.sin(this.time/200)*0.1;
             this.ctx.beginPath();
-            this.ctx.arc(e.pos.x, e.pos.y, e.radius, 0, Math.PI*2);
+            
+            // Borda irregular
+            const r = e.radius;
+            const segments = 12;
+            for(let i=0; i<=segments; i++) {
+                const angle = (i / segments) * Math.PI * 2;
+                const wobble = Math.sin(this.time/150 + i) * 5;
+                const px = e.pos.x + Math.cos(angle) * (r + wobble);
+                const py = e.pos.y + Math.sin(angle) * (r + wobble);
+                if (i===0) this.ctx.moveTo(px, py);
+                else this.ctx.lineTo(px, py);
+            }
+            this.ctx.closePath();
             this.ctx.fill();
+            
+            // Anel de Aviso
+            this.ctx.strokeStyle = '#ffff00';
+            this.ctx.lineWidth = 2;
+            this.ctx.globalAlpha = 0.6 + Math.sin(this.time/100)*0.4; // Pisca rápido
+            this.ctx.stroke();
+            
+            // Caveira no Centro
+            this.ctx.globalAlpha = 0.8;
+            this.ctx.font = `${e.radius * 0.8}px var(--font-tech)`; // Emoji escala com o raio
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+            this.ctx.fillText("💀", e.pos.x, e.pos.y);
+            
             this.ctx.globalAlpha = 1.0;
         }
         else if (e.type === EntityType.BIO_MINE) {

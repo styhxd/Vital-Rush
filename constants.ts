@@ -32,8 +32,8 @@ export const COLORS_DEFAULT: ThemePalette = {
   SURGE: 'rgba(0, 255, 255, 0.3)',
   COMBO: '#ffaa00',
   ORBITAL: '#0088ff',
-  BIO_MINE: '#00ff44',
-  ACID_POOL: '#33ff00'
+  BIO_MINE: '#00ff44', // Verde (Explosão aliada/útil)
+  ACID_POOL: '#bf00ff' // Roxo Tóxico (Perigo/Veneno) - Alterado para evitar confusão
 };
 
 export const COLORS_PLATINUM: ThemePalette = {

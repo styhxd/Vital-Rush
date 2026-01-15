@@ -129,15 +129,16 @@
         animation: pulse 4s ease-in-out infinite, flow 3s linear infinite; /* Animação dupla */
         pointer-events: none;
         z-index: 5;
-        will-change: transform, opacity, background-position; /* Dica para o compositor da GPU */
+        will-change: background-position, transform, opacity; /* Dica para o compositor da GPU */
       }
 
       /* PERFORMANCE OVERRIDE */
-      /* Se a classe .perf-mode-low for adicionada ao container principal, matamos as animações pesadas */
+      /* No modo de baixo desempenho, matamos a animação mas mantemos o visual estático da veia */
       .perf-mode-low .vein-overlay {
-          animation: none !important;
-          opacity: 0.05 !important;
+          animation: none !important; /* PÁRA TUDO */
+          opacity: 0.15 !important; /* Mantém visível e estático */
           filter: none !important;
+          background-position: 0 0 !important; /* Reseta posição */
       }
       
       /* Classes utilitárias de brilho para Neon */
