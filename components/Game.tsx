@@ -23,6 +23,7 @@ import { achievementManager } from '../services/achievementManager';
 import { GameState, PlayerStats, Upgrade, WaveConfig, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
 import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES_FIRST, PATIENT_NAMES_LAST, SYMPTOMS_KEYS, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES } from '../constants';
 import { Joystick } from './Joystick';
+import { PauseMenu } from './PauseMenu';
 
 // --- UI COMPONENTS (Pequenos componentes auxiliares) ---
 
@@ -1110,6 +1111,13 @@ export const Game: React.FC = () => {
                         {t('DEPLOY')}
                     </button>
                  </div>
+                 
+                 <button 
+                    onClick={() => setGameState(GameState.MENU)}
+                    className="mt-4 text-[10px] md:text-xs text-red-500/40 hover:text-red-500 tracking-[0.2em] border-b border-transparent hover:border-red-500 transition-all uppercase"
+                 >
+                    {t('ABORT')}
+                 </button>
              </div>
          </div>
       )}
@@ -1194,6 +1202,17 @@ export const Game: React.FC = () => {
       )}
 
       {isMobile && !isPaused && gameState === GameState.PLAYING && <Joystick onMove={handleJoystickMove} />}
+      
+      {/* NEW PAUSE MENU IMPLEMENTATION */}
+      <PauseMenu 
+          isPaused={isPaused} 
+          language={language} 
+          onResume={togglePause} 
+          onQuit={() => {
+              togglePause(); // Unpause logic
+              setGameState(GameState.MENU);
+          }}
+      />
     </div>
   );
 };
