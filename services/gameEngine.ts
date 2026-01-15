@@ -14,8 +14,8 @@
  * que o jogador nunca se sinta seguro.
  */
 
-import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette } from '../types';
-import { COLORS_DEFAULT, CANVAS_WIDTH, CANVAS_HEIGHT, WAVES, DIFFICULTY_MODIFIERS, INITIAL_LIVES, ADRENALINE_MAX_DURATION } from '../constants';
+import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette, Language } from '../types';
+import { COLORS_DEFAULT, CANVAS_WIDTH, CANVAS_HEIGHT, WAVES, DIFFICULTY_MODIFIERS, INITIAL_LIVES, ADRENALINE_MAX_DURATION, TEXTS } from '../constants';
 import { audioManager } from './audioManager';
 import { achievementManager } from './achievementManager';
 
@@ -37,6 +37,7 @@ export class GameEngine {
   public time: number = 0;
   public energy: number = 0; // Mana da ult
   public lives: number = INITIAL_LIVES; // Sistema de Vidas
+  public language: Language = 'EN'; // Idioma padrão, atualizado pelo React
   
   // Stats da Sessão (Contabilidade pra Conquistas)
   public sessionStats = {
@@ -120,6 +121,16 @@ export class GameEngine {
     for(let i=0; i<30; i++) this.spawnBackgroundCell(true);
   }
 
+  // Define o idioma para os textos flutuantes
+  public setLanguage(lang: Language) {
+      this.language = lang;
+  }
+
+  // Helper de tradução interna
+  private t(key: string): string {
+      return TEXTS[this.language][key] || key;
+  }
+
   private createPlayer(stats: PlayerStats): Entity {
     return {
       id: 'player',
@@ -158,7 +169,7 @@ export class GameEngine {
       this.surgeActive = true;
       this.surgeRadius = 0;
       this.shakeIntensity = 25;
-      this.spawnText(this.player.pos, "SURGE!", this.colors.PLAYER_CORE, 40);
+      this.spawnText(this.player.pos, this.t('MSG_SURGE'), this.colors.PLAYER_CORE, 40);
       audioManager.playSurge();
       
       // Puxa todo o dinheiro da tela (Magnetismo global)
@@ -255,7 +266,7 @@ export class GameEngine {
         
         if (this.adrenalineTimer > ADRENALINE_MAX_DURATION) {
             this.adrenalineExhausted = true; // Acabou a mamata
-            this.spawnText(this.player.pos, "ADRENALINE DEPLETED!", "#ff0000", 30);
+            this.spawnText(this.player.pos, this.t('MSG_ADRENALINE_EMPTY'), "#ff0000", 30);
         } else {
             timeScale = 0.4; // O tempo passa a 40% da velocidade
         }
@@ -383,7 +394,7 @@ export class GameEngine {
           if (config.hasBoss && !this.bossSpawned) {
               this.spawnBoss(config);
               this.bossSpawned = true;
-              this.spawnText({x: CANVAS_WIDTH/2, y: CANVAS_HEIGHT/2}, "WARNING: BOSS", this.colors.BOSS, 60);
+              this.spawnText({x: CANVAS_WIDTH/2, y: CANVAS_HEIGHT/2}, this.t('MSG_BOSS_WARN'), this.colors.BOSS, 60);
           }
       }
       
@@ -562,7 +573,7 @@ export class GameEngine {
                    achievementManager.track('mine_pop_20', 1);
                    
                    // KABOOM
-                   this.spawnText(other.pos, "BOOM!", this.colors.BIO_MINE, 40);
+                   this.spawnText(other.pos, this.t('MSG_BOOM'), this.colors.BIO_MINE, 40);
                    audioManager.playExplosion();
                    this.particles.push({
                         id: 'mine_expl', type: EntityType.PARTICLE, pos: {...other.pos},
@@ -648,7 +659,7 @@ export class GameEngine {
              this.shakeIntensity = e.type === EntityType.BOSS ? 20 : 8;
              this.screenShake = { x: (Math.random()-0.5)*10, y: (Math.random()-0.5)*10 };
              
-             if (this.comboCount > 5) this.spawnText(this.player.pos, "COMBO LOST", this.colors.PARASITE, 20);
+             if (this.comboCount > 5) this.spawnText(this.player.pos, this.t('MSG_COMBO_LOST'), this.colors.PARASITE, 20);
              this.comboCount = 0;
 
              // Empurra o inimigo levemente
@@ -738,7 +749,7 @@ export class GameEngine {
           this.surgeActive = true; // Solta uma ult de graça pra limpar a área
           this.surgeRadius = 0;
           this.energy = 0;
-          this.spawnText(this.player.pos, "SYSTEM RESTORED", "#00ffff", 30);
+          this.spawnText(this.player.pos, this.t('MSG_RESTORED'), "#00ffff", 30);
           audioManager.playSurge(); // Som de renascimento
           
           // Empurra todo mundo pra longe
@@ -889,7 +900,7 @@ export class GameEngine {
       // Vampirismo
       if (isCrit && stats.lifesteal > 0) {
          this.player.health = Math.min(this.player.health + 2, this.player.maxHealth);
-         this.spawnText(this.player.pos, "+HP", '#00ff00', 16);
+         this.spawnText(this.player.pos, this.t('MSG_HP_PLUS'), '#00ff00', 16);
       }
 
       this.comboCount++;
@@ -931,7 +942,7 @@ export class GameEngine {
       }
       
       if (this.comboCount % 10 === 0) {
-          this.spawnText(this.player.pos, `${this.comboCount}X COMBO!`, this.colors.COMBO, 40);
+          this.spawnText(this.player.pos, `${this.comboCount}X ${this.t('MSG_COMBO_X')}`, this.colors.COMBO, 40);
       }
       return true;
     }

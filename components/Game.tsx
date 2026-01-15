@@ -164,6 +164,12 @@ export const Game: React.FC = () => {
   }, []);
 
   useEffect(() => {
+      if (engineRef.current) {
+          engineRef.current.setLanguage(language);
+      }
+  }, [language]);
+
+  useEffect(() => {
       const handleUnlock = (ach: Achievement) => {
           setActiveAchievement(ach); 
           setTimeout(() => setActiveAchievement(null), 4000);
@@ -371,6 +377,7 @@ export const Game: React.FC = () => {
 
      if (canvasRef.current) {
          engineRef.current = new GameEngine(canvasRef.current, INITIAL_STATS, newPatient, difficulty, colors);
+         engineRef.current.setLanguage(language);
          
          setStats(INITIAL_STATS);
          setUpgrades(UPGRADES.map(u => ({...u}))); 
@@ -815,11 +822,11 @@ export const Game: React.FC = () => {
                         <span className="text-white">{patient.name} [{patient.age}]</span>
                     </div>
                     <div className="flex justify-between">
-                        <span className="text-gray-500">ID:</span>
+                        <span className="text-gray-500">{t('LABEL_ID')}:</span>
                         <span className="text-white">#{patient.id}</span>
                     </div>
                     <div className="flex justify-between">
-                        <span className="text-gray-500">SYMPTOMS:</span>
+                        <span className="text-gray-500">{t('LABEL_SYMPTOMS')}:</span>
                         <span className="text-red-400">{t(patient.symptoms)}</span>
                     </div>
                     <div className="flex justify-between border-t border-white/10 pt-2 mt-2">
@@ -901,7 +908,7 @@ export const Game: React.FC = () => {
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 overflow-y-auto">
                       {upgrades.filter(u => u.level > 0).length === 0 && (
-                          <div className="col-span-3 text-center text-white/30 py-10 font-mono">NO ACTIVE MUTATIONS DETECTED</div>
+                          <div className="col-span-3 text-center text-white/30 py-10 font-mono">{t('NO_MUTATIONS')}</div>
                       )}
                       
                       {upgrades.filter(u => u.level > 0).map((u, i) => (
@@ -939,20 +946,20 @@ export const Game: React.FC = () => {
                  </div>
                  
                  <div>
-                    <div className="text-xs text-gray-500 tracking-widest mb-4 border-b border-white/5 pb-2">AUDIO</div>
+                    <div className="text-xs text-gray-500 tracking-widest mb-4 border-b border-white/5 pb-2">{t('LABEL_AUDIO')}</div>
                     <VolumeSlider label="MASTER" value={audioSettings.master} onChange={(v) => updateAudio('master', v)} />
                     <VolumeSlider label="MUSIC" value={audioSettings.music} onChange={(v) => updateAudio('music', v)} />
                     <VolumeSlider label="SFX" value={audioSettings.sfx} onChange={(v) => updateAudio('sfx', v)} />
                 </div>
 
                  <div className="mt-8 pt-4 border-t border-white/5">
-                     <label className="block text-gray-700 text-[10px] tracking-widest mb-2 text-center uppercase">System Override</label>
+                     <label className="block text-gray-700 text-[10px] tracking-widest mb-2 text-center uppercase">{t('LABEL_OVERRIDE')}</label>
                      <input 
                         type="password" 
                         value={cheatInput} 
                         onChange={handleCheatInput}
                         className="w-full bg-black border border-white/10 p-2 text-center text-xs tracking-widest text-red-500 focus:outline-none focus:border-red-500/50 transition-colors"
-                        placeholder="ACCESS CODE"
+                        placeholder={t('PH_ACCESS_CODE')}
                      />
                  </div>
               </div>
