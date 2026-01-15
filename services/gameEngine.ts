@@ -143,6 +143,10 @@ export class GameEngine {
     this.bossSpawned = false;
     this.spawnTimer = 0;
     
+    // ATUALIZA A MÚSICA PARA A NOVA ONDA (Mudança de tonalidade e BPM)
+    const waveNum = waveIndex + 1; // Index é 0-based
+    audioManager.setGameState(waveNum, 1.0);
+    
     // Checks de Conquista
     if (waveIndex === 4) achievementManager.track('wave_5', 5);
     if (waveIndex === 9) achievementManager.track('wave_10', 10);
@@ -259,6 +263,14 @@ export class GameEngine {
         this.adrenalineActive = false;
         // Se a vida subiu pra cima de 30%, o timer reseta? 
         // Não. Vamos ser cruéis. Se curar, o timer para, mas não reseta. Só reseta se morrer.
+    }
+    
+    // MÚSICA ADAPTATIVA: Envia a vida atual para o filtro Low-Pass
+    // Isso cria o efeito de "ouvido entupido" quando está morrendo.
+    if (this.player.active) {
+        const healthRatio = Math.max(0, this.player.health / this.player.maxHealth);
+        // Usa waveNumber atual (base 1)
+        audioManager.setGameState(this.currentWaveIndex + 1, healthRatio);
     }
 
     const safeDt = Math.min(dt, 50) * timeScale; // Capa o delta time pra evitar bugs de física se o PC travar
