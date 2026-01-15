@@ -4,17 +4,16 @@
  * DIRETOR: PAULO GABRIEL DE L. S.
  * ------------------------------------------------------------------
  * 
- * A BESTA (GAME ENGINE) - PROTOCOLO "GRAVIDADE & VINGANÇA"
+ * A BESTA (GAME ENGINE) - PROTOCOLO "NEON LITE" (GRADIENT EDITION)
  * 
- * CORREÇÕES DE RENDERIZAÇÃO E PERFORMANCE (V2.1):
- * 1. CLAMP DT: Delta Time travado em 60ms. Se o jogo travar por 1 segundo,
- *    ele não tenta simular 1 segundo de física num frame só (o que causa explosão).
- *    Ele simula apenas 1 frame suave.
- * 2. BATCH RENDERING FIX: O loop de desenho foi separado. Projéteis (batch) são
- *    desenhados separadamente de Inimigos (individual path). Isso corrige as 
- *    "linhas verticais" bizarras conectando inimigos.
- * 3. BLOOD FLOW: Partículas de fundo agora são muito mais rápidas e reagem
- *    diretamente à velocidade do fluxo, criando sensação de velocidade sem custo de CPU.
+ * ATUALIZAÇÃO V4.1: GRADIENTES RADIAIS
+ * 
+ * Correção estética: Substituímos os halos sólidos (efeito "ovo") por
+ * gradientes radiais suaves.
+ * 
+ * Técnica: createRadialGradient(0, 0, inner, 0, 0, outer)
+ * Performance: Extremamente leve (GPU native).
+ * Visual: Glow suave que desaparece nas bordas, idêntico a luz real.
  */
 
 import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette, Language } from '../types';
@@ -36,6 +35,17 @@ const distSq = (v1: Vector2, v2: Vector2) => Math.pow(v2.x - v1.x, 2) + Math.pow
 const GRID_CELL_SIZE = 150;
 const GRID_COLS = Math.ceil(CANVAS_WIDTH / GRID_CELL_SIZE);
 const GRID_ROWS = Math.ceil(CANVAS_HEIGHT / GRID_CELL_SIZE);
+
+// Helper para criar cores transparentes para gradientes
+function hexToRgba(hex: string, alpha: number): string {
+    if (hex.startsWith('#')) {
+        const r = parseInt(hex.slice(1, 3), 16);
+        const g = parseInt(hex.slice(3, 5), 16);
+        const b = parseInt(hex.slice(5, 7), 16);
+        return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
+    return hex; // Fallback se já for rgba (embora não deva acontecer nos hex colors)
+}
 
 export class GameEngine {
   public entities: Entity[] = [];
@@ -90,7 +100,7 @@ export class GameEngine {
   public bossSpawned: boolean = false;
   
   public inputVector: Vector2 = { x: 0, y: 0 };
-  private bloodFlow: Vector2 = { x: -3.5, y: 0 }; // Aumentado fluxo base para sensação de velocidade
+  private bloodFlow: Vector2 = { x: -3.5, y: 0 }; 
   private lastShotTime: number = 0;
   private spawnTimer: number = 0;
   private regenTimer: number = 0;
@@ -105,18 +115,13 @@ export class GameEngine {
   public adrenalineExhausted: boolean = false;
   
   public invulnerabilityTimer: number = 0;
-  
-  // HIT STOP
   private hitStopTimer: number = 0;
 
-  // SMART WAVE END & VACUUM
-  private clearBufferTimer: number = 0; // Tempo de segurança sem inimigos antes de acabar
-  private isVacuuming: boolean = false; // Modo "Aspirador de Pó" no fim da wave
+  private clearBufferTimer: number = 0; 
+  private isVacuuming: boolean = false; 
   
-  private maxParticles = 300; // Leve aumento para dar mais volume
-  private maxEntities = 400;
-  private frameTimeAccumulator = 0;
-  private framesCounted = 0;
+  private maxParticles = 200; 
+  private maxEntities = 350; 
 
   private grid: Map<number, Entity[]> = new Map();
 
@@ -133,7 +138,7 @@ export class GameEngine {
     this.player = this.createPlayer(initialStats);
     this.lastInputTime = Date.now();
     
-    for(let i=0; i<60; i++) this.spawnBackgroundCell(true);
+    for(let i=0; i<30; i++) this.spawnBackgroundCell(true);
   }
 
   public setLanguage(lang: Language) { this.language = lang; }
@@ -156,11 +161,11 @@ export class GameEngine {
   }
 
   public spawnBackgroundCell(init: boolean = false) {
+      if (Math.random() > 0.4) return; // Menos background clutter
+
       const y = Math.random() * CANVAS_HEIGHT;
       const x = init ? Math.random() * CANVAS_WIDTH : CANVAS_WIDTH + 50;
-      const size = Math.random() * 4 + 2; // Partículas maiores
-      
-      // Velocidade relativa ao player, mas sempre rápida pra dar ideia de fluxo
+      const size = Math.random() * 4 + 2; 
       const speed = Math.random() * 2 + 1;
       
       this.particles.push({
@@ -176,6 +181,8 @@ export class GameEngine {
   }
 
   public spawnText(pos: Vector2, text: string, color: string, fontSize: number = 20) {
+      if (this.entities.filter(e => e.type === EntityType.TEXT_POPUP).length > 8) return;
+
       this.entities.push({
           id: text, 
           type: EntityType.TEXT_POPUP,
@@ -287,7 +294,6 @@ export class GameEngine {
       target.health -= finalDamage;
       target.hitFlash = 5;
       
-      // BOSS ANCHOR: Bosses quase não se movem com dano
       const knockback = target.type === EntityType.BOSS ? 0.1 : 2;
       target.pos.x += knockback; 
 
@@ -303,7 +309,8 @@ export class GameEngine {
       if (target.health <= 0) {
           target.active = false;
           
-          const count = target.type === EntityType.BOSS ? 50 : 8;
+          const count = (target.type === EntityType.BOSS ? 20 : 4); 
+          
           for(let i=0; i<count; i++) {
               this.particles.push({
                   id: 'blood', type: EntityType.PARTICLE,
@@ -378,12 +385,11 @@ export class GameEngine {
       return false;
   }
 
-  // PROTOCOLO VINGANÇA ATUALIZADO
   public handlePlayerDeath(onGameOver: () => void, onLifeLost: () => void, currentStats: PlayerStats) {
       if (this.lives > 0) {
           this.lives--;
-          onLifeLost(); // Notifica a UI
-          this.hitStopTimer = 0.2; // HIT STOP: 200ms de pausa dramática
+          onLifeLost(); 
+          this.hitStopTimer = 0.2; 
           achievementManager.track('die_10', 1);
           
           if (this.lives === 0) {
@@ -402,19 +408,16 @@ export class GameEngine {
               }
               onGameOver();
           } else {
-              // VINGANÇA: Surge automático com estilo VISCERAL
               this.triggerSurge(currentStats, true);
 
               this.player.health = this.player.maxHealth;
-              this.energy = 0; // Ainda zera a energia normal
+              this.energy = 0; 
               this.invulnerabilityTimer = 3.0;
               this.spawnText(this.player.pos, "CRITICAL FAILURE", '#ff0000', 50);
               
-              // Efeito de impacto massivo
               this.screenShake = {x: 40, y: 40}; 
               this.shakeIntensity = 40;
               
-              // Partículas de "sangue" do player explodindo
               for(let i=0; i<40; i++) {
                   const angle = Math.random() * Math.PI * 2;
                   const speed = Math.random() * 15 + 5;
@@ -429,7 +432,6 @@ export class GameEngine {
                   });
               }
               
-              // BLACK HOLE MANTIDO (Segurança extra)
               const killRadiusSq = 500 * 500;
               this.entities.forEach(e => {
                   if ((this.isEnemy(e.type) || e.type === EntityType.BOSS) && distSq(this.player.pos, e.pos) < killRadiusSq) {
@@ -445,7 +447,6 @@ export class GameEngine {
   }
 
   public prepareWave() {
-      // Remover excesso de partículas, mas manter as de background
       this.particles = this.particles.filter(p => p.id === 'bg' || Math.random() > 0.8);
       
       this.lastShotTime = performance.now();
@@ -461,32 +462,25 @@ export class GameEngine {
     this.waveActive = true;
     this.bossSpawned = false;
     this.spawnTimer = 0;
-    this.clearBufferTimer = 0; // Reset do buffer
-    this.isVacuuming = false;  // Reset do aspirador
+    this.clearBufferTimer = 0; 
+    this.isVacuuming = false;  
     const waveNum = waveIndex + 1; 
     audioManager.setGameState(waveNum, 1.0);
-    
-    // Aumenta o fluxo conforme a wave pra dar mais tensão
     this.bloodFlow.x = -2.5 - (waveIndex * 0.5); 
-    
     if (waveIndex === 4) achievementManager.track('wave_5', 5);
     if (waveIndex === 9) achievementManager.track('wave_10', 10);
   }
 
-  // FORCE: Se true, ignora custo de energia e ativa o modo "Morte"
   public triggerSurge(stats: PlayerStats, force: boolean = false) {
     if (force || this.energy >= stats.maxEnergy) {
       if (!force) this.energy = 0;
-      
       this.surgeActive = true;
-      this.deathSurgeActive = force; // Ativa visual vermelho se for morte
+      this.deathSurgeActive = force; 
       this.surgeRadius = 0;
       this.shakeIntensity = force ? 40 : 30;
-      
       if (!force) {
           this.spawnText(this.player.pos, this.t('MSG_SURGE'), this.colors.PLAYER_CORE, 45);
       }
-      
       audioManager.playSurge();
       this.entities.forEach(e => {
           if (e.type === EntityType.DNA_FRAGMENT && e.active) {
@@ -502,11 +496,9 @@ export class GameEngine {
           this.dashCooldownTimer = stats.dashCooldown / 1000;
           this.isDashing = true;
           this.dashDuration = 0.2; 
-          
           let dx = this.inputVector.x;
           let dy = this.inputVector.y;
           if (dx === 0 && dy === 0) dx = 1;
-          
           const mag = Math.sqrt(dx*dx + dy*dy);
           this.dashVector = { x: (dx / mag), y: (dy / mag) };
           this.player.vel.x = this.dashVector.x * stats.dashSpeed;
@@ -548,10 +540,7 @@ export class GameEngine {
       }
   }
 
-  private clearGrid() {
-      this.grid.clear();
-  }
-
+  private clearGrid() { this.grid.clear(); }
   private addToGrid(e: Entity) {
       const col = Math.floor(e.pos.x / GRID_CELL_SIZE);
       const row = Math.floor(e.pos.y / GRID_CELL_SIZE);
@@ -560,7 +549,6 @@ export class GameEngine {
       if (!this.grid.has(idx)) this.grid.set(idx, []);
       this.grid.get(idx)!.push(e);
   }
-
   private getPotentialCollisions(e: Entity): Entity[] {
       const col = Math.floor(e.pos.x / GRID_CELL_SIZE);
       const row = Math.floor(e.pos.y / GRID_CELL_SIZE);
@@ -576,50 +564,26 @@ export class GameEngine {
       }
       return candidates;
   }
-
   private killAllEnemies() {
       this.entities.forEach(e => {
           if (this.isEnemy(e.type) || e.type === EntityType.BOSS) {
-              e.health = -999; 
-              e.active = false;
-              e.pos.x = -10000; 
-              for(let i=0; i<5; i++) {
+              e.health = -999; e.active = false; e.pos.x = -10000; 
+              for(let i=0; i<3; i++) {
                   this.particles.push({
-                      id: 'force_kill', type: EntityType.PARTICLE, pos: {x: CANVAS_WIDTH/2 + (Math.random()-0.5)*CANVAS_WIDTH, y: CANVAS_HEIGHT/2}, // Efeito global
-                      vel: {x: 0, y: -5},
-                      radius: 3, health:1, maxHealth:1, color: e.color, damage:0, active:true, ttl: 15
+                      id: 'force_kill', type: EntityType.PARTICLE, pos: {x: CANVAS_WIDTH/2 + (Math.random()-0.5)*CANVAS_WIDTH, y: CANVAS_HEIGHT/2},
+                      vel: {x: 0, y: -5}, radius: 3, health:1, maxHealth:1, color: e.color, damage:0, active:true, ttl: 15
                   });
               }
           }
       });
   }
 
-  // UPDATE LOOP CORRIGIDO
   public update(dt: number, stats: PlayerStats, onWaveClear: () => void, onGameOver: () => void, onLifeLost: () => void) {
-    // --- LAG PREVENTION (CLAMP DT) ---
-    // Se o frame demorar mais que 100ms (pause/lag spike), assumimos que foi um frame normal (16ms).
-    // Isso evita que inimigos pulem pela tela ou que o jogo exploda após um pause.
-    if (dt > 100) dt = 16.66;
+    if (dt > 100) dt = 16.66; 
 
-    // --- HIT STOP MECHANIC ---
     if (this.hitStopTimer > 0) {
         this.hitStopTimer -= (dt / 1000);
-        return; // FREEZE THE GAME LOGIC
-    }
-
-    this.frameTimeAccumulator += dt;
-    this.framesCounted++;
-    if (this.framesCounted > 60) {
-        const avgFrameTime = this.frameTimeAccumulator / this.framesCounted;
-        if (avgFrameTime > 20) { 
-            this.maxParticles = 100;
-            this.maxEntities = 250;
-        } else {
-            this.maxParticles = 300;
-            this.maxEntities = 400;
-        }
-        this.frameTimeAccumulator = 0;
-        this.framesCounted = 0;
+        return;
     }
 
     let timeScale = 1.0;
@@ -641,7 +605,6 @@ export class GameEngine {
         audioManager.setGameState(this.currentWaveIndex + 1, healthRatio);
     }
 
-    // Double-check clamp just in case
     let cappedDt = dt;
     if (cappedDt > 60) cappedDt = 16.66;
 
@@ -659,7 +622,6 @@ export class GameEngine {
         this.invulnerabilityTimer = 0; 
     }
 
-    // CHECK DE MORTE (Agora com callback de vida perdida)
     if (this.player.active && this.player.health <= 0.5) {
         this.handlePlayerDeath(onGameOver, onLifeLost, stats);
         return; 
@@ -714,7 +676,7 @@ export class GameEngine {
                 radius: this.player.radius, health: 1, maxHealth: 1, color: 'rgba(255, 255, 255, 0.3)',
                 active: true, ttl: 10, damage: 0
             });
-            this.dashTrailTimer = 0.03;
+            this.dashTrailTimer = 0.05; // Menos rastro
         }
 
         if (this.dashDuration <= 0) {
@@ -728,8 +690,7 @@ export class GameEngine {
       this.waveTimer += dtSeconds;
       const config = WAVES[Math.min(this.currentWaveIndex, WAVES.length - 1)];
       
-      // Update Blood Flow Speed
-      const targetFlow = config.flowSpeed - (this.currentWaveIndex * 0.2); // Fica mais rápido com o tempo
+      const targetFlow = config.flowSpeed - (this.currentWaveIndex * 0.2); 
       this.bloodFlow.x = this.bloodFlow.x * 0.95 + targetFlow * 0.05;
       
       let spawnRateMod = 1.0;
@@ -762,12 +723,10 @@ export class GameEngine {
       const enemiesRemaining = this.entities.some(e => e.active && (this.isEnemy(e.type) || e.type === EntityType.BOSS));
       const bossRemaining = this.entities.some(e => e.active && e.type === EntityType.BOSS);
       
-      // LOGICA DE FIM DE WAVE INTELIGENTE
       if (this.waveTimer >= config.duration) {
           if (!enemiesRemaining && (!config.hasBoss || (this.bossSpawned && !bossRemaining))) {
-              this.isVacuuming = true; // Inicia a coleta
+              this.isVacuuming = true; 
           } else if (!config.hasBoss && !bossRemaining) {
-              // Verifica inimigos VISÍVEIS na tela (com margem de 50px)
               const hasVisibleEnemies = this.entities.some(e => 
                   (this.isEnemy(e.type) || e.type === EntityType.BOSS) && e.active &&
                   e.pos.x > -50 && e.pos.x < CANVAS_WIDTH + 50 &&
@@ -776,23 +735,20 @@ export class GameEngine {
 
               if (!hasVisibleEnemies) {
                   this.clearBufferTimer += dtSeconds;
-                  // Se ficar 3 segundos sem ninguém na tela, considera limpo
                   if (this.clearBufferTimer > 3.0) {
-                      this.killAllEnemies(); // Limpa quem sobrou fora da tela
+                      this.killAllEnemies(); 
                       this.isVacuuming = true;
                   }
               } else {
-                  this.clearBufferTimer = 0; // Reset se alguém aparecer
+                  this.clearBufferTimer = 0; 
               }
           }
       }
       
       if (this.isVacuuming) {
-          // Protocolo Vácuo: Puxa todo DNA para o player
           const dnaFragments = this.entities.filter(e => e.type === EntityType.DNA_FRAGMENT && e.active);
           
           if (dnaFragments.length === 0) {
-              // Só termina quando não tiver mais DNA
               this.waveActive = false;
               this.isVacuuming = false;
               if (this.currentWaveIndex === 0 && this.sessionStats.damageTaken === 0) achievementManager.track('perfect_wave', 1);
@@ -816,7 +772,6 @@ export class GameEngine {
               const dy = e.pos.y - this.player.pos.y;
               const dist = Math.sqrt(d);
               
-              // BOSS ANCHOR: Bosses não são empurrados pelo Surge
               if (e.type !== EntityType.BOSS) {
                   e.vel.x += (dx/dist) * 25; 
                   e.vel.y += (dy/dist) * 25;
@@ -876,7 +831,7 @@ export class GameEngine {
                   if (!this.isDashing && this.invulnerabilityTimer <= 0) {
                       this.player.health -= 0.5 * tick; 
                       this.sessionStats.damageTaken += 0.5 * tick;
-                      if (Math.random() < 0.1) {
+                      if (!this.isLowQuality() && Math.random() < 0.1) {
                           this.particles.push({
                               id: 'acid_burn', type: EntityType.PARTICLE, pos: {...this.player.pos},
                               vel: {x: 0, y: -2}, radius: 2, health: 1, maxHealth: 1, color: '#00ff00', damage: 0, active: true, ttl: 20
@@ -905,7 +860,6 @@ export class GameEngine {
         e.pos.x += (e.vel.x + (this.bloodFlow.x * (1 - drag) * flowInfluence)) * tick;
         e.pos.y += (e.vel.y + (this.bloodFlow.y * (1 - drag) * flowInfluence)) * tick;
         
-        // BOSS CLAMP: Garante que o Boss NUNCA saia da tela, não importa o que aconteça
         if (e.type === EntityType.BOSS) {
             const margin = e.radius + 10;
             e.pos.x = Math.max(margin, Math.min(CANVAS_WIDTH - margin, e.pos.x));
@@ -983,7 +937,7 @@ export class GameEngine {
                    if (e.type === EntityType.ANTIBODY) {
                        audioManager.playHit();
                        const angle = Math.atan2(e.vel.y, e.vel.x);
-                       for(let j=0; j<3; j++) {
+                       for(let j=0; j<2; j++) { // Reduzido particles
                            this.particles.push({
                                id: 'spark', type: EntityType.PARTICLE, pos: {...e.pos}, 
                                vel: { x: Math.cos(angle + (Math.random()-0.5)) * 5, y: Math.sin(angle + (Math.random()-0.5)) * 5 },
@@ -1049,14 +1003,10 @@ export class GameEngine {
           const dx = this.player.pos.x - e.pos.x;
           const dy = this.player.pos.y - e.pos.y;
           const dist = Math.sqrt(dx*dx + dy*dy);
-          
-          // VACUUM MODE: Ignora magnet radius, puxa TUDO
           const isVacuuming = this.isVacuuming;
           
           if (dist < stats.magnetRadius || this.surgeActive || isVacuuming) {
-            // Se estiver no vácuo, velocidade extrema (80)
             const speed = isVacuuming ? 80 : (this.surgeActive ? 50 : 28);
-            
             e.pos.x += (dx / dist) * speed * tick;
             e.pos.y += (dy / dist) * speed * tick;
             
@@ -1076,7 +1026,6 @@ export class GameEngine {
       }
     }
 
-    // UPDATE PARTICLES (BACKGROUND FLOW IMPROVEMENT)
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       if (p.id === 'mine_expl') {
@@ -1085,11 +1034,9 @@ export class GameEngine {
           continue;
       }
       
-      // Partículas de BG agora fluem 100% com o bloodFlow para dar sensação de velocidade
-      // Elas ignoram o drag
       if (p.id === 'bg') {
-          p.pos.x += (p.vel.x + this.bloodFlow.x * 2) * tick; // Multiplicador para background mais rápido
-          if (p.pos.x < -50) p.pos.x = CANVAS_WIDTH + 50; // Recycle
+          p.pos.x += (p.vel.x + this.bloodFlow.x * 2) * tick; 
+          if (p.pos.x < -50) p.pos.x = CANVAS_WIDTH + 50; 
       } else {
           p.pos.x += (p.vel.x + this.bloodFlow.x) * tick;
           p.pos.y += (p.vel.y + this.bloodFlow.y) * tick;
@@ -1102,17 +1049,19 @@ export class GameEngine {
     }
     
     if (this.particles.length > this.maxParticles) {
-        // Remove preferencialmente não-bg se estiver lotado
         const nonBg = this.particles.findIndex(p => p.id !== 'bg');
         if (nonBg !== -1) this.particles.splice(nonBg, 1);
         else this.particles.pop();
     }
     
-    if (this.particles.length < 60) this.spawnBackgroundCell();
+    if (this.particles.length < 30) this.spawnBackgroundCell();
     
     this.shakeIntensity *= 0.9;
     if (this.shakeIntensity < 0.5) this.shakeIntensity = 0;
   }
+
+  // Helper
+  private isLowQuality() { return true; } // Sempre otimizado
 
   private isOutOfBounds(pos: Vector2) {
     return pos.x < -100 || pos.x > CANVAS_WIDTH + 100 || pos.y < -100 || pos.y > CANVAS_HEIGHT + 100;
@@ -1152,36 +1101,26 @@ export class GameEngine {
       const angle = Math.atan2(target.pos.y - this.player.pos.y, target.pos.x - this.player.pos.x);
       const count = stats.bulletCount;
       const spread = 0.15; 
-      
       const startAngle = angle - ((count - 1) * spread) / 2;
 
       for (let i = 0; i < count; i++) {
           const a = startAngle + (i * spread) + (Math.random() - 0.5) * 0.05;
-          
           this.entities.push({
               id: `p_${Date.now()}_${i}`,
               type: EntityType.ANTIBODY,
               pos: { ...this.player.pos },
-              vel: { 
-                  x: Math.cos(a) * stats.bulletSpeed, 
-                  y: Math.sin(a) * stats.bulletSpeed 
-              },
-              radius: 5,
-              health: 1, 
-              maxHealth: 1,
-              color: this.colors.ANTIBODY,
-              damage: stats.damage,
-              active: true,
-              ttl: 120 
+              vel: { x: Math.cos(a) * stats.bulletSpeed, y: Math.sin(a) * stats.bulletSpeed },
+              radius: 5, health: 1, maxHealth: 1, color: this.colors.ANTIBODY,
+              damage: stats.damage, active: true, ttl: 120 
           });
       }
       this.sessionStats.bulletsFired += count;
       audioManager.playShoot();
-      
       this.player.vel.x -= Math.cos(angle) * 0.5;
       this.player.vel.y -= Math.sin(angle) * 0.5;
   }
 
+  // --- DRAWING: RENDERIZAÇÃO LÍQUIDA ---
   public draw() {
     this.ctx.fillStyle = this.colors.BG;
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -1190,8 +1129,6 @@ export class GameEngine {
     if (aberration) {
         this.ctx.save();
         this.ctx.globalCompositeOperation = 'screen';
-        
-        // Efeito de Morte ou Surge agressivo: Aberração Cromática Vermelha
         const shiftX = this.deathSurgeActive ? -8 : -2;
         this.ctx.translate(shiftX, 0); 
         this.ctx.fillStyle = this.deathSurgeActive ? 'rgba(255,0,0,0.3)' : 'rgba(255,0,0,0.1)';
@@ -1207,19 +1144,28 @@ export class GameEngine {
       this.ctx.translate(sx, sy);
     }
 
+    // SURGE
     if (this.surgeActive) {
       this.ctx.beginPath();
-      // DEATH SURGE: Desenho instável (radius varia com random) para parecer uma explosão biológica
       const r = this.deathSurgeActive ? this.surgeRadius * (0.9 + Math.random()*0.2) : this.surgeRadius;
-      
       this.ctx.arc(this.player.pos.x, this.player.pos.y, r, 0, Math.PI * 2);
+      
+      // Fake Glow para Surge (já era gradiente antes, vamos manter)
+      this.ctx.globalAlpha = 0.3;
+      this.ctx.lineWidth = this.deathSurgeActive ? 60 : 30;
       this.ctx.strokeStyle = this.deathSurgeActive ? '#ff0000' : this.colors.SURGE;
-      this.ctx.lineWidth = this.deathSurgeActive ? 40 : 20;
       this.ctx.stroke();
+      
+      this.ctx.globalAlpha = 1.0;
+      this.ctx.lineWidth = 5;
+      this.ctx.stroke();
+      
       this.ctx.fillStyle = this.deathSurgeActive ? `rgba(255, 0, 0, 0.2)` : `rgba(0, 255, 255, 0.1)`;
       this.ctx.fill();
     }
 
+    // PARTICLES (COM BLEND MODE LEVE)
+    this.ctx.globalCompositeOperation = 'screen';
     this.particles.forEach(p => {
       if (p.id === 'ghost') {
           this.ctx.fillStyle = p.color;
@@ -1231,13 +1177,6 @@ export class GameEngine {
           this.ctx.beginPath();
           this.ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI*2);
           this.ctx.fill();
-      } else if (p.id === 'blood_surge') {
-          this.ctx.fillStyle = p.color;
-          this.ctx.beginPath();
-          // Partículas de sangue alongadas
-          const angle = Math.atan2(p.vel.y, p.vel.x);
-          this.ctx.ellipse(p.pos.x, p.pos.y, p.radius*2, p.radius*0.5, angle, 0, Math.PI*2);
-          this.ctx.fill();
       } else {
         this.ctx.globalAlpha = p.id === 'bg' ? 0.3 : (p.ttl! / 20); 
         this.ctx.fillStyle = p.color;
@@ -1246,17 +1185,17 @@ export class GameEngine {
         this.ctx.fill();
       }
     });
+    this.ctx.globalCompositeOperation = 'source-over';
     this.ctx.globalAlpha = 1.0;
 
-    // --- BATCH DRAWING: ANTIBODIES ---
-    // Desenha todos os projéteis em um único path para performance
+    // --- PROJÉTEIS (LINHA MAIS SUAVE) ---
+    // 1. Passagem do Halo (Larga e muito transparente)
+    this.ctx.globalCompositeOperation = 'screen';
     this.ctx.beginPath();
     this.ctx.strokeStyle = this.colors.ANTIBODY;
-    this.ctx.lineWidth = 4;
+    this.ctx.lineWidth = 10; 
     this.ctx.lineCap = 'round';
-    this.ctx.shadowBlur = 15;
-    this.ctx.shadowColor = this.colors.ANTIBODY;
-    
+    this.ctx.globalAlpha = 0.15; 
     this.entities.forEach(e => {
         if (e.type === EntityType.ANTIBODY) {
              this.ctx.moveTo(e.pos.x, e.pos.y);
@@ -1265,13 +1204,39 @@ export class GameEngine {
              this.ctx.lineTo(tailX, tailY);
         }
     });
-    this.ctx.stroke(); 
-    this.ctx.shadowBlur = 0; 
+    this.ctx.stroke();
     
-    // --- INDIVIDUAL DRAWING: ORBITALS & OTHERS ---
-    // Desenhado separadamente para evitar glitch visual de paths conectados
+    // 2. Passagem do Núcleo
+    this.ctx.globalCompositeOperation = 'source-over';
+    this.ctx.beginPath();
+    this.ctx.lineWidth = 3; 
+    this.ctx.globalAlpha = 1.0;
+    this.ctx.strokeStyle = '#fff';
+    this.entities.forEach(e => {
+        if (e.type === EntityType.ANTIBODY) {
+             this.ctx.moveTo(e.pos.x, e.pos.y);
+             const tailX = e.pos.x - e.vel.x * 0.4; 
+             const tailY = e.pos.y - e.vel.y * 0.4;
+             this.ctx.lineTo(tailX, tailY);
+        }
+    });
+    this.ctx.stroke();
+
+    // --- ENTIDADES (INDIVIDUAL) ---
     this.entities.forEach(e => {
         if (e.type === EntityType.ORBITAL) {
+             // Gradiente para Orbital
+             const grad = this.ctx.createRadialGradient(e.pos.x, e.pos.y, e.radius * 0.2, e.pos.x, e.pos.y, e.radius * 2.0);
+             grad.addColorStop(0, hexToRgba(this.colors.ORBITAL, 0.6));
+             grad.addColorStop(1, 'rgba(0,0,0,0)');
+             
+             this.ctx.globalCompositeOperation = 'screen';
+             this.ctx.fillStyle = grad;
+             this.ctx.beginPath();
+             this.ctx.arc(e.pos.x, e.pos.y, e.radius * 2.0, 0, Math.PI*2);
+             this.ctx.fill();
+             
+             this.ctx.globalCompositeOperation = 'source-over';
              this.ctx.strokeStyle = this.colors.ORBITAL;
              this.ctx.lineWidth = 2;
              this.ctx.beginPath();
@@ -1282,12 +1247,6 @@ export class GameEngine {
              this.ctx.beginPath();
              this.ctx.arc(e.pos.x, e.pos.y, e.radius/2, 0, Math.PI*2);
              this.ctx.fill();
-             
-             this.ctx.beginPath();
-             this.ctx.moveTo(this.player.pos.x, this.player.pos.y);
-             this.ctx.lineTo(e.pos.x, e.pos.y);
-             this.ctx.strokeStyle = `rgba(0, 136, 255, 0.1)`;
-             this.ctx.stroke();
         }
         else if (e.type === EntityType.ACID_POOL) {
             this.ctx.fillStyle = this.colors.ACID_POOL;
@@ -1298,9 +1257,19 @@ export class GameEngine {
             this.ctx.globalAlpha = 1.0;
         }
         else if (e.type === EntityType.BIO_MINE) {
+            // Gradiente para Mina
+            const grad = this.ctx.createRadialGradient(e.pos.x, e.pos.y, e.radius * 0.2, e.pos.x, e.pos.y, e.radius * 2.0);
+            grad.addColorStop(0, hexToRgba(this.colors.BIO_MINE, 0.5));
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+            this.ctx.globalCompositeOperation = 'screen';
+            this.ctx.fillStyle = grad;
+            this.ctx.beginPath();
+            this.ctx.arc(e.pos.x, e.pos.y, e.radius * 2, 0, Math.PI*2);
+            this.ctx.fill();
+            this.ctx.globalCompositeOperation = 'source-over';
+
             this.ctx.fillStyle = this.colors.BIO_MINE;
-            this.ctx.shadowBlur = 10;
-            this.ctx.shadowColor = this.colors.BIO_MINE;
             this.ctx.beginPath();
             const spikes = 8;
             for(let i=0; i<spikes*2; i++) {
@@ -1310,12 +1279,9 @@ export class GameEngine {
             }
             this.ctx.closePath();
             this.ctx.fill();
-            this.ctx.shadowBlur = 0;
         }
         else if (e.type === EntityType.DNA_FRAGMENT) {
             this.ctx.fillStyle = e.isElite ? this.colors.ELITE_GLOW : this.colors.DNA;
-            this.ctx.shadowBlur = e.isElite ? 20 : 5;
-            this.ctx.shadowColor = this.ctx.fillStyle;
             this.ctx.beginPath();
             const s = e.radius;
             this.ctx.save();
@@ -1323,35 +1289,52 @@ export class GameEngine {
             this.ctx.rotate(this.time / 200);
             this.ctx.fillRect(-s/2, -s/2, s, s);
             this.ctx.restore();
-            this.ctx.shadowBlur = 0;
         }
     });
 
-    // --- ENEMIES & BOSS ---
-    // Usamos loops separados e beginPath explicito para evitar linhas verticais conectando entidades
+    // --- INIMIGOS ---
     this.entities.forEach(e => {
       if (this.isEnemy(e.type) || e.type === EntityType.BOSS) {
         this.ctx.save();
         this.ctx.translate(e.pos.x, e.pos.y);
         
-        // ELITE GLOW
-        if (e.isElite || e.type === EntityType.BOSS) {
-           const color = e.type === EntityType.BOSS ? this.colors.BOSS : this.colors.ELITE_GLOW;
-           this.ctx.shadowBlur = 20;
-           this.ctx.shadowColor = color;
-           this.ctx.strokeStyle = color;
-           this.ctx.lineWidth = 3;
-           
-           this.ctx.beginPath(); // CRÍTICO: Isola o path do glow
-           this.ctx.arc(0, 0, e.radius + 5, 0, Math.PI*2);
-           this.ctx.stroke();
+        // FAKE GLOW (GRADIENTE RADIAL - ADEUS OVO)
+        const glowColor = e.isElite || e.type === EntityType.BOSS 
+            ? (e.type === EntityType.BOSS ? this.colors.BOSS : this.colors.ELITE_GLOW)
+            : e.color;
+            
+        // Verifica se é hex para criar o gradiente corretamente
+        if (glowColor.startsWith('#')) {
+            const glowRadius = e.radius * (e.type === EntityType.BOSS ? 2.5 : 2.0);
+            const grad = this.ctx.createRadialGradient(0, 0, e.radius * 0.2, 0, 0, glowRadius);
+            grad.addColorStop(0, hexToRgba(glowColor, 0.6)); // Centro brilhante
+            grad.addColorStop(0.5, hexToRgba(glowColor, 0.2)); // Meio suave
+            grad.addColorStop(1, 'rgba(0,0,0,0)'); // Borda transparente
+            
+            this.ctx.globalCompositeOperation = 'screen';
+            this.ctx.fillStyle = grad;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, glowRadius, 0, Math.PI*2);
+            this.ctx.fill();
+        } else {
+            // Fallback para cores rgba complexas (raro)
+            this.ctx.globalCompositeOperation = 'screen';
+            this.ctx.fillStyle = glowColor;
+            this.ctx.globalAlpha = 0.2;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, e.radius * 2, 0, Math.PI*2);
+            this.ctx.fill();
         }
+        
+        this.ctx.globalCompositeOperation = 'source-over';
+        this.ctx.globalAlpha = 1.0;
 
+        // Corpo
         this.ctx.fillStyle = (e.hitFlash && e.hitFlash > 0) ? '#ffffff' : e.color;
         this.ctx.strokeStyle = '#220000';
         this.ctx.lineWidth = 2;
 
-        this.ctx.beginPath(); // CRÍTICO: Isola o path do corpo
+        this.ctx.beginPath();
         if (e.type === EntityType.BOSS) {
             const pulses = Math.sin(this.time / 200) * 10;
             this.ctx.arc(0, 0, e.radius + pulses, 0, Math.PI*2);
@@ -1366,8 +1349,6 @@ export class GameEngine {
           this.ctx.roundRect(-e.radius, -e.radius/2, e.radius*2, e.radius, 10);
         } else if (e.type === EntityType.VIRUS) {
            const r = e.radius;
-           // CORREÇÃO: Removido moveTo(r,0) que causava glitch visual "triângulo cortado".
-           // O loop agora desenha o polígono corretamente baseando-se na rotação.
            for(let i=0; i<6; i++) {
              const a = (i/6)*Math.PI*2 + (this.time/200);
              const vx = Math.cos(a)*r;
@@ -1386,9 +1367,23 @@ export class GameEngine {
       }
     });
 
+    // --- PLAYER ---
     if (this.player.active) {
-      this.ctx.shadowBlur = this.isDashing || this.invulnerabilityTimer > 0 ? 30 : 15;
-      this.ctx.shadowColor = this.isDashing || this.invulnerabilityTimer > 0 ? this.colors.PLAYER_CORE : this.colors.PLAYER;
+      // 1. Halo do Player (Gradiente)
+      const glowRadius = this.isDashing ? this.player.radius * 3 : this.player.radius * 2.5;
+      const grad = this.ctx.createRadialGradient(this.player.pos.x, this.player.pos.y, this.player.radius * 0.2, this.player.pos.x, this.player.pos.y, glowRadius);
+      grad.addColorStop(0, hexToRgba(this.colors.PLAYER_CORE, this.isDashing ? 0.8 : 0.6));
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+      this.ctx.globalCompositeOperation = 'screen';
+      this.ctx.fillStyle = grad;
+      this.ctx.beginPath();
+      this.ctx.arc(this.player.pos.x, this.player.pos.y, glowRadius, 0, Math.PI*2);
+      this.ctx.fill();
+      
+      // 2. Corpo do Player
+      this.ctx.globalCompositeOperation = 'source-over';
+      this.ctx.globalAlpha = 1.0;
       this.ctx.fillStyle = this.isDashing || this.invulnerabilityTimer > 0 ? this.colors.PLAYER_CORE : this.colors.PLAYER;
       
       if (this.invulnerabilityTimer > 0 && Math.floor(this.time / 100) % 2 === 0) {
@@ -1415,7 +1410,6 @@ export class GameEngine {
       this.ctx.beginPath();
       this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius*0.4, 0, Math.PI*2);
       this.ctx.fill();
-      this.ctx.shadowBlur = 0;
       this.ctx.globalAlpha = 1.0;
     }
 
