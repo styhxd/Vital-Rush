@@ -60,6 +60,10 @@ export const COLORS_PLATINUM: ThemePalette = {
 export const CANVAS_WIDTH = 1920;
 export const CANVAS_HEIGHT = 1080;
 
+// Configurações de Sobrevivência
+export const INITIAL_LIVES = 3; // Três chances. Não desperdice.
+export const ADRENALINE_MAX_DURATION = 20; // Segundos. Depois disso, o coração explode se não parar.
+
 // Status iniciais do "Heroi". 
 // NERF: Reduzimos tudo. Você não é mais um Rambo, é um estagiário com uma pistola de água.
 export const INITIAL_STATS = {
@@ -297,7 +301,7 @@ export const TEXTS: TranslationMap = {
     ACHIEVEMENTS: "CONQUISTAS",
     ACH_LOCKED: "BLOQUEADO",
     ACH_PROGRESS: "PROGRESSO",
-    ACH_PLATINUM_MSG: "SOBREPOSIÇÃO DE SISTEMA: MODO APEX ATIVADO. VISUAIS EVOLUÍDOS.",
+    ACH_PLATINUM_MSG: "SOBREPOSIÇÃO DE SISTEMA: MODO APEX ATIVADO. VISUALES EVOLUÍDOS.",
     DIFF_TRIAGE: "TRIAGEM",
     DIFF_RESIDENT: "RESIDENTE",
     DIFF_SPECIALIST: "ESPECIALISTA",

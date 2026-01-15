@@ -28,7 +28,7 @@ import { GameEngine } from '../services/gameEngine';
 import { audioManager } from '../services/audioManager';
 import { achievementManager } from '../services/achievementManager';
 import { GameState, PlayerStats, Upgrade, WaveConfig, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette } from '../types';
-import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES_FIRST, PATIENT_NAMES_LAST, SYMPTOMS_KEYS, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST } from '../constants';
+import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES_FIRST, PATIENT_NAMES_LAST, SYMPTOMS_KEYS, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES } from '../constants';
 import { Joystick } from './Joystick';
 
 // --- UI COMPONENTS (Pequenos componentes auxiliares) ---
@@ -168,7 +168,7 @@ export const Game: React.FC = () => {
   const [uiData, setUiData] = useState({ 
     health: 100, maxHealth: 100, score: 0, biomass: 0, 
     wave: 0, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100,
-    combo: 0, dashReady: true, adrenaline: false
+    combo: 0, dashReady: true, adrenaline: false, lives: INITIAL_LIVES
   });
   
   // Detecção de Mobile (pra mostrar o joystick virtual)
@@ -400,7 +400,8 @@ export const Game: React.FC = () => {
             maxEnergy: stats.maxEnergy,
             combo: eng.comboCount,
             dashReady: eng.dashCooldownTimer <= 0,
-            adrenaline: eng.adrenalineActive
+            adrenaline: eng.adrenalineActive,
+            lives: eng.lives
           });
       }
     }
@@ -452,7 +453,7 @@ export const Game: React.FC = () => {
          setUpgrades(UPGRADES.map(u => ({...u}))); 
          setUiData({ 
            health: 100, maxHealth: 100, score: 0, biomass: 0, 
-           wave: 1, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100, combo: 0, dashReady: true, adrenaline: false 
+           wave: 1, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100, combo: 0, dashReady: true, adrenaline: false, lives: INITIAL_LIVES
          });
          
          setGameState(GameState.BRIEFING);
@@ -623,8 +624,16 @@ export const Game: React.FC = () => {
                 <StatBar label={t('INTEGRITY')} value={uiData.health} max={uiData.maxHealth} colorClass={uiData.adrenaline ? "bg-red-600 animate-pulse" : (isPlatinum ? "bg-gradient-to-r from-purple-500 to-amber-400" : "bg-gradient-to-r from-red-600 to-red-400")} />
                 <StatBar label={t('SURGE_READY')} value={uiData.energy} max={uiData.maxEnergy} colorClass={isPlatinum ? "bg-gradient-to-r from-amber-400 to-white" : "bg-gradient-to-r from-cyan-600 to-cyan-400"} animate={true}/>
                 
+                <div className="flex gap-1 mt-2">
+                    {Array.from({length: INITIAL_LIVES}).map((_, i) => (
+                        <div key={i} className={`w-4 h-4 rounded-full border border-white/20 flex items-center justify-center ${i < uiData.lives ? 'bg-red-500 shadow-[0_0_10px_red]' : 'bg-transparent opacity-20'}`}>
+                            {i < uiData.lives && <span className="text-[8px]">♥</span>}
+                        </div>
+                    ))}
+                </div>
+
                 {uiData.adrenaline && (
-                    <div className="text-red-500 font-bold tracking-widest text-xs animate-pulse text-glow border border-red-500/50 bg-red-900/20 px-2 py-1">
+                    <div className="text-red-500 font-bold tracking-widest text-xs animate-pulse text-glow border border-red-500/50 bg-red-900/20 px-2 py-1 mt-2">
                         ⚠ {t('ADRENALINE')} ⚠
                     </div>
                 )}

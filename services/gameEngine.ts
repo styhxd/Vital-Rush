@@ -15,7 +15,7 @@
  */
 
 import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette } from '../types';
-import { COLORS_DEFAULT, CANVAS_WIDTH, CANVAS_HEIGHT, WAVES, DIFFICULTY_MODIFIERS } from '../constants';
+import { COLORS_DEFAULT, CANVAS_WIDTH, CANVAS_HEIGHT, WAVES, DIFFICULTY_MODIFIERS, INITIAL_LIVES, ADRENALINE_MAX_DURATION } from '../constants';
 import { audioManager } from './audioManager';
 import { achievementManager } from './achievementManager';
 
@@ -36,6 +36,7 @@ export class GameEngine {
   public biomass: number = 0; // Dinheiro
   public time: number = 0;
   public energy: number = 0; // Mana da ult
+  public lives: number = INITIAL_LIVES; // Sistema de Vidas
   
   // Stats da Sessão (Contabilidade pra Conquistas)
   public sessionStats = {
@@ -90,6 +91,11 @@ export class GameEngine {
   private surgeActive: boolean = false; // A "Ult"
   private surgeRadius: number = 0;
   public adrenalineActive: boolean = false; // Câmera lenta quando vai morrer
+  public adrenalineTimer: number = 0; // Quanto tempo você tá em slow motion
+  public adrenalineExhausted: boolean = false; // Se o coração cansou
+  
+  // Invulnerabilidade temporária (Respawn)
+  public invulnerabilityTimer: number = 0;
   
   // Limites pra não travar o browser
   private readonly MAX_PARTICLES = 250;
@@ -238,11 +244,21 @@ export class GameEngine {
     let timeScale = 1.0;
 
     // Efeito Adrenalina (Slow Motion quando quase morrendo)
-    if (this.player.active && this.player.health < this.player.maxHealth * 0.3) {
+    // REGRAS NOVAS: Só dura 20 segundos. Depois disso, azar o seu.
+    if (this.player.active && this.player.health < this.player.maxHealth * 0.3 && !this.adrenalineExhausted) {
         this.adrenalineActive = true;
-        timeScale = 0.4; // O tempo passa a 40% da velocidade
+        this.adrenalineTimer += (dt / 1000); // Conta tempo REAL (não afetado pelo timescale)
+        
+        if (this.adrenalineTimer > ADRENALINE_MAX_DURATION) {
+            this.adrenalineExhausted = true; // Acabou a mamata
+            this.spawnText(this.player.pos, "ADRENALINE DEPLETED!", "#ff0000", 30);
+        } else {
+            timeScale = 0.4; // O tempo passa a 40% da velocidade
+        }
     } else {
         this.adrenalineActive = false;
+        // Se a vida subiu pra cima de 30%, o timer reseta? 
+        // Não. Vamos ser cruéis. Se curar, o timer para, mas não reseta. Só reseta se morrer.
     }
 
     const safeDt = Math.min(dt, 50) * timeScale; // Capa o delta time pra evitar bugs de física se o PC travar
@@ -257,6 +273,10 @@ export class GameEngine {
         this.sessionStats.timePlayed += dtSeconds;
     }
     
+    if (this.invulnerabilityTimer > 0) {
+        this.invulnerabilityTimer -= (dt/1000); // Invulnerabilidade usa tempo real
+    }
+
     // Check Idle Achievement (AFK Strategy)
     if (this.inputVector.x === 0 && this.inputVector.y === 0 && this.waveActive) {
         this.sessionStats.idleTime += dtSeconds;
@@ -464,7 +484,7 @@ export class GameEngine {
       this.entities.forEach(e => {
           if (e.type === EntityType.ACID_POOL && e.active) {
               if (distSq(this.player.pos, e.pos) < (e.radius + this.player.radius - 10)**2) {
-                  if (!this.isDashing) {
+                  if (!this.isDashing && this.invulnerabilityTimer <= 0) {
                       this.player.health -= 0.5 * tick; // DoT (Damage over Time)
                       this.sessionStats.damageTaken += 0.5 * tick;
                       if (Math.random() < 0.1) {
@@ -599,7 +619,7 @@ export class GameEngine {
 
           // Colisão com o Jogador (Dano)
           const pSum = e.radius + this.player.radius;
-          const isInvulnerable = this.isDashing; 
+          const isInvulnerable = this.isDashing || this.invulnerabilityTimer > 0; 
           
           if (dMag < pSum * 0.8 && !isInvulnerable) {
              // Dano de Espinhos (Thorns)
@@ -629,12 +649,7 @@ export class GameEngine {
 
              // Morte do Jogador
              if (this.player.health <= 0) {
-               this.player.active = false;
-               audioManager.stopMusic();
-               achievementManager.track('die_10', 1);
-               achievementManager.track('play_time_1h', Math.floor(this.sessionStats.timePlayed));
-               achievementManager.track('play_time_5h', Math.floor(this.sessionStats.timePlayed));
-               onGameOver();
+                 this.handlePlayerDeath(onGameOver);
              }
           }
         }
@@ -696,6 +711,39 @@ export class GameEngine {
     
     this.shakeIntensity *= 0.9;
     if (this.shakeIntensity < 0.5) this.shakeIntensity = 0;
+  }
+
+  // Lógica de Morte (Com sistema de Vidas)
+  private handlePlayerDeath(onGameOver: () => void) {
+      this.lives--;
+      
+      if (this.lives > 0) {
+          // Respawn: Reinicia a Adrenalina
+          this.player.health = this.player.maxHealth;
+          this.invulnerabilityTimer = 3.0; // 3 Segundos de paz
+          this.adrenalineExhausted = false; // Coração descansa
+          this.adrenalineTimer = 0;
+          this.surgeActive = true; // Solta uma ult de graça pra limpar a área
+          this.surgeRadius = 0;
+          this.energy = 0;
+          this.spawnText(this.player.pos, "SYSTEM RESTORED", "#00ffff", 30);
+          audioManager.playSurge(); // Som de renascimento
+          
+          // Empurra todo mundo pra longe
+          this.entities.forEach(e => {
+              if (this.isEnemy(e.type)) {
+                  e.vel.x = 20; 
+              }
+          });
+      } else {
+          // Game Over Real
+           this.player.active = false;
+           audioManager.stopMusic();
+           achievementManager.track('die_10', 1);
+           achievementManager.track('play_time_1h', Math.floor(this.sessionStats.timePlayed));
+           achievementManager.track('play_time_5h', Math.floor(this.sessionStats.timePlayed));
+           onGameOver();
+      }
   }
 
   // --- LÓGICA DE SPAWN ---
@@ -1150,9 +1198,15 @@ export class GameEngine {
 
     // Renderiza Player
     if (this.player.active) {
-      this.ctx.shadowBlur = this.isDashing ? 30 : 15;
-      this.ctx.shadowColor = this.isDashing ? this.colors.PLAYER_CORE : this.colors.PLAYER;
-      this.ctx.fillStyle = this.isDashing ? this.colors.PLAYER_CORE : this.colors.PLAYER;
+      this.ctx.shadowBlur = this.isDashing || this.invulnerabilityTimer > 0 ? 30 : 15;
+      this.ctx.shadowColor = this.isDashing || this.invulnerabilityTimer > 0 ? this.colors.PLAYER_CORE : this.colors.PLAYER;
+      this.ctx.fillStyle = this.isDashing || this.invulnerabilityTimer > 0 ? this.colors.PLAYER_CORE : this.colors.PLAYER;
+      
+      // Blink se invulnerável
+      if (this.invulnerabilityTimer > 0 && Math.floor(this.time / 100) % 2 === 0) {
+          this.ctx.globalAlpha = 0.5;
+      }
+      
       this.ctx.beginPath();
       // Efeito de "gelatina"
       const wobbleX = Math.cos(this.time/150) * 3;
@@ -1175,6 +1229,7 @@ export class GameEngine {
       this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius*0.4, 0, Math.PI*2);
       this.ctx.fill();
       this.ctx.shadowBlur = 0;
+      this.ctx.globalAlpha = 1.0;
     }
 
     // Renderiza Projéteis (Rastros)
