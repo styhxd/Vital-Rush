@@ -348,9 +348,20 @@ export class AudioManager {
       const ahead = 0.1; 
       const now = this.ctx.currentTime;
       
-      if (this.nextNoteTime < now - 0.2) this.nextNoteTime = now;
+      // PARANOID FAILSAFE #1: DETECÇÃO DE DESSINCRONIA (O "Chronos Breaker")
+      // Se o nextNoteTime ficou muito para trás (ex: tab ficou em background),
+      // não tente tocar todas as notas perdidas. Pule direto para o agora.
+      // Isso impede o "thundering herd" de áudio que trava a CPU.
+      if (this.nextNoteTime < now - 0.2) {
+          this.nextNoteTime = now;
+      }
 
-      while (this.nextNoteTime < now + ahead) {
+      // PARANOID FAILSAFE #2: LOOP CAP
+      // Garante que nunca tentaremos agendar mais do que 4 notas em um único frame de JS.
+      // Se o sistema estiver engasgando, o áudio vai falhar elegantemente em vez de travar o browser.
+      let iterations = 0;
+      
+      while (this.nextNoteTime < now + ahead && iterations < 8) {
           this.playProceduralNote(this.current16thNote);
           
           const bpm = this.getCurrentBPM();
@@ -358,6 +369,7 @@ export class AudioManager {
           this.nextNoteTime += 0.25 * secondsPerBeat; // Semicolcheia
           
           this.current16thNote = (this.current16thNote + 1) % 16;
+          iterations++;
       }
       
       this.timerID = window.setTimeout(() => this.scheduler(), 25);

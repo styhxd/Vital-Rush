@@ -147,7 +147,20 @@ export class GameEngine {
     };
   }
 
+  // PARANOID CLEANUP: Chama isso antes de começar a onda para garantir que o array não está cheio de lixo
+  public prepareWave() {
+      // Limpa partículas excessivas que podem ter acumulado na tela de pausa/shop
+      if (this.particles.length > 50) {
+          this.particles = this.particles.filter(p => p.id === 'bg' || Math.random() > 0.5);
+      }
+      this.lastShotTime = performance.now();
+      // Reinicia timers que podem ter ficado grandes
+      this.spawnTimer = 0;
+      this.regenTimer = 0;
+  }
+
   public startWave(waveIndex: number) {
+    this.prepareWave();
     this.currentWaveIndex = waveIndex;
     this.waveTimer = 0;
     this.waveActive = true;
@@ -284,7 +297,14 @@ export class GameEngine {
         audioManager.setGameState(this.currentWaveIndex + 1, healthRatio);
     }
 
-    const safeDt = Math.min(dt, 50) * timeScale; // Capa o delta time pra evitar bugs de física se o PC travar
+    // PARANOID FAILSAFE #3: CLAMP DE DELTA TIME
+    // Se o navegador travou e voltou 2 segundos depois, dt será 2000.
+    // Isso faria os inimigos teleportarem através de paredes.
+    // Limitamos a 60ms (aprox 16fps) para manter a física estável mesmo no lag.
+    let cappedDt = dt;
+    if (cappedDt > 60) cappedDt = 16.66; 
+
+    const safeDt = cappedDt * timeScale;
     this.time += safeDt;
     const tick = safeDt / 16; // Normaliza para ~1.0 em 60fps
     const dtSeconds = safeDt / 1000;

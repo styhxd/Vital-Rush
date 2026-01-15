@@ -244,6 +244,9 @@ export const Game: React.FC = () => {
 
   const deployToWave = useCallback(() => {
       if (engineRef.current) {
+          // PARANOID FAILSAFE: Reset physics timer explicitly before engine resumes
+          lastTimeRef.current = performance.now();
+          
           const nextWaveIdx = engineRef.current.currentWaveIndex === -1 ? 0 : engineRef.current.currentWaveIndex + 1;
           engineRef.current.startWave(nextWaveIdx);
           setGameState(GameState.PLAYING);
@@ -262,6 +265,8 @@ export const Game: React.FC = () => {
 
   const closeLoadout = useCallback(() => {
       setIsPaused(false);
+      // PARANOID FAILSAFE: Reset timer when closing menus too
+      lastTimeRef.current = performance.now();
       setGameState(lastGameState);
   }, [lastGameState]);
 
@@ -441,8 +446,13 @@ export const Game: React.FC = () => {
 
   const togglePause = () => {
       setIsPaused(p => !p);
-      if (!isPaused) audioManager.stopMusic();
-      else audioManager.startGameMusic();
+      if (!isPaused) {
+          audioManager.stopMusic();
+      } else {
+          // PARANOID FAILSAFE: Reset timer explicitly on pause resume
+          lastTimeRef.current = performance.now();
+          audioManager.startGameMusic();
+      }
   };
 
   const toggleMute = () => {
@@ -472,6 +482,8 @@ export const Game: React.FC = () => {
       if (lastGameState === GameState.MENU) {
           setGameState(GameState.MENU);
       } else {
+          // PARANOID FAILSAFE: Reset timer explicitly when returning from controls
+          lastTimeRef.current = performance.now();
           setGameState(GameState.PLAYING);
           if (!isPaused) setIsPaused(true); 
       }
