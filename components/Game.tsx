@@ -20,7 +20,7 @@ import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from '../services/gameEngine';
 import { audioManager } from '../services/audioManager';
 import { achievementManager } from '../services/achievementManager';
-import { GameState, PlayerStats, Upgrade, WaveConfig, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette } from '../types';
+import { GameState, PlayerStats, Upgrade, WaveConfig, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
 import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES_FIRST, PATIENT_NAMES_LAST, SYMPTOMS_KEYS, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES } from '../constants';
 import { Joystick } from './Joystick';
 
@@ -206,8 +206,10 @@ export const Game: React.FC = () => {
   const [cheatInput, setCheatInput] = useState("");
   const [heartbreakAnim, setHeartbreakAnim] = useState(false); 
   
-  // State para controlar o tutorial
+  // State para controlar o tutorial e eventos de Boss
   const [showTutorial, setShowTutorial] = useState(false);
+  const [showBossIntro, setShowBossIntro] = useState(false);
+  const [bossEntity, setBossEntity] = useState<{hp: number, max: number, name: string} | null>(null);
 
   const t = (key: string) => TEXTS[language][key] || key;
 
@@ -308,6 +310,11 @@ export const Game: React.FC = () => {
     };
   }, [gameState, triggerUltimate, triggerDash, isPaused]);
 
+  const handleBossSpawn = useCallback(() => {
+      setShowBossIntro(true);
+      setTimeout(() => setShowBossIntro(false), 3000);
+  }, []);
+
   const deployToWave = useCallback(() => {
       if (engineRef.current) {
           lastTimeRef.current = performance.now();
@@ -320,6 +327,7 @@ export const Game: React.FC = () => {
               setShowTutorial(true);
               setTimeout(() => setShowTutorial(false), 4500);
           }
+          setBossEntity(null);
       }
   }, []);
 
@@ -386,7 +394,8 @@ export const Game: React.FC = () => {
             () => {
                 setHeartbreakAnim(true);
                 setTimeout(() => setHeartbreakAnim(false), 2500); 
-            }
+            },
+            handleBossSpawn // New Callback passed to update
           );
       }
       
@@ -403,6 +412,14 @@ export const Game: React.FC = () => {
 
           const waveIdx = Math.max(0, Math.min(eng.currentWaveIndex, WAVES.length - 1));
           const currentWaveConfig = WAVES[waveIdx];
+          
+          // Check for active boss for HP Bar
+          const activeBoss = eng.entities.find(e => e.type === EntityType.BOSS && e.active);
+          if (activeBoss) {
+              setBossEntity({ hp: activeBoss.health, max: activeBoss.maxHealth, name: "ANOMALY // BOSS" });
+          } else {
+              setBossEntity(null);
+          }
           
           setUiData({
             health: Math.floor(eng.player.health),
@@ -423,7 +440,7 @@ export const Game: React.FC = () => {
     }
     
     animationFrameRef.current = requestAnimationFrame(loop);
-  }, [gameState, stats, isPaused, isLowPerfMode]);
+  }, [gameState, stats, isPaused, isLowPerfMode, handleBossSpawn]);
 
   useEffect(() => {
     lastTimeRef.current = performance.now();
@@ -625,10 +642,15 @@ export const Game: React.FC = () => {
             80% { clip-path: inset(0 20% 0 20%); transform: translate(2px, 2px); }
             100% { opacity: 0; }
         }
+        @keyframes pulse-red {
+            0%, 100% { background-color: rgba(255, 0, 0, 0); }
+            50% { background-color: rgba(255, 0, 0, 0.4); }
+        }
         .anim-shake { animation: heart-shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
         .anim-break-left { animation: crack-left 1.5s ease-out forwards; animation-delay: 0.5s; }
         .anim-break-right { animation: crack-right 1.5s ease-out forwards; animation-delay: 0.5s; }
         .anim-glitch { animation: glitch-text 0.5s steps(5) infinite; }
+        .anim-pulse-red { animation: pulse-red 0.5s ease-in-out infinite; }
       `}</style>
 
       <div className="vignette"></div>
@@ -659,6 +681,42 @@ export const Game: React.FC = () => {
       {/* TUTORIAL OVERLAY (FANTASMA) */}
       {showTutorial && gameState === GameState.PLAYING && (
           <TutorialOverlay isMobile={isMobile} />
+      )}
+
+      {/* BOSS WARNING OVERLAY */}
+      {showBossIntro && (
+          <div className="absolute inset-0 z-[60] pointer-events-none flex flex-col items-center justify-center anim-pulse-red">
+              <div className="w-full bg-red-600/20 backdrop-blur-sm border-y-8 border-red-600 py-10 md:py-20 flex flex-col items-center justify-center relative overflow-hidden">
+                  <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-30 mix-blend-overlay"></div>
+                  <h1 className="text-5xl md:text-9xl font-black text-red-500 tracking-[0.2em] anim-glitch drop-shadow-[0_0_20px_red]">
+                      WARNING
+                  </h1>
+                  <h2 className="text-2xl md:text-4xl text-white font-mono tracking-widest mt-4 blink">
+                      BIOLOGICAL THREAT DETECTED
+                  </h2>
+                  <div className="w-[200%] h-2 bg-red-500 absolute top-0 animate-[flow_2s_linear_infinite]"></div>
+                  <div className="w-[200%] h-2 bg-red-500 absolute bottom-0 animate-[flow_2s_linear_infinite_reverse]"></div>
+              </div>
+          </div>
+      )}
+
+      {/* BOSS HEALTH BAR */}
+      {bossEntity && !showBossIntro && (
+          <div className="absolute top-16 md:top-8 left-1/2 -translate-x-1/2 z-30 w-[80%] md:w-[50%] flex flex-col items-center pointer-events-none anim-tutorial-fade" style={{animationDuration: '0.5s'}}>
+              <div className="flex justify-between w-full text-red-500 font-bold font-mono text-[10px] md:text-xs mb-1 tracking-[0.3em]">
+                  <span className="anim-glitch">ANOMALY // BOSS</span>
+                  <span>{Math.ceil(bossEntity.hp)}/{bossEntity.max}</span>
+              </div>
+              <div className="w-full h-4 md:h-6 bg-black/80 border-2 border-red-900 relative skew-x-[-20deg] overflow-hidden">
+                  <div 
+                      className="h-full bg-red-600 transition-all duration-200"
+                      style={{ width: `${(bossEntity.hp / bossEntity.max) * 100}%`, boxShadow: '0 0 20px rgba(255,0,0,0.5)' }}
+                  >
+                      <div className="absolute top-0 right-0 h-full w-2 bg-white/50 blur-[2px]"></div>
+                  </div>
+                  <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
+              </div>
+          </div>
       )}
 
       <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 z-[100] transition-all duration-500 ease-out ${activeAchievement ? 'translate-y-0 opacity-100' : '-translate-y-20 opacity-0'}`}>
@@ -777,34 +835,44 @@ export const Game: React.FC = () => {
       
       {gameState === GameState.WAVE_CLEARED && (
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-pulse">
-           <div className="w-full max-w-xs md:max-w-lg p-1 border-y-4 border-green-500 bg-black/80 relative">
-               <div className="absolute inset-0 bg-green-500/10"></div>
-               <div className="relative p-4 md:p-8 text-center">
-                   <h2 className="text-3xl md:text-6xl font-black text-green-500 tracking-[0.2em] mb-2 drop-shadow-[0_0_15px_rgba(0,255,0,0.8)] glitch-text">
-                       {t('CLEARED')}
-                   </h2>
-                   <div className="w-full h-1 bg-green-500/50 mb-4 md:mb-8"></div>
-                   
-                   <div className="grid grid-cols-2 gap-2 md:gap-4 mb-4 md:mb-8 text-xs md:text-sm font-mono tracking-widest">
-                       <div className="text-right text-gray-400">{t('WAVE')}:</div>
-                       <div className="text-left text-white font-bold">{uiData.wave}</div>
-                       <div className="text-right text-gray-400">{t('BIOMASS_AVAIL')}:</div>
-                       <div className="text-left text-yellow-400 font-bold">{uiData.biomass}</div>
-                   </div>
+           <div className="w-full h-full flex flex-col items-center justify-center relative overflow-hidden">
+               {/* DRAMATIC BACKGROUND */}
+               <div className="absolute inset-0 bg-green-500/10 mix-blend-overlay animate-pulse"></div>
+               <div className="absolute top-0 w-full h-32 bg-gradient-to-b from-green-500/20 to-transparent"></div>
+               <div className="absolute bottom-0 w-full h-32 bg-gradient-to-t from-green-500/20 to-transparent"></div>
+               
+               {/* HUGE TEXT */}
+               <h1 className="text-6xl md:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-b from-green-300 to-green-600 tracking-[0.1em] mb-8 animate-bounce drop-shadow-[0_0_30px_rgba(0,255,0,0.5)] text-center">
+                   {t('CLEARED')}
+               </h1>
+               
+               <div className="w-full max-w-xs md:max-w-lg p-1 border-y-4 border-green-500 bg-black/80 relative backdrop-blur-md">
+                   <div className="relative p-4 md:p-8 text-center">
+                       <div className="w-full h-1 bg-green-500/50 mb-4 md:mb-8"></div>
+                       
+                       <div className="grid grid-cols-2 gap-2 md:gap-4 mb-4 md:mb-8 text-xs md:text-sm font-mono tracking-widest">
+                           <div className="text-right text-gray-400">{t('WAVE')}:</div>
+                           <div className="text-left text-white font-bold">{uiData.wave}</div>
+                           <div className="text-right text-gray-400">{t('BIOMASS_AVAIL')}:</div>
+                           <div className="text-left text-yellow-400 font-bold">{uiData.biomass}</div>
+                       </div>
 
-                   <div className="flex flex-col gap-2 md:gap-4">
-                       <MenuButton variant="success" onClick={openShop}>
-                           {t('MUTATION')}
-                       </MenuButton>
-                       <MenuButton variant="secondary" onClick={() => setGameState(GameState.BRIEFING)}>
-                           {t('NEXT')}
-                       </MenuButton>
+                       <div className="flex flex-col gap-2 md:gap-4">
+                           <MenuButton variant="success" onClick={openShop}>
+                               {t('MUTATION')}
+                           </MenuButton>
+                           <MenuButton variant="secondary" onClick={() => setGameState(GameState.BRIEFING)}>
+                               {t('NEXT')}
+                           </MenuButton>
+                       </div>
                    </div>
                </div>
            </div>
         </div>
       )}
 
+      {/* (MANTIDO O RESTANTE DOS MENUS) */}
+      
       {gameState === GameState.MENU && (
         <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
@@ -856,9 +924,7 @@ export const Game: React.FC = () => {
         </div>
       )}
 
-      {/* (MANTIDO O RESTANTE DOS MENUS COMO ESTAVA) */}
-      {/* ...Achievements, Manual, Controls, Briefing, BioLab, GameOver... */}
-      {/* O React re-renderiza o resto com base no estado, mas o JSX é o mesmo */}
+      {/* (RESTANTE DOS MENUS) */}
       
       {gameState === GameState.ACHIEVEMENTS && (
           <div className="absolute inset-0 bg-black flex items-center justify-center z-50">

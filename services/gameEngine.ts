@@ -6,14 +6,10 @@
  * 
  * A BESTA (GAME ENGINE) - PROTOCOLO "NEON LITE" (GRADIENT EDITION)
  * 
- * ATUALIZAÇÃO V4.3: ESTABILIDADE DE TRANSIÇÃO
+ * ATUALIZAÇÃO V4.5: PROTOCOLO ANTI-CRASH & SAFETY NET
  * 
- * Correção crítica: O "Vacuum" de fim de fase agora possui um timeout
- * de segurança (5s). Se a biomassa ficar presa ou "NaN", a fase encerra
- * forçosamente. 
- * 
- * Proteção contra NaN na física de movimento e limpeza agressiva de 
- * entidades inativas no render loop.
+ * Adicionada verificação de segurança no callback do Boss.
+ * Proteção extra contra NaN na física do Surge.
  */
 
 import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette, Language } from '../types';
@@ -598,7 +594,8 @@ export class GameEngine {
       });
   }
 
-  public update(dt: number, stats: PlayerStats, onWaveClear: () => void, onGameOver: () => void, onLifeLost: () => void) {
+  // --- UPDATE: Agora com onBossSpawn opcional e verificação ---
+  public update(dt: number, stats: PlayerStats, onWaveClear: () => void, onGameOver: () => void, onLifeLost: () => void, onBossSpawn?: () => void) {
     if (dt > 32) dt = 32; 
 
     // --- 2. MONITOR DE PERFORMANCE ---
@@ -738,7 +735,7 @@ export class GameEngine {
           if (config.hasBoss && !this.bossSpawned) {
               this.spawnBoss(config);
               this.bossSpawned = true;
-              this.spawnText({x: CANVAS_WIDTH/2, y: CANVAS_HEIGHT/2}, this.t('MSG_BOSS_WARN'), this.colors.BOSS, 60);
+              if (onBossSpawn) onBossSpawn();
           }
       }
       
@@ -807,14 +804,16 @@ export class GameEngine {
               const dy = e.pos.y - this.player.pos.y;
               const dist = Math.sqrt(d);
               
-              if (e.type !== EntityType.BOSS) {
-                  e.vel.x += (dx/dist) * 25; 
-                  e.vel.y += (dy/dist) * 25;
-              }
-              
-              if (this.damageEnemy(e, 8, false, stats)) {
-                  this.sessionStats.surgeKills++;
-                  achievementManager.track('surge_kill_100', 1);
+              if (dist > 0.1) { // PROTEÇÃO CONTRA DIVISÃO POR ZERO
+                  if (e.type !== EntityType.BOSS) {
+                      e.vel.x += (dx/dist) * 25; 
+                      e.vel.y += (dy/dist) * 25;
+                  }
+                  
+                  if (this.damageEnemy(e, 8, false, stats)) {
+                      this.sessionStats.surgeKills++;
+                      achievementManager.track('surge_kill_100', 1);
+                  }
               }
            }
         }
