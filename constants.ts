@@ -23,17 +23,19 @@ export const COLORS_DEFAULT: ThemePalette = {
   BACTERIA: '#77dd77',
   VIRUS: '#ff00ff',
   PARASITE: '#ff3333',
+  FUNGI: '#bfff00', // Verde limão tóxico
+  ENEMY_PROJECTILE: '#ff8800', // Laranja perigo
   BOSS: '#880000', 
   ELITE_GLOW: '#ffd700',
   ANTIBODY: '#00ffff',
-  DNA: '#ffeeaa',
+  DNA: '#00ffcc', // Ciano neon (Mais visível)
   BLOOD_PARTICLE: '#3a0a0a',
   UI_ACCENT: '#ff4444',
   SURGE: 'rgba(0, 255, 255, 0.3)',
   COMBO: '#ffaa00',
   ORBITAL: '#0088ff',
-  BIO_MINE: '#00ff44', // Verde (Explosão aliada/útil)
-  ACID_POOL: '#bf00ff' // Roxo Tóxico (Perigo/Veneno) - Alterado para evitar confusão
+  BIO_MINE: '#00ff44', 
+  ACID_POOL: '#bf00ff' 
 };
 
 export const COLORS_PLATINUM: ThemePalette = {
@@ -43,10 +45,12 @@ export const COLORS_PLATINUM: ThemePalette = {
   BACTERIA: '#b39ddb', 
   VIRUS: '#80deea', 
   PARASITE: '#f48fb1', 
+  FUNGI: '#c6ff00',
+  ENEMY_PROJECTILE: '#ff3d00',
   BOSS: '#ffd700', 
   ELITE_GLOW: '#ffffff', 
   ANTIBODY: '#ffd700',
-  DNA: '#e1bee7', 
+  DNA: '#ffffff', // Branco brilhante
   BLOOD_PARTICLE: '#1a1a2e', 
   UI_ACCENT: '#ffd700', 
   SURGE: 'rgba(255, 215, 0, 0.3)', 
@@ -257,7 +261,7 @@ export const TEXTS: TranslationMap = {
     UP_ENERGY_NAME: "MITOCHONDRIA BOOST",
     UP_ENERGY_DESC: "Surge & Dash recharge 8% faster",
     UP_GIGA_NAME: "CYTOKINE STORM",
-    UP_GIGA_DESC: "+2 Proj, +10% Dmg, Full Heal",
+    UP_GIGA_DESC: "+1 Proj, +20% Dmg, Full Heal", // Nerfed
     UP_ORBITAL_NAME: "NANO-GUARDIANS",
     UP_ORBITAL_DESC: "Adds +1 Autonomous Defensive Drone",
     UP_DASH_NAME: "PLASMA TRAIL",
@@ -290,7 +294,7 @@ export const TEXTS: TranslationMap = {
     ACH_SURGE_KILL_100_TITLE: "Tsunami",
     ACH_SURGE_KILL_100_DESC: "Kill 100 enemies with Surge blasts.",
     ACH_MINE_POP_20_TITLE: "Minesweeper",
-    ACH_MINE_POP_20_DESC: "Detonate 20 Bio-Mines.",
+    ACH_MINE_POP_20_DESC: "Detonate 20 Bio-Minas.",
     ACH_BIOMASS_10K_TITLE: "Hoarder",
     ACH_BIOMASS_10K_DESC: "Collect 10,000 total Biomass.",
     ACH_WAVE_5_TITLE: "Survivor",
@@ -447,7 +451,7 @@ export const TEXTS: TranslationMap = {
     UP_ENERGY_NAME: "IMPULSO MITOCONDRIAL",
     UP_ENERGY_DESC: "Surto e Esquiva recarregam 8% mais rápido",
     UP_GIGA_NAME: "TEMPESTADE CITOCINA",
-    UP_GIGA_DESC: "+2 Proj, +10% Dano, Cura Total",
+    UP_GIGA_DESC: "+1 Proj, +20% Dano, Cura Total", // Nerfado
     UP_ORBITAL_NAME: "NANO-GUARDIÕES",
     UP_ORBITAL_DESC: "Adiciona +1 Drone de Defesa Autônomo",
     UP_DASH_NAME: "RASTRO DE PLASMA",
@@ -637,7 +641,7 @@ export const TEXTS: TranslationMap = {
     UP_ENERGY_NAME: "IMPULSO MITOCONDRIAL",
     UP_ENERGY_DESC: "Surge y Esquiva recarga 8% más rápido",
     UP_GIGA_NAME: "TORMENTA CITOCINA",
-    UP_GIGA_DESC: "+2 Proy, +10% Daño, Cura Total",
+    UP_GIGA_DESC: "+1 Proy, +20% Daño, Cura Total", // Nerfed
     UP_ORBITAL_NAME: "NANO-GUARDIANES",
     UP_ORBITAL_DESC: "Añade +1 Dron de Defensa Autónomo",
     UP_DASH_NAME: "RASTRO DE PLASMA",
@@ -719,9 +723,9 @@ export const TEXTS: TranslationMap = {
 export const WAVES: WaveConfig[] = [
   { waveNumber: 1, duration: 40, spawnRate: 600, enemyTypes: [EntityType.BACTERIA], flowSpeed: -0.4, hasBoss: false }, // Flow reduzido
   { waveNumber: 2, duration: 55, spawnRate: 500, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -0.6, hasBoss: false },
-  { waveNumber: 3, duration: 60, spawnRate: 400, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -0.8, hasBoss: true }, // Boss de treino
-  { waveNumber: 4, duration: 80, spawnRate: 350, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.0, hasBoss: false },
-  { waveNumber: 5, duration: 999, spawnRate: 150, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.4, hasBoss: true }, // Spam insano
+  { waveNumber: 3, duration: 60, spawnRate: 400, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS, EntityType.FUNGI], flowSpeed: -0.8, hasBoss: true }, // Fungi introduzido
+  { waveNumber: 4, duration: 80, spawnRate: 350, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE, EntityType.FUNGI], flowSpeed: -1.0, hasBoss: false },
+  { waveNumber: 5, duration: 999, spawnRate: 150, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS, EntityType.PARASITE, EntityType.FUNGI], flowSpeed: -1.4, hasBoss: true }, // Spam insano
 ];
 
 // O "Shopping" do jogo.
@@ -820,8 +824,8 @@ export const UPGRADES: Upgrade[] = [
     nameKey: 'UP_LIFE_NAME',
     descKey: 'UP_LIFE_DESC',
     rarity: 'LEGENDARY',
-    baseCost: 2000,
-    costMultiplier: 3.5,
+    baseCost: 3000, // Preço AUMENTADO (era 2000)
+    costMultiplier: 4.0, // Inflação AUMENTADA (era 3.5)
     level: 0,
     maxLevel: 3,
     apply: (s) => ({ ...s, lifesteal: s.lifesteal + 0.05 })
@@ -853,10 +857,10 @@ export const UPGRADES: Upgrade[] = [
     nameKey: 'UP_GIGA_NAME',
     descKey: 'UP_GIGA_DESC',
     rarity: 'LEGENDARY',
-    baseCost: 2500,
-    costMultiplier: 3.0,
+    baseCost: 3000, // Aumentado (era 2500)
+    costMultiplier: 3.5, // Aumentado (era 3.0)
     level: 0,
     maxLevel: 3,
-    apply: (s) => ({ ...s, bulletCount: s.bulletCount + 2, damage: s.damage * 1.10, health: s.maxHealth }) // Nerfado
+    apply: (s) => ({ ...s, bulletCount: s.bulletCount + 1, damage: s.damage * 1.20, health: s.maxHealth }) // NERFADO: +1 Proj (era +2), Buff de dano pra compensar
   }
 ];

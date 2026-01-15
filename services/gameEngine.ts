@@ -6,10 +6,11 @@
  * 
  * A BESTA (GAME ENGINE) - PROTOCOLO "NEON LITE" (GRADIENT EDITION)
  * 
- * ATUALIZAÇÃO V4.5: PROTOCOLO ANTI-CRASH & SAFETY NET
+ * ATUALIZAÇÃO V4.6: EVOLUÇÃO HOSTIL & NERF HAMMER
  * 
- * Adicionada verificação de segurança no callback do Boss.
- * Proteção extra contra NaN na física do Surge.
+ * Introduzido inimigo FUNGI que atira.
+ * Biomassa redesenhada para melhor visibilidade.
+ * Lógica de projéteis inimigos implementada.
  */
 
 import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette, Language } from '../types';
@@ -215,6 +216,7 @@ export class GameEngine {
       let radius = 35;
       let color = this.colors.BACTERIA;
       let val = 10;
+      let shootTimer = undefined;
       
       if (type === EntityType.BACTERIA) {
           hp = 35; dmg = 10; radius = 35; color = this.colors.BACTERIA; val = 10; speed = 0.6;
@@ -222,6 +224,9 @@ export class GameEngine {
           hp = 20; dmg = 15; radius = 25; color = this.colors.VIRUS; val = 15; speed = 2.2;
       } else if (type === EntityType.PARASITE) {
           hp = 120; dmg = 25; radius = 55; color = this.colors.PARASITE; val = 30; speed = 0.25;
+      } else if (type === EntityType.FUNGI) {
+          hp = 90; dmg = 15; radius = 40; color = this.colors.FUNGI; val = 45; speed = 0.15; // Muito lento
+          shootTimer = 2.0; // Começa a atirar após 2s
       }
 
       if (strain === ViralStrain.TITAN) { hp *= 2.0; radius *= 1.2; speed *= 0.7; val *= 1.5; }
@@ -255,8 +260,9 @@ export class GameEngine {
           active: true,
           value: Math.floor(val),
           isElite,
-          drag: 0.1,
-          hitFlash: 0
+          drag: type === EntityType.FUNGI ? 0.2 : 0.1, // Fungi é mais "pesado"
+          hitFlash: 0,
+          shootTimer
       });
   }
   
@@ -301,7 +307,7 @@ export class GameEngine {
       target.health -= finalDamage;
       target.hitFlash = 5;
       
-      const knockback = target.type === EntityType.BOSS ? 0.1 : 2;
+      const knockback = target.type === EntityType.BOSS || target.type === EntityType.FUNGI ? 0.1 : 2;
       target.pos.x += knockback; 
 
       if (isCrit && stats.lifesteal > 0) {
@@ -873,6 +879,23 @@ export class GameEngine {
                       }
                   }
               }
+          } else if (e.type === EntityType.ENEMY_PROJECTILE && e.active) {
+              // COLISÃO COM PROJÉTIL INIMIGO
+              if (distSq(this.player.pos, e.pos) < (e.radius + this.player.radius)**2) {
+                  if (!this.isDashing && this.invulnerabilityTimer <= 0) {
+                      this.player.health -= e.damage;
+                      this.sessionStats.damageTaken += e.damage;
+                      this.shakeIntensity = 10;
+                      this.screenShake = { x: (Math.random()-0.5)*5, y: (Math.random()-0.5)*5 };
+                      
+                      if (this.comboCount > 5) this.spawnText(this.player.pos, this.t('MSG_COMBO_LOST'), this.colors.PARASITE, 20);
+                      this.comboCount = 0;
+                      
+                      e.active = false; // Destrói o projétil
+                      
+                      if (this.player.health <= 0) this.handlePlayerDeath(onGameOver, onLifeLost, stats);
+                  }
+              }
           }
       });
     }
@@ -889,7 +912,7 @@ export class GameEngine {
 
       if (e.type !== EntityType.TEXT_POPUP) {
         const drag = e.drag ?? 0.5;
-        const flowInfluence = (e.type === EntityType.ANTIBODY || e.type === EntityType.ACID_POOL) ? 0 : (e.type === EntityType.BOSS ? 0.1 : 1);
+        const flowInfluence = (e.type === EntityType.ANTIBODY || e.type === EntityType.ACID_POOL || e.type === EntityType.ENEMY_PROJECTILE) ? 0 : (e.type === EntityType.BOSS ? 0.1 : 1);
         
         e.pos.x += (e.vel.x + (this.bloodFlow.x * (1 - drag) * flowInfluence)) * tick;
         e.pos.y += (e.vel.y + (this.bloodFlow.y * (1 - drag) * flowInfluence)) * tick;
@@ -900,12 +923,33 @@ export class GameEngine {
             e.pos.y = Math.max(margin, Math.min(CANVAS_HEIGHT - margin, e.pos.y));
         }
 
+        // LÓGICA DE TIRO DO FUNGI
+        if (e.type === EntityType.FUNGI && this.player.active && e.pos.x < CANVAS_WIDTH + 100) {
+            if (e.shootTimer !== undefined) {
+                e.shootTimer -= dtSeconds;
+                if (e.shootTimer <= 0) {
+                    // ATIRAR
+                    const angle = Math.atan2(this.player.pos.y - e.pos.y, this.player.pos.x - e.pos.x);
+                    const speed = 7;
+                    this.entities.push({
+                        id: `eproj_${Date.now()}`, type: EntityType.ENEMY_PROJECTILE,
+                        pos: { ...e.pos },
+                        vel: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
+                        radius: 12, health: 1, maxHealth: 1, color: this.colors.ENEMY_PROJECTILE,
+                        damage: 15 * this.difficultyMods.dmg, active: true, drag: 0
+                    });
+                    
+                    e.shootTimer = 3.0; // Recarrega
+                }
+            }
+        }
+
         if (e.type !== EntityType.BOSS && e.type !== EntityType.PLAYER && this.isOutOfBoundsExtended(e.pos)) {
             e.active = false;
             continue;
         }
 
-        if (e.type !== EntityType.ANTIBODY && e.type !== EntityType.ACID_POOL) {
+        if (e.type !== EntityType.ANTIBODY && e.type !== EntityType.ACID_POOL && e.type !== EntityType.ENEMY_PROJECTILE) {
           e.vel.x *= 0.95;
           e.vel.y *= 0.95;
         }
@@ -1019,6 +1063,7 @@ export class GameEngine {
                 if (e.type === EntityType.VIRUS) speed *= 1.4;
                 if (e.isElite) speed *= 0.7;
                 if (e.type === EntityType.BOSS) speed = 0.3; 
+                if (e.type === EntityType.FUNGI) speed = 0.2; // Fungi quase parado
 
                 e.vel.x += (dx / dMag) * speed * tick;
                 e.vel.y += (dy / dMag) * speed * tick;
@@ -1135,7 +1180,7 @@ export class GameEngine {
   }
   
   private isEnemy(t: EntityType) {
-    return t === EntityType.BACTERIA || t === EntityType.VIRUS || t === EntityType.PARASITE;
+    return t === EntityType.BACTERIA || t === EntityType.VIRUS || t === EntityType.PARASITE || t === EntityType.FUNGI;
   }
 
   private findTarget(): Entity | null {
@@ -1295,6 +1340,19 @@ export class GameEngine {
              const tailY = e.pos.y - e.vel.y * 0.4;
              this.ctx.lineTo(tailX, tailY);
         }
+        else if (e.type === EntityType.ENEMY_PROJECTILE) {
+            // Desenha projétil inimigo (Espinho laranja)
+            this.ctx.fillStyle = e.color;
+            this.ctx.beginPath();
+            const spikes = 5;
+            for(let i=0; i<spikes*2; i++) {
+                const r = i % 2 === 0 ? e.radius : e.radius * 0.5;
+                const angle = (i / (spikes*2)) * Math.PI * 2 + (this.time/100);
+                this.ctx.lineTo(e.pos.x + Math.cos(angle)*r, e.pos.y + Math.sin(angle)*r);
+            }
+            this.ctx.closePath();
+            this.ctx.fill();
+        }
     });
     this.ctx.stroke();
 
@@ -1385,13 +1443,35 @@ export class GameEngine {
             this.ctx.fill();
         }
         else if (e.type === EntityType.DNA_FRAGMENT) {
-            this.ctx.fillStyle = e.isElite ? this.colors.ELITE_GLOW : this.colors.DNA;
-            this.ctx.beginPath();
-            const s = e.radius;
+            // BIOMASSA REDESENHADA: Losango Pulsante Brilhante
             this.ctx.save();
             this.ctx.translate(e.pos.x, e.pos.y);
-            this.ctx.rotate(this.time / 200);
-            this.ctx.fillRect(-s/2, -s/2, s, s);
+            
+            // Halo de Luz (Screen)
+            this.ctx.globalCompositeOperation = 'screen';
+            const pulse = 1 + Math.sin(this.time / 100) * 0.3;
+            this.ctx.fillStyle = e.isElite ? 'rgba(255, 215, 0, 0.5)' : 'rgba(0, 255, 204, 0.4)';
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, e.radius * 2 * pulse, 0, Math.PI*2);
+            this.ctx.fill();
+            
+            // Corpo Principal (Losango Giratório)
+            this.ctx.globalCompositeOperation = 'source-over';
+            this.ctx.rotate(this.time / 100);
+            this.ctx.fillStyle = e.isElite ? this.colors.ELITE_GLOW : this.colors.DNA;
+            this.ctx.beginPath();
+            this.ctx.moveTo(0, -e.radius);
+            this.ctx.lineTo(e.radius, 0);
+            this.ctx.lineTo(0, e.radius);
+            this.ctx.lineTo(-e.radius, 0);
+            this.ctx.closePath();
+            this.ctx.fill();
+            
+            // Borda Branca Fina
+            this.ctx.strokeStyle = '#fff';
+            this.ctx.lineWidth = 1;
+            this.ctx.stroke();
+            
             this.ctx.restore();
         }
     });
@@ -1458,6 +1538,28 @@ export class GameEngine {
              else this.ctx.lineTo(vx, vy);
            }
            this.ctx.closePath();
+        } else if (e.type === EntityType.FUNGI) {
+            // FUNGI VISUAL: Pentágono pulsante com núcleo
+            const r = e.radius;
+            const sides = 5;
+            this.ctx.beginPath();
+            for(let i=0; i<sides; i++) {
+                const angle = (i/sides) * Math.PI*2 + Math.sin(this.time/300);
+                this.ctx.lineTo(Math.cos(angle)*r, Math.sin(angle)*r);
+            }
+            this.ctx.closePath();
+            this.ctx.fill();
+            this.ctx.stroke();
+            
+            // Núcleo que indica tiro
+            if (e.shootTimer !== undefined && e.shootTimer < 0.5) {
+                this.ctx.fillStyle = '#fff'; // Brilha antes de atirar
+            } else {
+                this.ctx.fillStyle = '#000';
+            }
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, r*0.4, 0, Math.PI*2);
+            this.ctx.fill();
         } else {
            const pulses = Math.sin(this.time/100) * 5;
            this.ctx.arc(0, 0, e.radius + pulses, 0, Math.PI*2);

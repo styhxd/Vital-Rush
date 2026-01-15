@@ -22,6 +22,8 @@ export enum EntityType {
   BACTERIA,       // O mob básico, bucha de canhão
   VIRUS,          // Rápido e chato
   PARASITE,       // Tanque de carne
+  FUNGI,          // NOVO: Torreta que atira
+  ENEMY_PROJECTILE, // NOVO: O que o Fungi atira
   ANTIBODY,       // Sua munição
   DNA_FRAGMENT,   // Dinheiro (biomassa)
   PARTICLE,       // Efeitos visuais para fritar a GPU
@@ -89,6 +91,8 @@ export interface ThemePalette {
   BACTERIA: string;
   VIRUS: string;
   PARASITE: string;
+  FUNGI: string; // NOVO
+  ENEMY_PROJECTILE: string; // NOVO
   BOSS: string;
   ELITE_GLOW: string;
   ANTIBODY: string;
@@ -122,6 +126,7 @@ export interface Entity {
   isElite?: boolean; // Se brilha e tem mais vida
   hitFlash?: number; // Frames restantes piscando branco
   orbitOffset?: number; // Para orbitais girarem bonitinho
+  shootTimer?: number; // Para inimigos que atiram
 }
 
 // Os números que definem se você é um deus ou um inseto.
