@@ -6,14 +6,14 @@
  * 
  * O CORAÇÃO PULSANTE (Game.tsx)
  * 
- * ATUALIZAÇÃO V4.5: ADAPTAÇÃO MORFOLÓGICA & UI DENSA
+ * ATUALIZAÇÃO V4.6: PROTOCOLO DE INICIALIZAÇÃO NEURAL
  * 
- * 1. ROTAÇÃO FORÇADA: O jogo não pede mais para girar. Ele gira o universo.
- *    Se estiver em retrato, aplicamos CSS Transform para forçar paisagem.
+ * 1. TUTORIAL FANTASMA: Um overlay tático que aparece no início do jogo.
+ *    Ele não bloqueia o input. O jogador pode sair atirando enquanto lê.
+ *    Desaparece sozinho após 4 segundos.
  * 
- * 2. UI COMPACTA: Achievements, Loja e Fim de Wave foram redesenhados
- *    com "Dense Mode" para caber em telas de celular sem cortar ou 
- *    exigir scroll infinito.
+ * 2. ÊNFASE NA ESQUIVA: O comando de DASH foi desenhado para gritar 
+ *    na cara do usuário que ele existe.
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
@@ -104,6 +104,71 @@ const IconTrophy = () => (
     </svg>
 );
 
+// --- TELA DE TUTORIAL (NOVA) ---
+const TutorialOverlay = ({ isMobile }: { isMobile: boolean }) => {
+    return (
+        <div className="absolute inset-0 z-40 pointer-events-none flex flex-col items-center justify-center anim-tutorial-fade">
+            <style>{`
+                @keyframes tutorial-seq {
+                    0% { opacity: 0; transform: scale(0.9); }
+                    10% { opacity: 1; transform: scale(1); }
+                    85% { opacity: 1; transform: scale(1); }
+                    100% { opacity: 0; transform: scale(1.1); pointer-events: none; }
+                }
+                .anim-tutorial-fade {
+                    animation: tutorial-seq 4.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+                }
+            `}</style>
+            
+            <div className="flex gap-8 md:gap-24 items-center">
+                {/* Movement */}
+                <div className="flex flex-col items-center gap-2 opacity-80">
+                    <div className="w-16 h-16 md:w-24 md:h-24 rounded-full border-2 border-cyan-500 flex items-center justify-center bg-cyan-900/20">
+                        {isMobile ? (
+                            <div className="w-8 h-8 rounded-full bg-cyan-400/50 shadow-[0_0_15px_cyan]"></div>
+                        ) : (
+                            <span className="text-2xl font-bold font-mono text-cyan-400">WASD</span>
+                        )}
+                    </div>
+                    <span className="text-xs tracking-[0.2em] text-cyan-300 font-bold">MOVE</span>
+                </div>
+
+                {/* DASH - O DESTAQUE */}
+                <div className="flex flex-col items-center gap-4 relative">
+                    <div className="absolute inset-0 bg-white/10 blur-xl rounded-full animate-pulse"></div>
+                    <div className="w-20 h-20 md:w-32 md:h-32 rounded-full border-4 border-white flex items-center justify-center bg-white/10 shadow-[0_0_30px_white] animate-bounce">
+                        {isMobile ? (
+                            <span className="text-2xl font-bold text-white">TAP</span>
+                        ) : (
+                            <span className="text-2xl font-bold font-mono text-white">SHIFT</span>
+                        )}
+                    </div>
+                    <div className="flex flex-col items-center">
+                        <span className="text-lg md:text-2xl tracking-[0.3em] text-white font-black drop-shadow-[0_0_10px_white]">DASH</span>
+                        <span className="text-[10px] md:text-xs text-yellow-300 uppercase tracking-widest bg-black/60 px-2 rounded mt-1">Invulnerability</span>
+                    </div>
+                </div>
+
+                {/* Ultimate */}
+                <div className="flex flex-col items-center gap-2 opacity-80">
+                    <div className="w-16 h-16 md:w-24 md:h-24 rounded-full border-2 border-red-500 border-dashed flex items-center justify-center bg-red-900/20">
+                         {isMobile ? (
+                            <div className="w-10 h-10 border-2 border-red-500 rounded-full"></div>
+                        ) : (
+                            <span className="text-xl font-bold font-mono text-red-400">SPACE</span>
+                        )}
+                    </div>
+                    <span className="text-xs tracking-[0.2em] text-red-300 font-bold">SURGE</span>
+                </div>
+            </div>
+            
+            <div className="mt-12 text-sm text-white/50 font-mono animate-pulse tracking-widest">
+                SYSTEMS INITIALIZED... GOOD LUCK.
+            </div>
+        </div>
+    );
+}
+
 // --- MAIN COMPONENT ---
 
 export const Game: React.FC = () => {
@@ -140,6 +205,9 @@ export const Game: React.FC = () => {
   const [colors, setColors] = useState<ThemePalette>(COLORS_DEFAULT);
   const [cheatInput, setCheatInput] = useState("");
   const [heartbreakAnim, setHeartbreakAnim] = useState(false); 
+  
+  // State para controlar o tutorial
+  const [showTutorial, setShowTutorial] = useState(false);
 
   const t = (key: string) => TEXTS[language][key] || key;
 
@@ -247,6 +315,11 @@ export const Game: React.FC = () => {
           engineRef.current.startWave(nextWaveIdx);
           setGameState(GameState.PLAYING);
           audioManager.startGameMusic();
+          // Tutorial só aparece na primeira onda da sessão
+          if (nextWaveIdx === 0) {
+              setShowTutorial(true);
+              setTimeout(() => setShowTutorial(false), 4500);
+          }
       }
   }, []);
 
@@ -583,6 +656,11 @@ export const Game: React.FC = () => {
           </div>
       )}
 
+      {/* TUTORIAL OVERLAY (FANTASMA) */}
+      {showTutorial && gameState === GameState.PLAYING && (
+          <TutorialOverlay isMobile={isMobile} />
+      )}
+
       <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 z-[100] transition-all duration-500 ease-out ${activeAchievement ? 'translate-y-0 opacity-100' : '-translate-y-20 opacity-0'}`}>
           {activeAchievement && (
               <div className={`flex items-center gap-4 p-4 rounded border-2 shadow-[0_0_30px_rgba(0,0,0,0.8)] backdrop-blur-md min-w-[300px]
@@ -778,6 +856,10 @@ export const Game: React.FC = () => {
         </div>
       )}
 
+      {/* (MANTIDO O RESTANTE DOS MENUS COMO ESTAVA) */}
+      {/* ...Achievements, Manual, Controls, Briefing, BioLab, GameOver... */}
+      {/* O React re-renderiza o resto com base no estado, mas o JSX é o mesmo */}
+      
       {gameState === GameState.ACHIEVEMENTS && (
           <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
               <div className={`w-full max-w-6xl h-full md:h-[90%] border p-4 md:p-8 relative flex flex-col ${isPlatinum ? 'border-amber-500/50 bg-purple-900/10' : 'border-white/10 bg-[#1a0a0a]'}`}>
