@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TEXTS } from '../constants';
 import { Language } from '../types';
 import { audioManager } from '../services/audioManager';
@@ -24,15 +24,56 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
     if (!isVisible) return null;
 
     const t = (key: string) => TEXTS[language][key] || key;
-    const [testAnim, setTestAnim] = useState(false);
+    
+    // State para o "Hold to Confirm" do reset
+    const [resetStage, setResetStage] = useState(0); 
+    // State para o CRT/Scanlines (lê do body para persistência visual durante a sessão)
+    const [crtEnabled, setCrtEnabled] = useState(!document.body.classList.contains('force-clean-vision'));
 
-    const handleTestAudio = () => {
-        audioManager.playPowerUp();
-        setTestAnim(true);
-        setTimeout(() => setTestAnim(false), 500);
+    // Efeito para injetar o CSS global que controla as scanlines sem precisar passar props pro Game.tsx
+    useEffect(() => {
+        const styleId = 'settings-override-style';
+        let style = document.getElementById(styleId);
+        if (!style) {
+            style = document.createElement('style');
+            style.id = styleId;
+            style.innerHTML = `
+                .force-clean-vision .scanlines,
+                .force-clean-vision .vignette { 
+                    opacity: 0 !important; 
+                    transition: opacity 0.5s ease;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }, []);
+
+    const toggleCrt = () => {
+        const newState = !crtEnabled;
+        setCrtEnabled(newState);
+        if (!newState) {
+            document.body.classList.add('force-clean-vision');
+            audioManager.playShoot(); // Feedback sonoro
+        } else {
+            document.body.classList.remove('force-clean-vision');
+            audioManager.playPowerUp(); // Feedback sonoro
+        }
     };
 
-    // Componente interno para o Slider Holográfico (Surpresa Visual 1)
+    const handleReset = () => {
+        if (resetStage === 0) {
+            setResetStage(1);
+            audioManager.playHit();
+            setTimeout(() => setResetStage(0), 3000); // Reseta o botão se não confirmar
+        } else {
+            // EXECUTE ORDER 66
+            audioManager.playExplosion();
+            localStorage.clear();
+            window.location.reload();
+        }
+    };
+
+    // Componente interno para o Slider Holográfico
     const HoloSlider = ({ label, value, onChange }: { label: string, value: number, onChange: (val: number) => void }) => {
         const percentage = Math.round(value * 100);
         return (
@@ -57,7 +98,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                                 <div 
                                     key={i} 
                                     className={`flex-1 transition-all duration-300 ${active ? 'bg-cyan-500 shadow-[0_0_5px_cyan]' : 'bg-cyan-900/20'} 
-                                    ${active && (i / 20) > 0.8 ? 'bg-red-500 shadow-[0_0_5px_red]' : ''}`} // Fica vermelho se estiver muito alto
+                                    ${active && (i / 20) > 0.8 ? 'bg-red-500 shadow-[0_0_5px_red]' : ''}`}
                                 ></div>
                             );
                         })}
@@ -67,6 +108,12 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
         );
     };
 
+    const FLAGS: Record<Language, string> = {
+        'EN': '🇺🇸',
+        'PT': '🇧🇷',
+        'ES': '🇪🇸'
+    };
+
     return (
         // FAILSAFE 2: Z-Index 110 (Acima do Pause que é 100) e Position Fixed
         <div className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in zoom-in duration-300">
@@ -74,16 +121,17 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none"></div>
 
             <div className="w-full max-w-lg p-1 border-y-2 border-cyan-500 bg-[#050b14] relative shadow-[0_0_100px_rgba(0,255,255,0.1)]">
-                <div className="p-6 md:p-10 relative overflow-hidden">
+                <div className="p-6 md:p-10 relative overflow-hidden flex flex-col max-h-[90vh] overflow-y-auto custom-scroll">
                     
                     {/* Header */}
                     <h2 className="text-3xl font-bold text-center text-cyan-400 tracking-[0.3em] mb-8 border-b border-cyan-800 pb-4">
                         {t('SETTINGS')}
-                        <span className="block text-[10px] text-gray-500 font-mono mt-1 tracking-normal">SYS.CONFIG.V4.5</span>
+                        <span className="block text-[10px] text-gray-500 font-mono mt-1 tracking-normal">SYS.CONFIG.V4.6</span>
                     </h2>
 
                     {/* Audio Section */}
-                    <div className="space-y-2">
+                    <div className="mb-8">
+                        <h3 className="text-xs font-mono text-gray-500 mb-4 border-l-2 border-cyan-500 pl-2">AUDIO PROTOCOLS</h3>
                         <HoloSlider 
                             label="MASTER OUTPUT" 
                             value={audioSettings.master} 
@@ -101,35 +149,57 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                         />
                     </div>
 
+                    {/* Visual Section (SURPRESA 1: Retro Optics) */}
+                    <div className="mb-8">
+                        <h3 className="text-xs font-mono text-gray-500 mb-4 border-l-2 border-cyan-500 pl-2">VISUAL OPTICS</h3>
+                        <div className="flex items-center justify-between bg-white/5 p-4 border border-white/10">
+                            <div className="flex flex-col">
+                                <span className="text-sm font-bold text-white tracking-widest">RETRO FILTER</span>
+                                <span className="text-[10px] text-gray-400">CRT SCANLINES & VIGNETTE</span>
+                            </div>
+                            <button 
+                                onClick={toggleCrt}
+                                className={`w-16 h-8 rounded-full relative transition-all duration-300 ${crtEnabled ? 'bg-cyan-900/80 border border-cyan-500' : 'bg-gray-800 border border-gray-600'}`}
+                            >
+                                <div className={`absolute top-1 bottom-1 w-6 bg-white rounded-full transition-all duration-300 shadow-[0_0_10px_white] ${crtEnabled ? 'left-8 bg-cyan-400' : 'left-1 bg-gray-500'}`}></div>
+                            </button>
+                        </div>
+                    </div>
+
                     {/* Language Section */}
-                    <div className="mt-8 mb-8">
-                        <div className="text-xs font-mono text-cyan-400 mb-2 tracking-widest uppercase">{t('LANG')}</div>
+                    <div className="mb-8">
+                        <h3 className="text-xs font-mono text-gray-500 mb-4 border-l-2 border-cyan-500 pl-2">{t('LANG')}</h3>
                         <div className="flex gap-2">
                             {(['EN', 'PT', 'ES'] as Language[]).map(l => (
                                 <button 
                                     key={l}
                                     onClick={() => onLanguageChange(l)}
-                                    className={`flex-1 py-2 font-bold text-xs tracking-widest border transition-all duration-300
+                                    className={`flex-1 py-3 font-bold text-xs tracking-widest border transition-all duration-300 flex items-center justify-center gap-2
                                     ${language === l 
                                         ? 'bg-cyan-600 text-black border-cyan-400 shadow-[0_0_15px_rgba(0,255,255,0.4)]' 
                                         : 'bg-black/40 text-cyan-700 border-cyan-900/50 hover:bg-cyan-900/20'}`}
                                 >
+                                    <span className="text-xl filter drop-shadow-md">{FLAGS[l]}</span>
                                     {l}
                                 </button>
                             ))}
                         </div>
                     </div>
 
-                    {/* Surpresa 2: Botão de Diagnóstico (Test Audio) */}
-                    <div className="flex gap-4 mb-6">
+                    {/* Surpresa 2: SYSTEM PURGE (Data Reset) */}
+                    <div className="mb-6 border-t border-red-900/30 pt-6">
                         <button 
-                            onClick={handleTestAudio}
-                            className={`flex-1 py-3 border border-yellow-500/30 text-yellow-500 font-mono text-xs tracking-widest hover:bg-yellow-500/10 transition-all relative overflow-hidden ${testAnim ? 'bg-yellow-500/20 translate-x-1' : ''}`}
+                            onClick={handleReset}
+                            className={`w-full py-4 border font-mono text-xs tracking-[0.2em] transition-all relative overflow-hidden group
+                                ${resetStage === 1 
+                                    ? 'bg-red-600 text-black border-red-500 animate-pulse' 
+                                    : 'bg-red-950/20 text-red-500 border-red-900/50 hover:bg-red-900/40'}`}
                         >
                             <span className="relative z-10 flex items-center justify-center gap-2">
-                                {testAnim ? 'Running...' : 'RUN DIAGNOSTICS'} 
-                                <span className={`w-2 h-2 rounded-full ${testAnim ? 'bg-red-500 animate-ping' : 'bg-yellow-500'}`}></span>
+                                {resetStage === 1 ? '⚠️ CONFIRM PURGE? ⚠️' : 'SYSTEM PURGE (RESET DATA)'}
                             </span>
+                            {/* Barra de progresso visual para o reset */}
+                            <div className={`absolute bottom-0 left-0 h-1 bg-red-500 transition-all duration-[3000ms] ease-linear ${resetStage === 1 ? 'w-full' : 'w-0'}`}></div>
                         </button>
                     </div>
 

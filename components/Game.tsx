@@ -618,6 +618,13 @@ export const Game: React.FC = () => {
       overflow: 'hidden'
   };
 
+  // Flag mapping for the menu
+  const FLAGS: Record<Language, string> = {
+      'EN': '🇺🇸',
+      'PT': '🇧🇷',
+      'ES': '🇪🇸'
+  };
+
   return (
     <div 
         className={`select-none ${isPlatinum ? 'bg-[#0a0a1a]' : 'bg-[#0f0505]'} ${isLowPerfMode ? 'perf-mode-low' : ''}`} 
@@ -915,13 +922,18 @@ export const Game: React.FC = () => {
                   <MenuButton variant="secondary" onClick={openAchievements}>{t('ACHIEVEMENTS')}</MenuButton>
                 </div>
                 
-                <div className="flex justify-center gap-4 mt-4 md:mt-6">
+                {/* REPLACED: Language Buttons now use FLAGS mapping and better styling */}
+                <div className="flex justify-center gap-2 mt-4 md:mt-6">
                     {(['EN', 'PT', 'ES'] as Language[]).map(l => (
                       <button 
                         key={l}
                         onClick={() => setLanguage(l)} 
-                        className={`text-xs md:text-sm font-bold tracking-widest px-2 py-1 border-b-2 transition-all ${language === l ? 'text-white border-red-500' : 'text-gray-600 border-transparent'}`}
+                        className={`text-xs md:text-sm font-bold tracking-widest px-3 py-2 border-b-2 transition-all flex items-center gap-2
+                            ${language === l 
+                                ? 'text-white border-red-500 bg-red-900/20' 
+                                : 'text-gray-600 border-transparent hover:text-gray-400'}`}
                       >
+                        <span className="text-base">{FLAGS[l]}</span>
                         {l}
                       </button>
                     ))}
