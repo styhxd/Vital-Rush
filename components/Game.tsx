@@ -375,6 +375,24 @@ export const Game: React.FC = () => {
   }
 
   const handleStartGame = () => {
+     // PROTOCOLO DE IMERSÃO TOTAL: Tenta forçar fullscreen
+     try {
+         const elem = document.documentElement;
+         if (!document.fullscreenElement) {
+             if (elem.requestFullscreen) {
+                 elem.requestFullscreen().catch((err) => {
+                    // Fail silencioso para navegadores que bloqueiam ou não suportam
+                    console.log("Fullscreen attempt blocked/failed:", err);
+                 });
+             } else if ((elem as any).webkitRequestFullscreen) {
+                 // Fallback para Safari/iOS antigos
+                 (elem as any).webkitRequestFullscreen();
+             }
+         }
+     } catch (e) {
+         // Ignora erros de API
+     }
+
      audioManager.init(); 
      
      const newPatient = generatePatient();
