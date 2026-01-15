@@ -9,6 +9,7 @@ interface SettingsMenuProps {
     audioSettings: { master: number; music: number; sfx: number };
     onUpdateAudio: (type: 'master' | 'music' | 'sfx', val: number) => void;
     onLanguageChange: (lang: Language) => void;
+    onSystemPurge: () => void; // New Prop for soft reset
     onClose: () => void;
 }
 
@@ -18,6 +19,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
     audioSettings, 
     onUpdateAudio, 
     onLanguageChange,
+    onSystemPurge,
     onClose 
 }) => {
     // FAILSAFE 1: Verificação lógica de entrada
@@ -66,10 +68,10 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             audioManager.playHit();
             setTimeout(() => setResetStage(0), 3000); // Reseta o botão se não confirmar
         } else {
-            // EXECUTE ORDER 66
+            // EXECUTE ORDER 66 - SOFT RESET
             audioManager.playExplosion();
-            localStorage.clear();
-            window.location.reload();
+            onSystemPurge(); // Chama a função do pai para resetar o estado React
+            setResetStage(0);
         }
     };
 
@@ -111,7 +113,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
     const FLAGS: Record<Language, string> = {
         'EN': '🇺🇸',
         'PT': '🇧🇷',
-        'ES': '🇪🇸'
+        'ES': '🇲🇽'
     };
 
     return (

@@ -41,13 +41,14 @@ export class AchievementManager {
   }
 
   // Tenta ler o LocalStorage. Se falhar, finge demência e começa do zero.
-  private load() {
+  public load() {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         this.progress = JSON.parse(stored);
       } else {
         // Inicializa tudo zerado pros noobs.
+        this.progress = {};
         ACHIEVEMENTS_LIST.forEach(ach => {
           this.progress[ach.id] = { unlocked: false, currentValue: 0 };
         });
@@ -65,6 +66,16 @@ export class AchievementManager {
     } catch (e) {
       console.error("Failed to save achievements. Memória cheia? Azar.", e);
     }
+  }
+
+  // SYSTEM PURGE: Reseta tudo para o estado zero.
+  public reset() {
+      this.progress = {};
+      ACHIEVEMENTS_LIST.forEach(ach => {
+          this.progress[ach.id] = { unlocked: false, currentValue: 0 };
+      });
+      // Não salvamos imediatamente aqui, deixamos o Game.tsx limpar o localStorage primeiro, 
+      // mas atualizamos a memória para refletir o vazio.
   }
 
   /**

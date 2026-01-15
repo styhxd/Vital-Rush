@@ -240,6 +240,34 @@ export const Game: React.FC = () => {
       }
   }, []);
 
+  const handleSystemPurge = useCallback(() => {
+      // 1. Limpa o armazenamento persistente
+      localStorage.clear();
+      achievementManager.reset(); // Reseta memória do achievement manager
+
+      // 2. Reseta estados visuais e de lógica
+      setGameState(GameState.MENU);
+      setIsPlatinum(false);
+      setColors(COLORS_DEFAULT);
+      setStats(INITIAL_STATS);
+      setUpgrades(UPGRADES.map(u => ({...u})));
+      setUiData({ 
+        health: 100, maxHealth: 100, score: 0, biomass: 0, 
+        wave: 0, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100,
+        combo: 0, dashReady: true, adrenaline: false, lives: INITIAL_LIVES
+      });
+      setDifficulty(Difficulty.NORMAL);
+      setPatient(null);
+      setIsPaused(false);
+      
+      // 3. Reseta Áudio
+      audioManager.stopMusic();
+      audioManager.startMenuMusic();
+      
+      // 4. Force reload visual se estiver no menu de settings
+      // (Isso é tratado pelo fechamento do menu ao mudar o state)
+  }, []);
+
   const triggerUltimate = useCallback(() => {
     if (engineRef.current && gameState === GameState.PLAYING && !isPaused) {
       engineRef.current.triggerSurge(stats);
@@ -622,7 +650,7 @@ export const Game: React.FC = () => {
   const FLAGS: Record<Language, string> = {
       'EN': '🇺🇸',
       'PT': '🇧🇷',
-      'ES': '🇪🇸'
+      'ES': '🇲🇽'
   };
 
   return (
@@ -950,6 +978,7 @@ export const Game: React.FC = () => {
           audioSettings={audioSettings}
           onUpdateAudio={updateAudio}
           onLanguageChange={setLanguage}
+          onSystemPurge={handleSystemPurge} // WIRING UP THE SOFT RESET
           onClose={closeSettings}
       />
 
