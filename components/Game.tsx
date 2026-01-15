@@ -646,13 +646,6 @@ export const Game: React.FC = () => {
       overflow: 'hidden'
   };
 
-  // Flag mapping for the menu
-  const FLAGS: Record<Language, string> = {
-      'EN': '🇺🇸',
-      'PT': '🇧🇷',
-      'ES': '🇲🇽'
-  };
-
   return (
     <div 
         className={`select-none ${isPlatinum ? 'bg-[#0a0a1a]' : 'bg-[#0f0505]'} ${isLowPerfMode ? 'perf-mode-low' : ''}`} 
@@ -961,7 +954,6 @@ export const Game: React.FC = () => {
                                 ? 'text-white border-red-500 bg-red-900/20' 
                                 : 'text-gray-600 border-transparent hover:text-gray-400'}`}
                       >
-                        <span className="text-base">{FLAGS[l]}</span>
                         {l}
                       </button>
                     ))}

@@ -110,12 +110,6 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
         );
     };
 
-    const FLAGS: Record<Language, string> = {
-        'EN': '🇺🇸',
-        'PT': '🇧🇷',
-        'ES': '🇲🇽'
-    };
-
     return (
         // FAILSAFE 2: Z-Index 110 (Acima do Pause que é 100) e Position Fixed
         <div className="fixed inset-0 z-[110] bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in zoom-in duration-300">
@@ -181,7 +175,6 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                                         ? 'bg-cyan-600 text-black border-cyan-400 shadow-[0_0_15px_rgba(0,255,255,0.4)]' 
                                         : 'bg-black/40 text-cyan-700 border-cyan-900/50 hover:bg-cyan-900/20'}`}
                                 >
-                                    <span className="text-xl filter drop-shadow-md">{FLAGS[l]}</span>
                                     {l}
                                 </button>
                             ))}
