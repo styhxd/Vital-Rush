@@ -4,14 +4,13 @@
  * DIRETOR: PAULO GABRIEL DE L. S.
  * ------------------------------------------------------------------
  * 
- * BEM-VINDO AO DNA DO JOGO - VERSÃO "PREPARE TO DIE"
+ * BEM-VINDO AO DNA DO JOGO - VERSÃO "RECALIBRADA"
  * 
- * O usuário reclamou que estava fácil. O usuário pediu dor.
- * O usuário receberá dor.
+ * O Arquiteto ouviu seus gritos. A viscosidade do fluido foi aumentada.
+ * Os inimigos agora se movem com a urgência de funcionários públicos.
  * 
- * Ajustamos a economia para simular uma crise financeira global.
- * Os inimigos agora tomam suplementos ilegais.
- * O jogador foi nerfado para a idade da pedra.
+ * EM TROCA: Os seus upgrades agora são menos potentes.
+ * O equilíbrio deve ser mantido. Nada vem de graça.
  */
 
 import { Upgrade, EntityType, WaveConfig, Language, Difficulty, Achievement, ThemePalette } from './types';
@@ -61,39 +60,38 @@ export const CANVAS_WIDTH = 1920;
 export const CANVAS_HEIGHT = 1080;
 
 // Configurações de Sobrevivência
-export const INITIAL_LIVES = 3; // Três chances. Não desperdice.
-export const ADRENALINE_MAX_DURATION = 20; // Segundos. Depois disso, o coração explode se não parar.
+export const INITIAL_LIVES = 3; 
+export const ADRENALINE_MAX_DURATION = 20;
 
 // Status iniciais do "Heroi". 
-// NERF: Reduzimos tudo. Você não é mais um Rambo, é um estagiário com uma pistola de água.
 export const INITIAL_STATS = {
-  speed: 4.0, // Um pouco mais lento pra dar agonia
-  fireRate: 450, // Muito mais lento. Clique ou morra.
-  damage: 15, // Dano de mosquito
+  speed: 4.5, // Leve aumento na velocidade base do player para compensar
+  fireRate: 450, 
+  damage: 15,
   bulletSpeed: 16, 
   bulletCount: 1,
-  magnetRadius: 100, // Vai ter que andar pra pegar dinheiro
-  maxHealth: 80, // Papel
-  regen: 0, // Regeneração? Isso é coisa de jogo fácil. Começa com ZERO.
-  maxEnergy: 120, // Mais difícil de ultar
+  magnetRadius: 120, // Raio um pouco maior para ajudar na coleta
+  maxHealth: 100, // Vida base restaurada para 100
+  regen: 0, 
+  maxEnergy: 100, // Energia base facilitada
   dashSpeed: 22, 
-  dashCooldown: 1500, // Cooldown maior
-  critChance: 0.01, // 1% de chance. Boa sorte.
-  critMultiplier: 1.2,
+  dashCooldown: 1200, // Dash volta mais rápido
+  critChance: 0.05, // 5% base
+  critMultiplier: 1.5,
   orbitals: 0,
   thorns: 0,
   lifesteal: 0,
   dashDamage: 0,
-  surgeRadiusMult: 0.8
+  surgeRadiusMult: 1.0
 };
 
 // Multiplicadores de dificuldade.
-// AGORA A BRINCADEIRA FICOU SÉRIA.
+// REDUÇÃO DE VELOCIDADE (SPEED) EM TODOS OS NÍVEIS
 export const DIFFICULTY_MODIFIERS = {
-  [Difficulty.EASY]: { hp: 1.0, dmg: 1.0, speed: 1.0, score: 0.8 }, // O Easy virou o antigo Normal
-  [Difficulty.NORMAL]: { hp: 1.8, dmg: 1.5, speed: 1.2, score: 1.0 }, // Normal já dói
-  [Difficulty.HARD]: { hp: 3.0, dmg: 2.5, speed: 1.4, score: 1.5 }, // Hard é para masoquistas
-  [Difficulty.APEX]: { hp: 5.5, dmg: 4.0, speed: 1.7, score: 3.0 } // APEX: Inimigos são tanques de guerra com propulsores
+  [Difficulty.EASY]: { hp: 0.8, dmg: 0.8, speed: 0.6, score: 0.8 }, // Muito lento
+  [Difficulty.NORMAL]: { hp: 1.5, dmg: 1.2, speed: 0.85, score: 1.0 }, // Lento (era 1.2)
+  [Difficulty.HARD]: { hp: 2.5, dmg: 2.0, speed: 1.1, score: 1.5 }, // Médio (era 1.4)
+  [Difficulty.APEX]: { hp: 4.5, dmg: 4.0, speed: 1.35, score: 3.0 } // Rápido (era 1.7)
 };
 
 export const PATIENT_NAMES_FIRST = ["J.", "A.", "M.", "K.", "R.", "S.", "T.", "L.", "C.", "B."];
@@ -249,29 +247,29 @@ export const TEXTS: TranslationMap = {
     NO_MUTATIONS: "NO ACTIVE MUTATIONS DETECTED",
     // Upgrades
     UP_MITOSIS_NAME: "RAPID MITOSIS",
-    UP_MITOSIS_DESC: "+10% Fire Rate",
+    UP_MITOSIS_DESC: "+6% Fire Rate",
     UP_MEMBRANE_NAME: "TITANIUM MEMBRANE",
-    UP_MEMBRANE_DESC: "+25% Max HP & Full Heal",
+    UP_MEMBRANE_DESC: "+12% Max HP & Full Heal",
     UP_ENZYME_NAME: "HYPER ENZYMES",
-    UP_ENZYME_DESC: "+15% Damage",
+    UP_ENZYME_DESC: "+8% Damage",
     UP_MULTISHOT_NAME: "ADAPTIVE SPLIT",
-    UP_MULTISHOT_DESC: "+1 Projectile, -15% Damage",
+    UP_MULTISHOT_DESC: "+1 Projectile, -25% Damage",
     UP_ENERGY_NAME: "MITOCHONDRIA BOOST",
-    UP_ENERGY_DESC: "Surge & Dash recharge 15% faster",
+    UP_ENERGY_DESC: "Surge & Dash recharge 8% faster",
     UP_GIGA_NAME: "CYTOKINE STORM",
-    UP_GIGA_DESC: "+2 Proj, +20% Dmg, Full Heal",
+    UP_GIGA_DESC: "+2 Proj, +10% Dmg, Full Heal",
     UP_ORBITAL_NAME: "NANO-GUARDIANS",
     UP_ORBITAL_DESC: "Adds +1 Autonomous Defensive Drone",
     UP_DASH_NAME: "PLASMA TRAIL",
-    UP_DASH_DESC: "Dash deals 30 Damage to enemies passed",
+    UP_DASH_DESC: "Dash deals 15 Damage to enemies passed",
     UP_CRIT_NAME: "PRECISION OPTICS",
-    UP_CRIT_DESC: "+10% Crit Chance, +0.3x Crit Dmg",
+    UP_CRIT_DESC: "+4% Crit Chance, +0.15x Crit Dmg",
     UP_THORNS_NAME: "SPIKED CARAPACE",
-    UP_THORNS_DESC: "Deals 3 Contact Dmg to attackers",
+    UP_THORNS_DESC: "Deals 1.5 Contact Dmg to attackers",
     UP_LIFE_NAME: "VAMPIRIC STRAIN",
     UP_LIFE_DESC: "Crit kills heal +1 HP",
     UP_MAGNET_NAME: "MAGNETIC FIELD",
-    UP_MAGNET_DESC: "+20% Magnet Range & Surge Radius",
+    UP_MAGNET_DESC: "+10% Magnet Range & Surge Radius",
     // Achievements
     ACH_KILL_100_TITLE: "Cleaner",
     ACH_KILL_100_DESC: "Eliminate 100 pathogens.",
@@ -439,29 +437,29 @@ export const TEXTS: TranslationMap = {
     NO_MUTATIONS: "NENHUMA MUTAÇÃO ATIVA DETECTADA",
     // Upgrades
     UP_MITOSIS_NAME: "MITOSE RÁPIDA",
-    UP_MITOSIS_DESC: "+10% Cadência de Tiro",
+    UP_MITOSIS_DESC: "+6% Cadência de Tiro",
     UP_MEMBRANE_NAME: "MEMBRANA DE TITÂNIO",
-    UP_MEMBRANE_DESC: "+25% Vida Máx & Cura Total",
+    UP_MEMBRANE_DESC: "+12% Vida Máx & Cura Total",
     UP_ENZYME_NAME: "HIPER ENZIMAS",
-    UP_ENZYME_DESC: "+15% Dano",
+    UP_ENZYME_DESC: "+8% Dano",
     UP_MULTISHOT_NAME: "DIVISÃO ADAPTATIVA",
-    UP_MULTISHOT_DESC: "+1 Projétil, -15% Dano",
+    UP_MULTISHOT_DESC: "+1 Projétil, -25% Dano",
     UP_ENERGY_NAME: "IMPULSO MITOCONDRIAL",
-    UP_ENERGY_DESC: "Surto e Esquiva recarregam 15% mais rápido",
+    UP_ENERGY_DESC: "Surto e Esquiva recarregam 8% mais rápido",
     UP_GIGA_NAME: "TEMPESTADE CITOCINA",
-    UP_GIGA_DESC: "+2 Proj, +20% Dano, Cura Total",
+    UP_GIGA_DESC: "+2 Proj, +10% Dano, Cura Total",
     UP_ORBITAL_NAME: "NANO-GUARDIÕES",
     UP_ORBITAL_DESC: "Adiciona +1 Drone de Defesa Autônomo",
     UP_DASH_NAME: "RASTRO DE PLASMA",
-    UP_DASH_DESC: "Dash causa 30 de Dano ao atravessar inimigos",
+    UP_DASH_DESC: "Dash causa 15 de Dano ao atravessar inimigos",
     UP_CRIT_NAME: "ÓPTICA DE PRECISÃO",
-    UP_CRIT_DESC: "+10% Chance Crítica, +0.3x Dano Crítico",
+    UP_CRIT_DESC: "+4% Chance Crítica, +0.15x Dano Crítico",
     UP_THORNS_NAME: "CARAPAÇA DE ESPINHOS",
-    UP_THORNS_DESC: "Causa 3 de Dano ao ser tocado",
+    UP_THORNS_DESC: "Causa 1.5 de Dano ao ser tocado",
     UP_LIFE_NAME: "CEPA VAMPÍRICA",
     UP_LIFE_DESC: "Abates críticos curam +1 Vida",
     UP_MAGNET_NAME: "CAMPO MAGNÉTICO",
-    UP_MAGNET_DESC: "+20% Alcance do Ímã e Tamanho do Surto",
+    UP_MAGNET_DESC: "+10% Alcance do Ímã e Tamanho do Surto",
     // Achievements
     ACH_KILL_100_TITLE: "Dedetizador",
     ACH_KILL_100_DESC: "Elimine 100 patógenos.",
@@ -572,7 +570,7 @@ export const TEXTS: TranslationMap = {
     DIFF_RESIDENT: "RESIDENTE",
     DIFF_SPECIALIST: "ESPECIALISTA",
     DIFF_APEX: "APEX",
-    CTRL_MOVE: "MOVIMIENTO",
+    CTRL_MOVE: "MOVIMENTO",
     CTRL_MOVE_DESC: "WASD / FLECHAS / JOYSTICK TÁCTIL",
     CTRL_DASH: "ESQUIVA",
     CTRL_DASH_DESC: "SHIFT / E / BOTÓN TÁCTIL",
@@ -629,29 +627,29 @@ export const TEXTS: TranslationMap = {
     NO_MUTATIONS: "NO SE DETECTARON MUTACIONES ACTIVAS",
     // Upgrades
     UP_MITOSIS_NAME: "MITOSIS RÁPIDA",
-    UP_MITOSIS_DESC: "+10% Cadencia de Tiro",
+    UP_MITOSIS_DESC: "+6% Cadencia de Tiro",
     UP_MEMBRANE_NAME: "MEMBRANA DE TITANIO",
-    UP_MEMBRANE_DESC: "+25% Vida Máx & Cura Total",
+    UP_MEMBRANE_DESC: "+12% Vida Máx & Cura Total",
     UP_ENZYME_NAME: "HIPER ENZIMAS",
-    UP_ENZYME_DESC: "+15% Daño",
+    UP_ENZYME_DESC: "+8% Daño",
     UP_MULTISHOT_NAME: "DIVISIÓN ADAPTATIVA",
-    UP_MULTISHOT_DESC: "+1 Proyectil, -15% Daño",
+    UP_MULTISHOT_DESC: "+1 Proyectil, -25% Daño",
     UP_ENERGY_NAME: "IMPULSO MITOCONDRIAL",
-    UP_ENERGY_DESC: "Surge y Esquiva recarga 15% más rápido",
+    UP_ENERGY_DESC: "Surge y Esquiva recarga 8% más rápido",
     UP_GIGA_NAME: "TORMENTA CITOCINA",
-    UP_GIGA_DESC: "+2 Proy, +20% Daño, Cura Total",
+    UP_GIGA_DESC: "+2 Proy, +10% Daño, Cura Total",
     UP_ORBITAL_NAME: "NANO-GUARDIANES",
     UP_ORBITAL_DESC: "Añade +1 Dron de Defensa Autónomo",
     UP_DASH_NAME: "RASTRO DE PLASMA",
-    UP_DASH_DESC: "Dash causa 30 de Daño al atravesar enemigos",
+    UP_DASH_DESC: "Dash causa 15 de Daño al atravesar enemigos",
     UP_CRIT_NAME: "ÓPTICA DE PRECISIÓN",
-    UP_CRIT_DESC: "+10% Prob. Crítica, +0.3x Daño Crítico",
+    UP_CRIT_DESC: "+4% Prob. Crítica, +0.15x Daño Crítico",
     UP_THORNS_NAME: "CAPARAZÓN DE ESPINAS",
-    UP_THORNS_DESC: "Causa 3 de Daño al ser tocado",
+    UP_THORNS_DESC: "Causa 1.5 de Daño al ser tocado",
     UP_LIFE_NAME: "CEPA VAMPÍRICA",
     UP_LIFE_DESC: "Bajas críticas curan +1 Vida",
     UP_MAGNET_NAME: "CAMPO MAGNÉTICO",
-    UP_MAGNET_DESC: "+20% Rango de Imán y Tamaño de Surge",
+    UP_MAGNET_DESC: "+10% Rango de Imán y Tamaño de Surge",
     // Achievements
     ACH_KILL_100_TITLE: "Limpiador",
     ACH_KILL_100_DESC: "Elimina 100 patógenos.",
@@ -719,11 +717,11 @@ export const TEXTS: TranslationMap = {
 // Configuração das Ondas.
 // Ajustado para o modo "Pesadelo". Spawns mais rápidos desde o começo.
 export const WAVES: WaveConfig[] = [
-  { waveNumber: 1, duration: 40, spawnRate: 600, enemyTypes: [EntityType.BACTERIA], flowSpeed: -0.6, hasBoss: false },
-  { waveNumber: 2, duration: 55, spawnRate: 500, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -0.8, hasBoss: false },
-  { waveNumber: 3, duration: 60, spawnRate: 400, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -1.0, hasBoss: true }, // Boss de treino
-  { waveNumber: 4, duration: 80, spawnRate: 350, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.3, hasBoss: false },
-  { waveNumber: 5, duration: 999, spawnRate: 150, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.8, hasBoss: true }, // Spam insano
+  { waveNumber: 1, duration: 40, spawnRate: 600, enemyTypes: [EntityType.BACTERIA], flowSpeed: -0.4, hasBoss: false }, // Flow reduzido
+  { waveNumber: 2, duration: 55, spawnRate: 500, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -0.6, hasBoss: false },
+  { waveNumber: 3, duration: 60, spawnRate: 400, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -0.8, hasBoss: true }, // Boss de treino
+  { waveNumber: 4, duration: 80, spawnRate: 350, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.0, hasBoss: false },
+  { waveNumber: 5, duration: 999, spawnRate: 150, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.4, hasBoss: true }, // Spam insano
 ];
 
 // O "Shopping" do jogo.
@@ -738,7 +736,7 @@ export const UPGRADES: Upgrade[] = [
     costMultiplier: 1.8,
     level: 0,
     maxLevel: 10,
-    apply: (s) => ({ ...s, fireRate: Math.max(100, s.fireRate * 0.90) })
+    apply: (s) => ({ ...s, fireRate: Math.max(150, s.fireRate * 0.94) }) // Nerfado (era 0.92)
   },
   {
     id: 'enzyme',
@@ -749,7 +747,7 @@ export const UPGRADES: Upgrade[] = [
     costMultiplier: 1.8,
     level: 0,
     maxLevel: 10,
-    apply: (s) => ({ ...s, damage: s.damage * 1.15 }) // Nerf no scaling (25% -> 15%)
+    apply: (s) => ({ ...s, damage: s.damage * 1.08 }) // Nerfado (era 1.10)
   },
   {
     id: 'membrane',
@@ -760,7 +758,7 @@ export const UPGRADES: Upgrade[] = [
     costMultiplier: 1.6,
     level: 0,
     maxLevel: 10,
-    apply: (s) => ({ ...s, maxHealth: Math.floor(s.maxHealth * 1.25), health: Math.floor(s.maxHealth * 1.25) })
+    apply: (s) => ({ ...s, maxHealth: Math.floor(s.maxHealth * 1.12), health: Math.floor(s.maxHealth * 1.12) }) // Nerfado (era 1.15)
   },
   {
     id: 'multishot',
@@ -771,7 +769,7 @@ export const UPGRADES: Upgrade[] = [
     costMultiplier: 2.5,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, bulletCount: s.bulletCount + 1, damage: s.damage * 0.85 })
+    apply: (s) => ({ ...s, bulletCount: s.bulletCount + 1, damage: s.damage * 0.75 }) // Nerfado (penalidade maior -25%)
   },
   {
     id: 'orbitals',
@@ -793,7 +791,7 @@ export const UPGRADES: Upgrade[] = [
     costMultiplier: 2.0,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, critChance: s.critChance + 0.10, critMultiplier: s.critMultiplier + 0.3 })
+    apply: (s) => ({ ...s, critChance: s.critChance + 0.04, critMultiplier: s.critMultiplier + 0.15 }) // Nerfado
   },
   {
     id: 'dash_dmg',
@@ -804,7 +802,7 @@ export const UPGRADES: Upgrade[] = [
     costMultiplier: 1.8,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, dashDamage: s.dashDamage + 30 })
+    apply: (s) => ({ ...s, dashDamage: s.dashDamage + 15 }) // Nerfado (era 20)
   },
   {
     id: 'thorns',
@@ -815,7 +813,7 @@ export const UPGRADES: Upgrade[] = [
     costMultiplier: 2.0,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, thorns: s.thorns + 3 }) // Nerf Brutal: 10 -> 3. Tentar AFK agora = morte.
+    apply: (s) => ({ ...s, thorns: s.thorns + 1.5 }) // Nerfado (2 -> 1.5)
   },
   {
     id: 'lifesteal',
@@ -837,7 +835,7 @@ export const UPGRADES: Upgrade[] = [
     costMultiplier: 1.5,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, magnetRadius: s.magnetRadius * 1.2, surgeRadiusMult: s.surgeRadiusMult * 1.1 })
+    apply: (s) => ({ ...s, magnetRadius: s.magnetRadius * 1.10, surgeRadiusMult: s.surgeRadiusMult * 1.1 }) // Nerfado
   },
   {
     id: 'energy_core',
@@ -848,7 +846,7 @@ export const UPGRADES: Upgrade[] = [
     costMultiplier: 1.8,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, maxEnergy: Math.max(50, s.maxEnergy * 0.85), dashCooldown: Math.max(400, s.dashCooldown * 0.85) })
+    apply: (s) => ({ ...s, maxEnergy: Math.max(50, s.maxEnergy * 0.92), dashCooldown: Math.max(400, s.dashCooldown * 0.92) }) // Nerfado (8%)
   },
   {
     id: 'giga_blast',
@@ -859,6 +857,6 @@ export const UPGRADES: Upgrade[] = [
     costMultiplier: 3.0,
     level: 0,
     maxLevel: 3,
-    apply: (s) => ({ ...s, bulletCount: s.bulletCount + 2, damage: s.damage * 1.2, health: s.maxHealth })
+    apply: (s) => ({ ...s, bulletCount: s.bulletCount + 2, damage: s.damage * 1.10, health: s.maxHealth }) // Nerfado
   }
 ];
