@@ -1615,7 +1615,7 @@ export class GameEngine {
              else this.ctx.lineTo(vx, vy);
            }
            this.ctx.closePath();
-        } else if (e.type === EntityType.VIRUS) { // NEW VIRUS: The Green Monster (Image Ref)
+        } else if (e.type === EntityType.VIRUS) { // NEW VIRUS: NO FACE, JUST PURE GEOMETRIC HATE
             // Body (Green Sphere)
             const r = e.radius;
             this.ctx.fillStyle = (e.hitFlash && e.hitFlash > 0) ? '#ffffff' : '#00aa00'; // Darker green body
@@ -1637,35 +1637,7 @@ export class GameEngine {
                 this.ctx.stroke();
             }
 
-            // Eyes (Red, Angled)
-            this.ctx.fillStyle = '#ff0000';
-            
-            // Left Eye
-            this.ctx.save();
-            this.ctx.translate(-r*0.3, -r*0.2);
-            this.ctx.rotate(-0.3); // Angle inwards
-            this.ctx.beginPath();
-            this.ctx.ellipse(0, 0, r*0.25, r*0.15, 0, 0, Math.PI*2);
-            this.ctx.fill();
-            this.ctx.restore();
-
-            // Right Eye
-            this.ctx.save();
-            this.ctx.translate(r*0.3, -r*0.2);
-            this.ctx.rotate(0.3); // Angle inwards
-            this.ctx.beginPath();
-            this.ctx.ellipse(0, 0, r*0.25, r*0.15, 0, 0, Math.PI*2);
-            this.ctx.fill();
-            this.ctx.restore();
-
-            // Mouth (Black Arc)
-            this.ctx.strokeStyle = '#000';
-            this.ctx.lineWidth = 3;
-            this.ctx.beginPath();
-            this.ctx.arc(0, r*0.2, r*0.4, 0.2, Math.PI - 0.2);
-            this.ctx.stroke();
-            
-            // Shoot Indicator (Glowing Core)
+            // SHOOT INDICATOR ONLY (No eyes/mouth)
             if (e.shootTimer !== undefined && e.shootTimer < 0.5) {
                 this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
                 this.ctx.beginPath();

@@ -364,6 +364,23 @@ export const Game: React.FC = () => {
       setGameState(GameState.ACHIEVEMENTS);
   }, [gameState]);
 
+  const generatePatient = () => {
+      const fName = PATIENT_NAMES_FIRST[Math.floor(Math.random() * PATIENT_NAMES_FIRST.length)];
+      const lName = PATIENT_NAMES_LAST[Math.floor(Math.random() * PATIENT_NAMES_LAST.length)];
+      const symptomKey = SYMPTOMS_KEYS[Math.floor(Math.random() * SYMPTOMS_KEYS.length)];
+      const strains = Object.values(ViralStrain);
+      const strain = strains[Math.floor(Math.random() * strains.length)];
+      
+      return {
+          id: Math.floor(Math.random() * 99999).toString(),
+          name: `${fName} ${lName}`,
+          age: Math.floor(Math.random() * 40) + 20,
+          symptoms: symptomKey, 
+          strain: strain,
+          difficultyMultiplier: 1
+      };
+  }
+
   const handleCheatInput = (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
       setCheatInput(val);
@@ -373,6 +390,45 @@ export const Game: React.FC = () => {
           audioManager.playPowerUp();
           setCheatInput("");
           alert("SYSTEM OVERRIDE: APEX PRIVILEGES GRANTED");
+      }
+      // NEW CHEAT: BORA FICAR FORTE (RUN WITH ALL UPGRADES)
+      else if (val === 'boraficarforte') {
+          // 1. Calculate stats as if all upgrades were bought to max
+          let godStats = { ...INITIAL_STATS };
+          const maxedUpgrades = UPGRADES.map(u => {
+              const def = UPGRADES.find(d => d.id === u.id);
+              if (def) {
+                  for(let i=0; i < u.maxLevel; i++) {
+                      godStats = def.apply(godStats);
+                  }
+              }
+              return { ...u, level: u.maxLevel };
+          });
+
+          // 2. Initialize Game immediately
+          audioManager.init();
+          const newPatient = generatePatient();
+          setPatient(newPatient);
+
+          if (canvasRef.current) {
+              engineRef.current = new GameEngine(canvasRef.current, godStats, newPatient, difficulty, colors);
+              engineRef.current.setLanguage(language);
+              
+              setStats(godStats);
+              setUpgrades(maxedUpgrades);
+              setUiData({ 
+                health: godStats.maxHealth, maxHealth: godStats.maxHealth, score: 0, biomass: 0, 
+                wave: 1, waveTime: 0, waveDuration: 1, energy: godStats.maxEnergy, maxEnergy: godStats.maxEnergy, 
+                combo: 0, dashReady: true, adrenaline: false, lives: INITIAL_LIVES
+              });
+              
+              engineRef.current.startWave(0); // Wave 1 start
+              setGameState(GameState.PLAYING);
+              setIsPaused(false);
+              audioManager.startGameMusic();
+              audioManager.playPowerUp();
+              setCheatInput("");
+          }
       }
   }
 
@@ -460,23 +516,6 @@ export const Game: React.FC = () => {
     animationFrameRef.current = requestAnimationFrame(loop);
     return () => { if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current); }
   }, [loop]);
-
-  const generatePatient = () => {
-      const fName = PATIENT_NAMES_FIRST[Math.floor(Math.random() * PATIENT_NAMES_FIRST.length)];
-      const lName = PATIENT_NAMES_LAST[Math.floor(Math.random() * PATIENT_NAMES_LAST.length)];
-      const symptomKey = SYMPTOMS_KEYS[Math.floor(Math.random() * SYMPTOMS_KEYS.length)];
-      const strains = Object.values(ViralStrain);
-      const strain = strains[Math.floor(Math.random() * strains.length)];
-      
-      return {
-          id: Math.floor(Math.random() * 99999).toString(),
-          name: `${fName} ${lName}`,
-          age: Math.floor(Math.random() * 40) + 20,
-          symptoms: symptomKey, 
-          strain: strain,
-          difficultyMultiplier: 1
-      };
-  }
 
   const handleStartGame = () => {
      try {
@@ -959,6 +998,16 @@ export const Game: React.FC = () => {
                       </button>
                     ))}
                 </div>
+            </div>
+            
+            <div className="mt-8">
+                <input 
+                    type="text" 
+                    value={cheatInput} 
+                    onChange={handleCheatInput}
+                    placeholder={t('PH_ACCESS_CODE')}
+                    className="bg-transparent border-b border-gray-800 text-center text-xs text-gray-500 focus:outline-none focus:border-red-500 w-full font-mono tracking-widest uppercase"
+                />
             </div>
           </div>
         </div>
