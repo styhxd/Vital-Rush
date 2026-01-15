@@ -1,23 +1,25 @@
 import React from 'react';
 import { TEXTS } from '../constants';
-import { Language } from '../types';
+import { Language, GameState } from '../types';
 
 interface PauseMenuProps {
     isPaused: boolean;
     language: Language;
+    gameState: GameState; // NEW: Receives current game state
     onResume: () => void;
-    onSettings: () => void; // New Prop
+    onSettings: () => void;
     onQuit: () => void;
 }
 
-export const PauseMenu: React.FC<PauseMenuProps> = ({ isPaused, language, onResume, onSettings, onQuit }) => {
-    // FAILSAFE 1: Verificação lógica dupla. Se não estiver pausado, ejeta imediatamente.
-    if (!isPaused) return null;
+export const PauseMenu: React.FC<PauseMenuProps> = ({ isPaused, language, gameState, onResume, onSettings, onQuit }) => {
+    // FAILSAFE 1: Verificação lógica dupla. 
+    // Se não estiver pausado, OU se estivermos no menu de LOADOUT/SETTINGS, não mostra o menu de pausa padrão.
+    if (!isPaused || gameState === GameState.LOADOUT || gameState === GameState.SETTINGS) return null;
 
     const t = (key: string) => TEXTS[language][key] || key;
 
     return (
-        // FAILSAFE 2: Z-Index 100 absoluto. SettingsMenu terá 110.
+        // FAILSAFE 2: Z-Index 100 absoluto. SettingsMenu terá 110, Loadout 120.
         <div 
             className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200"
             onClick={(e) => e.stopPropagation()}

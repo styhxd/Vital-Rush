@@ -6,7 +6,8 @@ import { GameState, PlayerStats, Upgrade, WaveConfig, Language, Difficulty, Pati
 import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES_FIRST, PATIENT_NAMES_LAST, SYMPTOMS_KEYS, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES } from '../constants';
 import { Joystick } from './Joystick';
 import { PauseMenu } from './PauseMenu';
-import { SettingsMenu } from './SettingsMenu'; // NEW IMPORT
+import { SettingsMenu } from './SettingsMenu';
+import { LoadoutMenu } from './LoadoutMenu'; // NEW IMPORT
 
 // --- UI COMPONENTS (Pequenos componentes auxiliares) ---
 
@@ -974,6 +975,15 @@ export const Game: React.FC = () => {
           onClose={closeSettings}
       />
 
+      {/* New LoadoutMenu Component Rendering */}
+      <LoadoutMenu
+          isVisible={gameState === GameState.LOADOUT}
+          stats={stats}
+          upgrades={upgrades}
+          language={language}
+          onClose={closeLoadout}
+      />
+
       {/* (RESTANTE DOS MENUS) */}
       
       {gameState === GameState.ACHIEVEMENTS && (
@@ -1257,7 +1267,8 @@ export const Game: React.FC = () => {
       {/* NEW PAUSE MENU IMPLEMENTATION */}
       <PauseMenu 
           isPaused={isPaused} 
-          language={language} 
+          language={language}
+          gameState={gameState} // NEW: Passing game state
           onResume={togglePause} 
           onSettings={openSettings} // New Handler
           onQuit={() => {
