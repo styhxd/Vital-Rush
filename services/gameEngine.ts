@@ -11,6 +11,8 @@
  * 2. BOSS CLAMP: Bosses são forçados a ficar dentro da tela. Adeus softlock.
  * 3. DEATH SURGE: Morreu? Explode tudo. De graça. E com visual de SANGUE.
  * 4. HIT STOP: O jogo para brevemente ao morrer para dar impacto.
+ * 5. SMART WAVE END: Verifica inimigos VISÍVEIS e faz buffer de segurança.
+ * 6. BIOMASS VACUUM: Puxa todo o dinheiro antes de abrir a loja.
  */
 
 import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette, Language } from '../types';
@@ -104,6 +106,10 @@ export class GameEngine {
   
   // HIT STOP
   private hitStopTimer: number = 0;
+
+  // SMART WAVE END & VACUUM
+  private clearBufferTimer: number = 0; // Tempo de segurança sem inimigos antes de acabar
+  private isVacuuming: boolean = false; // Modo "Aspirador de Pó" no fim da wave
   
   private maxParticles = 250;
   private maxEntities = 400;
@@ -451,6 +457,8 @@ export class GameEngine {
     this.waveActive = true;
     this.bossSpawned = false;
     this.spawnTimer = 0;
+    this.clearBufferTimer = 0; // Reset do buffer
+    this.isVacuuming = false;  // Reset do aspirador
     const waveNum = waveIndex + 1; 
     audioManager.setGameState(waveNum, 1.0);
     
@@ -738,20 +746,48 @@ export class GameEngine {
 
       const enemiesRemaining = this.entities.some(e => e.active && (this.isEnemy(e.type) || e.type === EntityType.BOSS));
       const bossRemaining = this.entities.some(e => e.active && e.type === EntityType.BOSS);
-      const isOvertime = this.waveTimer >= config.duration + 10;
       
-      if ((this.waveTimer >= config.duration && !enemiesRemaining && (!config.hasBoss || (this.bossSpawned && !bossRemaining))) || 
-          (isOvertime && !config.hasBoss && !bossRemaining)) {
-        
-        if (isOvertime && enemiesRemaining) {
-            this.killAllEnemies(); 
-        }
+      // LOGICA DE FIM DE WAVE INTELIGENTE
+      // 1. Tempo acabou?
+      // 2. Todos os inimigos morreram? OU
+      // 3. O tempo acabou E não tem ninguém VISÍVEL na tela por 3 segundos?
+      if (this.waveTimer >= config.duration) {
+          if (!enemiesRemaining && (!config.hasBoss || (this.bossSpawned && !bossRemaining))) {
+              this.isVacuuming = true; // Inicia a coleta
+          } else if (!config.hasBoss && !bossRemaining) {
+              // Verifica inimigos VISÍVEIS na tela (com margem de 50px)
+              const hasVisibleEnemies = this.entities.some(e => 
+                  (this.isEnemy(e.type) || e.type === EntityType.BOSS) && e.active &&
+                  e.pos.x > -50 && e.pos.x < CANVAS_WIDTH + 50 &&
+                  e.pos.y > -50 && e.pos.y < CANVAS_HEIGHT + 50
+              );
 
-        this.waveActive = false;
-        if (this.currentWaveIndex === 0 && this.sessionStats.damageTaken === 0) achievementManager.track('perfect_wave', 1);
-        if (this.player.health < this.player.maxHealth * 0.2) achievementManager.track('low_hp_survive', 1);
-        if (this.currentWaveIndex === 4 && this.currentDifficulty === Difficulty.APEX) achievementManager.track('win_apex', 1);
-        onWaveClear();
+              if (!hasVisibleEnemies) {
+                  this.clearBufferTimer += dtSeconds;
+                  // Se ficar 3 segundos sem ninguém na tela, considera limpo
+                  if (this.clearBufferTimer > 3.0) {
+                      this.killAllEnemies(); // Limpa quem sobrou fora da tela
+                      this.isVacuuming = true;
+                  }
+              } else {
+                  this.clearBufferTimer = 0; // Reset se alguém aparecer
+              }
+          }
+      }
+      
+      if (this.isVacuuming) {
+          // Protocolo Vácuo: Puxa todo DNA para o player
+          const dnaFragments = this.entities.filter(e => e.type === EntityType.DNA_FRAGMENT && e.active);
+          
+          if (dnaFragments.length === 0) {
+              // Só termina quando não tiver mais DNA
+              this.waveActive = false;
+              this.isVacuuming = false;
+              if (this.currentWaveIndex === 0 && this.sessionStats.damageTaken === 0) achievementManager.track('perfect_wave', 1);
+              if (this.player.health < this.player.maxHealth * 0.2) achievementManager.track('low_hp_survive', 1);
+              if (this.currentWaveIndex === 4 && this.currentDifficulty === Difficulty.APEX) achievementManager.track('win_apex', 1);
+              onWaveClear();
+          }
       }
     }
 
@@ -1002,8 +1038,13 @@ export class GameEngine {
           const dy = this.player.pos.y - e.pos.y;
           const dist = Math.sqrt(dx*dx + dy*dy);
           
-          if (dist < stats.magnetRadius || this.surgeActive) {
-            const speed = this.surgeActive ? 50 : 28;
+          // VACUUM MODE: Ignora magnet radius, puxa TUDO
+          const isVacuuming = this.isVacuuming;
+          
+          if (dist < stats.magnetRadius || this.surgeActive || isVacuuming) {
+            // Se estiver no vácuo, velocidade extrema (80)
+            const speed = isVacuuming ? 80 : (this.surgeActive ? 50 : 28);
+            
             e.pos.x += (dx / dist) * speed * tick;
             e.pos.y += (dy / dist) * speed * tick;
             
