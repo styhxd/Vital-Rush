@@ -540,8 +540,13 @@ export const Game: React.FC = () => {
                 
                 <div className="flex gap-1 mt-2">
                     {Array.from({length: INITIAL_LIVES}).map((_, i) => (
-                        <div key={i} className={`w-4 h-4 rounded-full border border-white/20 flex items-center justify-center ${i < uiData.lives ? 'bg-red-500 shadow-[0_0_10px_red]' : 'bg-transparent opacity-20'}`}>
-                            {i < uiData.lives && <span className="text-[8px]">♥</span>}
+                        <div key={i} className={`w-4 h-4 rounded-full flex items-center justify-center transition-all duration-500
+                            ${i < uiData.lives 
+                                ? 'bg-red-500 shadow-[0_0_10px_red] border-white/20 border' 
+                                : 'bg-black/50 border border-red-900/50 shadow-none'}`}>
+                            {i < uiData.lives 
+                                ? <span className="text-[8px]">♥</span> 
+                                : <span className="text-[8px] text-red-900 font-bold">X</span>}
                         </div>
                     ))}
                 </div>

@@ -4,13 +4,12 @@
  * DIRETOR: PAULO GABRIEL DE L. S.
  * ------------------------------------------------------------------
  * 
- * A BESTA (GAME ENGINE) - PROTOCOLO FINAL "ARQUITETO"
+ * A BESTA (GAME ENGINE) - PROTOCOLO "GRAVIDADE & VINGANÇA"
  * 
- * CORREÇÕES DE SEGURANÇA (FAILSAFES & FAILCHECKS):
- * 1. REAPER CHECK: Verifica morte no final de todo frame. Vida < 0.5 = Morte.
- * 2. BLACK HOLE: Inimigos mortos são banidos para x=-10000.
- * 3. TIMER CLAMP: Invulnerabilidade nunca buga negativa ou infinita.
- * 4. HARD SPAWN STOP: O tempo acabou? A torneira de monstros fecha.
+ * CORREÇÕES:
+ * 1. BOSS ANCHOR: Bosses agora são imunes a knockback do Surge. Eles não voam mais.
+ * 2. BOSS CLAMP: Bosses são forçados a ficar dentro da tela. Adeus softlock.
+ * 3. DEATH SURGE: Morreu? Explode tudo. De graça.
  */
 
 import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette, Language } from '../types';
@@ -175,7 +174,6 @@ export class GameEngine {
   }
 
   public spawnEnemy(config: WaveConfig) {
-      // FAILCHECK: Se a wave acabou, proíbe spawns imediatamente.
       if (this.waveTimer >= config.duration) return;
 
       const type = config.enemyTypes[Math.floor(Math.random() * config.enemyTypes.length)];
@@ -273,7 +271,10 @@ export class GameEngine {
 
       target.health -= finalDamage;
       target.hitFlash = 5;
-      target.pos.x += 2; 
+      
+      // BOSS ANCHOR: Bosses quase não se movem com dano
+      const knockback = target.type === EntityType.BOSS ? 0.1 : 2;
+      target.pos.x += knockback; 
 
       if (isCrit && stats.lifesteal > 0) {
           this.player.health = Math.min(this.player.health + 2, this.player.maxHealth);
@@ -362,15 +363,15 @@ export class GameEngine {
       return false;
   }
 
-  public handlePlayerDeath(onGameOver: () => void) {
+  // PROTOCOLO VINGANÇA: Agora recebe stats para calcular o Surge da Morte
+  public handlePlayerDeath(onGameOver: () => void, currentStats: PlayerStats) {
       if (this.lives > 0) {
           this.lives--;
           achievementManager.track('die_10', 1);
           
           if (this.lives === 0) {
-              // FAILSAFE DE MORTE: Desativa tudo imediatamente
               this.player.active = false;
-              this.waveActive = false; // Para a onda
+              this.waveActive = false; 
               for(let i=0; i<30; i++) {
                    this.particles.push({
                       id: 'p_death', type: EntityType.PARTICLE,
@@ -384,26 +385,24 @@ export class GameEngine {
               }
               onGameOver();
           } else {
+              // VINGANÇA: Surge automático GRATUITO ao morrer
+              this.triggerSurge(currentStats, true);
+
               this.player.health = this.player.maxHealth;
-              this.energy = 0;
-              this.invulnerabilityTimer = 3.0; // Restaura invul
+              this.energy = 0; // Ainda zera a energia normal
+              this.invulnerabilityTimer = 3.0;
               this.spawnText(this.player.pos, this.t('MSG_RESTORED'), '#0ff', 40);
-              this.screenShake = {x: 20, y: 0};
-              this.shakeIntensity = 20;
+              this.screenShake = {x: 25, y: 0}; // Shake mais violento
+              this.shakeIntensity = 25;
               
-              // BLACK HOLE PROTOCOL: Limpa inimigos próximos com redundância
+              // BLACK HOLE MANTIDO (Segurança extra)
               const killRadiusSq = 500 * 500;
               this.entities.forEach(e => {
                   if ((this.isEnemy(e.type) || e.type === EntityType.BOSS) && distSq(this.player.pos, e.pos) < killRadiusSq) {
-                      e.health = -9999;
-                      e.active = false;
-                      e.pos.x = -10000; // Banido para o reino das sombras
-                      for(let i=0; i<5; i++) {
-                          this.particles.push({ 
-                              id: 'force_kill', type: EntityType.PARTICLE, pos: {...this.player.pos}, // Partícula no player pra garantir visual
-                              vel: {x: (Math.random()-0.5)*20, y: (Math.random()-0.5)*20},
-                              radius: 3, health:1, maxHealth:1, color: e.color, damage:0, active:true, ttl: 20
-                          });
+                      if (e.type !== EntityType.BOSS) { // Não deleta o boss, só minions
+                          e.health = -9999;
+                          e.active = false;
+                          e.pos.x = -10000; 
                       }
                   }
               });
@@ -435,13 +434,15 @@ export class GameEngine {
     if (waveIndex === 9) achievementManager.track('wave_10', 10);
   }
 
-  public triggerSurge(stats: PlayerStats) {
-    if (this.energy >= stats.maxEnergy) {
-      this.energy = 0;
+  // FORCE: Se true, ignora custo de energia (usado na morte)
+  public triggerSurge(stats: PlayerStats, force: boolean = false) {
+    if (force || this.energy >= stats.maxEnergy) {
+      if (!force) this.energy = 0;
+      
       this.surgeActive = true;
       this.surgeRadius = 0;
-      this.shakeIntensity = 25;
-      this.spawnText(this.player.pos, this.t('MSG_SURGE'), this.colors.PLAYER_CORE, 40);
+      this.shakeIntensity = 30; // Mais impacto
+      this.spawnText(this.player.pos, this.t('MSG_SURGE'), this.colors.PLAYER_CORE, 45);
       audioManager.playSurge();
       this.entities.forEach(e => {
           if (e.type === EntityType.DNA_FRAGMENT && e.active) {
@@ -532,14 +533,12 @@ export class GameEngine {
       return candidates;
   }
 
-  // FAILSAFE 2: BLACK HOLE PROTOCOL
-  // Força inimigos a desaparecerem de vez.
   private killAllEnemies() {
       this.entities.forEach(e => {
           if (this.isEnemy(e.type) || e.type === EntityType.BOSS) {
               e.health = -999; 
               e.active = false;
-              e.pos.x = -10000; // Banimento geográfico
+              e.pos.x = -10000; 
               for(let i=0; i<5; i++) {
                   this.particles.push({
                       id: 'force_kill', type: EntityType.PARTICLE, pos: {x: CANVAS_WIDTH/2 + (Math.random()-0.5)*CANVAS_WIDTH, y: CANVAS_HEIGHT/2}, // Efeito global
@@ -596,23 +595,19 @@ export class GameEngine {
     
     if (this.waveActive) this.sessionStats.timePlayed += dtSeconds;
     
-    // FAILCHECK 3: Timer de invulnerabilidade saneado
     if (this.invulnerabilityTimer > 0) {
         this.invulnerabilityTimer -= dtSeconds;
-        if (this.invulnerabilityTimer > 5) this.invulnerabilityTimer = 3; // Clamp max
+        if (this.invulnerabilityTimer > 5) this.invulnerabilityTimer = 3; 
     } else {
-        this.invulnerabilityTimer = 0; // Clamp min
+        this.invulnerabilityTimer = 0; 
     }
 
-    // FAILSAFE 1: REAPER PROTOCOL
-    // Verifica explicitamente se o jogador deveria estar morto, independentemente da lógica de colisão.
-    // Margem de 0.5 para evitar erros de float (0.000001 de vida).
+    // Passa os stats atuais para o handler de morte usar no Surge
     if (this.player.active && this.player.health <= 0.5) {
-        this.handlePlayerDeath(onGameOver);
-        return; // Interrompe o frame atual para o jogador
+        this.handlePlayerDeath(onGameOver, stats);
+        return; 
     }
     
-    // FAILCHECK: NaN Protection
     if (isNaN(this.player.health)) this.player.health = 0;
 
     if (this.inputVector.x === 0 && this.inputVector.y === 0 && this.waveActive) {
@@ -672,7 +667,6 @@ export class GameEngine {
         }
     }
 
-    // --- WAVE LOGIC CORRIGIDA ---
     if (this.waveActive && this.currentWaveIndex >= 0) {
       this.waveTimer += dtSeconds;
       const config = WAVES[Math.min(this.currentWaveIndex, WAVES.length - 1)];
@@ -683,8 +677,6 @@ export class GameEngine {
       if (this.patient.strain === ViralStrain.SWARM) spawnRateMod = 0.5; 
       if (this.patient.strain === ViralStrain.TITAN) spawnRateMod = 1.5; 
 
-      // FAILCHECK 4: HARD SPAWN STOP
-      // O spawn é bloqueado rigidamente pelo timer.
       if (this.waveTimer < config.duration) {
           this.spawnTimer += safeDt;
           if (this.spawnTimer >= (config.spawnRate * spawnRateMod) && this.entities.length < this.maxEntities) {
@@ -699,7 +691,6 @@ export class GameEngine {
           }
       }
       
-      // Minas só aparecem dentro do tempo regulamentar + 10s de tolerância
       if (this.waveTimer < config.duration + 10 && Math.random() < 0.005) { 
           const y = Math.random() * CANVAS_HEIGHT;
           this.entities.push({
@@ -709,18 +700,13 @@ export class GameEngine {
           });
       }
 
-      // CHECK DE FIM DE ONDA REFORÇADO
-      // Filtra apenas inimigos ATIVOS. Fantasmas não contam.
       const enemiesRemaining = this.entities.some(e => e.active && (this.isEnemy(e.type) || e.type === EntityType.BOSS));
       const bossRemaining = this.entities.some(e => e.active && e.type === EntityType.BOSS);
-      
-      // PROTOCOLO MERCY: Se passar 10s do tempo limite e não tiver boss, ACABA.
       const isOvertime = this.waveTimer >= config.duration + 10;
       
       if ((this.waveTimer >= config.duration && !enemiesRemaining && (!config.hasBoss || (this.bossSpawned && !bossRemaining))) || 
           (isOvertime && !config.hasBoss && !bossRemaining)) {
         
-        // Se entrou no tempo extra e ainda tem inimigo bugado, mata todos.
         if (isOvertime && enemiesRemaining) {
             this.killAllEnemies(); 
         }
@@ -745,8 +731,13 @@ export class GameEngine {
               const dx = e.pos.x - this.player.pos.x;
               const dy = e.pos.y - this.player.pos.y;
               const dist = Math.sqrt(d);
-              e.vel.x += (dx/dist) * 25; 
-              e.vel.y += (dy/dist) * 25;
+              
+              // BOSS ANCHOR: Bosses não são empurrados pelo Surge
+              if (e.type !== EntityType.BOSS) {
+                  e.vel.x += (dx/dist) * 25; 
+                  e.vel.y += (dy/dist) * 25;
+              }
+              
               if (this.damageEnemy(e, 8, false, stats)) {
                   this.sessionStats.surgeKills++;
                   achievementManager.track('surge_kill_100', 1);
@@ -827,7 +818,13 @@ export class GameEngine {
         e.pos.x += (e.vel.x + (this.bloodFlow.x * (1 - drag) * flowInfluence)) * tick;
         e.pos.y += (e.vel.y + (this.bloodFlow.y * (1 - drag) * flowInfluence)) * tick;
         
-        // VACUUM PROTOCOL: Remove entidades muito longe (evita bugs de wave infinita)
+        // BOSS CLAMP: Garante que o Boss NUNCA saia da tela, não importa o que aconteça
+        if (e.type === EntityType.BOSS) {
+            const margin = e.radius + 10;
+            e.pos.x = Math.max(margin, Math.min(CANVAS_WIDTH - margin, e.pos.x));
+            e.pos.y = Math.max(margin, Math.min(CANVAS_HEIGHT - margin, e.pos.y));
+        }
+
         if (e.type !== EntityType.BOSS && e.type !== EntityType.PLAYER && this.isOutOfBoundsExtended(e.pos)) {
             e.active = false;
             continue;
@@ -935,7 +932,6 @@ export class GameEngine {
               }
 
               const pSum = e.radius + this.player.radius;
-              // Failcheck de invulnerabilidade na colisão também
               const isInvulnerable = this.isDashing || this.invulnerabilityTimer > 0; 
               
               if (dMag < pSum * 0.8 && !isInvulnerable) {
@@ -957,8 +953,7 @@ export class GameEngine {
                      e.vel.x = -5; 
                  }
 
-                 // Check de morte normal
-                 if (this.player.health <= 0) this.handlePlayerDeath(onGameOver);
+                 if (this.player.health <= 0) this.handlePlayerDeath(onGameOver, stats);
               }
           }
         }
