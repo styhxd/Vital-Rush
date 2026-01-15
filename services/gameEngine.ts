@@ -9,7 +9,8 @@
  * CORREÇÕES:
  * 1. BOSS ANCHOR: Bosses agora são imunes a knockback do Surge. Eles não voam mais.
  * 2. BOSS CLAMP: Bosses são forçados a ficar dentro da tela. Adeus softlock.
- * 3. DEATH SURGE: Morreu? Explode tudo. De graça.
+ * 3. DEATH SURGE: Morreu? Explode tudo. De graça. E com visual de SANGUE.
+ * 4. HIT STOP: O jogo para brevemente ao morrer para dar impacto.
  */
 
 import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette, Language } from '../types';
@@ -93,12 +94,16 @@ export class GameEngine {
   private shakeIntensity: number = 0;
   
   private surgeActive: boolean = false;
+  private deathSurgeActive: boolean = false; 
   private surgeRadius: number = 0;
   public adrenalineActive: boolean = false;
   public adrenalineTimer: number = 0;
   public adrenalineExhausted: boolean = false;
   
   public invulnerabilityTimer: number = 0;
+  
+  // HIT STOP
+  private hitStopTimer: number = 0;
   
   private maxParticles = 250;
   private maxEntities = 400;
@@ -363,10 +368,12 @@ export class GameEngine {
       return false;
   }
 
-  // PROTOCOLO VINGANÇA: Agora recebe stats para calcular o Surge da Morte
-  public handlePlayerDeath(onGameOver: () => void, currentStats: PlayerStats) {
+  // PROTOCOLO VINGANÇA ATUALIZADO
+  public handlePlayerDeath(onGameOver: () => void, onLifeLost: () => void, currentStats: PlayerStats) {
       if (this.lives > 0) {
           this.lives--;
+          onLifeLost(); // Notifica a UI
+          this.hitStopTimer = 0.2; // HIT STOP: 200ms de pausa dramática
           achievementManager.track('die_10', 1);
           
           if (this.lives === 0) {
@@ -385,21 +392,38 @@ export class GameEngine {
               }
               onGameOver();
           } else {
-              // VINGANÇA: Surge automático GRATUITO ao morrer
+              // VINGANÇA: Surge automático com estilo VISCERAL
               this.triggerSurge(currentStats, true);
 
               this.player.health = this.player.maxHealth;
               this.energy = 0; // Ainda zera a energia normal
               this.invulnerabilityTimer = 3.0;
-              this.spawnText(this.player.pos, this.t('MSG_RESTORED'), '#0ff', 40);
-              this.screenShake = {x: 25, y: 0}; // Shake mais violento
-              this.shakeIntensity = 25;
+              this.spawnText(this.player.pos, "CRITICAL FAILURE", '#ff0000', 50);
+              
+              // Efeito de impacto massivo
+              this.screenShake = {x: 40, y: 40}; 
+              this.shakeIntensity = 40;
+              
+              // Partículas de "sangue" do player explodindo
+              for(let i=0; i<40; i++) {
+                  const angle = Math.random() * Math.PI * 2;
+                  const speed = Math.random() * 15 + 5;
+                  this.particles.push({
+                      id: 'blood_surge', type: EntityType.PARTICLE,
+                      pos: { ...this.player.pos },
+                      vel: { x: Math.cos(angle)*speed, y: Math.sin(angle)*speed },
+                      radius: Math.random() * 4 + 2,
+                      health: 1, maxHealth: 1,
+                      color: '#ff0000',
+                      damage: 0, active: true, ttl: 40
+                  });
+              }
               
               // BLACK HOLE MANTIDO (Segurança extra)
               const killRadiusSq = 500 * 500;
               this.entities.forEach(e => {
                   if ((this.isEnemy(e.type) || e.type === EntityType.BOSS) && distSq(this.player.pos, e.pos) < killRadiusSq) {
-                      if (e.type !== EntityType.BOSS) { // Não deleta o boss, só minions
+                      if (e.type !== EntityType.BOSS) { 
                           e.health = -9999;
                           e.active = false;
                           e.pos.x = -10000; 
@@ -434,15 +458,20 @@ export class GameEngine {
     if (waveIndex === 9) achievementManager.track('wave_10', 10);
   }
 
-  // FORCE: Se true, ignora custo de energia (usado na morte)
+  // FORCE: Se true, ignora custo de energia e ativa o modo "Morte"
   public triggerSurge(stats: PlayerStats, force: boolean = false) {
     if (force || this.energy >= stats.maxEnergy) {
       if (!force) this.energy = 0;
       
       this.surgeActive = true;
+      this.deathSurgeActive = force; // Ativa visual vermelho se for morte
       this.surgeRadius = 0;
-      this.shakeIntensity = 30; // Mais impacto
-      this.spawnText(this.player.pos, this.t('MSG_SURGE'), this.colors.PLAYER_CORE, 45);
+      this.shakeIntensity = force ? 40 : 30;
+      
+      if (!force) {
+          this.spawnText(this.player.pos, this.t('MSG_SURGE'), this.colors.PLAYER_CORE, 45);
+      }
+      
       audioManager.playSurge();
       this.entities.forEach(e => {
           if (e.type === EntityType.DNA_FRAGMENT && e.active) {
@@ -550,7 +579,14 @@ export class GameEngine {
       });
   }
 
-  public update(dt: number, stats: PlayerStats, onWaveClear: () => void, onGameOver: () => void) {
+  // UPDATE LOOP CORRIGIDO
+  public update(dt: number, stats: PlayerStats, onWaveClear: () => void, onGameOver: () => void, onLifeLost: () => void) {
+    // --- HIT STOP MECHANIC ---
+    if (this.hitStopTimer > 0) {
+        this.hitStopTimer -= (dt / 1000);
+        return; // FREEZE THE GAME LOGIC
+    }
+
     this.frameTimeAccumulator += dt;
     this.framesCounted++;
     if (this.framesCounted > 60) {
@@ -602,9 +638,9 @@ export class GameEngine {
         this.invulnerabilityTimer = 0; 
     }
 
-    // Passa os stats atuais para o handler de morte usar no Surge
+    // CHECK DE MORTE (Agora com callback de vida perdida)
     if (this.player.active && this.player.health <= 0.5) {
-        this.handlePlayerDeath(onGameOver, stats);
+        this.handlePlayerDeath(onGameOver, onLifeLost, stats);
         return; 
     }
     
@@ -745,7 +781,10 @@ export class GameEngine {
            }
         }
       });
-      if (this.surgeRadius > CANVAS_WIDTH * 1.5) this.surgeActive = false;
+      if (this.surgeRadius > CANVAS_WIDTH * 1.5) {
+          this.surgeActive = false;
+          this.deathSurgeActive = false;
+      }
     }
 
     if (this.player.active) {
@@ -953,7 +992,7 @@ export class GameEngine {
                      e.vel.x = -5; 
                  }
 
-                 if (this.player.health <= 0) this.handlePlayerDeath(onGameOver, stats);
+                 if (this.player.health <= 0) this.handlePlayerDeath(onGameOver, onLifeLost, stats);
               }
           }
         }
@@ -1087,8 +1126,11 @@ export class GameEngine {
     if (aberration) {
         this.ctx.save();
         this.ctx.globalCompositeOperation = 'screen';
-        this.ctx.translate(-2, 0); 
-        this.ctx.fillStyle = 'rgba(255,0,0,0.1)';
+        
+        // Efeito de Morte ou Surge agressivo: Aberração Cromática Vermelha
+        const shiftX = this.deathSurgeActive ? -8 : -2;
+        this.ctx.translate(shiftX, 0); 
+        this.ctx.fillStyle = this.deathSurgeActive ? 'rgba(255,0,0,0.3)' : 'rgba(255,0,0,0.1)';
         this.ctx.fillRect(0,0, CANVAS_WIDTH, CANVAS_HEIGHT);
         this.ctx.restore();
     }
@@ -1103,11 +1145,14 @@ export class GameEngine {
 
     if (this.surgeActive) {
       this.ctx.beginPath();
-      this.ctx.arc(this.player.pos.x, this.player.pos.y, this.surgeRadius, 0, Math.PI * 2);
-      this.ctx.strokeStyle = this.colors.SURGE;
-      this.ctx.lineWidth = 20;
+      // DEATH SURGE: Desenho instável (radius varia com random) para parecer uma explosão biológica
+      const r = this.deathSurgeActive ? this.surgeRadius * (0.9 + Math.random()*0.2) : this.surgeRadius;
+      
+      this.ctx.arc(this.player.pos.x, this.player.pos.y, r, 0, Math.PI * 2);
+      this.ctx.strokeStyle = this.deathSurgeActive ? '#ff0000' : this.colors.SURGE;
+      this.ctx.lineWidth = this.deathSurgeActive ? 40 : 20;
       this.ctx.stroke();
-      this.ctx.fillStyle = `rgba(0, 255, 255, 0.1)`;
+      this.ctx.fillStyle = this.deathSurgeActive ? `rgba(255, 0, 0, 0.2)` : `rgba(0, 255, 255, 0.1)`;
       this.ctx.fill();
     }
 
@@ -1121,6 +1166,13 @@ export class GameEngine {
           this.ctx.fillStyle = p.color;
           this.ctx.beginPath();
           this.ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI*2);
+          this.ctx.fill();
+      } else if (p.id === 'blood_surge') {
+          this.ctx.fillStyle = p.color;
+          this.ctx.beginPath();
+          // Partículas de sangue alongadas
+          const angle = Math.atan2(p.vel.y, p.vel.x);
+          this.ctx.ellipse(p.pos.x, p.pos.y, p.radius*2, p.radius*0.5, angle, 0, Math.PI*2);
           this.ctx.fill();
       } else {
         this.ctx.globalAlpha = p.id === 'bg' ? 0.3 : (p.ttl! / 20); 

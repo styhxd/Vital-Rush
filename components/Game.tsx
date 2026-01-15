@@ -123,7 +123,7 @@ export const Game: React.FC = () => {
   const engineRef = useRef<GameEngine | null>(null);
   const animationFrameRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
-  const uiUpdateAccumulatorRef = useRef<number>(0); // NOVO: Acumulador para throttle da UI
+  const uiUpdateAccumulatorRef = useRef<number>(0); 
   
   const [gameState, setGameState] = useState<GameState>(GameState.MENU);
   const [lastGameState, setLastGameState] = useState<GameState>(GameState.MENU);
@@ -149,6 +149,7 @@ export const Game: React.FC = () => {
   const [isPlatinum, setIsPlatinum] = useState(false);
   const [colors, setColors] = useState<ThemePalette>(COLORS_DEFAULT);
   const [cheatInput, setCheatInput] = useState("");
+  const [heartbreakAnim, setHeartbreakAnim] = useState(false); // Animação de coração quebrando
 
   const t = (key: string) => TEXTS[language][key] || key;
 
@@ -314,6 +315,11 @@ export const Game: React.FC = () => {
             () => {
                 setGameState(GameState.GAME_OVER);
                 audioManager.stopMusic();
+            },
+            () => {
+                // onLifeLost callback
+                setHeartbreakAnim(true);
+                setTimeout(() => setHeartbreakAnim(false), 2500); 
             }
           );
       }
@@ -511,9 +517,63 @@ export const Game: React.FC = () => {
     <div className={`relative w-full h-screen overflow-hidden text-white select-none ${isPlatinum ? 'bg-[#0a0a1a]' : 'bg-[#0f0505]'}`} style={{fontFamily: 'var(--font-tech)'}}>
       <canvas ref={canvasRef} className="block w-full h-full object-contain" />
       
+      {/* CSS Injection for Dynamic Keyframes (The Heart Shatter) */}
+      <style>{`
+        @keyframes heart-shake {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            10%, 30%, 50%, 70%, 90% { transform: translate(-8px, -8px) rotate(-3deg) scale(1.1); }
+            20%, 40%, 60%, 80% { transform: translate(8px, 8px) rotate(3deg) scale(1.1); }
+        }
+        @keyframes crack-left {
+            0% { transform: translate(0, 0) rotate(0); opacity: 0.3; }
+            100% { transform: translate(-100px, 100px) rotate(-45deg); opacity: 0; }
+        }
+        @keyframes crack-right {
+            0% { transform: translate(0, 0) rotate(0); opacity: 0.3; }
+            100% { transform: translate(100px, 100px) rotate(45deg); opacity: 0; }
+        }
+        @keyframes glitch-text {
+            0% { opacity: 1; transform: translate(0); clip-path: inset(0 0 0 0); }
+            20% { clip-path: inset(20% 0 0 0); transform: translate(-2px, 2px); }
+            40% { clip-path: inset(0 0 20% 0); transform: translate(2px, -2px); }
+            60% { clip-path: inset(20% 0 20% 0); transform: translate(-2px, -2px); }
+            80% { clip-path: inset(0 20% 0 20%); transform: translate(2px, 2px); }
+            100% { opacity: 0; }
+        }
+        .anim-shake { animation: heart-shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+        .anim-break-left { animation: crack-left 1.5s ease-out forwards; animation-delay: 0.5s; }
+        .anim-break-right { animation: crack-right 1.5s ease-out forwards; animation-delay: 0.5s; }
+        .anim-glitch { animation: glitch-text 0.5s steps(5) infinite; }
+      `}</style>
+
       <div className="vignette"></div>
       <div className="scanlines"></div>
       <div className="vein-overlay opacity-20" style={{filter: isPlatinum ? 'hue-rotate(240deg)' : 'none'}}></div>
+
+      {/* HEARTBREAK OVERLAY - AGORA COM RACHADURA REAL E TRANSPARÊNCIA FANTASMA */}
+      {heartbreakAnim && (
+          <div className="absolute inset-0 flex items-center justify-center z-[150] pointer-events-none overflow-hidden">
+              <div className="relative w-[500px] h-[500px]"> 
+                  {/* Left Half */}
+                  <div className="absolute inset-0 anim-shake anim-break-left opacity-30 mix-blend-screen text-red-600">
+                      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-[0_0_50px_rgba(255,0,0,0.8)]" style={{clipPath: 'polygon(0 0, 50% 0, 55% 25%, 45% 45%, 55% 65%, 45% 85%, 50% 100%, 0 100%)'}}>
+                          <path fill="currentColor" d="M50 88.9L48.2 87.2C20.4 62 2 45.5 2 25.3 2 11.5 12.8 2 26.5 2c7.7 0 15.1 3.5 20 9.1C51.4 5.5 58.8 2 66.5 2 80.2 2 91 11.5 91 25.3c0 20.2-18.4 36.7-46.2 61.9L50 88.9z" />
+                      </svg>
+                  </div>
+                  {/* Right Half */}
+                  <div className="absolute inset-0 anim-shake anim-break-right opacity-30 mix-blend-screen text-red-600">
+                      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-[0_0_50px_rgba(255,0,0,0.8)]" style={{clipPath: 'polygon(100% 0, 50% 0, 55% 25%, 45% 45%, 55% 65%, 45% 85%, 50% 100%, 100% 100%)'}}>
+                          <path fill="currentColor" d="M50 88.9L48.2 87.2C20.4 62 2 45.5 2 25.3 2 11.5 12.8 2 26.5 2c7.7 0 15.1 3.5 20 9.1C51.4 5.5 58.8 2 66.5 2 80.2 2 91 11.5 91 25.3c0 20.2-18.4 36.7-46.2 61.9L50 88.9z" />
+                      </svg>
+                  </div>
+                  {/* Glitch Text */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                      <h1 className="text-6xl font-black text-red-500 tracking-[1em] anim-glitch opacity-80 mix-blend-overlay">CRITICAL</h1>
+                  </div>
+              </div>
+              <div className="absolute inset-0 bg-red-900/20 mix-blend-overlay animate-pulse"></div>
+          </div>
+      )}
 
       <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 z-[100] transition-all duration-500 ease-out ${activeAchievement ? 'translate-y-0 opacity-100' : '-translate-y-20 opacity-0'}`}>
           {activeAchievement && (
