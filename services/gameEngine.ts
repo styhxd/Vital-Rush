@@ -705,11 +705,11 @@ export class GameEngine {
                         vel: {x:0, y:0}, radius: 350, health:1, maxHealth:1, color: 'rgba(0, 255, 255, 0.5)', damage:0, active:true, ttl: 20
                     });
 
-                    // Dano em Área AUMENTADO (350px) mas Dano REDUZIDO (60)
+                    // Dano em Área AUMENTADO (350px) mas Dano REDUZIDO (25)
                     this.entities.forEach(victim => {
                         if ((this.isEnemy(victim.type) || victim.type === EntityType.BOSS) && victim.active) {
                             if (distSq(victim.pos, e.pos) < 350*350) {
-                                this.damageEnemy(victim, 60, true, stats); // Dano 60, Critavel
+                                this.damageEnemy(victim, 25, true, stats); // Dano 25, Critavel
                                 // Empurrão extra
                                 const dx = victim.pos.x - e.pos.x;
                                 const dy = victim.pos.y - e.pos.y;
