@@ -152,5 +152,11 @@
   <body>
     <!-- Onde o React é injetado. A caverna do dragão. -->
     <div id="root"></div>
+    <!-- 
+        A PEÇA QUE FALTA:
+        O script abaixo diz ao navegador para carregar o index.tsx como um módulo.
+        Sem isso, o código JS nunca é executado e a div #root fica vazia (só o fundo aparece).
+    -->
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>
