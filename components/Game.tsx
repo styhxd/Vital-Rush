@@ -1,21 +1,3 @@
-/**
- * ------------------------------------------------------------------
- * COPYRIGHT (c) 2026 ESTÚDIO CRIA
- * DIRETOR: PAULO GABRIEL DE L. S.
- * ------------------------------------------------------------------
- * 
- * O CORAÇÃO PULSANTE (Game.tsx)
- * 
- * ATUALIZAÇÃO V4.6: PROTOCOLO DE INICIALIZAÇÃO NEURAL
- * 
- * 1. TUTORIAL FANTASMA: Um overlay tático que aparece no início do jogo.
- *    Ele não bloqueia o input. O jogador pode sair atirando enquanto lê.
- *    Desaparece sozinho após 4 segundos.
- * 
- * 2. ÊNFASE NA ESQUIVA: O comando de DASH foi desenhado para gritar 
- *    na cara do usuário que ele existe.
- */
-
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from '../services/gameEngine';
 import { audioManager } from '../services/audioManager';
@@ -24,6 +6,7 @@ import { GameState, PlayerStats, Upgrade, WaveConfig, Language, Difficulty, Pati
 import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES_FIRST, PATIENT_NAMES_LAST, SYMPTOMS_KEYS, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES } from '../constants';
 import { Joystick } from './Joystick';
 import { PauseMenu } from './PauseMenu';
+import { SettingsMenu } from './SettingsMenu'; // NEW IMPORT
 
 // --- UI COMPONENTS (Pequenos componentes auxiliares) ---
 
@@ -594,6 +577,28 @@ export const Game: React.FC = () => {
       }
   }
 
+  // Novo Handler para Settings (Acessível do Menu e do Pause)
+  const openSettings = () => {
+      if (gameState === GameState.MENU) {
+          setLastGameState(GameState.MENU);
+      } else if (isPaused) {
+          setLastGameState(GameState.PLAYING); // Vai voltar para o Pause (que é tecnicamente PLAYING + isPaused)
+      } else {
+          setLastGameState(gameState);
+      }
+      setGameState(GameState.SETTINGS);
+  };
+
+  const closeSettings = () => {
+      if (lastGameState === GameState.MENU) {
+          setGameState(GameState.MENU);
+      } else {
+          setGameState(GameState.PLAYING);
+          // Se veio do pause, mantém pausado.
+          if (!isPaused) setIsPaused(true);
+      }
+  };
+
   // --- ROTAÇÃO AUTOMÁTICA VISUAL ---
   // Se estiver em modo retrato, o estilo abaixo força o jogo a girar 90 graus
   // e ocupar a tela "deitada", forçando o usuário a girar o aparelho.
@@ -905,7 +910,8 @@ export const Game: React.FC = () => {
                   <MenuButton variant="secondary" onClick={() => setGameState(GameState.MANUAL)}>{t('MANUAL')}</MenuButton>
                 </div>
                 <div className="grid grid-cols-2 gap-2 md:gap-4">
-                  <MenuButton variant="secondary" onClick={() => setGameState(GameState.SETTINGS)}>{t('SETTINGS')}</MenuButton>
+                  {/* CHANGED: Now uses openSettings handler */}
+                  <MenuButton variant="secondary" onClick={openSettings}>{t('SETTINGS')}</MenuButton>
                   <MenuButton variant="secondary" onClick={openAchievements}>{t('ACHIEVEMENTS')}</MenuButton>
                 </div>
                 
@@ -924,6 +930,16 @@ export const Game: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* REPLACED: New Settings Menu Component Rendering */}
+      <SettingsMenu 
+          isVisible={gameState === GameState.SETTINGS}
+          language={language}
+          audioSettings={audioSettings}
+          onUpdateAudio={updateAudio}
+          onLanguageChange={setLanguage}
+          onClose={closeSettings}
+      />
 
       {/* (RESTANTE DOS MENUS) */}
       
@@ -1208,6 +1224,7 @@ export const Game: React.FC = () => {
           isPaused={isPaused} 
           language={language} 
           onResume={togglePause} 
+          onSettings={openSettings} // New Handler
           onQuit={() => {
               togglePause(); // Unpause logic
               setGameState(GameState.MENU);
