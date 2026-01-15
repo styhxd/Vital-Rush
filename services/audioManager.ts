@@ -4,422 +4,307 @@
  * DIRETOR: PAULO GABRIEL DE L. S.
  * ------------------------------------------------------------------
  * 
- * O SINTETIZADOR (AUDIO MANAGER)
+ * AUDIO MANAGER V4: "BAKED BUFFERS"
  * 
- * Esqueça arquivos .mp3 pesados. Esqueça carregamento lento.
- * Aqui nós cozinhamos ondas sonoras puras usando matemática e a Web Audio API.
- * 
- * É como ter um sintetizador modular dentro do navegador.
- * Nós criamos osciladores, filtros, ganhos e compressores em tempo real.
- * Se o som sair "crocante", é arte, não bug.
+ * A solução definitiva para performance.
+ * Em vez de "cozinhar" o som na hora do tiro (pesado), nós
+ * deixamos os sons prontos na memória (leve).
  */
 
 export class AudioManager {
   private ctx: AudioContext | null = null;
-  
-  // Nossos nós de mixagem. É como uma mesa de som virtual.
   private masterGain: GainNode | null = null;
   private musicGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
+  private compressor: DynamicsCompressorNode | null = null;
   
-  // Estado do Sequenciador (A "Drum Machine" interna)
+  // O BANCO DE SONS (Memória Pura)
+  private buffers: Record<string, AudioBuffer> = {};
+  
+  // Controle de Throttling
+  private lastPlayTime: Record<string, number> = {};
+  
+  // Sequenciador Musical
   private isPlaying: boolean = false;
   private currentTrack: 'MENU' | 'GAME' | 'NONE' = 'NONE';
   private nextNoteTime: number = 0;
-  private current16thNote: number = 0; // Contagem de semicolcheias
+  private current16thNote: number = 0;
   private tempo: number = 120;
-  private lookahead: number = 25.0; // Milissegundos para olhar adiante
-  private scheduleAheadTime: number = 0.1; // Segundos para agendar no hardware
   private timerID: number | null = null;
 
-  // Estado da geração musical procedural
-  private baseNote: number = 110; // Lá (A2)
-  private noteQueue: {note: number, time: number}[] = [];
-
-  // Configurações de volume (mixagem padrão)
   public settings = {
     master: 0.8,
     music: 0.6,
     sfx: 0.7
   };
 
-  constructor() {
-    // Lazy init. Não iniciamos o áudio no construtor porque os navegadores bloqueiam
-    // AudioContext até o usuário clicar na página. Política anti-autoplay chata (mas justa).
-  }
+  constructor() {}
 
-  // Chamado quando o usuário clica em "START" ou interage.
-  public init() {
-    if (this.ctx) return; // Já tá rodando, cala a boca.
-    
-    // Suporte legado pro Safari velho de guerra.
+  public async init() {
+    if (this.ctx) {
+        if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+        return;
+    }
+
     const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext);
-    this.ctx = new AudioContextClass();
-    
-    // Cria os canais de áudio
+    this.ctx = new AudioContextClass({ latencyHint: 'interactive' });
+
     this.masterGain = this.ctx.createGain();
     this.musicGain = this.ctx.createGain();
     this.sfxGain = this.ctx.createGain();
 
-    // COMPRESSOR: O segredo de um som "profissional".
-    // Ele "esmaga" o som pra ficar tudo no mesmo nível e dá aquele efeito de "pumping"
-    // quando o bumbo bate. Engenharia de áudio pura.
-    const compressor = this.ctx.createDynamicsCompressor();
-    compressor.threshold.value = -24;
-    compressor.knee.value = 30;
-    compressor.ratio.value = 12;
-    compressor.attack.value = 0.003;
-    compressor.release.value = 0.25;
-
-    // Roteamento: Music/SFX -> Compressor -> Master -> Saída (Caixa de som)
-    this.musicGain.connect(compressor);
-    this.sfxGain.connect(compressor);
-    compressor.connect(this.masterGain);
+    this.compressor = this.ctx.createDynamicsCompressor();
+    this.compressor.threshold.value = -10;
+    
+    this.musicGain.connect(this.compressor);
+    this.sfxGain.connect(this.compressor);
+    this.compressor.connect(this.masterGain);
     this.masterGain.connect(this.ctx.destination);
-
+    
+    // PRÉ-RENDERIZAÇÃO (A Mágica)
+    // Gera todos os sons pesados agora, durante o loading, pra não travar o jogo depois.
+    await this.bakeSounds();
+    
     this.updateVolumes();
   }
 
+  // Gera os sons usando um contexto offline (super rápido) e salva em buffers
+  private async bakeSounds() {
+      if (!this.ctx) return;
+      
+      // SHOOT SOUND
+      this.buffers['shoot'] = await this.renderOffline(0.15, (c) => {
+          const osc = c.createOscillator();
+          const g = c.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(600, 0);
+          osc.frequency.exponentialRampToValueAtTime(50, 0.1);
+          g.gain.setValueAtTime(0.3, 0);
+          g.gain.exponentialRampToValueAtTime(0.01, 0.1);
+          osc.connect(g);
+          g.connect(c.destination);
+          osc.start();
+      });
+
+      // HIT SOUND
+      this.buffers['hit'] = await this.renderOffline(0.15, (c) => {
+          const osc = c.createOscillator();
+          const g = c.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(150, 0);
+          osc.frequency.exponentialRampToValueAtTime(10, 0.1);
+          g.gain.setValueAtTime(0.3, 0);
+          g.gain.exponentialRampToValueAtTime(0.01, 0.1);
+          const f = c.createBiquadFilter();
+          f.type = 'lowpass';
+          f.frequency.value = 1000;
+          osc.connect(f);
+          f.connect(g);
+          g.connect(c.destination);
+          osc.start();
+      });
+      
+      // EXPLOSION (NOISE)
+      this.buffers['expl'] = await this.renderOffline(0.5, (c) => {
+          const bufferSize = c.sampleRate * 0.5;
+          const noiseBuffer = c.createBuffer(1, bufferSize, c.sampleRate);
+          const data = noiseBuffer.getChannelData(0);
+          for(let i=0; i<bufferSize; i++) data[i] = Math.random()*2 - 1;
+          
+          const src = c.createBufferSource();
+          src.buffer = noiseBuffer;
+          const f = c.createBiquadFilter();
+          f.type = 'lowpass';
+          f.frequency.setValueAtTime(800, 0);
+          f.frequency.exponentialRampToValueAtTime(50, 0.4);
+          const g = c.createGain();
+          g.gain.setValueAtTime(0.8, 0);
+          g.gain.exponentialRampToValueAtTime(0.01, 0.4);
+          
+          src.connect(f);
+          f.connect(g);
+          g.connect(c.destination);
+          src.start();
+      });
+      
+      // POWERUP
+      this.buffers['power'] = await this.renderOffline(0.3, (c) => {
+          const osc = c.createOscillator();
+          const g = c.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(440, 0);
+          osc.frequency.setValueAtTime(554, 0.08);
+          osc.frequency.setValueAtTime(659, 0.16);
+          g.gain.setValueAtTime(0.1, 0);
+          g.gain.linearRampToValueAtTime(0, 0.3);
+          osc.connect(g);
+          g.connect(c.destination);
+          osc.start();
+      });
+      
+      // SURGE
+      this.buffers['surge'] = await this.renderOffline(1.0, (c) => {
+          const osc = c.createOscillator();
+          const g = c.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(200, 0);
+          osc.frequency.linearRampToValueAtTime(800, 0.5);
+          osc.frequency.linearRampToValueAtTime(100, 1.0);
+          g.gain.setValueAtTime(0.3, 0);
+          g.gain.linearRampToValueAtTime(0, 1.0);
+          osc.connect(g);
+          g.connect(c.destination);
+          osc.start();
+      });
+      
+      // HI-HAT (Curto e Grosso)
+      this.buffers['hat'] = await this.renderOffline(0.05, (c) => {
+          const bufferSize = c.sampleRate * 0.05;
+          const b = c.createBuffer(1, bufferSize, c.sampleRate);
+          const d = b.getChannelData(0);
+          for(let i=0; i<bufferSize; i++) d[i] = (Math.random()*2 - 1);
+          const src = c.createBufferSource();
+          src.buffer = b;
+          const f = c.createBiquadFilter();
+          f.type = 'highpass';
+          f.frequency.value = 6000;
+          const g = c.createGain();
+          g.gain.value = 0.1; // Baixo volume nativo
+          g.gain.exponentialRampToValueAtTime(0.01, 0.04);
+          src.connect(f);
+          f.connect(g);
+          g.connect(c.destination);
+          src.start();
+      });
+
+      // KICK (Curto)
+      this.buffers['kick'] = await this.renderOffline(0.2, (c) => {
+          const osc = c.createOscillator();
+          const g = c.createGain();
+          osc.frequency.setValueAtTime(150, 0);
+          osc.frequency.exponentialRampToValueAtTime(0.01, 0.2);
+          g.gain.setValueAtTime(0.8, 0);
+          g.gain.exponentialRampToValueAtTime(0.01, 0.2);
+          osc.connect(g);
+          g.connect(c.destination);
+          osc.start();
+      });
+  }
+
+  // Helper para renderizar som em background
+  private renderOffline(duration: number, renderFn: (ctx: OfflineAudioContext) => void): Promise<AudioBuffer> {
+      // 22050Hz é suficiente pra SFX retro e economiza RAM
+      const offlineCtx = new OfflineAudioContext(1, 22050 * duration, 22050); 
+      renderFn(offlineCtx);
+      return offlineCtx.startRendering();
+  }
+
+  // Toca um buffer pré-cozido. Extremamente leve.
+  private playBuffer(name: string, vol: number = 1.0, pitch: number = 1.0, throttleMs: number = 0) {
+      if (!this.ctx || this.ctx.state !== 'running') return;
+      if (!this.buffers[name]) return;
+      
+      const now = performance.now();
+      if (throttleMs > 0) {
+          if (now - (this.lastPlayTime[name] || 0) < throttleMs) return;
+          this.lastPlayTime[name] = now;
+      }
+      
+      // Criação de Source Node é barata
+      const source = this.ctx.createBufferSource();
+      source.buffer = this.buffers[name];
+      if (pitch !== 1.0) source.playbackRate.value = pitch;
+      
+      const gain = this.ctx.createGain();
+      gain.gain.value = vol;
+      
+      // Conecta: Buffer -> Gain -> Mix Bus
+      source.connect(gain);
+      // Decide o bus baseado no nome (gambiarra eficiente)
+      if (name === 'hat' || name === 'kick') {
+          gain.connect(this.musicGain!);
+      } else {
+          gain.connect(this.sfxGain!);
+      }
+      
+      source.start();
+      // GC limpa sozinho quando acaba
+  }
+
   public updateVolumes() {
-    if (!this.masterGain) return;
-    const now = this.ctx!.currentTime;
-    // setTargetAtTime evita "cliques" e "pops" ao mudar o volume bruscamente.
+    if (!this.masterGain || !this.ctx) return;
+    const now = this.ctx.currentTime;
     this.masterGain.gain.setTargetAtTime(this.settings.master, now, 0.1);
     this.musicGain!.gain.setTargetAtTime(this.settings.music, now, 0.1);
     this.sfxGain!.gain.setTargetAtTime(this.settings.sfx, now, 0.1);
   }
 
+  // --- API PÚBLICA (Extremamente Simples Agora) ---
+
+  public playShoot() { this.playBuffer('shoot', 0.8, 1.0 + Math.random()*0.1, 80); }
+  public playHit() { this.playBuffer('hit', 0.8, 0.8 + Math.random()*0.4, 80); }
+  public playExplosion() { this.playBuffer('expl', 1.0, 1.0, 120); }
+  public playPowerUp() { this.playBuffer('power', 0.6, 1.0, 100); }
+  public playSurge() { this.playBuffer('surge', 0.7, 1.0, 500); }
+
+  // --- MUSIC ENGINE (Simplificada e Segura) ---
+  
   public stopMusic() {
     this.isPlaying = false;
     this.currentTrack = 'NONE';
     if (this.timerID !== null) {
-        window.clearTimeout(this.timerID); // Para o loop do sequenciador
+        window.clearTimeout(this.timerID);
         this.timerID = null;
     }
   }
 
-  // --- MOTOR DO SEQUENCIADOR (The heartbeat) ---
-  // Baseado no artigo clássico "A Tale of Two Clocks" do Chris Wilson.
+  public startGameMusic() { this.startTrack('GAME', 135); }
+  public startMenuMusic() { this.startTrack('MENU', 80); }
 
-  private nextNote() {
-    const secondsPerBeat = 60.0 / this.tempo;
-    this.nextNoteTime += 0.25 * secondsPerBeat; // Avança uma semicolcheia (1/16)
-    this.current16thNote++;
-    if (this.current16thNote === 16) {
-        this.current16thNote = 0; // Loop do compasso
-    }
+  private startTrack(track: 'MENU' | 'GAME', bpm: number) {
+      if (this.currentTrack === track) return;
+      this.stopMusic();
+      if (!this.ctx) return;
+
+      this.isPlaying = true;
+      this.currentTrack = track;
+      this.tempo = bpm;
+      this.current16thNote = 0;
+      this.nextNoteTime = this.ctx.currentTime + 0.1;
+      this.scheduler();
   }
 
-  private scheduleNote(beatNumber: number, time: number) {
-    if (this.currentTrack === 'GAME') {
-        this.playGameBeat(beatNumber, time);
-    } else if (this.currentTrack === 'MENU') {
-        this.playMenuBeat(beatNumber, time);
-    }
-  }
-
-  // O Loop Infinito (enquanto tocar música)
   private scheduler() {
-    if (!this.ctx || !this.isPlaying) return;
-
-    // Enquanto houver notas para tocar no futuro próximo, agende-as.
-    while (this.nextNoteTime < this.ctx.currentTime + this.scheduleAheadTime) {
-        this.scheduleNote(this.current16thNote, this.nextNoteTime);
-        this.nextNote();
-    }
-    // Verifica novamente daqui a pouco. setTimeout não é preciso, mas o AudioContext clock é.
-    this.timerID = window.setTimeout(() => this.scheduler(), this.lookahead);
-  }
-
-  // --- INSTRUMENTOS SINTETIZADOS ---
-  // Aqui é onde brincamos de Kraftwerk.
-
-  private playKick(time: number, vol = 1.0) {
-      if (!this.ctx) return;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
+      if (!this.ctx || !this.isPlaying) return;
       
-      // Um Kick (Bumbo) é basicamente uma onda senoidal caindo de frequência muito rápido.
-      osc.frequency.setValueAtTime(150, time); // Começa em 150Hz
-      osc.frequency.exponentialRampToValueAtTime(0.01, time + 0.5); // Cai pra quase zero
+      const ahead = 0.15; // 150ms lookahead
+      const now = this.ctx.currentTime;
       
-      gain.gain.setValueAtTime(vol, time);
-      gain.gain.exponentialRampToValueAtTime(0.01, time + 0.5); // Envelope de volume
-      
-      osc.connect(gain);
-      gain.connect(this.musicGain!);
-      
-      osc.start(time);
-      osc.stop(time + 0.5);
-  }
-
-  private playHat(time: number, open = false) {
-      if (!this.ctx) return;
-      // Hi-Hat é Ruído Branco (White Noise) filtrado.
-      const bufferSize = this.ctx.sampleRate * (open ? 0.3 : 0.05);
-      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-      const data = buffer.getChannelData(0);
-      for(let i=0; i<bufferSize; i++) data[i] = Math.random() * 2 - 1; // Gera estática
-
-      const noise = this.ctx.createBufferSource();
-      noise.buffer = buffer;
-
-      // Filtro Passa-Alta pra tirar os graves e deixar só o "Tss Tss"
-      const filter = this.ctx.createBiquadFilter();
-      filter.type = 'highpass';
-      filter.frequency.value = 7000;
-
-      const gain = this.ctx.createGain();
-      gain.gain.setValueAtTime(open ? 0.05 : 0.03, time);
-      gain.gain.exponentialRampToValueAtTime(0.01, time + (open ? 0.2 : 0.05));
-
-      noise.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.musicGain!);
-      noise.start(time);
-  }
-
-  private playBass(time: number, freq: number) {
-      if (!this.ctx) return;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      const filter = this.ctx.createBiquadFilter();
-
-      // Som estilo Acid / TB-303
-      osc.type = 'sawtooth'; // Onda Dente de Serra (agressiva)
-      osc.frequency.setValueAtTime(freq, time);
-
-      filter.type = 'lowpass';
-      filter.Q.value = 8; // Ressonância alta pra "gritar"
-      filter.frequency.setValueAtTime(200, time);
-      filter.frequency.exponentialRampToValueAtTime(2000, time + 0.05); // "Wown" effect
-      filter.frequency.exponentialRampToValueAtTime(100, time + 0.3);
-
-      gain.gain.setValueAtTime(0.15, time);
-      gain.gain.linearRampToValueAtTime(0, time + 0.3);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(this.musicGain!);
-      osc.start(time);
-      osc.stop(time + 0.3);
-  }
-
-  private playPad(time: number, freq: number, duration: number) {
-      if (!this.ctx) return;
-      const osc = this.ctx.createOscillator();
-      const gain = this.ctx.createGain();
-      
-      osc.type = 'triangle'; // Onda suave
-      osc.frequency.setValueAtTime(freq, time);
-      
-      // Envelope suave (Slow Attack, Slow Release)
-      gain.gain.setValueAtTime(0, time);
-      gain.gain.linearRampToValueAtTime(0.05, time + duration/2);
-      gain.gain.linearRampToValueAtTime(0, time + duration);
-
-      osc.connect(gain);
-      gain.connect(this.musicGain!);
-      osc.start(time);
-      osc.stop(time + duration);
-  }
-
-  // --- TRILHAS MUSICAIS (COMPOSIÇÃO PROCEDURAL) ---
-
-  public startMenuMusic() {
-    if (this.currentTrack === 'MENU') return;
-    this.stopMusic();
-    if (!this.ctx) return;
-
-    this.isPlaying = true;
-    this.currentTrack = 'MENU';
-    this.tempo = 80; // Lento, atmosférico, tenso
-    this.current16thNote = 0;
-    this.nextNoteTime = this.ctx.currentTime + 0.1;
-    this.scheduler();
-  }
-
-  private playMenuBeat(beat: number, time: number) {
-      // Ambient Dark Pulsante
-      if (beat === 0) {
-          this.playKick(time, 0.4); // Kick suave (batida do coração)
-          this.playPad(time, 55, 2); // Drone grave em Lá (A1)
-          this.playPad(time, 110, 2);
+      // Resync violento se atrasar
+      if (this.nextNoteTime < now - 0.2) {
+          this.nextNoteTime = now;
       }
-      if (beat === 8) {
-           this.playKick(time, 0.2); // Síncope
+
+      while (this.nextNoteTime < now + ahead) {
+          this.playNote(this.current16thNote);
+          const secondsPerBeat = 60.0 / this.tempo;
+          this.nextNoteTime += 0.25 * secondsPerBeat;
+          this.current16thNote = (this.current16thNote + 1) % 16;
       }
       
-      // Bleeps aleatórios pra parecer computador de filme dos anos 80
-      if (Math.random() > 0.8) {
-          const notes = [440, 554, 659, 880]; // Escala pentatônica maior de Lá
-          const n = notes[Math.floor(Math.random() * notes.length)];
-          this.playPad(time, n, 0.2);
-      }
+      this.timerID = window.setTimeout(() => this.scheduler(), 30);
   }
 
-  public startGameMusic() {
-    if (this.currentTrack === 'GAME') return;
-    this.stopMusic();
-    if (!this.ctx) return;
-
-    this.isPlaying = true;
-    this.currentTrack = 'GAME';
-    this.tempo = 135; // Psytrance / Techno rápido pra gerar ansiedade
-    this.current16thNote = 0;
-    this.nextNoteTime = this.ctx.currentTime + 0.1;
-    this.scheduler();
-  }
-
-  private playGameBeat(beat: number, time: number) {
-      // Kick "Four-on-the-floor" clássico
-      if (beat % 4 === 0) {
-          this.playKick(time, 1.0);
-      }
-      
-      // Hi-Hats no contra-tempo (Tss Tss Tss)
-      if (beat % 4 === 2) {
-          this.playHat(time, true); // Aberto
+  private playNote(beat: number) {
+      if (this.currentTrack === 'GAME') {
+          if (beat % 4 === 0) this.playBuffer('kick', 1.0);
+          if (beat % 4 === 2) this.playBuffer('hat', 0.6, 1.0); // Open
+          else this.playBuffer('hat', 0.2, 2.0); // Closed (pitch alto)
       } else {
-          this.playHat(time, false); // Fechado
+          // Menu Ambient (Minimalista)
+          if (beat === 0) this.playBuffer('kick', 0.5, 0.5); // Low kick
+          if (beat % 8 === 2) this.playBuffer('hat', 0.1, 0.5);
       }
-
-      // Linha de Baixo Galopante (16th notes)
-      // Escala Ré Menor: D, E, F, G, A, Bb, C
-      const root = 73.42; // D2
-      const scale = [1, 9/8, 6/5, 4/3, 3/2, 8/5, 9/5, 2]; // Razões de entonação justa (matemática musical)
-      
-      if (beat % 4 !== 0) { // Sidechain: O baixo "cala a boca" quando o Kick bate
-        // Melodia Procedural: O computador improvisa o baixo
-        const noteIdx = Math.floor(Math.random() * 4); 
-        const freq = root * scale[noteIdx];
-        
-        // Salto de oitava aleatório pra dar groove
-        const finalFreq = Math.random() > 0.9 ? freq * 2 : freq;
-        this.playBass(time, finalFreq);
-      }
-  }
-
-  // --- EFEITOS SONOROS (SFX) ---
-  // Disparados pelo jogo sob demanda.
-
-  public playShoot() {
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    
-    // Pew Pew clássico
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(600, t);
-    osc.frequency.exponentialRampToValueAtTime(100, t + 0.1); // Pitch drop rápido
-    
-    gain.gain.setValueAtTime(0.15, t);
-    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
-
-    osc.connect(gain);
-    gain.connect(this.sfxGain!);
-    osc.start(t);
-    osc.stop(t + 0.1);
-  }
-
-  public playHit() {
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    
-    // Som de impacto áspero
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(100, t);
-    osc.frequency.exponentialRampToValueAtTime(10, t + 0.1);
-    
-    gain.gain.setValueAtTime(0.2, t);
-    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.1);
-
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.value = 500; // Abafa o som
-
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.sfxGain!);
-    osc.start(t);
-    osc.stop(t + 0.1);
-  }
-
-  public playExplosion() {
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    
-    // Cria ruído rosa/branco manualmente
-    const bufferSize = this.ctx.sampleRate * 0.5; 
-    const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = Math.random() * 2 - 1;
-    }
-
-    const noise = this.ctx.createBufferSource();
-    noise.buffer = buffer;
-    
-    // Filtro passa-baixa fechando simula a dissipação da explosão
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(800, t);
-    filter.frequency.exponentialRampToValueAtTime(50, t + 0.4);
-
-    const gain = this.ctx.createGain();
-    gain.gain.setValueAtTime(0.5, t);
-    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.4);
-
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.sfxGain!);
-    noise.start(t);
-  }
-
-  public playPowerUp() {
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    
-    // Arpeggio rápido pra cima (som de moeda do Mario, mas Sci-Fi)
-    osc.type = 'square'; // Onda quadrada = som de videogame 8-bit
-    osc.frequency.setValueAtTime(300, t);
-    osc.frequency.linearRampToValueAtTime(800, t + 0.1); 
-    osc.frequency.linearRampToValueAtTime(1200, t + 0.2); 
-    
-    gain.gain.setValueAtTime(0.1, t);
-    gain.gain.linearRampToValueAtTime(0.1, t + 0.2);
-    gain.gain.linearRampToValueAtTime(0.01, t + 0.3);
-
-    osc.connect(gain);
-    gain.connect(this.sfxGain!);
-    osc.start(t);
-    osc.stop(t + 0.3);
-  }
-  
-  public playSurge() {
-    if (!this.ctx) return;
-    const t = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    
-    // Efeito de sirene / carga de energia
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(400, t);
-    osc.frequency.linearRampToValueAtTime(800, t + 0.5); 
-    osc.frequency.linearRampToValueAtTime(400, t + 1.0); 
-
-    gain.gain.setValueAtTime(0.3, t);
-    gain.gain.linearRampToValueAtTime(0, t + 1.2);
-
-    osc.connect(gain);
-    gain.connect(this.sfxGain!);
-    osc.start(t);
-    osc.stop(t + 1.2);
   }
 }
 

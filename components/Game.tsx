@@ -10,17 +10,9 @@
  * a interface reativa do React (Menus, HUD, Botões) e a brutalidade imperativa
  * do GameEngine no Canvas HTML5.
  * 
- * ARQUITETURA "DUPLA CAMADA":
- * 1. Camada Canvas (Engine): Renderiza 60FPS, gerencia física, colisões e partículas.
- *    É "burra" para UI, mas rápida para matemática. Vive dentro do `engineRef`.
- * 
- * 2. Camada React (DOM): Gerencia estado do jogo (Menu, Playing, GameOver),
- *    inputs de UI, e renderiza textos/botões sobre o canvas. Vive nos `useState`.
- * 
- * CUIDADO:
- * Tentar renderizar o HUD do jogo (barra de vida, score) via React a cada frame (60fps)
- * vai derreter a CPU do mobile. Usamos um "throttle" (atualização espaçada) ou
- * desenhamos coisas críticas direto no Canvas.
+ * ATUALIZAÇÃO DE OTIMIZAÇÃO:
+ * A atualização da UI agora é limitada (throttled) a 10FPS.
+ * Isso impede que o React roube ciclos de CPU do motor de áudio e física.
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
@@ -33,11 +25,6 @@ import { Joystick } from './Joystick';
 
 // --- UI COMPONENTS (Pequenos componentes auxiliares) ---
 
-/**
- * StatBar: Barra de progresso genérica com estilo Sci-Fi.
- * Aquele "skew-x" no CSS é o que faz ela parecer rápida.
- * O "animate-pulse" é pra quando a coisa fica crítica (ex: Adrenalina).
- */
 const StatBar = ({ value, max, colorClass, label, animate = false }: any) => (
   <div className="flex flex-col w-full">
     <div className="flex justify-between items-end mb-1 px-1">
@@ -49,7 +36,6 @@ const StatBar = ({ value, max, colorClass, label, animate = false }: any) => (
         className={`h-full ${colorClass} transition-all duration-200 origin-left ${animate && value >= max ? 'animate-pulse brightness-150' : ''}`}
         style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
       />
-      {/* Brilho fake no topo da barra */}
       <div className="absolute top-0 left-0 w-full h-[50%] bg-white/10"></div>
     </div>
   </div>
@@ -64,11 +50,6 @@ const IconButton = ({ onClick, icon }: any) => (
   </button>
 );
 
-/**
- * MenuButton: O botão principal.
- * Usa `clip-path` para cortar o canto inferior direito. Estética Cyberpunk 101.
- * O efeito de hover (aquele brilho passando) é feito com uma div absoluta transformando no CSS.
- */
 const MenuButton = ({ onClick, children, variant = 'primary', selected = false }: any) => {
   const base = "w-full py-4 font-bold text-xl tracking-widest uppercase clip-path-polygon transition-all hover:scale-105 shadow-[0_0_20px_rgba(0,0,0,0.4)] relative overflow-hidden group";
   let colors = "";
@@ -112,9 +93,6 @@ const DatabaseCard = ({ title, desc, color }: any) => (
     </div>
 );
 
-// --- ÍCONES SVG INLINE ---
-// Porque baixar biblioteca de ícones é bloat. Desenhamos vetores na unha.
-
 const IconSpeaker = ({ muted }: { muted: boolean }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         {muted ? (
@@ -141,63 +119,41 @@ const IconTrophy = () => (
 // --- MAIN COMPONENT ---
 
 export const Game: React.FC = () => {
-  // Referências Mutable para coisas que mudam rápido demais para o React.
-  // Se colocássemos o Engine no State, o React tentaria re-renderizar a árvore inteira a cada frame.
-  // O PC do usuário explodiria.
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
   const animationFrameRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
+  const uiUpdateAccumulatorRef = useRef<number>(0); // NOVO: Acumulador para throttle da UI
   
-  // --- STATE DO REACT (Gerenciamento de Fluxo) ---
   const [gameState, setGameState] = useState<GameState>(GameState.MENU);
-  const [lastGameState, setLastGameState] = useState<GameState>(GameState.MENU); // "Voltar"
+  const [lastGameState, setLastGameState] = useState<GameState>(GameState.MENU);
   
   const [isPaused, setIsPaused] = useState(false);
   const [language, setLanguage] = useState<Language>('EN');
   const [difficulty, setDifficulty] = useState<Difficulty>(Difficulty.NORMAL);
   
-  // Stats do jogador. Mudar isso aqui reflete na Engine e na UI.
   const [stats, setStats] = useState<PlayerStats>(INITIAL_STATS);
-  
-  // Loja de Upgrades. Clonamos o array inicial para não modificar a constante global por acidente.
   const [upgrades, setUpgrades] = useState<Upgrade[]>(UPGRADES.map(u => ({...u}))); 
   
-  // Bridge State: Dados copiados da Engine para o React para exibir na HUD.
-  // Não precisa ser perfeitamente sincronizado a 60fps.
   const [uiData, setUiData] = useState({ 
     health: 100, maxHealth: 100, score: 0, biomass: 0, 
     wave: 0, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100,
     combo: 0, dashReady: true, adrenaline: false, lives: INITIAL_LIVES
   });
   
-  // Detecção de Mobile (pra mostrar o joystick virtual)
   const [isMobile, setIsMobile] = useState(false);
-  
-  // Dados do paciente procedural (flavor text)
   const [patient, setPatient] = useState<PatientProfile | null>(null);
-  
-  // Áudio & Conquistas
   const [audioSettings, setAudioSettings] = useState(audioManager.settings);
   const [isMuted, setIsMuted] = useState(false);
   const [activeAchievement, setActiveAchievement] = useState<Achievement | null>(null);
-  
-  // O "Endgame": Se isPlatinum for true, o jogo vira um show de luzes douradas.
   const [isPlatinum, setIsPlatinum] = useState(false);
   const [colors, setColors] = useState<ThemePalette>(COLORS_DEFAULT);
-  
-  // Cheat Code Input: O segredo para os impacientes.
   const [cheatInput, setCheatInput] = useState("");
 
-  // Helper de tradução
   const t = (key: string) => TEXTS[language][key] || key;
 
-  // --- EFEITOS E INICIALIZAÇÃO ---
-
-  // Detecta se é mobile no mount e no resize
   useEffect(() => {
     const checkMobile = () => {
-      // Coarse pointer geralmente significa dedo.
       const hasTouch = window.matchMedia('(pointer: coarse)').matches;
       const multiTouch = navigator.maxTouchPoints > 0;
       setIsMobile(hasTouch || multiTouch);
@@ -207,33 +163,26 @@ export const Game: React.FC = () => {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Inicializa o Listener de Conquistas
   useEffect(() => {
-      // Callback quando desbloqueia algo
       const handleUnlock = (ach: Achievement) => {
-          setActiveAchievement(ach); // Mostra o popup
-          setTimeout(() => setActiveAchievement(null), 4000); // Esconde depois de 4s
+          setActiveAchievement(ach); 
+          setTimeout(() => setActiveAchievement(null), 4000);
           audioManager.playPowerUp(); 
       };
       
-      // Callback quando platina o jogo (The Apex Virus)
       const handlePlatinum = () => {
           setIsPlatinum(true);
-          setColors(COLORS_PLATINUM); // Injeta a paleta dourada
+          setColors(COLORS_PLATINUM);
       };
 
       achievementManager.setCallbacks(handleUnlock, handlePlatinum);
-      
-      // Verifica se já começou platinado (persistência)
       if (achievementManager.isPlatinumUnlocked()) {
           setIsPlatinum(true);
           setColors(COLORS_PLATINUM);
       }
   }, []);
 
-  // Handlers para Ações de Jogo (Disparados por teclas ou botões virtuais)
   const triggerUltimate = useCallback(() => {
-    // Só dispara se estiver jogando e não pausado. Lógica básica.
     if (engineRef.current && gameState === GameState.PLAYING && !isPaused) {
       engineRef.current.triggerSurge(stats);
     }
@@ -245,17 +194,14 @@ export const Game: React.FC = () => {
     }
   }, [gameState, isPaused, stats]);
 
-  // Listener de Teclado (WASD / Setas / Espaço / Shift)
   useEffect(() => {
     const keys = new Set<string>();
     const handleKey = (e: KeyboardEvent, isDown: boolean) => {
-      // ESC pausa
       if (isDown && e.code === 'Escape' && gameState === GameState.PLAYING) {
           togglePause();
           return;
       }
       
-      // Bloqueia input se não estiver jogando
       if ((gameState !== GameState.PLAYING && gameState !== GameState.WAVE_CLEARED) || isPaused) return;
       
       if (isDown) {
@@ -266,7 +212,6 @@ export const Game: React.FC = () => {
         keys.delete(e.code);
       }
 
-      // Calcula vetor de movimento baseado nas teclas pressionadas
       let x = 0;
       let y = 0;
       if (keys.has('KeyW') || keys.has('ArrowUp')) y -= 1;
@@ -274,15 +219,12 @@ export const Game: React.FC = () => {
       if (keys.has('KeyA') || keys.has('ArrowLeft')) x -= 1;
       if (keys.has('KeyD') || keys.has('ArrowRight')) x += 1;
 
-      // Normalização de vetor (para não andar mais rápido na diagonal)
-      // Matemática de pitágoras: a hipotenusa de 1,1 é ~1.41. Temos que dividir por isso.
       if (x !== 0 && y !== 0) {
         const invLen = 1.0 / Math.sqrt(x * x + y * y);
         x *= invLen;
         y *= invLen;
       }
 
-      // Envia o input vetorizado para a Engine
       if (engineRef.current) engineRef.current.inputVector = { x, y };
     };
 
@@ -294,10 +236,8 @@ export const Game: React.FC = () => {
     };
   }, [gameState, triggerUltimate, triggerDash, isPaused]);
 
-  // Lógica de Deploy (Avançar Wave)
   const deployToWave = useCallback(() => {
       if (engineRef.current) {
-          // Se currentWaveIndex for -1 (início), vai pra 0.
           const nextWaveIdx = engineRef.current.currentWaveIndex === -1 ? 0 : engineRef.current.currentWaveIndex + 1;
           engineRef.current.startWave(nextWaveIdx);
           setGameState(GameState.PLAYING);
@@ -305,7 +245,6 @@ export const Game: React.FC = () => {
       }
   }, []);
 
-  // -- Navegação de Menus (Boilerplate) --
   const openShop = useCallback(() => setGameState(GameState.BIO_LAB), []);
   const closeShop = useCallback(() => setGameState(GameState.BRIEFING), []);
   
@@ -325,11 +264,10 @@ export const Game: React.FC = () => {
       setGameState(GameState.ACHIEVEMENTS);
   }, [gameState]);
 
-  // O famoso código Konami (adaptado para um hash maluco)
   const handleCheatInput = (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
       setCheatInput(val);
-      if (val === 'j6t2hybt26fwxgy2hvxjttbdy') { // Se alguém descobrir isso sem olhar o código, merece um prêmio.
+      if (val === 'j6t2hybt26fwxgy2hvxjttbdy') {
           achievementManager.unlockAll();
           audioManager.playExplosion();
           audioManager.playPowerUp();
@@ -338,30 +276,23 @@ export const Game: React.FC = () => {
       }
   }
 
-  // --- GAME LOOP (O Ciclo da Vida e Morte) ---
   const loop = useCallback((time: number) => {
-    // Se a engine morreu (null), tenta reviver ou sai.
     if (!engineRef.current) {
         animationFrameRef.current = requestAnimationFrame(loop);
         return;
     }
 
-    // Se não estamos jogando ou está pausado, apenas atualiza o tempo delta 
-    // mas não roda a lógica de física.
     if ((gameState !== GameState.PLAYING && gameState !== GameState.WAVE_CLEARED) || isPaused) {
         lastTimeRef.current = time;
         animationFrameRef.current = requestAnimationFrame(loop);
         return;
     }
     
-    // Delta Time: Tempo entre frames. Essencial para física frame-rate independent.
     const dt = time - lastTimeRef.current;
     lastTimeRef.current = time;
 
     if (engineRef.current) {
       if (gameState === GameState.PLAYING) {
-          // Update da Engine: Move bichos, calcula colisão, mata o jogador.
-          // Recebe callbacks para mudar o estado do React (WaveClear, GameOver).
           engineRef.current.update(
             dt, 
             stats, 
@@ -376,14 +307,14 @@ export const Game: React.FC = () => {
           );
       }
       
-      // Renderiza o Canvas (Draw calls)
       engineRef.current.draw();
       
-      // Sincronização Engine -> React UI
-      // ATENÇÃO: Usamos Math.random() < 0.5 como um "Throttle" barato.
-      // Atualizar o estado do React a 60fps é pedir pra travar.
-      // Atualizar a ~30fps é suave e imperceptível pro olho humano na UI.
-      if (Math.random() < 0.5) {
+      // --- UI THROTTLING (A CURA PARA O LAG) ---
+      // Atualiza o estado do React apenas a cada 100ms (10fps).
+      // Isso libera a main thread para o Áudio e o Canvas processarem lisinho.
+      uiUpdateAccumulatorRef.current += dt;
+      if (uiUpdateAccumulatorRef.current > 100) {
+          uiUpdateAccumulatorRef.current = 0;
           const eng = engineRef.current;
           const waveIdx = Math.max(0, Math.min(eng.currentWaveIndex, WAVES.length - 1));
           const currentWaveConfig = WAVES[waveIdx];
@@ -406,21 +337,16 @@ export const Game: React.FC = () => {
       }
     }
     
-    // Agenda o próximo frame
     animationFrameRef.current = requestAnimationFrame(loop);
   }, [gameState, stats, isPaused]);
 
-  // Inicia o Loop ao montar o componente
   useEffect(() => {
     lastTimeRef.current = performance.now();
     animationFrameRef.current = requestAnimationFrame(loop);
     return () => { if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current); }
   }, [loop]);
 
-  // --- LÓGICA DE PARTIDA ---
-
   const generatePatient = () => {
-      // Cria um paciente aleatório pra você sentir pena antes de ele morrer.
       const fName = PATIENT_NAMES_FIRST[Math.floor(Math.random() * PATIENT_NAMES_FIRST.length)];
       const lName = PATIENT_NAMES_LAST[Math.floor(Math.random() * PATIENT_NAMES_LAST.length)];
       const symptomKey = SYMPTOMS_KEYS[Math.floor(Math.random() * SYMPTOMS_KEYS.length)];
@@ -438,17 +364,14 @@ export const Game: React.FC = () => {
   }
 
   const handleStartGame = () => {
-     audioManager.init(); // O navegador exige interação do usuário pra ligar o áudio.
+     audioManager.init(); 
      
      const newPatient = generatePatient();
      setPatient(newPatient);
 
      if (canvasRef.current) {
-         // Instancia a Engine. Passamos a referência do canvas e as configurações.
-         // É aqui que a "alma" do jogo é criada.
          engineRef.current = new GameEngine(canvasRef.current, INITIAL_STATS, newPatient, difficulty, colors);
          
-         // Reseta estados
          setStats(INITIAL_STATS);
          setUpgrades(UPGRADES.map(u => ({...u}))); 
          setUiData({ 
@@ -462,69 +385,35 @@ export const Game: React.FC = () => {
   };
 
   const buyUpgrade = (upgradeId: string) => {
-      // Transação segura de upgrades.
-      // Valida tudo duas vezes pra evitar que o jogador quebre o jogo clicando rápido demais.
-      if (!engineRef.current) {
-          console.warn("CRITICAL: Engine instance is null during transaction.");
-          return;
-      }
+      if (!engineRef.current) return;
       
       const upgIdx = upgrades.findIndex(u => u.id === upgradeId);
-      if (upgIdx === -1) {
-          console.error("CRITICAL: Invalid upgrade ID requested:", upgradeId);
-          return;
-      }
+      if (upgIdx === -1) return;
       
       const upgState = upgrades[upgIdx];
-      // Fonte da verdade: CONSTANTS.
       const upgDef = UPGRADES.find(u => u.id === upgradeId);
       
-      if (!upgDef) {
-          console.error("CRITICAL: Upgrade Definition not found for ID:", upgradeId);
-          return;
-      }
+      if (!upgDef) return;
 
-      // Cálculo de custo exponencial (inflação gamer)
       const cost = Math.floor(upgState.baseCost * Math.pow(upgState.costMultiplier, upgState.level));
       
-      // Validação de saldo
-      if (isNaN(engineRef.current.biomass) || engineRef.current.biomass < 0) {
-          engineRef.current.biomass = 0; 
-          console.error("State Corruption: Biomass reset.");
-          return;
-      }
-
       if (engineRef.current.biomass >= cost && upgState.level < upgState.maxLevel) {
-          // Backup do estado para rollback em caso de falha na aplicação
           const prevStats = {...stats};
 
           try {
-              // Deduz saldo na Engine
               engineRef.current.biomass -= cost;
-              
-              // Aplica lógica de upgrade
               const newStats = upgDef.apply(stats);
-              
-              // Sanity check
-              if (isNaN(newStats.damage) || isNaN(newStats.maxHealth)) {
-                   throw new Error("Upgrade resulted in NaN stats.");
-              }
-
               setStats(newStats);
               audioManager.playPowerUp();
               
-              // Atualiza nível na UI
               const newUpgrades = [...upgrades];
               newUpgrades[upgIdx] = {
                   ...newUpgrades[upgIdx],
                   level: newUpgrades[upgIdx].level + 1
               };
               setUpgrades(newUpgrades);
-              
-              // Atualiza UI de Biomassa imediatamente
               setUiData(prev => ({...prev, biomass: engineRef.current!.biomass}));
               
-              // Verifica Conquistas relacionadas a upgrades
               if (newUpgrades[upgIdx].level >= newUpgrades[upgIdx].maxLevel) {
                   if (upgradeId === 'mitosis') achievementManager.track('fire_rate_max', 1);
               }
@@ -533,15 +422,13 @@ export const Game: React.FC = () => {
               achievementManager.set('unlock_all_upgrades', boughtCount);
 
           } catch (e) {
-              console.error("Upgrade transaction failed. Rolling back.", e);
-              engineRef.current.biomass += cost; // Devolve o dinheiro
-              setStats(prevStats); // Restaura stats
+              engineRef.current.biomass += cost;
+              setStats(prevStats);
           }
       }
   };
 
   const handleJoystickMove = (vec: {x: number, y: number}) => {
-    // Passa o input do componente React Joystick para a Engine
     if (engineRef.current) engineRef.current.inputVector = vec;
   };
 
@@ -554,7 +441,6 @@ export const Game: React.FC = () => {
   const toggleMute = () => {
       const newVal = !isMuted;
       setIsMuted(newVal);
-      // Muta o master ou restaura
       if (newVal) {
           audioManager.settings.master = 0;
       } else {
@@ -580,25 +466,18 @@ export const Game: React.FC = () => {
           setGameState(GameState.MENU);
       } else {
           setGameState(GameState.PLAYING);
-          // Volta pausado pra não morrer instantaneamente
           if (!isPaused) setIsPaused(true); 
       }
   }
 
-  // --- RENDERIZAÇÃO (JSX) ---
-  // A parte onde misturamos HTML dentro do JS e chamamos de "Moderno".
-
   return (
     <div className={`relative w-full h-screen overflow-hidden text-white select-none ${isPlatinum ? 'bg-[#0a0a1a]' : 'bg-[#0f0505]'}`} style={{fontFamily: 'var(--font-tech)'}}>
-      {/* O CANVAS: Onde o jogo realmente acontece */}
       <canvas ref={canvasRef} className="block w-full h-full object-contain" />
       
-      {/* OVERLAYS: Efeitos visuais por cima do canvas */}
       <div className="vignette"></div>
       <div className="scanlines"></div>
       <div className="vein-overlay opacity-20" style={{filter: isPlatinum ? 'hue-rotate(240deg)' : 'none'}}></div>
 
-      {/* --- TOAST DE CONQUISTA (A dopamina do jogador) --- */}
       <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 z-[100] transition-all duration-500 ease-out ${activeAchievement ? 'translate-y-0 opacity-100' : '-translate-y-20 opacity-0'}`}>
           {activeAchievement && (
               <div className={`flex items-center gap-4 p-4 rounded border-2 shadow-[0_0_30px_rgba(0,0,0,0.8)] backdrop-blur-md min-w-[300px]
@@ -615,10 +494,8 @@ export const Game: React.FC = () => {
           )}
       </div>
 
-      {/* --- HUD (Heads Up Display) --- */}
       {(gameState === GameState.PLAYING || gameState === GameState.WAVE_CLEARED || gameState === GameState.LOADOUT) && (
         <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between p-2 md:p-6">
-           {/* Top HUD */}
            <div className="flex justify-between items-start">
              <div className="flex flex-col gap-3 w-40 md:w-64">
                 <StatBar label={t('INTEGRITY')} value={uiData.health} max={uiData.maxHealth} colorClass={uiData.adrenaline ? "bg-red-600 animate-pulse" : (isPlatinum ? "bg-gradient-to-r from-purple-500 to-amber-400" : "bg-gradient-to-r from-red-600 to-red-400")} />
@@ -675,18 +552,15 @@ export const Game: React.FC = () => {
              </div>
            </div>
 
-           {/* Mobile Controls Layer (Botões Virtuais) */}
            {isMobile && !isPaused && (
              <div className="absolute inset-0 z-10 pointer-events-none">
                  <div className="absolute bottom-8 right-8 pointer-events-auto flex gap-4 items-end">
-                     {/* Dash Button */}
                      <button 
                         onTouchStart={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             triggerDash();
                         }}
-                        // Fallback pra desktop (click)
                         onClick={!isMobile ? triggerDash : undefined}
                         disabled={!uiData.dashReady}
                         className={`w-16 h-16 rounded-full border-2 flex items-center justify-center relative transition-all duration-100 active:scale-95
@@ -698,14 +572,12 @@ export const Game: React.FC = () => {
                          <span className="font-bold text-xs">DASH</span>
                      </button>
 
-                     {/* Surge Button */}
                      <button 
                         onTouchStart={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             triggerUltimate();
                         }}
-                        // Fallback pra desktop (click)
                         onClick={!isMobile ? triggerUltimate : undefined}
                         disabled={uiData.energy < uiData.maxEnergy}
                         className={`w-24 h-24 rounded-full border-4 flex items-center justify-center relative transition-all duration-100 active:scale-95
@@ -722,9 +594,6 @@ export const Game: React.FC = () => {
         </div>
       )}
       
-      {/* --- MENUS DO JOGO (States diferentes) --- */}
-
-      {/* Main Menu */}
       {gameState === GameState.MENU && (
         <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
@@ -776,7 +645,6 @@ export const Game: React.FC = () => {
         </div>
       )}
 
-      {/* Achievement Menu */}
       {gameState === GameState.ACHIEVEMENTS && (
           <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
               <div className={`w-full max-w-6xl h-[90%] border p-8 relative flex flex-col ${isPlatinum ? 'border-amber-500/50 bg-purple-900/10' : 'border-white/10 bg-[#1a0a0a]'}`}>
@@ -790,13 +658,11 @@ export const Game: React.FC = () => {
                       </div>
                   </div>
 
-                  {/* Scrollable Container */}
                   <div className="flex-1 overflow-y-auto pr-2 custom-scroll min-h-0">
                       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-4">
                           {ACHIEVEMENTS_LIST.map((ach) => {
                               const progress = achievementManager.getProgress()[ach.id] || { unlocked: false, currentValue: 0 };
                               const isLocked = !progress.unlocked;
-                              // Oculta conquistas secretas bloqueadas
                               if (ach.secret && isLocked) {
                                   return (
                                       <div key={ach.id} className="bg-black/60 border border-white/5 p-6 flex items-center justify-center opacity-50 min-h-[120px]">
@@ -816,7 +682,6 @@ export const Game: React.FC = () => {
                                               <p className={`text-sm mb-4 leading-relaxed flex-1 ${isLocked ? 'text-gray-600' : 'text-gray-300'}`}>{ach.desc}</p>
                                               
                                               <div className="mt-auto w-full">
-                                                  {/* Barra de Progresso cumulativa */}
                                                   {ach.isCumulative && !progress.unlocked && (
                                                       <div className="w-full h-1.5 bg-black rounded overflow-hidden mb-2 border border-white/5">
                                                           <div className="h-full bg-cyan-600" style={{width: `${Math.min(100, (progress.currentValue / ach.targetValue)*100)}%`}}></div>
@@ -849,7 +714,6 @@ export const Game: React.FC = () => {
           </div>
       )}
 
-      {/* Manual / Database Screen */}
       {gameState === GameState.MANUAL && (
         <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
            <div className="w-full max-w-4xl p-6 md:p-10 bg-[#1a0a0a] border border-white/10 relative h-[90vh] flex flex-col">
@@ -859,8 +723,6 @@ export const Game: React.FC = () => {
               </h2>
               
               <div className="flex-1 overflow-y-auto custom-scroll pr-4 space-y-8">
-                  
-                  {/* Hostiles Section */}
                   <section>
                       <h4 className="text-cyan-400 font-bold tracking-[0.2em] mb-4 text-sm border-l-2 border-cyan-500 pl-3">{t('MANUAL_HOSTILES')}</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -871,7 +733,6 @@ export const Game: React.FC = () => {
                       </div>
                   </section>
 
-                  {/* Mechanics Section */}
                   <section>
                       <h4 className="text-white font-bold tracking-[0.2em] mb-4 text-sm border-l-2 border-white pl-3">{t('MANUAL_MECHANICS')}</h4>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -881,7 +742,6 @@ export const Game: React.FC = () => {
                       </div>
                   </section>
 
-                  {/* Strains Section */}
                   <section>
                       <h4 className="text-yellow-400 font-bold tracking-[0.2em] mb-4 text-sm border-l-2 border-yellow-500 pl-3">{t('MANUAL_STRAINS')}</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -900,14 +760,12 @@ export const Game: React.FC = () => {
         </div>
       )}
 
-      {/* Controls Screen */}
       {gameState === GameState.CONTROLS && (
         <div className="absolute inset-0 bg-black flex items-center justify-center z-[60]">
            <div className="w-full max-w-3xl p-8 bg-[#1a0a0a] border border-white/10 relative">
               <h2 className="text-3xl text-white font-bold tracking-widest mb-8 border-b border-white/10 pb-4">{t('CONTROLS')}</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                  {/* Movement */}
                   <div className="p-4 border border-white/5 bg-white/5 rounded">
                       <div className="text-cyan-400 font-bold mb-2 tracking-widest">{t('CTRL_MOVE')}</div>
                       <div className="text-sm text-gray-400">{t('CTRL_MOVE_DESC')}</div>
@@ -919,7 +777,6 @@ export const Game: React.FC = () => {
                       </div>
                   </div>
 
-                  {/* Dash */}
                   <div className="p-4 border border-white/5 bg-white/5 rounded">
                       <div className="text-cyan-400 font-bold mb-2 tracking-widest">{t('CTRL_DASH')}</div>
                       <div className="text-sm text-gray-400">{t('CTRL_DASH_DESC')}</div>
@@ -928,7 +785,6 @@ export const Game: React.FC = () => {
                       </div>
                   </div>
 
-                  {/* Surge */}
                   <div className="p-4 border border-white/5 bg-white/5 rounded">
                       <div className="text-cyan-400 font-bold mb-2 tracking-widest">{t('CTRL_SURGE')}</div>
                       <div className="text-sm text-gray-400">{t('CTRL_SURGE_DESC')}</div>
@@ -937,7 +793,6 @@ export const Game: React.FC = () => {
                       </div>
                   </div>
 
-                   {/* Note */}
                    <div className="p-4 border border-white/5 bg-white/5 rounded flex items-center justify-center">
                       <div className="text-sm text-yellow-500 font-mono text-center">{t('CTRL_NOTE')}</div>
                   </div>
@@ -948,7 +803,6 @@ export const Game: React.FC = () => {
         </div>
       )}
 
-      {/* Briefing Screen (Gerado dinamicamente) */}
       {gameState === GameState.BRIEFING && patient && (
          <div className="absolute inset-0 bg-black/95 flex items-center justify-center z-50">
              <div className="w-full max-w-2xl p-8 border border-cyan-500/20 bg-cyan-900/10 text-center relative overflow-hidden flex flex-col items-center">
@@ -990,7 +844,6 @@ export const Game: React.FC = () => {
          </div>
       )}
 
-      {/* Bio-Lab (Loja) */}
       {gameState === GameState.BIO_LAB && (
         <div className="absolute inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
              <div className="w-full max-w-5xl h-[90%] flex flex-col relative">
@@ -1041,7 +894,6 @@ export const Game: React.FC = () => {
         </div>
       )}
 
-      {/* Loadout Menu (In-Game) */}
       {gameState === GameState.LOADOUT && (
           <div className="absolute inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-6">
               <div className="w-full max-w-4xl h-[80%] border border-cyan-500/30 p-8 relative flex flex-col">
@@ -1071,7 +923,6 @@ export const Game: React.FC = () => {
           </div>
       )}
 
-      {/* Settings Menu */}
       {gameState === GameState.SETTINGS && (
         <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
            <div className="w-full max-w-md p-8 bg-[#1a0a0a] border border-white/10 relative">
@@ -1092,9 +943,8 @@ export const Game: React.FC = () => {
                     <VolumeSlider label="MASTER" value={audioSettings.master} onChange={(v) => updateAudio('master', v)} />
                     <VolumeSlider label="MUSIC" value={audioSettings.music} onChange={(v) => updateAudio('music', v)} />
                     <VolumeSlider label="SFX" value={audioSettings.sfx} onChange={(v) => updateAudio('sfx', v)} />
-                 </div>
+                </div>
 
-                 {/* Cheat Input (Easter Egg) */}
                  <div className="mt-8 pt-4 border-t border-white/5">
                      <label className="block text-gray-700 text-[10px] tracking-widest mb-2 text-center uppercase">System Override</label>
                      <input 
@@ -1112,7 +962,6 @@ export const Game: React.FC = () => {
         </div>
       )}
 
-      {/* Credits */}
       {gameState === GameState.CREDITS && (
          <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
             <div className="w-full max-w-md p-8 text-center">
@@ -1129,14 +978,12 @@ export const Game: React.FC = () => {
          </div>
       )}
 
-      {/* Pause Menu (Enhanced) */}
       {isPaused && gameState !== GameState.CONTROLS && gameState !== GameState.LOADOUT && (
         <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="bg-[#1a0a0a] border border-white/10 p-10 text-center shadow-2xl relative overflow-hidden w-full max-w-md">
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent"></div>
                 <h2 className="text-4xl text-white font-bold tracking-widest mb-8">{t('PAUSED')}</h2>
                 
-                {/* Audio Controls In-Game */}
                 <div className="mb-8 text-left">
                     <div className="text-xs text-gray-500 tracking-widest mb-2 border-b border-white/5 pb-1">{t('AUDIO_LINK')}</div>
                     <VolumeSlider label="MASTER" value={audioSettings.master} onChange={(v) => updateAudio('master', v)} />
@@ -1156,7 +1003,6 @@ export const Game: React.FC = () => {
         </div>
       )}
 
-      {/* Wave Cleared */}
       {gameState === GameState.WAVE_CLEARED && (
          <div className="absolute inset-0 flex items-center justify-center z-30 bg-black/40 backdrop-blur-sm pointer-events-none">
             <div className="text-center pointer-events-auto animate-in fade-in zoom-in duration-300">
@@ -1168,7 +1014,6 @@ export const Game: React.FC = () => {
          </div>
       )}
 
-      {/* Game Over */}
       {gameState === GameState.GAME_OVER && (
         <div className="absolute inset-0 bg-red-950/95 flex items-center justify-center z-50">
            <div className="text-center p-8 border-y-2 border-red-600 w-full bg-black/50 backdrop-blur-md max-w-lg">
@@ -1196,7 +1041,6 @@ export const Game: React.FC = () => {
         </div>
       )}
 
-      {/* Joystick (Só aparece no mobile) */}
       {isMobile && !isPaused && gameState === GameState.PLAYING && <Joystick onMove={handleJoystickMove} />}
     </div>
   );
