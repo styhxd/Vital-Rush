@@ -294,6 +294,10 @@ export const Game: React.FC = () => {
         return;
     }
 
+    // AQUI É O SEGREDO DO "ANTI-LAG"
+    // Se o jogo não está rodando (pausa, menu, wave clear), nós
+    // AINDA ATUALIZAMOS O lastTimeRef.current.
+    // Isso impede que, ao voltar para o jogo, o 'dt' seja gigantesco (ex: 5000ms).
     if ((gameState !== GameState.PLAYING && gameState !== GameState.WAVE_CLEARED) || isPaused) {
         lastTimeRef.current = time;
         animationFrameRef.current = requestAnimationFrame(loop);
@@ -358,6 +362,7 @@ export const Game: React.FC = () => {
   }, [gameState, stats, isPaused]);
 
   useEffect(() => {
+    // Reset timer na montagem e mudança de loop
     lastTimeRef.current = performance.now();
     animationFrameRef.current = requestAnimationFrame(loop);
     return () => { if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current); }
