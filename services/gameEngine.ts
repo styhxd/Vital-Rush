@@ -6,14 +6,14 @@
  * 
  * A BESTA (GAME ENGINE) - PROTOCOLO "NEON LITE" (GRADIENT EDITION)
  * 
- * ATUALIZAÇÃO V4.1: GRADIENTES RADIAIS
+ * ATUALIZAÇÃO V4.3: ESTABILIDADE DE TRANSIÇÃO
  * 
- * Correção estética: Substituímos os halos sólidos (efeito "ovo") por
- * gradientes radiais suaves.
+ * Correção crítica: O "Vacuum" de fim de fase agora possui um timeout
+ * de segurança (5s). Se a biomassa ficar presa ou "NaN", a fase encerra
+ * forçosamente. 
  * 
- * Técnica: createRadialGradient(0, 0, inner, 0, 0, outer)
- * Performance: Extremamente leve (GPU native).
- * Visual: Glow suave que desaparece nas bordas, idêntico a luz real.
+ * Proteção contra NaN na física de movimento e limpeza agressiva de 
+ * entidades inativas no render loop.
  */
 
 import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette, Language } from '../types';
@@ -44,7 +44,7 @@ function hexToRgba(hex: string, alpha: number): string {
         const b = parseInt(hex.slice(5, 7), 16);
         return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     }
-    return hex; // Fallback se já for rgba (embora não deva acontecer nos hex colors)
+    return hex; 
 }
 
 export class GameEngine {
@@ -119,8 +119,13 @@ export class GameEngine {
 
   private clearBufferTimer: number = 0; 
   private isVacuuming: boolean = false; 
+  private vacuumTimer: number = 0; // Failsafe timer
   
-  private maxParticles = 200; 
+  // --- PERFORMANCE MONITORING VARIABLES ---
+  public isLowQuality: boolean = false; 
+  private frameTimes: number[] = [];
+  private perfCheckTimer: number = 0;
+  
   private maxEntities = 350; 
 
   private grid: Map<number, Entity[]> = new Map();
@@ -137,6 +142,10 @@ export class GameEngine {
     
     this.player = this.createPlayer(initialStats);
     this.lastInputTime = Date.now();
+    
+    if (window.innerWidth < 768) {
+        this.isLowQuality = true;
+    }
     
     for(let i=0; i<30; i++) this.spawnBackgroundCell(true);
   }
@@ -161,7 +170,8 @@ export class GameEngine {
   }
 
   public spawnBackgroundCell(init: boolean = false) {
-      if (Math.random() > 0.4) return; // Menos background clutter
+      if (this.isLowQuality) return;
+      if (Math.random() > 0.4) return; 
 
       const y = Math.random() * CANVAS_HEIGHT;
       const x = init ? Math.random() * CANVAS_WIDTH : CANVAS_WIDTH + 50;
@@ -181,6 +191,7 @@ export class GameEngine {
   }
 
   public spawnText(pos: Vector2, text: string, color: string, fontSize: number = 20) {
+      if (this.isLowQuality && this.entities.filter(e => e.type === EntityType.TEXT_POPUP).length > 3) return;
       if (this.entities.filter(e => e.type === EntityType.TEXT_POPUP).length > 8) return;
 
       this.entities.push({
@@ -309,18 +320,19 @@ export class GameEngine {
       if (target.health <= 0) {
           target.active = false;
           
-          const count = (target.type === EntityType.BOSS ? 20 : 4); 
-          
-          for(let i=0; i<count; i++) {
-              this.particles.push({
-                  id: 'blood', type: EntityType.PARTICLE,
-                  pos: { ...target.pos },
-                  vel: { x: (Math.random()-0.5)*10, y: (Math.random()-0.5)*10 },
-                  radius: Math.random() * 4 + 1,
-                  health: 1, maxHealth: 1,
-                  color: target.color,
-                  damage: 0, active: true, ttl: 30
-              });
+          if (!this.isLowQuality) {
+              const count = (target.type === EntityType.BOSS ? 20 : 4); 
+              for(let i=0; i<count; i++) {
+                  this.particles.push({
+                      id: 'blood', type: EntityType.PARTICLE,
+                      pos: { ...target.pos },
+                      vel: { x: (Math.random()-0.5)*10, y: (Math.random()-0.5)*10 },
+                      radius: Math.random() * 4 + 1,
+                      health: 1, maxHealth: 1,
+                      color: target.color,
+                      damage: 0, active: true, ttl: 30
+                  });
+              }
           }
           
           if (target.type === EntityType.BOSS) {
@@ -395,7 +407,8 @@ export class GameEngine {
           if (this.lives === 0) {
               this.player.active = false;
               this.waveActive = false; 
-              for(let i=0; i<30; i++) {
+              const pCount = this.isLowQuality ? 10 : 30;
+              for(let i=0; i<pCount; i++) {
                    this.particles.push({
                       id: 'p_death', type: EntityType.PARTICLE,
                       pos: { ...this.player.pos },
@@ -418,7 +431,8 @@ export class GameEngine {
               this.screenShake = {x: 40, y: 40}; 
               this.shakeIntensity = 40;
               
-              for(let i=0; i<40; i++) {
+              const pCount = this.isLowQuality ? 10 : 40;
+              for(let i=0; i<pCount; i++) {
                   const angle = Math.random() * Math.PI * 2;
                   const speed = Math.random() * 15 + 5;
                   this.particles.push({
@@ -447,12 +461,15 @@ export class GameEngine {
   }
 
   public prepareWave() {
-      this.particles = this.particles.filter(p => p.id === 'bg' || Math.random() > 0.8);
+      // LIMPEZA AGRESSIVA: Remove qualquer entidade inativa ou bugada
+      this.particles = []; 
+      this.entities = this.entities.filter(e => e.active && e.type === EntityType.PLAYER);
       
       this.lastShotTime = performance.now();
       this.spawnTimer = 0;
       this.regenTimer = 0;
       this.grid.clear(); 
+      this.vacuumTimer = 0; // Reset failsafe timer
   }
 
   public startWave(waveIndex: number) {
@@ -464,6 +481,7 @@ export class GameEngine {
     this.spawnTimer = 0;
     this.clearBufferTimer = 0; 
     this.isVacuuming = false;  
+    this.vacuumTimer = 0;
     const waveNum = waveIndex + 1; 
     audioManager.setGameState(waveNum, 1.0);
     this.bloodFlow.x = -2.5 - (waveIndex * 0.5); 
@@ -568,18 +586,34 @@ export class GameEngine {
       this.entities.forEach(e => {
           if (this.isEnemy(e.type) || e.type === EntityType.BOSS) {
               e.health = -999; e.active = false; e.pos.x = -10000; 
-              for(let i=0; i<3; i++) {
-                  this.particles.push({
-                      id: 'force_kill', type: EntityType.PARTICLE, pos: {x: CANVAS_WIDTH/2 + (Math.random()-0.5)*CANVAS_WIDTH, y: CANVAS_HEIGHT/2},
-                      vel: {x: 0, y: -5}, radius: 3, health:1, maxHealth:1, color: e.color, damage:0, active:true, ttl: 15
-                  });
+              if (!this.isLowQuality) {
+                  for(let i=0; i<3; i++) {
+                      this.particles.push({
+                          id: 'force_kill', type: EntityType.PARTICLE, pos: {x: CANVAS_WIDTH/2 + (Math.random()-0.5)*CANVAS_WIDTH, y: CANVAS_HEIGHT/2},
+                          vel: {x: 0, y: -5}, radius: 3, health:1, maxHealth:1, color: e.color, damage:0, active:true, ttl: 15
+                      });
+                  }
               }
           }
       });
   }
 
   public update(dt: number, stats: PlayerStats, onWaveClear: () => void, onGameOver: () => void, onLifeLost: () => void) {
-    if (dt > 100) dt = 16.66; 
+    if (dt > 32) dt = 32; 
+
+    // --- 2. MONITOR DE PERFORMANCE ---
+    this.perfCheckTimer += dt;
+    if (this.perfCheckTimer > 500) { 
+        const avgFrameTime = this.frameTimes.reduce((a,b) => a+b, 0) / (this.frameTimes.length || 1);
+        if (avgFrameTime > 20) {
+            this.isLowQuality = true;
+        } else if (avgFrameTime < 14) {
+            this.isLowQuality = false;
+        }
+        this.frameTimes = [];
+        this.perfCheckTimer = 0;
+    }
+    this.frameTimes.push(dt);
 
     if (this.hitStopTimer > 0) {
         this.hitStopTimer -= (dt / 1000);
@@ -605,10 +639,7 @@ export class GameEngine {
         audioManager.setGameState(this.currentWaveIndex + 1, healthRatio);
     }
 
-    let cappedDt = dt;
-    if (cappedDt > 60) cappedDt = 16.66;
-
-    const safeDt = cappedDt * timeScale;
+    const safeDt = dt * timeScale;
     this.time += safeDt;
     const tick = safeDt / 16; 
     const dtSeconds = safeDt / 1000;
@@ -669,7 +700,7 @@ export class GameEngine {
             }
         }
 
-        if (this.dashTrailTimer <= 0) {
+        if (this.dashTrailTimer <= 0 && !this.isLowQuality) {
             this.particles.push({
                 id: 'ghost', type: EntityType.PARTICLE,
                 pos: { ...this.player.pos }, vel: { x: 0, y: 0 },
@@ -746,9 +777,13 @@ export class GameEngine {
       }
       
       if (this.isVacuuming) {
+          // FAILSAFE: Timeout de 5 segundos para o vacuum.
+          // Se a biomassa estiver bugada (NaN ou off-screen), forçamos o fim da wave.
+          this.vacuumTimer += dtSeconds;
+          
           const dnaFragments = this.entities.filter(e => e.type === EntityType.DNA_FRAGMENT && e.active);
           
-          if (dnaFragments.length === 0) {
+          if (dnaFragments.length === 0 || this.vacuumTimer > 5.0) {
               this.waveActive = false;
               this.isVacuuming = false;
               if (this.currentWaveIndex === 0 && this.sessionStats.damageTaken === 0) achievementManager.track('perfect_wave', 1);
@@ -831,7 +866,7 @@ export class GameEngine {
                   if (!this.isDashing && this.invulnerabilityTimer <= 0) {
                       this.player.health -= 0.5 * tick; 
                       this.sessionStats.damageTaken += 0.5 * tick;
-                      if (!this.isLowQuality() && Math.random() < 0.1) {
+                      if (!this.isLowQuality && Math.random() < 0.1) {
                           this.particles.push({
                               id: 'acid_burn', type: EntityType.PARTICLE, pos: {...this.player.pos},
                               vel: {x: 0, y: -2}, radius: 2, health: 1, maxHealth: 1, color: '#00ff00', damage: 0, active: true, ttl: 20
@@ -936,13 +971,15 @@ export class GameEngine {
                    
                    if (e.type === EntityType.ANTIBODY) {
                        audioManager.playHit();
-                       const angle = Math.atan2(e.vel.y, e.vel.x);
-                       for(let j=0; j<2; j++) { // Reduzido particles
-                           this.particles.push({
-                               id: 'spark', type: EntityType.PARTICLE, pos: {...e.pos}, 
-                               vel: { x: Math.cos(angle + (Math.random()-0.5)) * 5, y: Math.sin(angle + (Math.random()-0.5)) * 5 },
-                               radius: 2, health: 1, maxHealth: 1, color: '#fff', damage: 0, active: true, ttl: 10
-                           });
+                       if (!this.isLowQuality) {
+                           const angle = Math.atan2(e.vel.y, e.vel.x);
+                           for(let j=0; j<2; j++) { 
+                               this.particles.push({
+                                   id: 'spark', type: EntityType.PARTICLE, pos: {...e.pos}, 
+                                   vel: { x: Math.cos(angle + (Math.random()-0.5)) * 5, y: Math.sin(angle + (Math.random()-0.5)) * 5 },
+                                   radius: 2, health: 1, maxHealth: 1, color: '#fff', damage: 0, active: true, ttl: 10
+                               });
+                           }
                        }
                    }
                    break; 
@@ -1007,8 +1044,16 @@ export class GameEngine {
           
           if (dist < stats.magnetRadius || this.surgeActive || isVacuuming) {
             const speed = isVacuuming ? 80 : (this.surgeActive ? 50 : 28);
-            e.pos.x += (dx / dist) * speed * tick;
-            e.pos.y += (dy / dist) * speed * tick;
+            
+            // NaN PROTECTION: Se a distância for minúscula, coletar imediatamente
+            // para evitar divisão por zero ou coordenadas infinitas.
+            if (dist > 1) {
+                e.pos.x += (dx / dist) * speed * tick;
+                e.pos.y += (dy / dist) * speed * tick;
+            } else {
+                e.pos.x = this.player.pos.x;
+                e.pos.y = this.player.pos.y;
+            }
             
             if (dist < this.player.radius + e.radius) {
               e.active = false;
@@ -1035,8 +1080,10 @@ export class GameEngine {
       }
       
       if (p.id === 'bg') {
-          p.pos.x += (p.vel.x + this.bloodFlow.x * 2) * tick; 
-          if (p.pos.x < -50) p.pos.x = CANVAS_WIDTH + 50; 
+          if (!this.isLowQuality) {
+              p.pos.x += (p.vel.x + this.bloodFlow.x * 2) * tick; 
+              if (p.pos.x < -50) p.pos.x = CANVAS_WIDTH + 50; 
+          }
       } else {
           p.pos.x += (p.vel.x + this.bloodFlow.x) * tick;
           p.pos.y += (p.vel.y + this.bloodFlow.y) * tick;
@@ -1048,21 +1095,20 @@ export class GameEngine {
       }
     }
     
-    if (this.particles.length > this.maxParticles) {
+    const currentMaxParticles = this.isLowQuality ? 60 : 250;
+    if (this.particles.length > currentMaxParticles) {
         const nonBg = this.particles.findIndex(p => p.id !== 'bg');
         if (nonBg !== -1) this.particles.splice(nonBg, 1);
         else this.particles.pop();
     }
     
-    if (this.particles.length < 30) this.spawnBackgroundCell();
+    if (!this.isLowQuality && this.particles.length < 30) this.spawnBackgroundCell();
     
     this.shakeIntensity *= 0.9;
     if (this.shakeIntensity < 0.5) this.shakeIntensity = 0;
   }
 
   // Helper
-  private isLowQuality() { return true; } // Sempre otimizado
-
   private isOutOfBounds(pos: Vector2) {
     return pos.x < -100 || pos.x > CANVAS_WIDTH + 100 || pos.y < -100 || pos.y > CANVAS_HEIGHT + 100;
   }
@@ -1120,7 +1166,7 @@ export class GameEngine {
       this.player.vel.y -= Math.sin(angle) * 0.5;
   }
 
-  // --- DRAWING: RENDERIZAÇÃO LÍQUIDA ---
+  // --- DRAWING: OTIMIZADO PARA IGNORAR ENTIDADES INATIVAS ---
   public draw() {
     this.ctx.fillStyle = this.colors.BG;
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -1150,7 +1196,6 @@ export class GameEngine {
       const r = this.deathSurgeActive ? this.surgeRadius * (0.9 + Math.random()*0.2) : this.surgeRadius;
       this.ctx.arc(this.player.pos.x, this.player.pos.y, r, 0, Math.PI * 2);
       
-      // Fake Glow para Surge (já era gradiente antes, vamos manter)
       this.ctx.globalAlpha = 0.3;
       this.ctx.lineWidth = this.deathSurgeActive ? 60 : 30;
       this.ctx.strokeStyle = this.deathSurgeActive ? '#ff0000' : this.colors.SURGE;
@@ -1164,7 +1209,7 @@ export class GameEngine {
       this.ctx.fill();
     }
 
-    // PARTICLES (COM BLEND MODE LEVE)
+    // PARTICLES
     this.ctx.globalCompositeOperation = 'screen';
     this.particles.forEach(p => {
       if (p.id === 'ghost') {
@@ -1188,8 +1233,7 @@ export class GameEngine {
     this.ctx.globalCompositeOperation = 'source-over';
     this.ctx.globalAlpha = 1.0;
 
-    // --- PROJÉTEIS (LINHA MAIS SUAVE) ---
-    // 1. Passagem do Halo (Larga e muito transparente)
+    // --- PROJÉTEIS ---
     this.ctx.globalCompositeOperation = 'screen';
     this.ctx.beginPath();
     this.ctx.strokeStyle = this.colors.ANTIBODY;
@@ -1197,6 +1241,7 @@ export class GameEngine {
     this.ctx.lineCap = 'round';
     this.ctx.globalAlpha = 0.15; 
     this.entities.forEach(e => {
+        if (!e.active) return; // SKIP INACTIVE
         if (e.type === EntityType.ANTIBODY) {
              this.ctx.moveTo(e.pos.x, e.pos.y);
              const tailX = e.pos.x - e.vel.x * 0.4; 
@@ -1206,13 +1251,13 @@ export class GameEngine {
     });
     this.ctx.stroke();
     
-    // 2. Passagem do Núcleo
     this.ctx.globalCompositeOperation = 'source-over';
     this.ctx.beginPath();
     this.ctx.lineWidth = 3; 
     this.ctx.globalAlpha = 1.0;
     this.ctx.strokeStyle = '#fff';
     this.entities.forEach(e => {
+        if (!e.active) return; // SKIP INACTIVE
         if (e.type === EntityType.ANTIBODY) {
              this.ctx.moveTo(e.pos.x, e.pos.y);
              const tailX = e.pos.x - e.vel.x * 0.4; 
@@ -1222,10 +1267,10 @@ export class GameEngine {
     });
     this.ctx.stroke();
 
-    // --- ENTIDADES (INDIVIDUAL) ---
+    // --- ENTIDADES ---
     this.entities.forEach(e => {
+        if (!e.active) return; // SKIP INACTIVE
         if (e.type === EntityType.ORBITAL) {
-             // Gradiente para Orbital
              const grad = this.ctx.createRadialGradient(e.pos.x, e.pos.y, e.radius * 0.2, e.pos.x, e.pos.y, e.radius * 2.0);
              grad.addColorStop(0, hexToRgba(this.colors.ORBITAL, 0.6));
              grad.addColorStop(1, 'rgba(0,0,0,0)');
@@ -1257,7 +1302,6 @@ export class GameEngine {
             this.ctx.globalAlpha = 1.0;
         }
         else if (e.type === EntityType.BIO_MINE) {
-            // Gradiente para Mina
             const grad = this.ctx.createRadialGradient(e.pos.x, e.pos.y, e.radius * 0.2, e.pos.x, e.pos.y, e.radius * 2.0);
             grad.addColorStop(0, hexToRgba(this.colors.BIO_MINE, 0.5));
             grad.addColorStop(1, 'rgba(0,0,0,0)');
@@ -1294,22 +1338,21 @@ export class GameEngine {
 
     // --- INIMIGOS ---
     this.entities.forEach(e => {
+      if (!e.active) return; // SKIP INACTIVE
       if (this.isEnemy(e.type) || e.type === EntityType.BOSS) {
         this.ctx.save();
         this.ctx.translate(e.pos.x, e.pos.y);
         
-        // FAKE GLOW (GRADIENTE RADIAL - ADEUS OVO)
         const glowColor = e.isElite || e.type === EntityType.BOSS 
             ? (e.type === EntityType.BOSS ? this.colors.BOSS : this.colors.ELITE_GLOW)
             : e.color;
             
-        // Verifica se é hex para criar o gradiente corretamente
         if (glowColor.startsWith('#')) {
             const glowRadius = e.radius * (e.type === EntityType.BOSS ? 2.5 : 2.0);
             const grad = this.ctx.createRadialGradient(0, 0, e.radius * 0.2, 0, 0, glowRadius);
-            grad.addColorStop(0, hexToRgba(glowColor, 0.6)); // Centro brilhante
-            grad.addColorStop(0.5, hexToRgba(glowColor, 0.2)); // Meio suave
-            grad.addColorStop(1, 'rgba(0,0,0,0)'); // Borda transparente
+            grad.addColorStop(0, hexToRgba(glowColor, 0.6)); 
+            grad.addColorStop(0.5, hexToRgba(glowColor, 0.2)); 
+            grad.addColorStop(1, 'rgba(0,0,0,0)'); 
             
             this.ctx.globalCompositeOperation = 'screen';
             this.ctx.fillStyle = grad;
@@ -1317,7 +1360,6 @@ export class GameEngine {
             this.ctx.arc(0, 0, glowRadius, 0, Math.PI*2);
             this.ctx.fill();
         } else {
-            // Fallback para cores rgba complexas (raro)
             this.ctx.globalCompositeOperation = 'screen';
             this.ctx.fillStyle = glowColor;
             this.ctx.globalAlpha = 0.2;
@@ -1329,7 +1371,6 @@ export class GameEngine {
         this.ctx.globalCompositeOperation = 'source-over';
         this.ctx.globalAlpha = 1.0;
 
-        // Corpo
         this.ctx.fillStyle = (e.hitFlash && e.hitFlash > 0) ? '#ffffff' : e.color;
         this.ctx.strokeStyle = '#220000';
         this.ctx.lineWidth = 2;
@@ -1369,7 +1410,6 @@ export class GameEngine {
 
     // --- PLAYER ---
     if (this.player.active) {
-      // 1. Halo do Player (Gradiente)
       const glowRadius = this.isDashing ? this.player.radius * 3 : this.player.radius * 2.5;
       const grad = this.ctx.createRadialGradient(this.player.pos.x, this.player.pos.y, this.player.radius * 0.2, this.player.pos.x, this.player.pos.y, glowRadius);
       grad.addColorStop(0, hexToRgba(this.colors.PLAYER_CORE, this.isDashing ? 0.8 : 0.6));
@@ -1381,7 +1421,6 @@ export class GameEngine {
       this.ctx.arc(this.player.pos.x, this.player.pos.y, glowRadius, 0, Math.PI*2);
       this.ctx.fill();
       
-      // 2. Corpo do Player
       this.ctx.globalCompositeOperation = 'source-over';
       this.ctx.globalAlpha = 1.0;
       this.ctx.fillStyle = this.isDashing || this.invulnerabilityTimer > 0 ? this.colors.PLAYER_CORE : this.colors.PLAYER;
