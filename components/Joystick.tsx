@@ -4,9 +4,11 @@
  * DIRETOR: PAULO GABRIEL DE L. S.
  * ------------------------------------------------------------------
  * 
- * O CONTROLE TÁCTIL.
- * Aquela coisa que todo dev odeia fazer porque envolve matemática de vetor.
- * Se você não gosta de trigonometria, feche este arquivo.
+ * O CONTROLE TÁCTIL (AGORA COM MULTI-TOUCH)
+ * 
+ * Atualizado para rastrear o ID do toque específico.
+ * Isso permite que você use o joystick com um dedo e aperte botões com outro
+ * sem que o navegador fique confuso.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -20,50 +22,18 @@ export const Joystick: React.FC<JoystickProps> = ({ onMove }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [startPos, setStartPos] = useState({ x: 0, y: 0 });
   
-  // Tamanhos ajustados para dedões humanos médios.
-  // Se o usuário for um gigante, azar o dele.
+  // Ref para guardar o ID do dedo que está controlando este joystick especificamente.
+  // Isso é crucial para o multi-touch.
+  const touchIdRef = useRef<number | null>(null);
+  
   const CONTAINER_SIZE = 160;
   const HANDLE_SIZE = 60;
   const MAX_RADIUS = CONTAINER_SIZE / 2 - HANDLE_SIZE / 2;
 
-  useEffect(() => {
-    const handleEnd = () => {
-      setActive(false);
-      setPosition({ x: 0, y: 0 });
-      onMove({ x: 0, y: 0 }); // Zera o vetor quando solta
-    };
-
-    // Ouvintes globais porque o dedo do usuário escapa do joystick
-    window.addEventListener('touchend', handleEnd);
-    window.addEventListener('mouseup', handleEnd);
-    return () => {
-      window.removeEventListener('touchend', handleEnd);
-      window.removeEventListener('mouseup', handleEnd);
-    };
-  }, [onMove]);
-
-  const handleStart = (clientX: number, clientY: number) => {
-    setActive(true);
-    setStartPos({ x: clientX, y: clientY }); 
-    
-    // Matemática chata pra centralizar o toque inicial
-    if (containerRef.current) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const centerX = rect.left + rect.width / 2;
-        const centerY = rect.top + rect.height / 2;
-        
-        const dx = clientX - centerX;
-        const dy = clientY - centerY;
-        
-        // Snap imediato pra parecer responsivo
-        handleMove(clientX, clientY);
-    }
-  };
-
-  const handleMove = (clientX: number, clientY: number) => {
-    if (containerRef.current) {
+  // Lógica de Movimento Centralizada
+  const processMove = (clientX: number, clientY: number) => {
+      if (containerRef.current) {
         const rect = containerRef.current.getBoundingClientRect();
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
@@ -72,18 +42,85 @@ export const Joystick: React.FC<JoystickProps> = ({ onMove }) => {
         const dy = clientY - centerY;
         const distance = Math.sqrt(dx * dx + dy * dy);
         
-        // Clampa a distância para o stick não sair voando da base
         const clampedDistance = Math.min(distance, MAX_RADIUS);
-        const angle = Math.atan2(dy, dx); // O bom e velho arctan2
+        const angle = Math.atan2(dy, dx);
         
         const x = Math.cos(angle) * clampedDistance;
         const y = Math.sin(angle) * clampedDistance;
         
         setPosition({ x, y });
-        
-        // Normaliza para o motor do jogo (-1 a 1)
         onMove({ x: x / MAX_RADIUS, y: y / MAX_RADIUS });
     }
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+      e.preventDefault(); // Impede scroll/zoom
+      e.stopPropagation();
+
+      // Se já tem um dedo no joystick, ignora novos toques
+      if (touchIdRef.current !== null) return;
+
+      const touch = e.changedTouches[0];
+      touchIdRef.current = touch.identifier;
+      setActive(true);
+      processMove(touch.clientX, touch.clientY);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      if (touchIdRef.current === null) return;
+
+      // Procura pelo dedo certo na lista de toques que mudaram
+      for (let i = 0; i < e.changedTouches.length; i++) {
+          if (e.changedTouches[i].identifier === touchIdRef.current) {
+              const touch = e.changedTouches[i];
+              processMove(touch.clientX, touch.clientY);
+              return;
+          }
+      }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+      e.preventDefault();
+      // Não precisamos de stopPropagation aqui para permitir que o evento suba se necessário, 
+      // mas preventDefault é bom pra evitar cliques fantasmas.
+
+      if (touchIdRef.current === null) return;
+
+      for (let i = 0; i < e.changedTouches.length; i++) {
+          if (e.changedTouches[i].identifier === touchIdRef.current) {
+              // O dedo do joystick levantou
+              setActive(false);
+              setPosition({ x: 0, y: 0 });
+              onMove({ x: 0, y: 0 });
+              touchIdRef.current = null;
+              return;
+          }
+      }
+  };
+
+  // Fallback para Mouse (Desktop)
+  const handleMouseDown = (e: React.MouseEvent) => {
+      e.preventDefault();
+      setActive(true);
+      processMove(e.clientX, e.clientY);
+      
+      const handleWindowMouseMove = (evt: MouseEvent) => {
+          processMove(evt.clientX, evt.clientY);
+      };
+      
+      const handleWindowMouseUp = () => {
+          setActive(false);
+          setPosition({ x: 0, y: 0 });
+          onMove({ x: 0, y: 0 });
+          window.removeEventListener('mousemove', handleWindowMouseMove);
+          window.removeEventListener('mouseup', handleWindowMouseUp);
+      };
+
+      window.addEventListener('mousemove', handleWindowMouseMove);
+      window.addEventListener('mouseup', handleWindowMouseUp);
   };
 
   return (
@@ -92,15 +129,16 @@ export const Joystick: React.FC<JoystickProps> = ({ onMove }) => {
       className={`absolute bottom-8 left-8 rounded-full border-2 flex items-center justify-center touch-none select-none z-50 backdrop-blur-sm transition-colors duration-200
         ${active ? 'border-cyan-500/50 bg-cyan-900/20' : 'border-white/10 bg-black/20'}`}
       style={{ width: CONTAINER_SIZE, height: CONTAINER_SIZE }}
-      onTouchStart={(e) => handleStart(e.touches[0].clientX, e.touches[0].clientY)}
-      onTouchMove={(e) => handleMove(e.touches[0].clientX, e.touches[0].clientY)}
-      onMouseDown={(e) => handleStart(e.clientX, e.clientY)}
-      onMouseMove={(e) => active && handleMove(e.clientX, e.clientY)}
+      // Eventos de Toque Diretos (React Synthetic Events)
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+      // Evento de Mouse
+      onMouseDown={handleMouseDown}
     >
-        {/* Anel decorativo giratório (pra ficar Tech) */}
         <div className={`absolute rounded-full border border-dashed transition-all duration-300 ${active ? 'border-cyan-400/30 scale-90 rotate-180' : 'border-white/5 scale-100'}`} style={{width: '70%', height: '70%'}}></div>
         
-        {/* O Stick em si */}
       <div 
         className={`rounded-full absolute shadow-xl transition-transform duration-75 ease-linear flex items-center justify-center
             ${active ? 'bg-gradient-to-br from-cyan-400 to-blue-600 shadow-[0_0_20px_rgba(0,255,255,0.4)]' : 'bg-white/20'}`}

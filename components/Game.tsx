@@ -681,7 +681,13 @@ export const Game: React.FC = () => {
                  <div className="absolute bottom-8 right-8 pointer-events-auto flex gap-4 items-end">
                      {/* Dash Button */}
                      <button 
-                        onClick={triggerDash}
+                        onTouchStart={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            triggerDash();
+                        }}
+                        // Fallback pra desktop (click)
+                        onClick={!isMobile ? triggerDash : undefined}
                         disabled={!uiData.dashReady}
                         className={`w-16 h-16 rounded-full border-2 flex items-center justify-center relative transition-all duration-100 active:scale-95
                             ${uiData.dashReady
@@ -694,7 +700,13 @@ export const Game: React.FC = () => {
 
                      {/* Surge Button */}
                      <button 
-                        onClick={triggerUltimate}
+                        onTouchStart={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            triggerUltimate();
+                        }}
+                        // Fallback pra desktop (click)
+                        onClick={!isMobile ? triggerUltimate : undefined}
                         disabled={uiData.energy < uiData.maxEnergy}
                         className={`w-24 h-24 rounded-full border-4 flex items-center justify-center relative transition-all duration-100 active:scale-95
                             ${uiData.energy >= uiData.maxEnergy 
