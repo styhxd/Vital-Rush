@@ -4,52 +4,49 @@
  * DIRETOR: PAULO GABRIEL DE L. S.
  * ------------------------------------------------------------------
  * 
- * BEM-VINDO AO DNA DO JOGO.
+ * BEM-VINDO AO DNA DO JOGO - VERSÃO "PREPARE TO DIE"
  * 
- * Aqui residem as constantes universais. Se você mudar a gravidade aqui,
- * o jogo quebra. Se mudar as cores, o designer chora.
- * Mexa com cautela, ou o linter vai te julgar.
+ * O usuário reclamou que estava fácil. O usuário pediu dor.
+ * O usuário receberá dor.
+ * 
+ * Ajustamos a economia para simular uma crise financeira global.
+ * Os inimigos agora tomam suplementos ilegais.
+ * O jogador foi nerfado para a idade da pedra.
  */
 
 import { Upgrade, EntityType, WaveConfig, Language, Difficulty, Achievement, ThemePalette } from './types';
 
 // --- PALETA DE CORES ---
-// O tema padrão é "Biopunk Sangrento". Vermelho, Ciano, Roxo.
-// A vibe é: "Você está dentro de alguém e esse alguém não está tendo um bom dia".
 export const COLORS_DEFAULT: ThemePalette = {
   BG: '#1a0505',
-  PLAYER: '#ffffff', // O glóbulo branco herói
-  PLAYER_CORE: '#00ffff', // O núcleo de nanotecnologia (porque sim)
-  BACTERIA: '#77dd77', // Verde clássico de "coisa ruim"
-  VIRUS: '#ff00ff', // Magenta pra ser irritante
-  PARASITE: '#ff3333', // Vermelho "pare de me bater"
+  PLAYER: '#ffffff',
+  PLAYER_CORE: '#00ffff',
+  BACTERIA: '#77dd77',
+  VIRUS: '#ff00ff',
+  PARASITE: '#ff3333',
   BOSS: '#880000', 
-  ELITE_GLOW: '#ffd700', // Brilho de elite (vulgo: inimigo bombado)
-  ANTIBODY: '#00ffff', // Tiro
-  DNA: '#ffeeaa', // Moedinha do jogo
-  BLOOD_PARTICLE: '#3a0a0a', // Sangue ambiente
+  ELITE_GLOW: '#ffd700',
+  ANTIBODY: '#00ffff',
+  DNA: '#ffeeaa',
+  BLOOD_PARTICLE: '#3a0a0a',
   UI_ACCENT: '#ff4444',
-  SURGE: 'rgba(0, 255, 255, 0.3)', // A ult
+  SURGE: 'rgba(0, 255, 255, 0.3)',
   COMBO: '#ffaa00',
   ORBITAL: '#0088ff',
   BIO_MINE: '#00ff44',
-  ACID_POOL: '#33ff00' // Aquele ácido de videogame dos anos 90
+  ACID_POOL: '#33ff00'
 };
 
-// --- MODO PLATINA (ASCENDED) ---
-// Se o jogador for maluco o suficiente para platinar o jogo, ele ganha isso.
-// É uma paleta "Divina/Real". Dourado, Roxo Profundo, Branco.
-// Basicamente transformamos o jogo em um clipe de hip-hop ostentação sci-fi.
 export const COLORS_PLATINUM: ThemePalette = {
   BG: '#0a0a1a', 
   PLAYER: '#ffffff',
-  PLAYER_CORE: '#ffd700', // Ouro puro
+  PLAYER_CORE: '#ffd700',
   BACTERIA: '#b39ddb', 
   VIRUS: '#80deea', 
   PARASITE: '#f48fb1', 
   BOSS: '#ffd700', 
   ELITE_GLOW: '#ffffff', 
-  ANTIBODY: '#ffd700', // Tiros de ouro
+  ANTIBODY: '#ffd700',
   DNA: '#e1bee7', 
   BLOOD_PARTICLE: '#1a1a2e', 
   UI_ACCENT: '#ffd700', 
@@ -60,43 +57,41 @@ export const COLORS_PLATINUM: ThemePalette = {
   ACID_POOL: '#7c4dff'
 };
 
-export const CANVAS_WIDTH = 1920; // Full HD é o padrão, o resto a gente escala na marreta
+export const CANVAS_WIDTH = 1920;
 export const CANVAS_HEIGHT = 1080;
 
 // Status iniciais do "Heroi". 
-// Se deixar muito fraco, o jogador desiste. Se deixar muito forte, ele enjoa.
-// O equilíbrio é uma arte (que eu chutei valores até ficar bom).
+// NERF: Reduzimos tudo. Você não é mais um Rambo, é um estagiário com uma pistola de água.
 export const INITIAL_STATS = {
-  speed: 4.5,
-  fireRate: 280, // Milissegundos entre tiros
-  damage: 25,
-  bulletSpeed: 18, 
+  speed: 4.0, // Um pouco mais lento pra dar agonia
+  fireRate: 450, // Muito mais lento. Clique ou morra.
+  damage: 15, // Dano de mosquito
+  bulletSpeed: 16, 
   bulletCount: 1,
-  magnetRadius: 180, // Alcance pra pegar dinheiro sem encostar
-  maxHealth: 100,
-  regen: 1,
-  maxEnergy: 100, // Pra ultar
-  dashSpeed: 25, 
-  dashCooldown: 1000,
-  critChance: 0.05,
-  critMultiplier: 1.5,
+  magnetRadius: 100, // Vai ter que andar pra pegar dinheiro
+  maxHealth: 80, // Papel
+  regen: 0, // Regeneração? Isso é coisa de jogo fácil. Começa com ZERO.
+  maxEnergy: 120, // Mais difícil de ultar
+  dashSpeed: 22, 
+  dashCooldown: 1500, // Cooldown maior
+  critChance: 0.01, // 1% de chance. Boa sorte.
+  critMultiplier: 1.2,
   orbitals: 0,
   thorns: 0,
   lifesteal: 0,
   dashDamage: 0,
-  surgeRadiusMult: 1.0
+  surgeRadiusMult: 0.8
 };
 
 // Multiplicadores de dificuldade.
-// APEX é para quem gosta de sofrer.
+// AGORA A BRINCADEIRA FICOU SÉRIA.
 export const DIFFICULTY_MODIFIERS = {
-  [Difficulty.EASY]: { hp: 0.7, dmg: 0.6, speed: 0.8, score: 0.5 },
-  [Difficulty.NORMAL]: { hp: 1.0, dmg: 1.0, speed: 1.0, score: 1.0 },
-  [Difficulty.HARD]: { hp: 1.5, dmg: 1.5, speed: 1.2, score: 1.5 },
-  [Difficulty.APEX]: { hp: 2.5, dmg: 2.0, speed: 1.4, score: 2.5 }
+  [Difficulty.EASY]: { hp: 1.0, dmg: 1.0, speed: 1.0, score: 0.8 }, // O Easy virou o antigo Normal
+  [Difficulty.NORMAL]: { hp: 1.8, dmg: 1.5, speed: 1.2, score: 1.0 }, // Normal já dói
+  [Difficulty.HARD]: { hp: 3.0, dmg: 2.5, speed: 1.4, score: 1.5 }, // Hard é para masoquistas
+  [Difficulty.APEX]: { hp: 5.5, dmg: 4.0, speed: 1.7, score: 3.0 } // APEX: Inimigos são tanques de guerra com propulsores
 };
 
-// Nomes procedurais para dar uma "personalidade" ao cadáver... digo, paciente.
 export const PATIENT_NAMES_FIRST = ["J.", "A.", "M.", "K.", "R.", "S.", "T.", "L.", "C.", "B."];
 export const PATIENT_NAMES_LAST = ["Doe", "Smith", "Neo", "Kovac", "Vane", "Ross", "Cole", "Drake", "Pike", "Ward"];
 
@@ -105,62 +100,38 @@ export const SYMPTOMS_KEYS = [
   "SYMPTOM_FAILURE", "SYMPTOM_TOXICITY", "SYMPTOM_DECAY", "SYMPTOM_MUTATION"
 ];
 
-// --- LISTA DE CONQUISTAS ---
-// O vício em forma de lista JSON.
-// Se adicionar mais, lembre de criar ícones bonitinhos.
 export const ACHIEVEMENTS_LIST: Achievement[] = [
-    // Kill Counts (Cumulative)
     { id: 'kill_100', icon: '🦠', title: 'Cleaner', desc: 'Eliminate 100 pathogens.', targetValue: 100, isCumulative: true },
     { id: 'kill_1000', icon: '🧹', title: 'Sterilizer', desc: 'Eliminate 1,000 pathogens.', targetValue: 1000, isCumulative: true },
     { id: 'kill_5000', icon: '🔥', title: 'Eradicator', desc: 'Eliminate 5,000 pathogens.', targetValue: 5000, isCumulative: true },
     { id: 'kill_10000', icon: '💀', title: 'Extinction Event', desc: 'Eliminate 10,000 pathogens.', targetValue: 10000, isCumulative: true },
-    
-    // Bosses
     { id: 'boss_1', icon: '👾', title: 'Anomaly Neutralized', desc: 'Defeat your first Boss.', targetValue: 1, isCumulative: true },
     { id: 'boss_10', icon: '👹', title: 'Titan Slayer', desc: 'Defeat 10 Bosses.', targetValue: 10, isCumulative: true },
     { id: 'boss_50', icon: '👑', title: 'King of Veins', desc: 'Defeat 50 Bosses.', targetValue: 50, isCumulative: true },
-
-    // Mechanics
     { id: 'dash_kill_50', icon: '⚡', title: 'Roadkill', desc: 'Kill 50 enemies using Dash damage.', targetValue: 50, isCumulative: true },
     { id: 'surge_kill_100', icon: '🌊', title: 'Tsunami', desc: 'Kill 100 enemies with Surge blasts.', targetValue: 100, isCumulative: true },
     { id: 'mine_pop_20', icon: '💣', title: 'Minesweeper', desc: 'Detonate 20 Bio-Mines.', targetValue: 20, isCumulative: true },
     { id: 'biomass_10k', icon: '💎', title: 'Hoarder', desc: 'Collect 10,000 total Biomass.', targetValue: 10000, isCumulative: true },
-    
-    // Single Run Challenges
     { id: 'wave_5', icon: '🖐', title: 'Survivor', desc: 'Reach Wave 5.', targetValue: 5, isCumulative: false },
     { id: 'wave_10', icon: '🧗', title: 'Deep Dive', desc: 'Reach Wave 10 (Endless Mode).', targetValue: 10, isCumulative: false },
     { id: 'score_50k', icon: '📈', title: 'High Score', desc: 'Reach 50,000 Score in one run.', targetValue: 50000, isCumulative: false },
     { id: 'combo_50', icon: '⛓', title: 'Flow State', desc: 'Reach a 50x Combo.', targetValue: 50, isCumulative: false },
     { id: 'max_hp_200', icon: '❤️', title: 'Juggernaut', desc: 'Reach 200 Max HP in a run.', targetValue: 200, isCumulative: false },
-    { id: 'fire_rate_max', icon: '🔫', title: 'Minigun', desc: 'Max out Fire Rate upgrade.', targetValue: 1, isCumulative: false }, // Special check
-    
-    // Skill / Specific
+    { id: 'fire_rate_max', icon: '🔫', title: 'Minigun', desc: 'Max out Fire Rate upgrade.', targetValue: 1, isCumulative: false },
     { id: 'perfect_wave', icon: '✨', title: 'Untouchable', desc: 'Complete a wave without taking damage.', targetValue: 1, isCumulative: true },
     { id: 'low_hp_survive', icon: '🚑', title: 'Adrenaline Junkie', desc: 'Clear a wave with < 20% HP.', targetValue: 1, isCumulative: true },
     { id: 'crit_master', icon: '🎯', title: 'Surgical Precision', desc: 'Land 1,000 Critical Hits.', targetValue: 1000, isCumulative: true },
-    
-    // Collection
     { id: 'unlock_all_upgrades', icon: '🧬', title: 'Genetic Perfection', desc: 'Buy every type of upgrade at least once (Cumulative).', targetValue: 12, isCumulative: true },
-    
-    // Hardcore
     { id: 'win_apex', icon: '🏆', title: 'Apex Predator', desc: 'Clear Wave 5 on APEX difficulty.', targetValue: 1, isCumulative: false },
     { id: 'die_10', icon: '⚰️', title: 'Trial and Error', desc: 'Die 10 times.', targetValue: 10, isCumulative: true },
-    
-    // Secrets
     { id: 'afk', icon: '🗿', title: 'Statue', desc: 'Stand still for 10 seconds in combat.', targetValue: 10, isCumulative: false, secret: true },
     { id: 'pacifist', icon: '🕊', title: 'Pacifist', desc: 'Survive 30 seconds without shooting.', targetValue: 30, isCumulative: false, secret: true },
     { id: 'overkill', icon: '💥', title: 'Overkill', desc: 'Deal over 500 damage in a single hit.', targetValue: 1, isCumulative: true },
     { id: 'rich', icon: '💰', title: 'Tycoon', desc: 'Hold 3,000 Biomass at once.', targetValue: 3000, isCumulative: false },
-    
-    // The Big Ones
     { id: 'play_time_1h', icon: '⏳', title: 'Intern', desc: 'Play for 1 hour (Total).', targetValue: 3600, isCumulative: true },
     { id: 'play_time_5h', icon: '👨‍⚕️', title: 'Specialist', desc: 'Play for 5 hours (Total).', targetValue: 18000, isCumulative: true },
     { id: 'all_achievements', icon: '💠', title: 'THE APEX VIRUS', desc: 'Unlock all other achievements.', targetValue: 1, isCumulative: true, secret: true }
 ];
-
-// --- TRADUÇÕES ---
-// Porque o mundo não fala só Inglês.
-// E meu portunhol é excelente.
 
 type TranslationMap = {
   [key in Language]: {
@@ -207,7 +178,7 @@ export const TEXTS: TranslationMap = {
     AUDIO_LINK: "AUDIO LINK",
     STATUS_TERM: "STATUS: TERMINATED",
     INTEGRITY: "INTEGRITY",
-    ADRENALINE: "ADRENALINE ACTIVE",
+    ADRENALINE: "ADRENALINA ACTIVE",
     LOADOUT: "ACTIVE GENOME",
     ACHIEVEMENTS: "ACHIEVEMENTS",
     ACH_LOCKED: "LOCKED",
@@ -261,28 +232,27 @@ export const TEXTS: TranslationMap = {
     UP_MITOSIS_NAME: "RAPID MITOSIS",
     UP_MITOSIS_DESC: "+10% Fire Rate",
     UP_MEMBRANE_NAME: "TITANIUM MEMBRANE",
-    UP_MEMBRANE_DESC: "+30% Max HP & Full Heal",
+    UP_MEMBRANE_DESC: "+25% Max HP & Full Heal",
     UP_ENZYME_NAME: "HYPER ENZYMES",
-    UP_ENZYME_DESC: "+25% Damage",
+    UP_ENZYME_DESC: "+15% Damage",
     UP_MULTISHOT_NAME: "ADAPTIVE SPLIT",
-    UP_MULTISHOT_DESC: "+1 Projectile, -10% Damage",
+    UP_MULTISHOT_DESC: "+1 Projectile, -15% Damage",
     UP_ENERGY_NAME: "MITOCHONDRIA BOOST",
-    UP_ENERGY_DESC: "Surge & Dash recharge 20% faster",
+    UP_ENERGY_DESC: "Surge & Dash recharge 15% faster",
     UP_GIGA_NAME: "CYTOKINE STORM",
     UP_GIGA_DESC: "+2 Proj, +20% Dmg, Full Heal",
-    // NEW UPGRADES TRANSLATIONS
     UP_ORBITAL_NAME: "NANO-GUARDIANS",
     UP_ORBITAL_DESC: "Adds +1 Autonomous Defensive Drone",
     UP_DASH_NAME: "PLASMA TRAIL",
-    UP_DASH_DESC: "Dash deals 50 Damage to enemies passed",
+    UP_DASH_DESC: "Dash deals 30 Damage to enemies passed",
     UP_CRIT_NAME: "PRECISION OPTICS",
-    UP_CRIT_DESC: "+15% Crit Chance, +0.5x Crit Dmg",
+    UP_CRIT_DESC: "+10% Crit Chance, +0.3x Crit Dmg",
     UP_THORNS_NAME: "SPIKED CARAPACE",
-    UP_THORNS_DESC: "Deals 10 Contact Dmg to attackers",
+    UP_THORNS_DESC: "Deals 3 Contact Dmg to attackers",
     UP_LIFE_NAME: "VAMPIRIC STRAIN",
-    UP_LIFE_DESC: "Crit kills heal +2 HP",
+    UP_LIFE_DESC: "Crit kills heal +1 HP",
     UP_MAGNET_NAME: "MAGNETIC FIELD",
-    UP_MAGNET_DESC: "+30% Magnet Range & Surge Radius"
+    UP_MAGNET_DESC: "+20% Magnet Range & Surge Radius"
   },
   PT: {
     TITLE_MAIN: "VITAL",
@@ -376,28 +346,28 @@ export const TEXTS: TranslationMap = {
     UP_MITOSIS_NAME: "MITOSE RÁPIDA",
     UP_MITOSIS_DESC: "+10% Cadência de Tiro",
     UP_MEMBRANE_NAME: "MEMBRANA DE TITÂNIO",
-    UP_MEMBRANE_DESC: "+30% Vida Máx & Cura Total",
+    UP_MEMBRANE_DESC: "+25% Vida Máx & Cura Total",
     UP_ENZYME_NAME: "HIPER ENZIMAS",
-    UP_ENZYME_DESC: "+25% Dano",
+    UP_ENZYME_DESC: "+15% Dano",
     UP_MULTISHOT_NAME: "DIVISÃO ADAPTATIVA",
-    UP_MULTISHOT_DESC: "+1 Projétil, -10% Dano",
+    UP_MULTISHOT_DESC: "+1 Projétil, -15% Dano",
     UP_ENERGY_NAME: "IMPULSO MITOCONDRIAL",
-    UP_ENERGY_DESC: "Surto e Esquiva recarregam 20% mais rápido",
+    UP_ENERGY_DESC: "Surto e Esquiva recarregam 15% mais rápido",
     UP_GIGA_NAME: "TEMPESTADE CITOCINA",
     UP_GIGA_DESC: "+2 Proj, +20% Dano, Cura Total",
     // NEW
     UP_ORBITAL_NAME: "NANO-GUARDIÕES",
     UP_ORBITAL_DESC: "Adiciona +1 Drone de Defesa Autônomo",
     UP_DASH_NAME: "RASTRO DE PLASMA",
-    UP_DASH_DESC: "Dash causa 50 de Dano ao atravessar inimigos",
+    UP_DASH_DESC: "Dash causa 30 de Dano ao atravessar inimigos",
     UP_CRIT_NAME: "ÓPTICA DE PRECISÃO",
-    UP_CRIT_DESC: "+15% Chance Crítica, +0.5x Dano Crítico",
+    UP_CRIT_DESC: "+10% Chance Crítica, +0.3x Dano Crítico",
     UP_THORNS_NAME: "CARAPAÇA DE ESPINHOS",
-    UP_THORNS_DESC: "Causa 10 de Dano ao ser tocado",
+    UP_THORNS_DESC: "Causa 3 de Dano ao ser tocado",
     UP_LIFE_NAME: "CEPA VAMPÍRICA",
-    UP_LIFE_DESC: "Abates críticos curam +2 Vida",
+    UP_LIFE_DESC: "Abates críticos curam +1 Vida",
     UP_MAGNET_NAME: "CAMPO MAGNÉTICO",
-    UP_MAGNET_DESC: "+30% Alcance do Ímã e Tamanho do Surto"
+    UP_MAGNET_DESC: "+20% Alcance do Ímã e Tamanho do Surto"
   },
   ES: {
     TITLE_MAIN: "VITAL",
@@ -460,7 +430,7 @@ export const TEXTS: TranslationMap = {
     MANUAL_BAC_DESC: "Patógeno estándar. Movimiento común y predecible.",
     MANUAL_VIR_DESC: "Atacante rápido. Poca vida, pero ataca en enjambre.",
     MANUAL_PAR_DESC: "Tanque pesado. Lento, mucha vida, absorve daño.",
-    MANUAL_BOSS_DESC: "Anomalía masiva. Requiere potencia de fuego extrema.",
+    MANUAL_BOSS_DESC: "Anomalia masiva. Requiere potencia de fuego extrema.",
     MANUAL_MECH_DASH_TITLE: "Evasión (Dash)",
     MANUAL_MECH_DASH_DESC: "Otorga invulnerabilidad momentánea. Úsalo para atravesar enemigos.",
     MANUAL_MECH_SURGE_TITLE: "Sistema Surge",
@@ -491,95 +461,94 @@ export const TEXTS: TranslationMap = {
     UP_MITOSIS_NAME: "MITOSIS RÁPIDA",
     UP_MITOSIS_DESC: "+10% Cadencia de Tiro",
     UP_MEMBRANE_NAME: "MEMBRANA DE TITANIO",
-    UP_MEMBRANE_DESC: "+30% Vida Máx & Cura Total",
+    UP_MEMBRANE_DESC: "+25% Vida Máx & Cura Total",
     UP_ENZYME_NAME: "HIPER ENZIMAS",
-    UP_ENZYME_DESC: "+25% Daño",
+    UP_ENZYME_DESC: "+15% Daño",
     UP_MULTISHOT_NAME: "DIVISIÓN ADAPTATIVA",
-    UP_MULTISHOT_DESC: "+1 Proyectil, -10% Daño",
+    UP_MULTISHOT_DESC: "+1 Proyectil, -15% Daño",
     UP_ENERGY_NAME: "IMPULSO MITOCONDRIAL",
-    UP_ENERGY_DESC: "Surge y Esquiva recarga 20% más rápido",
+    UP_ENERGY_DESC: "Surge y Esquiva recarga 15% más rápido",
     UP_GIGA_NAME: "TORMENTA CITOCINA",
     UP_GIGA_DESC: "+2 Proy, +20% Daño, Cura Total",
-    // NEW
     UP_ORBITAL_NAME: "NANO-GUARDIANES",
     UP_ORBITAL_DESC: "Añade +1 Dron de Defensa Autónomo",
     UP_DASH_NAME: "RASTRO DE PLASMA",
-    UP_DASH_DESC: "Dash causa 50 de Daño al atravesar enemigos",
+    UP_DASH_DESC: "Dash causa 30 de Daño al atravesar enemigos",
     UP_CRIT_NAME: "ÓPTICA DE PRECISIÓN",
-    UP_CRIT_DESC: "+15% Prob. Crítica, +0.5x Daño Crítico",
+    UP_CRIT_DESC: "+10% Prob. Crítica, +0.3x Daño Crítico",
     UP_THORNS_NAME: "CAPARAZÓN DE ESPINAS",
-    UP_THORNS_DESC: "Causa 10 de Daño al ser tocado",
+    UP_THORNS_DESC: "Causa 3 de Daño al ser tocado",
     UP_LIFE_NAME: "CEPA VAMPÍRICA",
-    UP_LIFE_DESC: "Bajas críticas curan +2 Vida",
+    UP_LIFE_DESC: "Bajas críticas curan +1 Vida",
     UP_MAGNET_NAME: "CAMPO MAGNÉTICO",
-    UP_MAGNET_DESC: "+30% Rango de Imán y Tamaño de Surge"
+    UP_MAGNET_DESC: "+20% Rango de Imán y Tamaño de Surge"
   }
 };
 
 // Configuração das Ondas.
-// Se achar que a onda 5 tá fácil, você não jogou o suficiente.
+// Ajustado para o modo "Pesadelo". Spawns mais rápidos desde o começo.
 export const WAVES: WaveConfig[] = [
-  { waveNumber: 1, duration: 40, spawnRate: 1000, enemyTypes: [EntityType.BACTERIA], flowSpeed: -0.5, hasBoss: false },
-  { waveNumber: 2, duration: 55, spawnRate: 900, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -0.7, hasBoss: false },
-  { waveNumber: 3, duration: 60, spawnRate: 800, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -0.9, hasBoss: true }, // Boss de treino
-  { waveNumber: 4, duration: 80, spawnRate: 700, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.2, hasBoss: false },
-  { waveNumber: 5, duration: 999, spawnRate: 600, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.5, hasBoss: true }, // Modo Infinito basicamente
+  { waveNumber: 1, duration: 40, spawnRate: 600, enemyTypes: [EntityType.BACTERIA], flowSpeed: -0.6, hasBoss: false },
+  { waveNumber: 2, duration: 55, spawnRate: 500, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -0.8, hasBoss: false },
+  { waveNumber: 3, duration: 60, spawnRate: 400, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -1.0, hasBoss: true }, // Boss de treino
+  { waveNumber: 4, duration: 80, spawnRate: 350, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.3, hasBoss: false },
+  { waveNumber: 5, duration: 999, spawnRate: 150, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.8, hasBoss: true }, // Spam insano
 ];
 
 // O "Shopping" do jogo.
-// Se mexer nos custos, a economia quebra e viramos a Venezuela digital.
+// Inflação aplicada. Tudo custa o olho da cara.
 export const UPGRADES: Upgrade[] = [
   {
     id: 'mitosis',
     nameKey: 'UP_MITOSIS_NAME',
     descKey: 'UP_MITOSIS_DESC',
     rarity: 'COMMON',
-    baseCost: 100,
-    costMultiplier: 1.5,
+    baseCost: 200,
+    costMultiplier: 1.8,
     level: 0,
     maxLevel: 10,
-    apply: (s) => ({ ...s, fireRate: Math.max(50, s.fireRate * 0.90) })
+    apply: (s) => ({ ...s, fireRate: Math.max(100, s.fireRate * 0.90) })
   },
   {
     id: 'enzyme',
     nameKey: 'UP_ENZYME_NAME',
     descKey: 'UP_ENZYME_DESC',
     rarity: 'RARE',
-    baseCost: 200,
-    costMultiplier: 1.6,
+    baseCost: 350,
+    costMultiplier: 1.8,
     level: 0,
-    maxLevel: 8,
-    apply: (s) => ({ ...s, damage: s.damage * 1.25 })
+    maxLevel: 10,
+    apply: (s) => ({ ...s, damage: s.damage * 1.15 }) // Nerf no scaling (25% -> 15%)
   },
   {
     id: 'membrane',
     nameKey: 'UP_MEMBRANE_NAME',
     descKey: 'UP_MEMBRANE_DESC',
     rarity: 'COMMON',
-    baseCost: 150,
-    costMultiplier: 1.4,
+    baseCost: 250,
+    costMultiplier: 1.6,
     level: 0,
     maxLevel: 10,
-    apply: (s) => ({ ...s, maxHealth: Math.floor(s.maxHealth * 1.3), health: Math.floor(s.maxHealth * 1.3) })
+    apply: (s) => ({ ...s, maxHealth: Math.floor(s.maxHealth * 1.25), health: Math.floor(s.maxHealth * 1.25) })
   },
   {
     id: 'multishot',
     nameKey: 'UP_MULTISHOT_NAME',
     descKey: 'UP_MULTISHOT_DESC',
     rarity: 'EPIC',
-    baseCost: 500,
-    costMultiplier: 2.0,
+    baseCost: 1000,
+    costMultiplier: 2.5,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, bulletCount: s.bulletCount + 1, damage: s.damage * 0.9 })
+    apply: (s) => ({ ...s, bulletCount: s.bulletCount + 1, damage: s.damage * 0.85 })
   },
   {
     id: 'orbitals',
     nameKey: 'UP_ORBITAL_NAME',
     descKey: 'UP_ORBITAL_DESC',
     rarity: 'EPIC',
-    baseCost: 600,
-    costMultiplier: 2.5,
+    baseCost: 1500, // Ficou caro demais pra comprar no começo
+    costMultiplier: 3.0,
     level: 0,
     maxLevel: 4,
     apply: (s) => ({ ...s, orbitals: s.orbitals + 1 })
@@ -589,74 +558,74 @@ export const UPGRADES: Upgrade[] = [
     nameKey: 'UP_CRIT_NAME',
     descKey: 'UP_CRIT_DESC',
     rarity: 'RARE',
-    baseCost: 300,
-    costMultiplier: 1.5,
+    baseCost: 500,
+    costMultiplier: 2.0,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, critChance: s.critChance + 0.15, critMultiplier: s.critMultiplier + 0.5 })
+    apply: (s) => ({ ...s, critChance: s.critChance + 0.10, critMultiplier: s.critMultiplier + 0.3 })
   },
   {
     id: 'dash_dmg',
     nameKey: 'UP_DASH_NAME',
     descKey: 'UP_DASH_DESC',
     rarity: 'COMMON',
-    baseCost: 200,
-    costMultiplier: 1.5,
+    baseCost: 300,
+    costMultiplier: 1.8,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, dashDamage: s.dashDamage + 50 })
+    apply: (s) => ({ ...s, dashDamage: s.dashDamage + 30 })
   },
   {
     id: 'thorns',
     nameKey: 'UP_THORNS_NAME',
     descKey: 'UP_THORNS_DESC',
     rarity: 'COMMON',
-    baseCost: 150,
-    costMultiplier: 1.5,
+    baseCost: 400,
+    costMultiplier: 2.0,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, thorns: s.thorns + 10 })
+    apply: (s) => ({ ...s, thorns: s.thorns + 3 }) // Nerf Brutal: 10 -> 3. Tentar AFK agora = morte.
   },
   {
     id: 'lifesteal',
     nameKey: 'UP_LIFE_NAME',
     descKey: 'UP_LIFE_DESC',
     rarity: 'LEGENDARY',
-    baseCost: 800,
-    costMultiplier: 2.5,
+    baseCost: 2000,
+    costMultiplier: 3.5,
     level: 0,
     maxLevel: 3,
-    apply: (s) => ({ ...s, lifesteal: s.lifesteal + 0.05 }) // Vampirismo. Clássico.
+    apply: (s) => ({ ...s, lifesteal: s.lifesteal + 0.05 })
   },
   {
     id: 'magnet',
     nameKey: 'UP_MAGNET_NAME',
     descKey: 'UP_MAGNET_DESC',
     rarity: 'COMMON',
-    baseCost: 100,
-    costMultiplier: 1.3,
+    baseCost: 200,
+    costMultiplier: 1.5,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, magnetRadius: s.magnetRadius * 1.3, surgeRadiusMult: s.surgeRadiusMult * 1.1 })
+    apply: (s) => ({ ...s, magnetRadius: s.magnetRadius * 1.2, surgeRadiusMult: s.surgeRadiusMult * 1.1 })
   },
   {
     id: 'energy_core',
     nameKey: 'UP_ENERGY_NAME',
     descKey: 'UP_ENERGY_DESC',
     rarity: 'RARE',
-    baseCost: 150,
-    costMultiplier: 1.5,
+    baseCost: 400,
+    costMultiplier: 1.8,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, maxEnergy: Math.max(50, s.maxEnergy * 0.8), dashCooldown: Math.max(400, s.dashCooldown * 0.8) })
+    apply: (s) => ({ ...s, maxEnergy: Math.max(50, s.maxEnergy * 0.85), dashCooldown: Math.max(400, s.dashCooldown * 0.85) })
   },
   {
     id: 'giga_blast',
     nameKey: 'UP_GIGA_NAME',
     descKey: 'UP_GIGA_DESC',
     rarity: 'LEGENDARY',
-    baseCost: 1000,
-    costMultiplier: 2.5,
+    baseCost: 2500,
+    costMultiplier: 3.0,
     level: 0,
     maxLevel: 3,
     apply: (s) => ({ ...s, bulletCount: s.bulletCount + 2, damage: s.damage * 1.2, health: s.maxHealth })

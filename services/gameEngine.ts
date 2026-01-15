@@ -9,8 +9,9 @@
  * Este arquivo é onde a matemática acontece. Colisão, vetores, renderização.
  * Não usamos Unity. Não usamos Godot. Usamos puro ódio e JavaScript.
  * 
- * Se você mexer no loop de `update` e o jogo cair para 30 FPS,
- * saiba que um gatinho morre em algum lugar.
+ * A MATEMÁTICA DA DOR:
+ * Alteramos o loop de regeneração e ganho de recursos para garantir
+ * que o jogador nunca se sinta seguro.
  */
 
 import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette } from '../types';
@@ -440,8 +441,9 @@ export class GameEngine {
       if (this.player.pos.y > CANVAS_HEIGHT - this.player.radius) this.player.pos.y = CANVAS_HEIGHT - this.player.radius;
 
       // Regeneração Passiva
+      // NERF: Muito mais lento agora (2 segundos entre ticks, em vez de 1)
       this.regenTimer += safeDt;
-      if (this.regenTimer > 1000) {
+      if (this.regenTimer > 2000 && stats.regen > 0) {
         this.player.health = Math.min(this.player.health + stats.regen, this.player.maxHealth);
         this.regenTimer = 0;
       }
@@ -851,7 +853,8 @@ export class GameEngine {
         vel: { x: (Math.random()-0.5)*8, y: (Math.random()-0.5)*8 },
         radius: 12,
         health: 1, maxHealth: 1, color: this.colors.DNA, damage: 0, active: true, drag: 0.05, 
-        value: Math.ceil((enemy.value || 10) * comboMult), 
+        // NERF: Limitando o ganho de biomassa com base no combo para evitar economia quebrada
+        value: Math.ceil((enemy.value || 10) * Math.min(3, comboMult)), 
         isElite: enemy.isElite
       });
       
