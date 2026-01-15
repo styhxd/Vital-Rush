@@ -687,6 +687,44 @@ export class GameEngine {
         this.player.vel.x *= 0.95; 
         this.player.vel.y *= 0.95;
 
+        // NEW: DASH MINE DETONATION (KINETIC OVERLOAD)
+        for (const e of this.entities) {
+            if (e.type === EntityType.BIO_MINE && e.active) {
+                // Se player tocar na mina durante o dash
+                if (distSq(this.player.pos, e.pos) < (this.player.radius + e.radius) ** 2) {
+                    e.active = false;
+                    this.sessionStats.mineKills++;
+                    achievementManager.track('mine_pop_20', 1);
+                    this.spawnText(e.pos, "OVERLOAD!", '#00ffff', 45); // Feedback visual
+                    audioManager.playExplosion();
+                    audioManager.playSurge(); // Som elétrico extra
+
+                    // Efeito Visual da Explosão Elétrica (Dash)
+                    this.particles.push({
+                        id: 'mine_expl_dash', type: EntityType.PARTICLE, pos: {...e.pos},
+                        vel: {x:0, y:0}, radius: 350, health:1, maxHealth:1, color: 'rgba(0, 255, 255, 0.5)', damage:0, active:true, ttl: 20
+                    });
+
+                    // Dano em Área AUMENTADO (350px) mas Dano REDUZIDO (60)
+                    this.entities.forEach(victim => {
+                        if ((this.isEnemy(victim.type) || victim.type === EntityType.BOSS) && victim.active) {
+                            if (distSq(victim.pos, e.pos) < 350*350) {
+                                this.damageEnemy(victim, 60, true, stats); // Dano 60, Critavel
+                                // Empurrão extra
+                                const dx = victim.pos.x - e.pos.x;
+                                const dy = victim.pos.y - e.pos.y;
+                                const d = Math.sqrt(dx*dx + dy*dy);
+                                if (d > 0) {
+                                    victim.vel.x += (dx/d) * 15;
+                                    victim.vel.y += (dy/d) * 15;
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
         if (stats.dashDamage > 0) {
             for (const e of this.entities) {
                 if ((this.isEnemy(e.type) || e.type === EntityType.BOSS) && e.active) {
@@ -1135,7 +1173,18 @@ export class GameEngine {
 
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
-      if (p.id === 'mine_expl') {
+      // HANDLE MINE EXPLOSIONS (STANDARD & DASH)
+      if (p.id === 'mine_expl' || p.id === 'mine_expl_dash') {
+          const maxLife = 20; // Increased visual life
+          const life = p.ttl || 0;
+          const progress = 1 - (life / maxLife);
+          const easeOut = 1 - Math.pow(1 - progress, 3); 
+
+          // Update radius for dash explosion because it grows bigger
+          const visualRadius = p.id === 'mine_expl_dash' ? p.radius * 1.5 : p.radius; 
+
+          // Logic is handled in Draw for these particles
+          
           p.ttl = (p.ttl || 0) - 1;
           if (p.ttl <= 0) this.particles.splice(i, 1);
           continue;
@@ -1281,24 +1330,37 @@ export class GameEngine {
           this.ctx.beginPath();
           this.ctx.ellipse(p.pos.x, p.pos.y, p.radius * 1.5, p.radius * 0.6, 0, 0, Math.PI*2);
           this.ctx.fill();
-      } else if (p.id === 'mine_expl') {
+      } else if (p.id === 'mine_expl' || p.id === 'mine_expl_dash') {
           // UPDATE: EXPLOSÃO DA MINA MELHORADA (Shockwave & Core)
-          const maxLife = 15; // Combina com o novo TTL definido no update
+          const maxLife = 20; 
           const life = p.ttl || 0;
           const progress = 1 - (life / maxLife);
-          const easeOut = 1 - Math.pow(1 - progress, 3); // Cubic Ease Out para "pop" rápido
+          const easeOut = 1 - Math.pow(1 - progress, 3); // Cubic Ease Out
+
+          const isDashExpl = p.id === 'mine_expl_dash';
+          const radius = p.radius * easeOut;
 
           // Shockwave (Anel)
           this.ctx.beginPath();
-          this.ctx.arc(p.pos.x, p.pos.y, p.radius * easeOut, 0, Math.PI*2);
-          this.ctx.lineWidth = 20 * (1 - progress); // Afina conforme expande
-          this.ctx.strokeStyle = `rgba(50, 255, 100, ${life/maxLife})`;
+          this.ctx.arc(p.pos.x, p.pos.y, radius, 0, Math.PI*2);
+          this.ctx.lineWidth = (isDashExpl ? 40 : 20) * (1 - progress); 
+          
+          if (isDashExpl) {
+              // CYAN ELECTRIC SHOCKWAVE
+              this.ctx.strokeStyle = `rgba(0, 255, 255, ${life/maxLife})`;
+              this.ctx.setLineDash([10, 20]); // Dashed line for electric look
+          } else {
+              // GREEN BIO SHOCKWAVE
+              this.ctx.strokeStyle = `rgba(50, 255, 100, ${life/maxLife})`;
+              this.ctx.setLineDash([]);
+          }
           this.ctx.stroke();
+          this.ctx.setLineDash([]); // Reset
 
           // Núcleo Brilhante
           this.ctx.beginPath();
-          this.ctx.arc(p.pos.x, p.pos.y, p.radius * 0.5 * (1-progress), 0, Math.PI*2);
-          this.ctx.fillStyle = `rgba(200, 255, 200, ${life/maxLife})`;
+          this.ctx.arc(p.pos.x, p.pos.y, radius * 0.5 * (1-progress), 0, Math.PI*2);
+          this.ctx.fillStyle = isDashExpl ? `rgba(200, 255, 255, ${life/maxLife})` : `rgba(200, 255, 200, ${life/maxLife})`;
           this.ctx.fill();
       } else {
         this.ctx.globalAlpha = p.id === 'bg' ? 0.3 : (p.ttl! / 20); 
