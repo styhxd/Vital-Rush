@@ -944,10 +944,26 @@ export class GameEngine {
                    achievementManager.track('mine_pop_20', 1);
                    this.spawnText(other.pos, this.t('MSG_BOOM'), this.colors.BIO_MINE, 40);
                    audioManager.playExplosion();
+                   
+                   // UPDATE: MELHORIA VISUAL DA BOMBA (SISTEMA DE PARTÍCULAS)
                    this.particles.push({
                         id: 'mine_expl', type: EntityType.PARTICLE, pos: {...other.pos},
-                        vel: {x:0, y:0}, radius: 150, health:1, maxHealth:1, color: 'rgba(0, 255, 100, 0.4)', damage:0, active:true, ttl: 10
+                        vel: {x:0, y:0}, radius: 150, health:1, maxHealth:1, color: 'rgba(0, 255, 100, 0.4)', damage:0, active:true, ttl: 15
                    });
+                   
+                   // ADICIONA SPARKS SE NÃO ESTIVER EM LOW QUALITY
+                   if (!this.isLowQuality) {
+                       for(let k=0; k<8; k++) {
+                           const ang = Math.random() * Math.PI * 2;
+                           const spd = Math.random() * 10 + 5;
+                           this.particles.push({
+                               id: 'spark', type: EntityType.PARTICLE, pos: {...other.pos},
+                               vel: { x: Math.cos(ang)*spd, y: Math.sin(ang)*spd },
+                               radius: 3, health:1, maxHealth:1, color: '#aaffaa', damage:0, active:true, ttl: 20
+                           });
+                       }
+                   }
+
                    this.entities.forEach(victim => {
                        if ((this.isEnemy(victim.type) || victim.type === EntityType.BOSS) && victim.active) {
                            if (distSq(victim.pos, other.pos) < 150*150) {
@@ -1219,9 +1235,23 @@ export class GameEngine {
           this.ctx.ellipse(p.pos.x, p.pos.y, p.radius * 1.5, p.radius * 0.6, 0, 0, Math.PI*2);
           this.ctx.fill();
       } else if (p.id === 'mine_expl') {
-          this.ctx.fillStyle = p.color;
+          // UPDATE: EXPLOSÃO DA MINA MELHORADA (Shockwave & Core)
+          const maxLife = 15; // Combina com o novo TTL definido no update
+          const life = p.ttl || 0;
+          const progress = 1 - (life / maxLife);
+          const easeOut = 1 - Math.pow(1 - progress, 3); // Cubic Ease Out para "pop" rápido
+
+          // Shockwave (Anel)
           this.ctx.beginPath();
-          this.ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI*2);
+          this.ctx.arc(p.pos.x, p.pos.y, p.radius * easeOut, 0, Math.PI*2);
+          this.ctx.lineWidth = 20 * (1 - progress); // Afina conforme expande
+          this.ctx.strokeStyle = `rgba(50, 255, 100, ${life/maxLife})`;
+          this.ctx.stroke();
+
+          // Núcleo Brilhante
+          this.ctx.beginPath();
+          this.ctx.arc(p.pos.x, p.pos.y, p.radius * 0.5 * (1-progress), 0, Math.PI*2);
+          this.ctx.fillStyle = `rgba(200, 255, 200, ${life/maxLife})`;
           this.ctx.fill();
       } else {
         this.ctx.globalAlpha = p.id === 'bg' ? 0.3 : (p.ttl! / 20); 
@@ -1323,7 +1353,8 @@ export class GameEngine {
             
             // Caveira no Centro
             this.ctx.globalAlpha = 0.8;
-            this.ctx.font = `${e.radius * 0.8}px var(--font-tech)`; // Emoji escala com o raio
+            // UPDATE: DOBREI O TAMANHO (0.8 -> 1.6)
+            this.ctx.font = `${e.radius * 1.6}px var(--font-tech)`; 
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
             this.ctx.fillText("💀", e.pos.x, e.pos.y);
