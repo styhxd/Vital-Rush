@@ -1434,7 +1434,7 @@ export class GameEngine {
             
             // Corpo Principal (Losango Giratório)
             this.ctx.globalCompositeOperation = 'source-over';
-            this.ctx.rotate(this.time / 50); // Gira rápido
+            this.ctx.rotate(this.time / 125); // UPDATE: Gira mais devagar (era 50, agora 125)
             this.ctx.fillStyle = this.colors.BIO_MINE;
             this.ctx.beginPath();
             this.ctx.moveTo(0, -e.radius);
@@ -1452,35 +1452,40 @@ export class GameEngine {
             this.ctx.restore();
         }
         else if (e.type === EntityType.DNA_FRAGMENT) {
-            // NEW: BIOMASSA AGORA É UMA ESTRELA (Menor)
+            // NEW: BIOMASSA AGORA É UMA MOEDA DOURADA
             this.ctx.save();
             this.ctx.translate(e.pos.x, e.pos.y);
             
             this.ctx.globalCompositeOperation = 'screen';
-            // Brilho
-            this.ctx.fillStyle = e.isElite ? 'rgba(255, 215, 0, 0.6)' : 'rgba(0, 255, 204, 0.5)';
+            // Brilho Dourado
+            this.ctx.fillStyle = e.isElite ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 215, 0, 0.4)';
             this.ctx.beginPath();
-            this.ctx.arc(0, 0, e.radius * 3, 0, Math.PI*2);
+            this.ctx.arc(0, 0, e.radius * 2.5, 0, Math.PI*2);
             this.ctx.fill();
             
             this.ctx.globalCompositeOperation = 'source-over';
-            this.ctx.rotate(this.time / 150); // Gira suave
             
-            // Desenha Estrela
-            const spikes = 5;
-            const outerRadius = e.radius;
-            const innerRadius = e.radius * 0.4;
+            // Efeito de Rotação 3D Falso (Escala no eixo X)
+            const scaleX = Math.cos(this.time / 150);
+            this.ctx.scale(Math.abs(scaleX), 1);
             
+            // Corpo da Moeda
+            this.ctx.fillStyle = e.isElite ? '#ffeeb0' : this.colors.DNA;
             this.ctx.beginPath();
-            this.ctx.fillStyle = e.isElite ? this.colors.ELITE_GLOW : this.colors.DNA;
-            
-            for(let i=0; i<spikes*2; i++) {
-                const r = i % 2 === 0 ? outerRadius : innerRadius;
-                const a = (i / (spikes*2)) * Math.PI * 2;
-                this.ctx.lineTo(Math.cos(a)*r, Math.sin(a)*r);
-            }
-            this.ctx.closePath();
+            this.ctx.arc(0, 0, e.radius, 0, Math.PI*2);
             this.ctx.fill();
+            
+            // Borda da Moeda
+            this.ctx.strokeStyle = '#b8860b'; // Dark Golden Rod
+            this.ctx.lineWidth = 1.5;
+            this.ctx.stroke();
+            
+            // Detalhe interno (Círculo menor)
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, e.radius * 0.6, 0, Math.PI*2);
+            this.ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+            this.ctx.lineWidth = 1;
+            this.ctx.stroke();
             
             this.ctx.restore();
         }

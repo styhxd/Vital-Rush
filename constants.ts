@@ -24,11 +24,11 @@ export const COLORS_DEFAULT: ThemePalette = {
   VIRUS: '#ff00ff',
   PARASITE: '#ff3333',
   FUNGI: '#bfff00', // Verde limão tóxico
-  ENEMY_PROJECTILE: '#ff8800', // Laranja perigo
+  ENEMY_PROJECTILE: '#bf00ff', // ROXO TÓXICO (Igual Poça de Ácido)
   BOSS: '#880000', 
   ELITE_GLOW: '#ffd700',
   ANTIBODY: '#00ffff',
-  DNA: '#00ffcc', // Ciano neon (Mais visível)
+  DNA: '#FFD700', // DOURADO (Moeda)
   BLOOD_PARTICLE: '#3a0a0a',
   UI_ACCENT: '#ff4444',
   SURGE: 'rgba(0, 255, 255, 0.3)',
@@ -46,11 +46,11 @@ export const COLORS_PLATINUM: ThemePalette = {
   VIRUS: '#80deea', 
   PARASITE: '#f48fb1', 
   FUNGI: '#c6ff00',
-  ENEMY_PROJECTILE: '#ff3d00',
+  ENEMY_PROJECTILE: '#bf00ff', // ROXO TÓXICO
   BOSS: '#ffd700', 
   ELITE_GLOW: '#ffffff', 
   ANTIBODY: '#ffd700',
-  DNA: '#ffffff', // Branco brilhante
+  DNA: '#FFD700', // DOURADO SEMPRE
   BLOOD_PARTICLE: '#1a1a2e', 
   UI_ACCENT: '#ffd700', 
   SURGE: 'rgba(255, 215, 0, 0.3)', 
