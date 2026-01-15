@@ -221,13 +221,13 @@ export class GameEngine {
       
       if (type === EntityType.BACTERIA) {
           hp = 35; dmg = 10; radius = 35; color = this.colors.BACTERIA; val = 10; speed = 0.6;
-      } else if (type === EntityType.VIRUS) {
-          hp = 20; dmg = 15; radius = 25; color = this.colors.VIRUS; val = 15; speed = 2.2;
+      } else if (type === EntityType.FUNGI) { // SWAPPED: Fungi is now the fast swarmer (Old Virus)
+          hp = 20; dmg = 15; radius = 25; color = this.colors.FUNGI; val = 15; speed = 2.2;
       } else if (type === EntityType.PARASITE) {
           hp = 120; dmg = 25; radius = 55; color = this.colors.PARASITE; val = 30; speed = 0.25;
-      } else if (type === EntityType.FUNGI) {
-          hp = 90; dmg = 15; radius = 28; // MENOR (era 40)
-          color = this.colors.FUNGI; val = 45; speed = 0.15;
+      } else if (type === EntityType.VIRUS) { // SWAPPED: Virus is now the Turret (Old Fungi)
+          hp = 90; dmg = 15; radius = 28; 
+          color = this.colors.VIRUS; val = 45; speed = 0.15;
           shootTimer = 2.0; 
       }
 
@@ -262,7 +262,7 @@ export class GameEngine {
           active: true,
           value: Math.floor(val),
           isElite,
-          drag: type === EntityType.FUNGI ? 0.2 : 0.1, 
+          drag: type === EntityType.VIRUS ? 0.2 : 0.1, // Virus (Turret) has high drag
           hitFlash: 0,
           shootTimer
       });
@@ -309,7 +309,7 @@ export class GameEngine {
       target.health -= finalDamage;
       target.hitFlash = 5;
       
-      const knockback = target.type === EntityType.BOSS || target.type === EntityType.FUNGI ? 0.1 : 2;
+      const knockback = target.type === EntityType.BOSS || target.type === EntityType.VIRUS ? 0.1 : 2; // Virus (Turret) resists KB
       target.pos.x += knockback; 
 
       if (isCrit && stats.lifesteal > 0) {
@@ -963,8 +963,8 @@ export class GameEngine {
             e.pos.y = Math.max(margin, Math.min(CANVAS_HEIGHT - margin, e.pos.y));
         }
 
-        // LÓGICA DE TIRO DO FUNGI
-        if (e.type === EntityType.FUNGI && this.player.active && e.pos.x < CANVAS_WIDTH + 100) {
+        // LÓGICA DE TIRO DO VIRUS (Antigo Fungi)
+        if (e.type === EntityType.VIRUS && this.player.active && e.pos.x < CANVAS_WIDTH + 100) {
             if (e.shootTimer !== undefined) {
                 e.shootTimer -= dtSeconds;
                 if (e.shootTimer <= 0) {
@@ -1103,7 +1103,7 @@ export class GameEngine {
                 if (e.type === EntityType.VIRUS) speed *= 1.4;
                 if (e.isElite) speed *= 0.7;
                 if (e.type === EntityType.BOSS) speed = 0.3; 
-                if (e.type === EntityType.FUNGI) speed = 0.2; // Fungi quase parado
+                if (e.type === EntityType.FUNGI) speed = 0.2; // Fungi (Swarmer)
 
                 e.vel.x += (dx / dMag) * speed * tick;
                 e.vel.y += (dy / dMag) * speed * tick;
@@ -1605,7 +1605,7 @@ export class GameEngine {
         } else if (e.type === EntityType.BACTERIA) {
           this.ctx.rotate(this.time / 500);
           this.ctx.roundRect(-e.radius, -e.radius/2, e.radius*2, e.radius, 10);
-        } else if (e.type === EntityType.VIRUS) {
+        } else if (e.type === EntityType.FUNGI) { // NEW FUNGI: Old Virus Shape (Hexagon/Circle with nodes)
            const r = e.radius;
            for(let i=0; i<6; i++) {
              const a = (i/6)*Math.PI*2 + (this.time/200);
@@ -1615,28 +1615,64 @@ export class GameEngine {
              else this.ctx.lineTo(vx, vy);
            }
            this.ctx.closePath();
-        } else if (e.type === EntityType.FUNGI) {
-            // FUNGI VISUAL: Pentágono pulsante com núcleo
+        } else if (e.type === EntityType.VIRUS) { // NEW VIRUS: The Green Monster (Image Ref)
+            // Body (Green Sphere)
             const r = e.radius;
-            const sides = 5;
+            this.ctx.fillStyle = (e.hitFlash && e.hitFlash > 0) ? '#ffffff' : '#00aa00'; // Darker green body
             this.ctx.beginPath();
-            for(let i=0; i<sides; i++) {
-                const angle = (i/sides) * Math.PI*2 + Math.sin(this.time/300);
-                this.ctx.lineTo(Math.cos(angle)*r, Math.sin(angle)*r);
-            }
-            this.ctx.closePath();
+            this.ctx.arc(0, 0, r, 0, Math.PI*2);
             this.ctx.fill();
             this.ctx.stroke();
-            
-            // Núcleo que indica tiro
-            if (e.shootTimer !== undefined && e.shootTimer < 0.5) {
-                this.ctx.fillStyle = '#fff'; // Brilha antes de atirar
-            } else {
-                this.ctx.fillStyle = '#000';
+
+            // Spikes (Corona) - Small green circles around
+            const spikes = 8;
+            this.ctx.fillStyle = '#00ff00'; // Bright green spikes
+            for(let i=0; i<spikes; i++) {
+                const angle = (i/spikes) * Math.PI*2 + (this.time/500);
+                const sx = Math.cos(angle) * (r * 1.2);
+                const sy = Math.sin(angle) * (r * 1.2);
+                this.ctx.beginPath();
+                this.ctx.arc(sx, sy, r*0.3, 0, Math.PI*2);
+                this.ctx.fill();
+                this.ctx.stroke();
             }
+
+            // Eyes (Red, Angled)
+            this.ctx.fillStyle = '#ff0000';
+            
+            // Left Eye
+            this.ctx.save();
+            this.ctx.translate(-r*0.3, -r*0.2);
+            this.ctx.rotate(-0.3); // Angle inwards
             this.ctx.beginPath();
-            this.ctx.arc(0, 0, r*0.4, 0, Math.PI*2);
+            this.ctx.ellipse(0, 0, r*0.25, r*0.15, 0, 0, Math.PI*2);
             this.ctx.fill();
+            this.ctx.restore();
+
+            // Right Eye
+            this.ctx.save();
+            this.ctx.translate(r*0.3, -r*0.2);
+            this.ctx.rotate(0.3); // Angle inwards
+            this.ctx.beginPath();
+            this.ctx.ellipse(0, 0, r*0.25, r*0.15, 0, 0, Math.PI*2);
+            this.ctx.fill();
+            this.ctx.restore();
+
+            // Mouth (Black Arc)
+            this.ctx.strokeStyle = '#000';
+            this.ctx.lineWidth = 3;
+            this.ctx.beginPath();
+            this.ctx.arc(0, r*0.2, r*0.4, 0.2, Math.PI - 0.2);
+            this.ctx.stroke();
+            
+            // Shoot Indicator (Glowing Core)
+            if (e.shootTimer !== undefined && e.shootTimer < 0.5) {
+                this.ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, r, 0, Math.PI*2);
+                this.ctx.fill();
+            }
+
         } else {
            const pulses = Math.sin(this.time/100) * 5;
            this.ctx.arc(0, 0, e.radius + pulses, 0, Math.PI*2);

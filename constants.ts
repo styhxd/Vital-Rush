@@ -21,10 +21,10 @@ export const COLORS_DEFAULT: ThemePalette = {
   PLAYER: '#ffffff',
   PLAYER_CORE: '#00ffff',
   BACTERIA: '#77dd77',
-  VIRUS: '#ff00ff',
+  VIRUS: '#00ff00', // AGORA VERDE (Como na imagem)
   PARASITE: '#ff3333',
-  FUNGI: '#bfff00', // Verde limão tóxico
-  ENEMY_PROJECTILE: '#bf00ff', // ROXO TÓXICO (Igual Poça de Ácido)
+  FUNGI: '#bf00ff', // AGORA ROXO (Antigo Virus)
+  ENEMY_PROJECTILE: '#bf00ff', // ROXO TÓXICO
   BOSS: '#880000', 
   ELITE_GLOW: '#ffd700',
   ANTIBODY: '#00ffff',
@@ -43,14 +43,14 @@ export const COLORS_PLATINUM: ThemePalette = {
   PLAYER: '#ffffff',
   PLAYER_CORE: '#ffd700',
   BACTERIA: '#b39ddb', 
-  VIRUS: '#80deea', 
+  VIRUS: '#c6ff00', // Verde Neon
   PARASITE: '#f48fb1', 
-  FUNGI: '#c6ff00',
-  ENEMY_PROJECTILE: '#bf00ff', // ROXO TÓXICO
+  FUNGI: '#80deea',
+  ENEMY_PROJECTILE: '#bf00ff', 
   BOSS: '#ffd700', 
   ELITE_GLOW: '#ffffff', 
   ANTIBODY: '#ffd700',
-  DNA: '#FFD700', // DOURADO SEMPRE
+  DNA: '#FFD700', 
   BLOOD_PARTICLE: '#1a1a2e', 
   UI_ACCENT: '#ffd700', 
   SURGE: 'rgba(255, 215, 0, 0.3)', 
@@ -205,9 +205,9 @@ export const TEXTS: TranslationMap = {
     MANUAL_STRAINS: "VIRAL STRAINS",
     MANUAL_MECHANICS: "BATTLE MECHANICS",
     MANUAL_BAC_DESC: "Standard pathogen. Common, predictable movement.",
-    MANUAL_VIR_DESC: "Fast attacker. Low HP but swarms quickly.",
+    MANUAL_VIR_DESC: "Stationary turret. Shoots tracking spikes.", // SWAPPED
     MANUAL_PAR_DESC: "Heavy tank. Slow, high HP, absorbs damage.",
-    MANUAL_FUNGI_DESC: "Stationary turret. Shoots tracking spikes.", // NEW
+    MANUAL_FUNGI_DESC: "Fast attacker. Low HP but swarms quickly.", // SWAPPED
     MANUAL_BOSS_DESC: "Massive anomaly. Requires extreme firepower.",
     MANUAL_MECH_DASH_TITLE: "Evasive Dash",
     MANUAL_MECH_DASH_DESC: "Grants momentary invulnerability. Use to pass through enemies.",
@@ -396,9 +396,9 @@ export const TEXTS: TranslationMap = {
     MANUAL_STRAINS: "CEPAS VIRAIS",
     MANUAL_MECHANICS: "MECÂNICAS DE COMBATE",
     MANUAL_BAC_DESC: "Patógeno padrão. Movimento comum e previsível.",
-    MANUAL_VIR_DESC: "Atacante rápido. Pouca vida, mas ataca em enxame.",
+    MANUAL_VIR_DESC: "Torreta estacionária. Dispara espinhos teleguiados.", // SWAPPED
     MANUAL_PAR_DESC: "Tanque pesado. Lento, muita vida, absorve dano.",
-    MANUAL_FUNGI_DESC: "Torreta estacionária. Dispara espinhos teleguiados.", // NEW
+    MANUAL_FUNGI_DESC: "Atacante rápido. Pouca vida, mas ataca em enxame.", // SWAPPED
     MANUAL_BOSS_DESC: "Anomalia massiva. Requer poder de fogo extremo.",
     MANUAL_MECH_DASH_TITLE: "Esquiva (Dash)",
     MANUAL_MECH_DASH_DESC: "Concede invulnerabilidade momentânea. Use para atravessar inimigos.",
@@ -587,12 +587,12 @@ export const TEXTS: TranslationMap = {
     MANUAL_STRAINS: "CEPAS VIRALES",
     MANUAL_MECHANICS: "MECÁNICA DE BATALLA",
     MANUAL_BAC_DESC: "Patógeno estándar. Movimiento común y predecible.",
-    MANUAL_VIR_DESC: "Atacante rápido. Poca vida, pero ataca en enjambre.",
+    MANUAL_VIR_DESC: "Torreta estacionaria. Dispara espinas teledirigidas.", // SWAPPED
     MANUAL_PAR_DESC: "Tanque pesado. Lento, mucha vida, absorve daño.",
-    MANUAL_FUNGI_DESC: "Torreta estacionaria. Dispara espinas teledirigidas.", // NEW
+    MANUAL_FUNGI_DESC: "Atacante rápido. Poca vida, pero ataca en enjambre.", // SWAPPED
     MANUAL_BOSS_DESC: "Anomalia masiva. Requiere potencia de fuego extrema.",
     MANUAL_MECH_DASH_TITLE: "Evasión (Dash)",
-    MANUAL_MECH_DASH_DESC: "Otorga invulnerabilidad momentánea. Úsalo para atravesar enemigos.",
+    MANUAL_MECH_DASH_DESC: "Otorga invulnerabilidade momentánea. Úsalo para atravesar enemigos.",
     MANUAL_MECH_SURGE_TITLE: "Sistema Surge",
     MANUAL_MECH_SURGE_DESC: "Empuja enemigos y MAGNETIZA toda la biomasa al instante.",
     MANUAL_MECH_COMBO_TITLE: "Cadena de Combo",
@@ -725,10 +725,10 @@ export const TEXTS: TranslationMap = {
 // Ajustado para o modo "Pesadelo". Spawns mais rápidos desde o começo.
 export const WAVES: WaveConfig[] = [
   { waveNumber: 1, duration: 40, spawnRate: 600, enemyTypes: [EntityType.BACTERIA], flowSpeed: -0.4, hasBoss: false }, // Flow reduzido
-  { waveNumber: 2, duration: 55, spawnRate: 500, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -0.6, hasBoss: false },
-  { waveNumber: 3, duration: 60, spawnRate: 400, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS, EntityType.FUNGI], flowSpeed: -0.8, hasBoss: true }, // Fungi introduzido
-  { waveNumber: 4, duration: 80, spawnRate: 350, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE, EntityType.FUNGI], flowSpeed: -1.0, hasBoss: false },
-  { waveNumber: 5, duration: 999, spawnRate: 150, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS, EntityType.PARASITE, EntityType.FUNGI], flowSpeed: -1.4, hasBoss: true }, // Spam insano
+  { waveNumber: 2, duration: 55, spawnRate: 500, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI], flowSpeed: -0.6, hasBoss: false }, // SWAP
+  { waveNumber: 3, duration: 60, spawnRate: 400, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS], flowSpeed: -0.8, hasBoss: true }, // SWAP
+  { waveNumber: 4, duration: 80, spawnRate: 350, enemyTypes: [EntityType.FUNGI, EntityType.PARASITE, EntityType.VIRUS], flowSpeed: -1.0, hasBoss: false }, // SWAP
+  { waveNumber: 5, duration: 999, spawnRate: 150, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.PARASITE, EntityType.VIRUS], flowSpeed: -1.4, hasBoss: true }, // SWAP
 ];
 
 // O "Shopping" do jogo.
