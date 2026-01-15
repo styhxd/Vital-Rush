@@ -6,11 +6,14 @@
  * 
  * O CORAÇÃO PULSANTE (Game.tsx)
  * 
- * ATUALIZAÇÃO V4.4: A CURA DO SOFTLOCK
+ * ATUALIZAÇÃO V4.5: ADAPTAÇÃO MORFOLÓGICA & UI DENSA
  * 
- * Correção Crítica: Adicionada a UI de 'WAVE_CLEARED'.
- * Anteriormente, o jogo entrava neste estado e ficava num limbo
- * existencial sem botões. Agora existe um caminho para frente.
+ * 1. ROTAÇÃO FORÇADA: O jogo não pede mais para girar. Ele gira o universo.
+ *    Se estiver em retrato, aplicamos CSS Transform para forçar paisagem.
+ * 
+ * 2. UI COMPACTA: Achievements, Loja e Fim de Wave foram redesenhados
+ *    com "Dense Mode" para caber em telas de celular sem cortar ou 
+ *    exigir scroll infinito.
  */
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
@@ -29,7 +32,7 @@ const StatBar = ({ value, max, colorClass, label, animate = false }: any) => (
         <span className="text-[10px] md:text-xs font-bold tracking-widest text-white/70">{label}</span>
         <span className="text-[10px] md:text-xs font-mono text-white/70">{Math.floor(value)}/{max}</span>
     </div>
-    <div className="h-2 md:h-3 w-full bg-black/50 border border-white/10 rounded-sm skew-x-[-10deg] overflow-hidden backdrop-blur-sm relative">
+    <div className="h-1.5 md:h-3 w-full bg-black/50 border border-white/10 rounded-sm skew-x-[-10deg] overflow-hidden backdrop-blur-sm relative">
       <div 
         className={`h-full ${colorClass} transition-all duration-200 origin-left ${animate && value >= max ? 'animate-pulse brightness-150' : ''}`}
         style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
@@ -42,14 +45,14 @@ const StatBar = ({ value, max, colorClass, label, animate = false }: any) => (
 const IconButton = ({ onClick, icon }: any) => (
   <button 
     onClick={onClick} 
-    className="p-3 bg-black/40 border border-white/20 rounded hover:bg-white/10 active:scale-95 transition-all text-white/80"
+    className="p-2 md:p-3 bg-black/40 border border-white/20 rounded hover:bg-white/10 active:scale-95 transition-all text-white/80"
   >
     {icon}
   </button>
 );
 
 const MenuButton = ({ onClick, children, variant = 'primary', selected = false }: any) => {
-  const base = "w-full py-4 font-bold text-xl tracking-widest uppercase clip-path-polygon transition-all hover:scale-105 shadow-[0_0_20px_rgba(0,0,0,0.4)] relative overflow-hidden group";
+  const base = "w-full py-3 md:py-4 font-bold text-base md:text-xl tracking-widest uppercase clip-path-polygon transition-all hover:scale-105 shadow-[0_0_20px_rgba(0,0,0,0.4)] relative overflow-hidden group";
   let colors = "";
   
   if (variant === 'primary') {
@@ -71,15 +74,15 @@ const MenuButton = ({ onClick, children, variant = 'primary', selected = false }
 };
 
 const DatabaseCard = ({ title, desc, color }: any) => (
-    <div className="bg-white/5 border border-white/10 p-4 relative overflow-hidden">
+    <div className="bg-white/5 border border-white/10 p-2 md:p-4 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-1 h-full" style={{backgroundColor: color}}></div>
-        <h3 className="text-lg font-bold mb-1" style={{color: color}}>{title}</h3>
-        <p className="text-xs text-gray-400 leading-relaxed">{desc}</p>
+        <h3 className="text-sm md:text-lg font-bold mb-1" style={{color: color}}>{title}</h3>
+        <p className="text-[10px] md:text-xs text-gray-400 leading-relaxed">{desc}</p>
     </div>
 );
 
 const IconSpeaker = ({ muted }: { muted: boolean }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         {muted ? (
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
         ) : (
@@ -90,13 +93,13 @@ const IconSpeaker = ({ muted }: { muted: boolean }) => (
 );
 
 const IconDNA = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
     </svg>
 );
 
 const IconTrophy = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 md:h-6 md:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
     </svg>
 );
@@ -146,6 +149,7 @@ export const Game: React.FC = () => {
       const multiTouch = navigator.maxTouchPoints > 0;
       setIsMobile(hasTouch || multiTouch);
       
+      // Detecção de orientação física
       if (window.innerHeight > window.innerWidth) {
           setIsPortrait(true);
       } else {
@@ -247,7 +251,6 @@ export const Game: React.FC = () => {
   }, []);
 
   const openShop = useCallback(() => setGameState(GameState.BIO_LAB), []);
-  // Modificado: Se sair da loja, vai pro briefing, que é o hub central entre waves
   const closeShop = useCallback(() => setGameState(GameState.BRIEFING), []);
   
   const openLoadout = useCallback(() => {
@@ -300,7 +303,6 @@ export const Game: React.FC = () => {
             dt, 
             stats, 
             () => {
-                // Aqui acontece a mágica. Quando a wave acaba, mudamos o estado.
                 setGameState(GameState.WAVE_CLEARED);
                 audioManager.stopMusic(); 
             },
@@ -315,7 +317,6 @@ export const Game: React.FC = () => {
           );
       }
       
-      // Mesmo no estado WAVE_CLEARED, queremos desenhar o jogo (congelado ou em câmera lenta)
       engineRef.current.draw();
       
       uiUpdateAccumulatorRef.current += dt;
@@ -379,8 +380,14 @@ export const Game: React.FC = () => {
          const elem = document.documentElement;
          if (!document.fullscreenElement) {
              if (elem.requestFullscreen) {
-                 elem.requestFullscreen().catch((err) => {
-                    console.log("Fullscreen attempt blocked/failed:", err);
+                 elem.requestFullscreen().then(() => {
+                     // TENTATIVA DE TRAVA NATIVA APÓS FULLSCREEN
+                     if ('orientation' in screen && 'lock' in screen.orientation) {
+                         // @ts-ignore - TS as vezes reclama do lock
+                         screen.orientation.lock('landscape').catch((err) => console.log('Orientation lock failed:', err));
+                     }
+                 }).catch((err) => {
+                    console.log("Fullscreen blocked:", err);
                  });
              } else if ((elem as any).webkitRequestFullscreen) {
                  (elem as any).webkitRequestFullscreen();
@@ -496,30 +503,30 @@ export const Game: React.FC = () => {
       }
   }
 
-  // --- OVERLAY DE ORIENTAÇÃO (MODO RETRATO BLOQUEADO) ---
-  if (isPortrait) {
-      return (
-          <div className="w-full h-screen bg-[#0f0505] flex flex-col items-center justify-center p-8 text-center relative overflow-hidden">
-              <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
-              <div className="scanlines"></div>
-              <div className="vignette"></div>
-              <div className="z-10 animate-pulse mb-8">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-24 w-24 text-red-600 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  <div className="text-4xl text-red-600 font-bold tracking-widest animate-bounce" style={{transform: 'rotate(90deg)'}}>⟳</div>
-              </div>
-              <h2 className="text-2xl text-red-500 font-bold tracking-[0.2em] mb-4 z-10 uppercase">System Malfunction</h2>
-              <p className="text-gray-400 font-mono text-sm max-w-xs z-10 uppercase border-t border-b border-white/10 py-4">
-                  Optical sensors require landscape orientation.<br/>
-                  Rotate device to initiate sequence.
-              </p>
-          </div>
-      )
-  }
+  // --- ROTAÇÃO AUTOMÁTICA VISUAL ---
+  // Se estiver em modo retrato, o estilo abaixo força o jogo a girar 90 graus
+  // e ocupar a tela "deitada", forçando o usuário a girar o aparelho.
+  const containerStyle: React.CSSProperties = isPortrait && isMobile ? {
+      transform: 'rotate(90deg)',
+      width: '100vh',
+      height: '100vw',
+      position: 'absolute',
+      top: '50%',
+      left: '50%',
+      translate: '-50% -50%',
+      overflow: 'hidden'
+  } : {
+      width: '100%',
+      height: '100vh',
+      position: 'relative',
+      overflow: 'hidden'
+  };
 
   return (
-    <div className={`relative w-full h-screen overflow-hidden text-white select-none ${isPlatinum ? 'bg-[#0a0a1a]' : 'bg-[#0f0505]'} ${isLowPerfMode ? 'perf-mode-low' : ''}`} style={{fontFamily: 'var(--font-tech)'}}>
+    <div 
+        className={`select-none ${isPlatinum ? 'bg-[#0a0a1a]' : 'bg-[#0f0505]'} ${isLowPerfMode ? 'perf-mode-low' : ''}`} 
+        style={{...containerStyle, fontFamily: 'var(--font-tech)'}}
+    >
       <canvas ref={canvasRef} className="block w-full h-full object-contain" />
       
       {/* CSS Injection for Dynamic Keyframes */}
@@ -595,48 +602,41 @@ export const Game: React.FC = () => {
       {(gameState === GameState.PLAYING || gameState === GameState.WAVE_CLEARED || gameState === GameState.LOADOUT) && (
         <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between p-2 md:p-6">
            <div className="flex justify-between items-start">
-             <div className="flex flex-col gap-3 w-40 md:w-64">
+             <div className="flex flex-col gap-3 w-32 md:w-64">
                 <StatBar label={t('INTEGRITY')} value={uiData.health} max={uiData.maxHealth} colorClass={uiData.adrenaline ? "bg-red-600 animate-pulse" : (isPlatinum ? "bg-gradient-to-r from-purple-500 to-amber-400" : "bg-gradient-to-r from-red-600 to-red-400")} />
                 <StatBar label={t('SURGE_READY')} value={uiData.energy} max={uiData.maxEnergy} colorClass={isPlatinum ? "bg-gradient-to-r from-amber-400 to-white" : "bg-gradient-to-r from-cyan-600 to-cyan-400"} animate={true}/>
                 
                 <div className="flex gap-1 mt-2">
                     {Array.from({length: INITIAL_LIVES}).map((_, i) => (
-                        <div key={i} className={`w-4 h-4 rounded-full flex items-center justify-center transition-all duration-500
+                        <div key={i} className={`w-3 h-3 md:w-4 md:h-4 rounded-full flex items-center justify-center transition-all duration-500
                             ${i < uiData.lives 
                                 ? 'bg-red-500 shadow-[0_0_10px_red] border-white/20 border' 
                                 : 'bg-black/50 border border-red-900/50 shadow-none'}`}>
                             {i < uiData.lives 
-                                ? <span className="text-[8px]">♥</span> 
-                                : <span className="text-[8px] text-red-900 font-bold">X</span>}
+                                ? <span className="text-[6px] md:text-[8px]">♥</span> 
+                                : <span className="text-[6px] md:text-[8px] text-red-900 font-bold">X</span>}
                         </div>
                     ))}
                 </div>
 
                 {uiData.adrenaline && (
-                    <div className="text-red-500 font-bold tracking-widest text-xs animate-pulse text-glow border border-red-500/50 bg-red-900/20 px-2 py-1 mt-2">
+                    <div className="text-red-500 font-bold tracking-widest text-[8px] md:text-xs animate-pulse text-glow border border-red-500/50 bg-red-900/20 px-2 py-1 mt-2">
                         ⚠ {t('ADRENALINE')} ⚠
-                    </div>
-                )}
-
-                {!isMobile && (
-                    <div className="flex gap-2 items-center mt-2">
-                        <div className={`h-2 w-8 skew-x-[-10deg] transition-all duration-300 ${uiData.dashReady ? 'bg-white shadow-[0_0_10px_white]' : 'bg-white/20'}`}></div>
-                        <span className="text-[10px] tracking-widest text-white/70">{t('DASH')}</span>
                     </div>
                 )}
              </div>
 
              <div className="flex flex-col items-center">
-                 <div className="bg-black/50 border border-white/10 px-4 py-1 rounded-full backdrop-blur-md mb-1">
-                     <span className={`font-bold tracking-widest text-lg md:text-2xl text-glow ${isPlatinum ? 'text-amber-400' : 'text-red-400'}`}>{t('WAVE')} {uiData.wave}</span>
+                 <div className="bg-black/50 border border-white/10 px-3 py-1 rounded-full backdrop-blur-md mb-1">
+                     <span className={`font-bold tracking-widest text-base md:text-2xl text-glow ${isPlatinum ? 'text-amber-400' : 'text-red-400'}`}>{t('WAVE')} {uiData.wave}</span>
                  </div>
-                 <div className="text-xs text-white/50 tracking-widest">{(uiData.waveDuration - uiData.waveTime).toFixed(0)}s</div>
+                 <div className="text-[10px] md:text-xs text-white/50 tracking-widest">{(uiData.waveDuration - uiData.waveTime).toFixed(0)}s</div>
                  
                  <div className={`mt-4 transition-all duration-200 ${uiData.combo > 1 ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}>
-                     <div className="text-4xl font-black italic text-yellow-400 text-glow" style={{textShadow: '0 0 20px orange'}}>
+                     <div className="text-3xl md:text-4xl font-black italic text-yellow-400 text-glow" style={{textShadow: '0 0 20px orange'}}>
                          {uiData.combo}x
                      </div>
-                     <div className="text-xs font-bold text-yellow-600 tracking-[0.5em] text-center">{t('COMBO')}</div>
+                     <div className="text-[8px] md:text-xs font-bold text-yellow-600 tracking-[0.5em] text-center">{t('COMBO')}</div>
                  </div>
              </div>
 
@@ -644,13 +644,13 @@ export const Game: React.FC = () => {
                  <div className="pointer-events-auto flex gap-2">
                      <IconButton onClick={openLoadout} icon={<IconDNA />} />
                      <IconButton onClick={toggleMute} icon={<IconSpeaker muted={isMuted} />} />
-                     <IconButton onClick={togglePause} icon={<span className="font-bold text-xl">||</span>} />
+                     <IconButton onClick={togglePause} icon={<span className="font-bold text-lg md:text-xl">||</span>} />
                  </div>
                  <div className="text-right">
-                    <div className="text-xs text-white/50 tracking-widest">{t('SCORE')}</div>
-                    <div className="text-2xl md:text-3xl font-bold font-mono text-white tracking-tighter cyan-glow">{uiData.score.toString().padStart(6, '0')}</div>
-                    <div className="text-xs text-yellow-500 tracking-widest mt-1">{t('BIOMASS_AVAIL')}</div>
-                    <div className="text-xl font-bold font-mono text-yellow-400 tracking-tighter">{uiData.biomass}</div>
+                    <div className="text-[8px] md:text-xs text-white/50 tracking-widest">{t('SCORE')}</div>
+                    <div className="text-xl md:text-3xl font-bold font-mono text-white tracking-tighter cyan-glow">{uiData.score.toString().padStart(6, '0')}</div>
+                    <div className="text-[8px] md:text-xs text-yellow-500 tracking-widest mt-1">{t('BIOMASS_AVAIL')}</div>
+                    <div className="text-lg md:text-xl font-bold font-mono text-yellow-400 tracking-tighter">{uiData.biomass}</div>
                  </div>
              </div>
            </div>
@@ -666,13 +666,13 @@ export const Game: React.FC = () => {
                         }}
                         onClick={!isMobile ? triggerDash : undefined}
                         disabled={!uiData.dashReady}
-                        className={`w-16 h-16 rounded-full border-2 flex items-center justify-center relative transition-all duration-100 active:scale-95
+                        className={`w-14 h-14 md:w-16 md:h-16 rounded-full border-2 flex items-center justify-center relative transition-all duration-100 active:scale-95
                             ${uiData.dashReady
                                 ? 'border-white bg-white/20' 
                                 : 'border-white/10 bg-black/40 opacity-50'}`}
                      >
                          <div className={`absolute inset-0 bg-white/30 rounded-full transition-all duration-500 ${uiData.dashReady ? 'scale-0' : 'scale-100'}`} style={{clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0% 100%)'}}></div>
-                         <span className="font-bold text-xs">DASH</span>
+                         <span className="font-bold text-[10px] md:text-xs">DASH</span>
                      </button>
 
                      <button 
@@ -683,13 +683,13 @@ export const Game: React.FC = () => {
                         }}
                         onClick={!isMobile ? triggerUltimate : undefined}
                         disabled={uiData.energy < uiData.maxEnergy}
-                        className={`w-24 h-24 rounded-full border-4 flex items-center justify-center relative transition-all duration-100 active:scale-95
+                        className={`w-20 h-20 md:w-24 md:h-24 rounded-full border-4 flex items-center justify-center relative transition-all duration-100 active:scale-95
                             ${uiData.energy >= uiData.maxEnergy 
                                 ? (isPlatinum ? 'border-amber-400 bg-amber-900/40 shadow-[0_0_30px_rgba(255,215,0,0.4)]' : 'border-cyan-400 bg-cyan-900/40 shadow-[0_0_30px_rgba(0,255,255,0.4)]')
                                 : 'border-white/10 bg-black/40 grayscale opacity-50'}`}
                      >
                          <div className={`absolute inset-0 rounded-full border border-dashed border-white/20 ${uiData.energy >= uiData.maxEnergy ? 'animate-spin-slow' : ''}`}></div>
-                         <span className={`font-bold text-sm tracking-widest ${uiData.energy >= uiData.maxEnergy ? (isPlatinum ? 'text-amber-200' : 'text-cyan-200') : 'text-white/30'}`}>SURGE</span>
+                         <span className={`font-bold text-xs md:text-sm tracking-widest ${uiData.energy >= uiData.maxEnergy ? (isPlatinum ? 'text-amber-200' : 'text-cyan-200') : 'text-white/30'}`}>SURGE</span>
                      </button>
                  </div>
              </div>
@@ -697,28 +697,24 @@ export const Game: React.FC = () => {
         </div>
       )}
       
-      {/* 
-          AQUI ESTAVA O PROBLEMA: FALTAVA A TELA DE 'WAVE_CLEARED'.
-          O jogo mudava o estado, mas não renderizava nada novo, parecendo travado.
-      */}
       {gameState === GameState.WAVE_CLEARED && (
         <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-pulse">
-           <div className="w-full max-w-lg p-1 border-y-4 border-green-500 bg-black/80 relative">
+           <div className="w-full max-w-xs md:max-w-lg p-1 border-y-4 border-green-500 bg-black/80 relative">
                <div className="absolute inset-0 bg-green-500/10"></div>
-               <div className="relative p-8 text-center">
-                   <h2 className="text-6xl font-black text-green-500 tracking-[0.2em] mb-2 drop-shadow-[0_0_15px_rgba(0,255,0,0.8)] glitch-text">
+               <div className="relative p-4 md:p-8 text-center">
+                   <h2 className="text-3xl md:text-6xl font-black text-green-500 tracking-[0.2em] mb-2 drop-shadow-[0_0_15px_rgba(0,255,0,0.8)] glitch-text">
                        {t('CLEARED')}
                    </h2>
-                   <div className="w-full h-1 bg-green-500/50 mb-8"></div>
+                   <div className="w-full h-1 bg-green-500/50 mb-4 md:mb-8"></div>
                    
-                   <div className="grid grid-cols-2 gap-4 mb-8 text-sm font-mono tracking-widest">
+                   <div className="grid grid-cols-2 gap-2 md:gap-4 mb-4 md:mb-8 text-xs md:text-sm font-mono tracking-widest">
                        <div className="text-right text-gray-400">{t('WAVE')}:</div>
                        <div className="text-left text-white font-bold">{uiData.wave}</div>
                        <div className="text-right text-gray-400">{t('BIOMASS_AVAIL')}:</div>
                        <div className="text-left text-yellow-400 font-bold">{uiData.biomass}</div>
                    </div>
 
-                   <div className="flex flex-col gap-4">
+                   <div className="flex flex-col gap-2 md:gap-4">
                        <MenuButton variant="success" onClick={openShop}>
                            {t('MUTATION')}
                        </MenuButton>
@@ -734,20 +730,20 @@ export const Game: React.FC = () => {
       {gameState === GameState.MENU && (
         <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-          <div className="relative text-center p-8 max-w-md w-full">
-            <h1 className={`text-7xl md:text-9xl font-bold mb-2 tracking-tighter mix-blend-screen leading-none ${isPlatinum ? 'text-amber-400 shadow-[0_0_30px_rgba(255,170,0,0.5)]' : 'text-red-600 red-glow'}`} style={{fontFamily: 'Impact, sans-serif'}}>{t('TITLE_MAIN')}</h1>
-            <h2 className="text-4xl md:text-5xl font-light text-white mb-8 tracking-[0.5em] -mt-2 opacity-80">{t('TITLE_SUB')}</h2>
+          <div className="relative text-center p-4 md:p-8 max-w-md w-full">
+            <h1 className={`text-6xl md:text-9xl font-bold mb-2 tracking-tighter mix-blend-screen leading-none ${isPlatinum ? 'text-amber-400 shadow-[0_0_30px_rgba(255,170,0,0.5)]' : 'text-red-600 red-glow'}`} style={{fontFamily: 'Impact, sans-serif'}}>{t('TITLE_MAIN')}</h1>
+            <h2 className="text-3xl md:text-5xl font-light text-white mb-4 md:mb-8 tracking-[0.5em] -mt-2 opacity-80">{t('TITLE_SUB')}</h2>
             
-            {isPlatinum && <div className="text-xs tracking-[0.5em] text-purple-400 mb-4 animate-pulse">{t('ACH_PLATINUM_MSG')}</div>}
+            {isPlatinum && <div className="text-[8px] md:text-xs tracking-[0.5em] text-purple-400 mb-4 animate-pulse">{t('ACH_PLATINUM_MSG')}</div>}
 
-            <div className="mb-8">
-                <div className="text-xs text-gray-500 tracking-widest mb-2">{t('DIFFICULTY')}</div>
-                <div className="grid grid-cols-4 gap-2">
+            <div className="mb-4 md:mb-8">
+                <div className="text-[10px] md:text-xs text-gray-500 tracking-widest mb-2">{t('DIFFICULTY')}</div>
+                <div className="grid grid-cols-4 gap-1 md:gap-2">
                     {Object.values(Difficulty).map(d => (
                         <button 
                             key={d} 
                             onClick={() => setDifficulty(d)}
-                            className={`text-[10px] font-bold py-2 border transition-all ${difficulty === d ? 'bg-red-600 text-black border-red-600' : 'bg-transparent text-gray-500 border-gray-800'}`}
+                            className={`text-[8px] md:text-[10px] font-bold py-2 border transition-all ${difficulty === d ? 'bg-red-600 text-black border-red-600' : 'bg-transparent text-gray-500 border-gray-800'}`}
                         >
                             {t(`DIFF_${d}`)}
                         </button>
@@ -755,23 +751,23 @@ export const Game: React.FC = () => {
                 </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-2 md:space-y-4">
                 <MenuButton onClick={() => { handleStartGame(); audioManager.startMenuMusic(); }}>{t('START')}</MenuButton>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2 md:gap-4">
                   <MenuButton variant="secondary" onClick={() => openControls(true)}>{t('CONTROLS')}</MenuButton>
                   <MenuButton variant="secondary" onClick={() => setGameState(GameState.MANUAL)}>{t('MANUAL')}</MenuButton>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-2 gap-2 md:gap-4">
                   <MenuButton variant="secondary" onClick={() => setGameState(GameState.SETTINGS)}>{t('SETTINGS')}</MenuButton>
                   <MenuButton variant="secondary" onClick={openAchievements}>{t('ACHIEVEMENTS')}</MenuButton>
                 </div>
                 
-                <div className="flex justify-center gap-4 mt-6">
+                <div className="flex justify-center gap-4 mt-4 md:mt-6">
                     {(['EN', 'PT', 'ES'] as Language[]).map(l => (
                       <button 
                         key={l}
                         onClick={() => setLanguage(l)} 
-                        className={`text-sm font-bold tracking-widest px-2 py-1 border-b-2 transition-all ${language === l ? 'text-white border-red-500' : 'text-gray-600 border-transparent'}`}
+                        className={`text-xs md:text-sm font-bold tracking-widest px-2 py-1 border-b-2 transition-all ${language === l ? 'text-white border-red-500' : 'text-gray-600 border-transparent'}`}
                       >
                         {l}
                       </button>
@@ -782,52 +778,50 @@ export const Game: React.FC = () => {
         </div>
       )}
 
-      {/* (OUTROS MENUS - MANUAIS, ACHIEVEMENTS, ETC - MANTIDOS IDÊNTICOS PARA BREVIDADE) */}
-      {/* O React re-renderiza o resto com base no estado, mas o JSX é o mesmo */}
       {gameState === GameState.ACHIEVEMENTS && (
           <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
-              <div className={`w-full max-w-6xl h-[90%] border p-8 relative flex flex-col ${isPlatinum ? 'border-amber-500/50 bg-purple-900/10' : 'border-white/10 bg-[#1a0a0a]'}`}>
-                  <div className="flex justify-between items-center mb-8 border-b border-white/10 pb-4 flex-shrink-0">
-                      <h2 className={`text-4xl font-bold tracking-widest ${isPlatinum ? 'text-amber-400' : 'text-cyan-400'}`}>{t('ACHIEVEMENTS')}</h2>
+              <div className={`w-full max-w-6xl h-full md:h-[90%] border p-4 md:p-8 relative flex flex-col ${isPlatinum ? 'border-amber-500/50 bg-purple-900/10' : 'border-white/10 bg-[#1a0a0a]'}`}>
+                  <div className="flex justify-between items-center mb-4 border-b border-white/10 pb-2 flex-shrink-0">
+                      <h2 className={`text-2xl md:text-4xl font-bold tracking-widest ${isPlatinum ? 'text-amber-400' : 'text-cyan-400'}`}>{t('ACHIEVEMENTS')}</h2>
                       <div className="flex items-center gap-2">
                           <IconTrophy />
-                          <span className="text-xl font-mono">
+                          <span className="text-lg md:text-xl font-mono">
                               {Object.values(achievementManager.getProgress()).filter(p => p.unlocked).length} / {ACHIEVEMENTS_LIST.length}
                           </span>
                       </div>
                   </div>
 
                   <div className="flex-1 overflow-y-auto pr-2 custom-scroll min-h-0">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 pb-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 md:gap-4 pb-4">
                           {ACHIEVEMENTS_LIST.map((ach) => {
                               const progress = achievementManager.getProgress()[ach.id] || { unlocked: false, currentValue: 0 };
                               const isLocked = !progress.unlocked;
                               if (ach.secret && isLocked) {
                                   return (
-                                      <div key={ach.id} className="bg-black/60 border border-white/5 p-6 flex items-center justify-center opacity-50 min-h-[120px]">
-                                          <span className="text-xs tracking-widest text-gray-600 font-mono">??? ENCRYPTED DATA ???</span>
+                                      <div key={ach.id} className="bg-black/60 border border-white/5 p-2 md:p-6 flex items-center justify-center opacity-50 min-h-[60px] md:min-h-[120px]">
+                                          <span className="text-[10px] md:text-xs tracking-widest text-gray-600 font-mono">??? ENCRYPTED DATA ???</span>
                                       </div>
                                   )
                               }
 
                               return (
-                                  <div key={ach.id} className={`p-6 border relative overflow-hidden transition-all group flex flex-col min-h-[140px]
+                                  <div key={ach.id} className={`p-3 md:p-6 border relative overflow-hidden transition-all group flex flex-col min-h-[80px] md:min-h-[140px]
                                       ${isLocked ? 'border-white/10 bg-black/80 grayscale opacity-70' : 
                                         (ach.id === 'all_achievements' ? 'border-amber-500 bg-amber-900/30 shadow-[0_0_20px_rgba(255,215,0,0.2)]' : 'border-cyan-500/30 bg-cyan-900/20')}`}>
-                                      <div className="flex items-start gap-6 z-10 relative h-full">
-                                          <div className="text-4xl filter drop-shadow-md pt-1">{ach.icon}</div>
-                                          <div className="flex-1 flex flex-col h-full">
-                                              <h4 className={`font-bold text-lg mb-2 ${isLocked ? 'text-gray-500' : 'text-white'}`}>{t(ach.titleKey)}</h4>
-                                              <p className={`text-sm mb-4 leading-relaxed flex-1 ${isLocked ? 'text-gray-600' : 'text-gray-300'}`}>{t(ach.descKey)}</p>
+                                      <div className="flex items-center md:items-start gap-4 z-10 relative h-full">
+                                          <div className="text-2xl md:text-4xl filter drop-shadow-md">{ach.icon}</div>
+                                          <div className="flex-1 flex flex-col h-full justify-center">
+                                              <h4 className={`font-bold text-sm md:text-lg mb-1 ${isLocked ? 'text-gray-500' : 'text-white'}`}>{t(ach.titleKey)}</h4>
+                                              <p className={`text-[10px] md:text-sm mb-1 leading-relaxed ${isLocked ? 'text-gray-600' : 'text-gray-300'}`}>{t(ach.descKey)}</p>
                                               
                                               <div className="mt-auto w-full">
                                                   {ach.isCumulative && !progress.unlocked && (
-                                                      <div className="w-full h-1.5 bg-black rounded overflow-hidden mb-2 border border-white/5">
+                                                      <div className="w-full h-1 bg-black rounded overflow-hidden mb-1 border border-white/5">
                                                           <div className="h-full bg-cyan-600" style={{width: `${Math.min(100, (progress.currentValue / ach.targetValue)*100)}%`}}></div>
                                                       </div>
                                                   )}
                                                   
-                                                  <div className="flex justify-between text-xs tracking-widest font-mono">
+                                                  <div className="flex justify-between text-[8px] md:text-xs tracking-widest font-mono">
                                                       <span className={progress.unlocked ? 'text-green-400 font-bold' : 'text-gray-600'}>
                                                           {progress.unlocked ? 'UNLOCKED' : t('ACH_LOCKED')}
                                                       </span>
@@ -846,7 +840,7 @@ export const Game: React.FC = () => {
                       </div>
                   </div>
 
-                  <div className="mt-6 pt-4 border-t border-white/10 flex-shrink-0">
+                  <div className="mt-2 md:mt-6 pt-2 md:pt-4 border-t border-white/10 flex-shrink-0">
                       <MenuButton variant="secondary" onClick={() => setGameState(GameState.MENU)}>{t('BACK')}</MenuButton>
                   </div>
               </div>
@@ -855,16 +849,16 @@ export const Game: React.FC = () => {
 
       {gameState === GameState.MANUAL && (
         <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
-           <div className="w-full max-w-4xl p-6 md:p-10 bg-[#1a0a0a] border border-white/10 relative h-[90vh] flex flex-col">
-              <h2 className="text-3xl text-white font-bold tracking-widest mb-6 border-b border-white/10 pb-4 flex justify-between">
+           <div className="w-full max-w-4xl p-4 md:p-10 bg-[#1a0a0a] border border-white/10 relative h-[100vh] md:h-[90vh] flex flex-col">
+              <h2 className="text-xl md:text-3xl text-white font-bold tracking-widest mb-4 border-b border-white/10 pb-2 flex justify-between">
                   <span>{t('MANUAL')}</span>
-                  <span className="text-cyan-500 text-sm font-mono tracking-normal opacity-50">DB-V2.4</span>
+                  <span className="text-cyan-500 text-xs md:text-sm font-mono tracking-normal opacity-50">DB-V2.4</span>
               </h2>
               
-              <div className="flex-1 overflow-y-auto custom-scroll pr-4 space-y-8">
+              <div className="flex-1 overflow-y-auto custom-scroll pr-2 md:pr-4 space-y-4 md:space-y-8">
                   <section>
-                      <h4 className="text-cyan-400 font-bold tracking-[0.2em] mb-4 text-sm border-l-2 border-cyan-500 pl-3">{t('MANUAL_HOSTILES')}</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <h4 className="text-cyan-400 font-bold tracking-[0.2em] mb-2 text-xs md:text-sm border-l-2 border-cyan-500 pl-3">{t('MANUAL_HOSTILES')}</h4>
+                      <div className="grid grid-cols-2 gap-2">
                           <DatabaseCard title="BACTERIA" desc={t('MANUAL_BAC_DESC')} color={COLORS_DEFAULT.BACTERIA} />
                           <DatabaseCard title="VIRUS" desc={t('MANUAL_VIR_DESC')} color={COLORS_DEFAULT.VIRUS} />
                           <DatabaseCard title="PARASITE" desc={t('MANUAL_PAR_DESC')} color={COLORS_DEFAULT.PARASITE} />
@@ -873,8 +867,8 @@ export const Game: React.FC = () => {
                   </section>
 
                   <section>
-                      <h4 className="text-white font-bold tracking-[0.2em] mb-4 text-sm border-l-2 border-white pl-3">{t('MANUAL_MECHANICS')}</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <h4 className="text-white font-bold tracking-[0.2em] mb-2 text-xs md:text-sm border-l-2 border-white pl-3">{t('MANUAL_MECHANICS')}</h4>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                            <DatabaseCard title={t('MANUAL_MECH_DASH_TITLE')} desc={t('MANUAL_MECH_DASH_DESC')} color="#fff" />
                            <DatabaseCard title={t('MANUAL_MECH_SURGE_TITLE')} desc={t('MANUAL_MECH_SURGE_DESC')} color={COLORS_DEFAULT.PLAYER_CORE} />
                            <DatabaseCard title={t('MANUAL_MECH_COMBO_TITLE')} desc={t('MANUAL_MECH_COMBO_DESC')} color={COLORS_DEFAULT.COMBO} />
@@ -882,8 +876,8 @@ export const Game: React.FC = () => {
                   </section>
 
                   <section>
-                      <h4 className="text-yellow-400 font-bold tracking-[0.2em] mb-4 text-sm border-l-2 border-yellow-500 pl-3">{t('MANUAL_STRAINS')}</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <h4 className="text-yellow-400 font-bold tracking-[0.2em] mb-2 text-xs md:text-sm border-l-2 border-yellow-500 pl-3">{t('MANUAL_STRAINS')}</h4>
+                      <div className="grid grid-cols-2 gap-2">
                            <DatabaseCard title={t('STRAIN_STANDARD')} desc={t('STRAIN_STD_DESC')} color="#fff" />
                            <DatabaseCard title={t('STRAIN_SWARM')} desc={t('STRAIN_SWM_DESC')} color="#ff00ff" />
                            <DatabaseCard title={t('STRAIN_TITAN')} desc={t('STRAIN_TTN_DESC')} color="#ffaa00" />
@@ -892,48 +886,37 @@ export const Game: React.FC = () => {
                   </section>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-white/10">
+              <div className="mt-2 md:mt-6 pt-2 border-t border-white/10">
                   <MenuButton variant="secondary" onClick={() => setGameState(GameState.MENU)}>{t('BACK')}</MenuButton>
               </div>
            </div>
         </div>
       )}
 
+      {/* CONTROLS (Mantido compacto) */}
       {gameState === GameState.CONTROLS && (
         <div className="absolute inset-0 bg-black flex items-center justify-center z-[60]">
-           <div className="w-full max-w-3xl p-8 bg-[#1a0a0a] border border-white/10 relative">
-              <h2 className="text-3xl text-white font-bold tracking-widest mb-8 border-b border-white/10 pb-4">{t('CONTROLS')}</h2>
+           <div className="w-full max-w-3xl p-4 md:p-8 bg-[#1a0a0a] border border-white/10 relative h-full md:h-auto overflow-y-auto">
+              <h2 className="text-2xl md:text-3xl text-white font-bold tracking-widest mb-4 border-b border-white/10 pb-2">{t('CONTROLS')}</h2>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                  <div className="p-4 border border-white/5 bg-white/5 rounded">
-                      <div className="text-cyan-400 font-bold mb-2 tracking-widest">{t('CTRL_MOVE')}</div>
-                      <div className="text-sm text-gray-400">{t('CTRL_MOVE_DESC')}</div>
-                      <div className="mt-4 flex gap-2 opacity-50">
-                          <div className="w-8 h-8 border border-white flex items-center justify-center text-xs">W</div>
-                          <div className="w-8 h-8 border border-white flex items-center justify-center text-xs">A</div>
-                          <div className="w-8 h-8 border border-white flex items-center justify-center text-xs">S</div>
-                          <div className="w-8 h-8 border border-white flex items-center justify-center text-xs">D</div>
-                      </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div className="p-3 md:p-4 border border-white/5 bg-white/5 rounded">
+                      <div className="text-cyan-400 font-bold mb-1 tracking-widest text-sm">{t('CTRL_MOVE')}</div>
+                      <div className="text-xs text-gray-400">{t('CTRL_MOVE_DESC')}</div>
                   </div>
 
-                  <div className="p-4 border border-white/5 bg-white/5 rounded">
-                      <div className="text-cyan-400 font-bold mb-2 tracking-widest">{t('CTRL_DASH')}</div>
-                      <div className="text-sm text-gray-400">{t('CTRL_DASH_DESC')}</div>
-                      <div className="mt-4 opacity-50">
-                           <div className="px-3 py-1 border border-white inline-block text-xs">SHIFT</div>
-                      </div>
+                  <div className="p-3 md:p-4 border border-white/5 bg-white/5 rounded">
+                      <div className="text-cyan-400 font-bold mb-1 tracking-widest text-sm">{t('CTRL_DASH')}</div>
+                      <div className="text-xs text-gray-400">{t('CTRL_DASH_DESC')}</div>
                   </div>
 
-                  <div className="p-4 border border-white/5 bg-white/5 rounded">
-                      <div className="text-cyan-400 font-bold mb-2 tracking-widest">{t('CTRL_SURGE')}</div>
-                      <div className="text-sm text-gray-400">{t('CTRL_SURGE_DESC')}</div>
-                      <div className="mt-4 opacity-50">
-                           <div className="px-6 py-1 border border-white inline-block text-xs">SPACE</div>
-                      </div>
+                  <div className="p-3 md:p-4 border border-white/5 bg-white/5 rounded">
+                      <div className="text-cyan-400 font-bold mb-1 tracking-widest text-sm">{t('CTRL_SURGE')}</div>
+                      <div className="text-xs text-gray-400">{t('CTRL_SURGE_DESC')}</div>
                   </div>
 
-                   <div className="p-4 border border-white/5 bg-white/5 rounded flex items-center justify-center">
-                      <div className="text-sm text-yellow-500 font-mono text-center">{t('CTRL_NOTE')}</div>
+                   <div className="p-3 md:p-4 border border-white/5 bg-white/5 rounded flex items-center justify-center">
+                      <div className="text-xs text-yellow-500 font-mono text-center">{t('CTRL_NOTE')}</div>
                   </div>
               </div>
 
@@ -944,11 +927,11 @@ export const Game: React.FC = () => {
 
       {gameState === GameState.BRIEFING && patient && (
          <div className="absolute inset-0 bg-black/95 flex items-center justify-center z-50">
-             <div className="w-full max-w-2xl p-8 border border-cyan-500/20 bg-cyan-900/10 text-center relative overflow-hidden flex flex-col items-center">
+             <div className="w-full max-w-2xl p-4 md:p-8 border border-cyan-500/20 bg-cyan-900/10 text-center relative overflow-hidden flex flex-col items-center">
                  <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500 shadow-[0_0_10px_#00ffff]"></div>
-                 <h2 className="text-2xl text-cyan-400 tracking-[0.3em] mb-4 animate-pulse">{t('BRIEFING')}</h2>
+                 <h2 className="text-xl md:text-2xl text-cyan-400 tracking-[0.3em] mb-4 animate-pulse">{t('BRIEFING')}</h2>
                  
-                 <div className="w-full bg-black/40 p-6 border-l-2 border-cyan-500 mb-8 text-left font-mono text-sm md:text-base space-y-2">
+                 <div className="w-full bg-black/40 p-4 md:p-6 border-l-2 border-cyan-500 mb-4 md:mb-8 text-left font-mono text-xs md:text-base space-y-2">
                     <div className="flex justify-between">
                         <span className="text-gray-500">{t('PATIENT')}:</span>
                         <span className="text-white">{patient.name} [{patient.age}]</span>
@@ -971,11 +954,11 @@ export const Game: React.FC = () => {
                     </div>
                  </div>
 
-                 <div className="flex gap-4 w-full">
-                    <button onClick={openShop} className="flex-1 py-4 border border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10 font-bold tracking-widest transition-all">
+                 <div className="flex gap-2 md:gap-4 w-full">
+                    <button onClick={openShop} className="flex-1 py-3 md:py-4 border border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10 font-bold text-xs md:text-base tracking-widest transition-all">
                         {t('OPEN_SHOP')}
                     </button>
-                    <button onClick={deployToWave} className="flex-[2] py-4 bg-cyan-600 text-black font-bold tracking-widest hover:bg-cyan-500 transition-all shadow-[0_0_20px_rgba(0,255,255,0.4)]">
+                    <button onClick={deployToWave} className="flex-[2] py-3 md:py-4 bg-cyan-600 text-black font-bold text-xs md:text-base tracking-widest hover:bg-cyan-500 transition-all shadow-[0_0_20px_rgba(0,255,255,0.4)]">
                         {t('DEPLOY')}
                     </button>
                  </div>
@@ -984,35 +967,35 @@ export const Game: React.FC = () => {
       )}
 
       {gameState === GameState.BIO_LAB && (
-        <div className="absolute inset-0 bg-black/95 flex items-center justify-center z-50 p-4">
-             <div className="w-full max-w-5xl h-[90%] flex flex-col relative">
-                <div className="flex justify-between items-center mb-6 border-b border-white/10 pb-4">
-                    <h2 className="text-4xl text-yellow-400 font-bold tracking-widest text-glow">{t('MUTATION')}</h2>
+        <div className="absolute inset-0 bg-black/95 flex items-center justify-center z-50 p-2 md:p-4">
+             <div className="w-full max-w-5xl h-full md:h-[90%] flex flex-col relative">
+                <div className="flex justify-between items-center mb-2 md:mb-6 border-b border-white/10 pb-2 md:pb-4">
+                    <h2 className="text-2xl md:text-4xl text-yellow-400 font-bold tracking-widest text-glow">{t('MUTATION')}</h2>
                     <div className="text-right">
-                        <div className="text-xs text-gray-500 tracking-widest">{t('BIOMASS_AVAIL')}</div>
-                        <div className="text-3xl font-mono text-yellow-400">{uiData.biomass}</div>
+                        <div className="text-[10px] md:text-xs text-gray-500 tracking-widest">{t('BIOMASS_AVAIL')}</div>
+                        <div className="text-xl md:text-3xl font-mono text-yellow-400">{uiData.biomass}</div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 overflow-y-auto pb-4">
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 md:gap-4 overflow-y-auto pb-4 custom-scroll">
                     {upgrades.map((upgrade, idx) => {
                          const cost = Math.floor(upgrade.baseCost * Math.pow(upgrade.costMultiplier, upgrade.level));
                          const canAfford = uiData.biomass >= cost;
                          const isMaxed = upgrade.level >= upgrade.maxLevel;
 
                          return (
-                            <div key={idx} className={`p-6 bg-[#151515] border ${upgrade.rarity === 'LEGENDARY' ? 'border-amber-500/30' : 'border-white/10'} relative group`}>
-                                <div className="flex justify-between mb-2">
-                                    <span className={`text-[10px] px-2 py-0.5 border ${upgrade.rarity === 'LEGENDARY' ? 'text-amber-400 border-amber-400/30' : 'text-gray-400 border-gray-600'}`}>{upgrade.rarity}</span>
-                                    <span className="text-xs text-gray-500">LVL {upgrade.level}/{upgrade.maxLevel}</span>
+                            <div key={idx} className={`p-2 md:p-6 bg-[#151515] border ${upgrade.rarity === 'LEGENDARY' ? 'border-amber-500/30' : 'border-white/10'} relative group`}>
+                                <div className="flex justify-between mb-1 md:mb-2">
+                                    <span className={`text-[8px] md:text-[10px] px-1 md:px-2 py-0.5 border ${upgrade.rarity === 'LEGENDARY' ? 'text-amber-400 border-amber-400/30' : 'text-gray-400 border-gray-600'}`}>{upgrade.rarity}</span>
+                                    <span className="text-[8px] md:text-xs text-gray-500">LVL {upgrade.level}/{upgrade.maxLevel}</span>
                                 </div>
-                                <h3 className="text-xl font-bold text-white mb-2">{t(upgrade.nameKey)}</h3>
-                                <p className="text-sm text-gray-400 mb-4 h-10">{t(upgrade.descKey)}</p>
+                                <h3 className="text-sm md:text-xl font-bold text-white mb-1 md:mb-2 leading-tight">{t(upgrade.nameKey)}</h3>
+                                <p className="text-[10px] md:text-sm text-gray-400 mb-2 md:mb-4 h-8 md:h-10 leading-tight">{t(upgrade.descKey)}</p>
                                 
                                 <button 
                                     onClick={() => buyUpgrade(upgrade.id)}
                                     disabled={!canAfford || isMaxed}
-                                    className={`w-full py-3 font-bold tracking-widest text-sm transition-all
+                                    className={`w-full py-2 md:py-3 font-bold tracking-widest text-[10px] md:text-sm transition-all
                                         ${isMaxed 
                                             ? 'bg-green-900/20 text-green-500 border border-green-500/30 cursor-default' 
                                             : canAfford 
@@ -1026,34 +1009,33 @@ export const Game: React.FC = () => {
                     })}
                 </div>
 
-                <button onClick={closeShop} className="mt-auto py-4 w-full border-t border-white/10 text-white/50 hover:text-white hover:bg-white/5 transition-colors tracking-widest">
+                <button onClick={closeShop} className="mt-auto py-3 md:py-4 w-full border-t border-white/10 text-white/50 hover:text-white hover:bg-white/5 transition-colors tracking-widest text-xs md:text-base">
                     {t('BACK')}
                 </button>
              </div>
         </div>
       )}
 
-      {/* (LOADOUT, SETTINGS, CREDITS, PAUSED, WAVE_CLEARED, GAME_OVER) mantidos sem alterações */}
-      {/* ... */}
+      {/* (LOADOUT, SETTINGS, CREDITS, PAUSED, GAME_OVER) mantidos */}
       
       {gameState === GameState.GAME_OVER && (
         <div className="absolute inset-0 bg-red-950/95 flex items-center justify-center z-50">
-           <div className="text-center p-8 border-y-2 border-red-600 w-full bg-black/50 backdrop-blur-md max-w-lg">
-             <h2 className="text-5xl md:text-7xl font-bold text-red-500 mb-2 tracking-widest red-glow">{t('GAME_OVER')}</h2>
+           <div className="text-center p-4 md:p-8 border-y-2 border-red-600 w-full bg-black/50 backdrop-blur-md max-w-lg">
+             <h2 className="text-3xl md:text-7xl font-bold text-red-500 mb-2 tracking-widest red-glow">{t('GAME_OVER')}</h2>
              
-             <div className="grid grid-cols-2 gap-8 mx-auto mb-10 text-left mt-8">
+             <div className="grid grid-cols-2 gap-4 md:gap-8 mx-auto mb-4 md:mb-10 text-left mt-4 md:mt-8">
                  <div>
                      <div className="text-xs text-red-400/50">{t('SCORE')}</div>
-                     <div className="text-3xl font-bold text-white">{uiData.score}</div>
+                     <div className="text-xl md:text-3xl font-bold text-white">{uiData.score}</div>
                  </div>
                  <div>
                      <div className="text-xs text-red-400/50">{t('WAVE')}</div>
-                     <div className="text-3xl font-bold text-white">{uiData.wave}</div>
+                     <div className="text-xl md:text-3xl font-bold text-white">{uiData.wave}</div>
                  </div>
              </div>
              
              {patient && (
-                 <div className="mb-8 text-sm font-mono text-gray-400">
+                 <div className="mb-4 md:mb-8 text-xs md:text-sm font-mono text-gray-400">
                      {t('STATUS_TERM')}
                  </div>
              )}
