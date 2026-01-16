@@ -13,6 +13,8 @@
  * Aceite a dor.
  */
 
+import { BossMutation } from './services/bossArchitect';
+
 // Geometria básica. Se você reprovou em matemática, sinto muito.
 export type Vector2 = { x: number; y: number };
 
@@ -127,6 +129,7 @@ export interface Entity {
   hitFlash?: number; // Frames restantes piscando branco
   orbitOffset?: number; // Para orbitais girarem bonitinho
   shootTimer?: number; // Para inimigos que atiram
+  mutation?: BossMutation; // NEW: Procedural Boss Data
 }
 
 // Os números que definem se você é um deus ou um inseto.
