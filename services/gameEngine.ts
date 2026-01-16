@@ -503,8 +503,18 @@ export class GameEngine {
       audioManager.playSurge();
       this.entities.forEach(e => {
           if (e.type === EntityType.DNA_FRAGMENT && e.active) {
-              e.vel.x = (this.player.pos.x - e.pos.x) * 0.5; 
-              e.vel.y = (this.player.pos.y - e.pos.y) * 0.5;
+              // CORREÇÃO: Usar velocidade normalizada para evitar "efeito estilingue"
+              const dx = this.player.pos.x - e.pos.x;
+              const dy = this.player.pos.y - e.pos.y;
+              const dist = Math.sqrt(dx*dx + dy*dy);
+              
+              if (dist > 0) {
+                  // Velocidade fixa e alta, em vez de proporcional à distância
+                  // Isso impede que moedas distantes "atravessem" o player e voem pra longe
+                  const speed = 25; 
+                  e.vel.x = (dx / dist) * speed;
+                  e.vel.y = (dy / dist) * speed;
+              }
           }
       });
     }
@@ -1001,7 +1011,10 @@ export class GameEngine {
 
       if (e.type !== EntityType.TEXT_POPUP) {
         const drag = e.drag ?? 0.5;
-        const flowInfluence = (e.type === EntityType.ANTIBODY || e.type === EntityType.ACID_POOL || e.type === EntityType.ENEMY_PROJECTILE) ? 0 : (e.type === EntityType.BOSS ? 0.1 : 1);
+        // CORREÇÃO: Desabilitar o Blood Flow no fragmento de DNA se o SURGE estiver ativo
+        // Isso impede que a corrente sanguínea lute contra o ímã
+        const isMagnetized = e.type === EntityType.DNA_FRAGMENT && (this.surgeActive || this.isVacuuming);
+        const flowInfluence = (e.type === EntityType.ANTIBODY || e.type === EntityType.ACID_POOL || e.type === EntityType.ENEMY_PROJECTILE || isMagnetized) ? 0 : (e.type === EntityType.BOSS ? 0.1 : 1);
         
         e.pos.x += (e.vel.x + (this.bloodFlow.x * (1 - drag) * flowInfluence)) * tick;
         e.pos.y += (e.vel.y + (this.bloodFlow.y * (1 - drag) * flowInfluence)) * tick;
