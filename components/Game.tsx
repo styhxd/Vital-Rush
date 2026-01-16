@@ -777,7 +777,7 @@ export const Game: React.FC = () => {
 
       {/* BOSS HEALTH BAR */}
       {bossEntity && !showBossIntro && (
-          <div className="absolute top-12 lg:top-8 left-1/2 -translate-x-1/2 z-30 w-[80%] lg:w-[50%] flex flex-col items-center pointer-events-none anim-tutorial-fade" style={{animationDuration: '0.5s'}}>
+          <div className="absolute top-24 lg:top-36 left-1/2 -translate-x-1/2 z-30 w-[80%] lg:w-[50%] flex flex-col items-center pointer-events-none anim-tutorial-fade" style={{animationDuration: '0.5s'}}>
               <div className="flex justify-between w-full text-red-500 font-bold font-mono text-[8px] lg:text-xs mb-1 tracking-[0.3em]">
                   <span className="anim-glitch">ANOMALY // BOSS</span>
                   <span>{Math.ceil(bossEntity.hp)}/{bossEntity.max}</span>
