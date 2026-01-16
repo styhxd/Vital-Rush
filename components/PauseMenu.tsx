@@ -25,19 +25,19 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({ isPaused, language, gameSt
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
         >
-            <div className="flex flex-col gap-2 md:gap-3 min-w-[250px] md:min-w-[300px] max-w-sm w-full border-y-2 border-cyan-500 p-4 md:p-8 bg-[#0a0a1a] shadow-[0_0_50px_rgba(0,255,255,0.15)] relative">
+            <div className="flex flex-col gap-1.5 lg:gap-3 min-w-[200px] lg:min-w-[300px] max-w-sm w-full border-y-2 border-cyan-500 p-3 lg:p-8 bg-[#0a0a1a] shadow-[0_0_50px_rgba(0,255,255,0.15)] relative">
                 
                 {/* Linhas decorativas do sistema */}
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-50"></div>
                 <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-cyan-500 to-transparent opacity-50"></div>
 
-                <h2 className="text-2xl md:text-4xl text-cyan-400 font-bold text-center tracking-[0.3em] mb-4 text-glow border-b border-cyan-900/50 pb-4">
+                <h2 className="text-lg lg:text-4xl text-cyan-400 font-bold text-center tracking-[0.3em] mb-2 lg:mb-4 text-glow border-b border-cyan-900/50 pb-2 lg:pb-4">
                     {t('PAUSED')}
                 </h2>
                 
                 <button 
                     onClick={(e) => { e.stopPropagation(); onResume(); }}
-                    className="w-full py-2 md:py-4 bg-cyan-900/20 border border-cyan-500/50 hover:bg-cyan-500 hover:text-black text-cyan-100 font-bold text-sm md:text-base tracking-widest transition-all uppercase group relative overflow-hidden"
+                    className="w-full py-1.5 lg:py-4 bg-cyan-900/20 border border-cyan-500/50 hover:bg-cyan-500 hover:text-black text-cyan-100 font-bold text-[10px] lg:text-base tracking-widest transition-all uppercase group relative overflow-hidden"
                 >
                     <span className="relative z-10">{t('RESUME')}</span>
                     <div className="absolute inset-0 bg-cyan-400/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
@@ -45,7 +45,7 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({ isPaused, language, gameSt
 
                 <button 
                     onClick={(e) => { e.stopPropagation(); onSettings(); }}
-                    className="w-full py-2 md:py-4 bg-cyan-900/10 border border-cyan-500/30 hover:bg-cyan-500/20 text-cyan-200 font-bold text-sm md:text-base tracking-widest transition-all uppercase group relative overflow-hidden"
+                    className="w-full py-1.5 lg:py-4 bg-cyan-900/10 border border-cyan-500/30 hover:bg-cyan-500/20 text-cyan-200 font-bold text-[10px] lg:text-base tracking-widest transition-all uppercase group relative overflow-hidden"
                 >
                     <span className="relative z-10">{t('SETTINGS')}</span>
                     <div className="absolute inset-0 bg-cyan-400/10 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
@@ -53,13 +53,13 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({ isPaused, language, gameSt
                 
                 <button 
                     onClick={(e) => { e.stopPropagation(); onQuit(); }}
-                    className="w-full py-2 md:py-4 bg-red-900/10 border border-red-500/30 hover:bg-red-600 hover:text-black text-red-400 font-bold text-sm md:text-base tracking-widest transition-all uppercase mt-2 group relative overflow-hidden"
+                    className="w-full py-1.5 lg:py-4 bg-red-900/10 border border-red-500/30 hover:bg-red-600 hover:text-black text-red-400 font-bold text-[10px] lg:text-base tracking-widest transition-all uppercase mt-1 lg:mt-2 group relative overflow-hidden"
                 >
                     <span className="relative z-10">{t('ABORT')}</span>
                     <div className="absolute inset-0 bg-red-500/20 translate-x-[-100%] group-hover:translate-x-0 transition-transform duration-300"></div>
                 </button>
 
-                <div className="mt-4 text-[10px] text-cyan-500/30 font-mono text-center tracking-widest">
+                <div className="mt-2 lg:mt-4 text-[8px] lg:text-[10px] text-cyan-500/30 font-mono text-center tracking-widest">
                     SYSTEM HALTED // WAITING INPUT
                 </div>
             </div>

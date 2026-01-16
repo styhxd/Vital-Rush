@@ -27,9 +27,9 @@ export const Joystick: React.FC<JoystickProps> = ({ onMove }) => {
   // Isso é crucial para o multi-touch.
   const touchIdRef = useRef<number | null>(null);
   
-  // REDUZIDO PARA MOBILE (Era 160/60)
-  const CONTAINER_SIZE = 100;
-  const HANDLE_SIZE = 40;
+  // REDUZIDO PARA MOBILE (Era 100/40) - Agora é minúsculo para não atrapalhar
+  const CONTAINER_SIZE = 80; 
+  const HANDLE_SIZE = 35;
   const MAX_RADIUS = CONTAINER_SIZE / 2 - HANDLE_SIZE / 2;
 
   // Lógica de Movimento Centralizada
@@ -127,7 +127,7 @@ export const Joystick: React.FC<JoystickProps> = ({ onMove }) => {
   return (
     <div 
       ref={containerRef}
-      className={`absolute bottom-6 left-6 md:bottom-8 md:left-8 rounded-full border-2 flex items-center justify-center touch-none select-none z-50 backdrop-blur-sm transition-colors duration-200
+      className={`absolute bottom-4 left-4 lg:bottom-8 lg:left-8 rounded-full border-2 flex items-center justify-center touch-none select-none z-50 backdrop-blur-sm transition-colors duration-200
         ${active ? 'border-cyan-500/50 bg-cyan-900/20' : 'border-white/10 bg-black/20'}`}
       style={{ width: CONTAINER_SIZE, height: CONTAINER_SIZE }}
       // Eventos de Toque Diretos (React Synthetic Events)
