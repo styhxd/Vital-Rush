@@ -102,7 +102,7 @@ const TutorialOverlay = ({ isMobile }: { isMobile: boolean }) => {
                     100% { opacity: 0; transform: scale(1.1); pointer-events: none; }
                 }
                 .anim-tutorial-fade {
-                    animation: tutorial-seq 4.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+                    animation: tutorial-seq 4.0s cubic-bezier(0.22, 1, 0.36, 1) forwards;
                 }
             `}</style>
             
@@ -333,14 +333,21 @@ export const Game: React.FC = () => {
       if (engineRef.current) {
           lastTimeRef.current = performance.now();
           const nextWaveIdx = engineRef.current.currentWaveIndex === -1 ? 0 : engineRef.current.currentWaveIndex + 1;
-          engineRef.current.startWave(nextWaveIdx);
+          
+          // Sincroniza o atraso do spawn dos monstros com a duração do tutorial
+          const TUTORIAL_DURATION = 4000; // 4 segundos (reduzido para ser mais rápido)
+          
+          if (nextWaveIdx === 0) {
+              // Passa o delay para a engine (em segundos)
+              engineRef.current.startWave(nextWaveIdx, TUTORIAL_DURATION / 1000);
+              setShowTutorial(true);
+              setTimeout(() => setShowTutorial(false), TUTORIAL_DURATION);
+          } else {
+              engineRef.current.startWave(nextWaveIdx, 0);
+          }
+          
           setGameState(GameState.PLAYING);
           audioManager.startGameMusic();
-          // Tutorial só aparece na primeira onda da sessão
-          if (nextWaveIdx === 0) {
-              setShowTutorial(true);
-              setTimeout(() => setShowTutorial(false), 4500);
-          }
           setBossEntity(null);
       }
   }, []);

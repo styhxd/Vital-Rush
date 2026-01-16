@@ -92,6 +92,9 @@ export class GameEngine {
   public waveActive: boolean = false;
   public bossSpawned: boolean = false;
   
+  // NOVO: Controle de atraso inicial da onda (para tutoriais)
+  public waveStartDelay: number = 0;
+
   public inputVector: Vector2 = { x: 0, y: 0 };
   private bloodFlow: Vector2 = { x: -3.5, y: 0 }; 
   private lastShotTime: number = 0;
@@ -473,7 +476,8 @@ export class GameEngine {
       this.vacuumTimer = 0; // Reset failsafe timer
   }
 
-  public startWave(waveIndex: number) {
+  // ATUALIZADO: Agora aceita um delay opcional para o tutorial
+  public startWave(waveIndex: number, delay: number = 0) {
     this.prepareWave();
     this.currentWaveIndex = waveIndex;
     this.waveTimer = 0;
@@ -483,6 +487,10 @@ export class GameEngine {
     this.clearBufferTimer = 0; 
     this.isVacuuming = false;  
     this.vacuumTimer = 0;
+    
+    // Configura o delay inicial (para tutorial)
+    this.waveStartDelay = delay;
+
     const waveNum = waveIndex + 1; 
     audioManager.setGameState(waveNum, 1.0);
     this.bloodFlow.x = -2.5 - (waveIndex * 0.5); 
@@ -503,14 +511,11 @@ export class GameEngine {
       audioManager.playSurge();
       this.entities.forEach(e => {
           if (e.type === EntityType.DNA_FRAGMENT && e.active) {
-              // CORREÇÃO: Usar velocidade normalizada para evitar "efeito estilingue"
               const dx = this.player.pos.x - e.pos.x;
               const dy = this.player.pos.y - e.pos.y;
               const dist = Math.sqrt(dx*dx + dy*dy);
               
               if (dist > 0) {
-                  // Velocidade fixa e alta, em vez de proporcional à distância
-                  // Isso impede que moedas distantes "atravessem" o player e voem pra longe
                   const speed = 25; 
                   e.vel.x = (dx / dist) * speed;
                   e.vel.y = (dy / dist) * speed;
@@ -824,60 +829,65 @@ export class GameEngine {
     }
 
     if (this.waveActive && this.currentWaveIndex >= 0) {
-      this.waveTimer += dtSeconds;
-      const config = WAVES[Math.min(this.currentWaveIndex, WAVES.length - 1)];
-      
-      const targetFlow = config.flowSpeed - (this.currentWaveIndex * 0.2); 
-      this.bloodFlow.x = this.bloodFlow.x * 0.95 + targetFlow * 0.05;
-      
-      let spawnRateMod = 1.0;
-      if (this.patient.strain === ViralStrain.SWARM) spawnRateMod = 0.5; 
-      if (this.patient.strain === ViralStrain.TITAN) spawnRateMod = 1.5; 
-
-      if (this.waveTimer < config.duration) {
-          this.spawnTimer += safeDt;
-          if (this.spawnTimer >= (config.spawnRate * spawnRateMod) && this.entities.length < this.maxEntities) {
-            this.spawnEnemy(config);
-            this.spawnTimer = 0;
-          }
+      // MODIFICADO: Se houver delay de início (tutorial), não avança o tempo da onda nem spawna inimigos
+      if (this.waveStartDelay > 0) {
+          this.waveStartDelay -= dtSeconds;
       } else {
-          if (config.hasBoss && !this.bossSpawned) {
-              this.spawnBoss(config);
-              this.bossSpawned = true;
-              if (onBossSpawn) onBossSpawn();
+          this.waveTimer += dtSeconds;
+          const config = WAVES[Math.min(this.currentWaveIndex, WAVES.length - 1)];
+          
+          const targetFlow = config.flowSpeed - (this.currentWaveIndex * 0.2); 
+          this.bloodFlow.x = this.bloodFlow.x * 0.95 + targetFlow * 0.05;
+          
+          let spawnRateMod = 1.0;
+          if (this.patient.strain === ViralStrain.SWARM) spawnRateMod = 0.5; 
+          if (this.patient.strain === ViralStrain.TITAN) spawnRateMod = 1.5; 
+
+          if (this.waveTimer < config.duration) {
+              this.spawnTimer += safeDt;
+              if (this.spawnTimer >= (config.spawnRate * spawnRateMod) && this.entities.length < this.maxEntities) {
+                this.spawnEnemy(config);
+                this.spawnTimer = 0;
+              }
+          } else {
+              if (config.hasBoss && !this.bossSpawned) {
+                  this.spawnBoss(config);
+                  this.bossSpawned = true;
+                  if (onBossSpawn) onBossSpawn();
+              }
           }
-      }
-      
-      if (this.waveTimer < config.duration + 10 && Math.random() < 0.005) { 
-          const y = Math.random() * CANVAS_HEIGHT;
-          this.entities.push({
-              id: `mine_${Date.now()}`, type: EntityType.BIO_MINE,
-              pos: { x: CANVAS_WIDTH + 50, y }, vel: { x: -0.5, y: 0 },
-              radius: 20, health: 10, maxHealth: 10, color: this.colors.BIO_MINE, damage: 150, active: true, drag: 0.1
-          });
-      }
+          
+          if (this.waveTimer < config.duration + 10 && Math.random() < 0.005) { 
+              const y = Math.random() * CANVAS_HEIGHT;
+              this.entities.push({
+                  id: `mine_${Date.now()}`, type: EntityType.BIO_MINE,
+                  pos: { x: CANVAS_WIDTH + 50, y }, vel: { x: -0.5, y: 0 },
+                  radius: 20, health: 10, maxHealth: 10, color: this.colors.BIO_MINE, damage: 150, active: true, drag: 0.1
+              });
+          }
 
-      const enemiesRemaining = this.entities.some(e => e.active && (this.isEnemy(e.type) || e.type === EntityType.BOSS));
-      const bossRemaining = this.entities.some(e => e.active && e.type === EntityType.BOSS);
-      
-      if (this.waveTimer >= config.duration) {
-          if (!enemiesRemaining && (!config.hasBoss || (this.bossSpawned && !bossRemaining))) {
-              this.isVacuuming = true; 
-          } else if (!config.hasBoss && !bossRemaining) {
-              const hasVisibleEnemies = this.entities.some(e => 
-                  (this.isEnemy(e.type) || e.type === EntityType.BOSS) && e.active &&
-                  e.pos.x > -50 && e.pos.x < CANVAS_WIDTH + 50 &&
-                  e.pos.y > -50 && e.pos.y < CANVAS_HEIGHT + 50
-              );
+          const enemiesRemaining = this.entities.some(e => e.active && (this.isEnemy(e.type) || e.type === EntityType.BOSS));
+          const bossRemaining = this.entities.some(e => e.active && e.type === EntityType.BOSS);
+          
+          if (this.waveTimer >= config.duration) {
+              if (!enemiesRemaining && (!config.hasBoss || (this.bossSpawned && !bossRemaining))) {
+                  this.isVacuuming = true; 
+              } else if (!config.hasBoss && !bossRemaining) {
+                  const hasVisibleEnemies = this.entities.some(e => 
+                      (this.isEnemy(e.type) || e.type === EntityType.BOSS) && e.active &&
+                      e.pos.x > -50 && e.pos.x < CANVAS_WIDTH + 50 &&
+                      e.pos.y > -50 && e.pos.y < CANVAS_HEIGHT + 50
+                  );
 
-              if (!hasVisibleEnemies) {
-                  this.clearBufferTimer += dtSeconds;
-                  if (this.clearBufferTimer > 3.0) {
-                      this.killAllEnemies(); 
-                      this.isVacuuming = true;
+                  if (!hasVisibleEnemies) {
+                      this.clearBufferTimer += dtSeconds;
+                      if (this.clearBufferTimer > 3.0) {
+                          this.killAllEnemies(); 
+                          this.isVacuuming = true;
+                      }
+                  } else {
+                      this.clearBufferTimer = 0; 
                   }
-              } else {
-                  this.clearBufferTimer = 0; 
               }
           }
       }
