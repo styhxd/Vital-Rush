@@ -857,7 +857,12 @@ export class GameEngine {
               }
           }
           
-          if (this.waveTimer < config.duration + 10 && Math.random() < 0.005) { 
+          // BIO-MINE SPAWN LOGIC UPDATE (Requested Feature)
+          // Agora spawna minas se a onda estiver ativa OU se houver um Boss vivo (ignora timer negativo)
+          const bossActive = this.entities.some(e => e.type === EntityType.BOSS && e.active);
+          const shouldSpawnMines = this.waveTimer < config.duration || bossActive;
+
+          if (shouldSpawnMines && Math.random() < 0.005) { 
               const y = Math.random() * CANVAS_HEIGHT;
               this.entities.push({
                   id: `mine_${Date.now()}`, type: EntityType.BIO_MINE,
@@ -1095,36 +1100,51 @@ export class GameEngine {
          for (const other of candidates) {
            if (!other.active) continue;
 
+           // COLLISION: Antibody/Orbital vs BIO_MINE
            if (other.type === EntityType.BIO_MINE && e.type === EntityType.ANTIBODY) {
-               if (distSq(e.pos, other.pos) < (e.radius + other.radius)**2) {
+               // BIO-MINE BUFF: Generous Hitbox (2.5x radius detection for shots)
+               if (distSq(e.pos, other.pos) < (e.radius + other.radius * 2.5)**2) {
                    e.active = false;
                    other.active = false;
                    this.sessionStats.mineKills++;
                    achievementManager.track('mine_pop_20', 1);
-                   this.spawnText(other.pos, this.t('MSG_BOOM'), this.colors.BIO_MINE, 40);
+                   // TEXTO DE CRÍTICO PARA MINAS
+                   this.spawnText(other.pos, "CRITICAL DETONATION", '#00ff00', 45); 
                    audioManager.playExplosion();
                    
                    this.particles.push({
                         id: 'mine_expl', type: EntityType.PARTICLE, pos: {...other.pos},
-                        vel: {x:0, y:0}, radius: 150, health:1, maxHealth:1, color: 'rgba(0, 255, 100, 0.4)', damage:0, active:true, ttl: 15
+                        vel: {x:0, y:0}, radius: 280, health:1, maxHealth:1, color: 'rgba(0, 255, 100, 0.4)', damage:0, active:true, ttl: 15
                    });
                    
                    if (!this.isLowQuality) {
-                       for(let k=0; k<8; k++) {
+                       for(let k=0; k<12; k++) {
                            const ang = Math.random() * Math.PI * 2;
-                           const spd = Math.random() * 10 + 5;
+                           const spd = Math.random() * 15 + 8;
                            this.particles.push({
                                id: 'spark', type: EntityType.PARTICLE, pos: {...other.pos},
                                vel: { x: Math.cos(ang)*spd, y: Math.sin(ang)*spd },
-                               radius: 3, health:1, maxHealth:1, color: '#aaffaa', damage:0, active:true, ttl: 20
+                               radius: 4, health:1, maxHealth:1, color: '#aaffaa', damage:0, active:true, ttl: 25
                            });
                        }
                    }
 
+                   // BIO-MINE BUFF: Increased Radius (150->280) and Damage (200->500)
+                   const explosionRadiusSq = 280 * 280;
                    this.entities.forEach(victim => {
                        if ((this.isEnemy(victim.type) || victim.type === EntityType.BOSS) && victim.active) {
-                           if (distSq(victim.pos, other.pos) < 150*150) {
-                               this.damageEnemy(victim, 200, true, stats);
+                           const d = distSq(victim.pos, other.pos);
+                           if (d < explosionRadiusSq) {
+                               this.damageEnemy(victim, 500, true, stats);
+                               // Added Massive Knockback
+                               const dist = Math.sqrt(d);
+                               if (dist > 0) {
+                                   const force = 30; // Strong push
+                                   const dx = victim.pos.x - other.pos.x;
+                                   const dy = victim.pos.y - other.pos.y;
+                                   victim.vel.x += (dx/dist) * force;
+                                   victim.vel.y += (dy/dist) * force;
+                               }
                            }
                        }
                    });
