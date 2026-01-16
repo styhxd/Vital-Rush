@@ -79,12 +79,12 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
     const HoloSlider = ({ label, value, onChange }: { label: string, value: number, onChange: (val: number) => void }) => {
         const percentage = Math.round(value * 100);
         return (
-            <div className="mb-6">
-                <div className="flex justify-between text-xs font-mono text-cyan-400 mb-2 tracking-widest">
+            <div className="mb-4 md:mb-6">
+                <div className="flex justify-between text-[10px] md:text-xs font-mono text-cyan-400 mb-1 tracking-widest">
                     <span>{label}</span>
                     <span>{percentage}%</span>
                 </div>
-                <div className="relative h-6 w-full bg-black/50 border border-cyan-900/50 skew-x-[-10deg] flex items-center px-1 cursor-pointer group">
+                <div className="relative h-4 md:h-6 w-full bg-black/50 border border-cyan-900/50 skew-x-[-10deg] flex items-center px-1 cursor-pointer group">
                     <input 
                         type="range" 
                         min="0" max="1" step="0.1" 
@@ -93,7 +93,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                         className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer"
                     />
                     {/* Visualização de Barras Segmentadas */}
-                    <div className="flex gap-1 w-full h-3 z-10 pointer-events-none">
+                    <div className="flex gap-1 w-full h-2 md:h-3 z-10 pointer-events-none">
                         {Array.from({ length: 20 }).map((_, i) => {
                             const active = (i / 20) < value;
                             return (
@@ -117,17 +117,17 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none"></div>
 
             <div className="w-full max-w-lg p-1 border-y-2 border-cyan-500 bg-[#050b14] relative shadow-[0_0_100px_rgba(0,255,255,0.1)]">
-                <div className="p-6 md:p-10 relative overflow-hidden flex flex-col max-h-[90vh] overflow-y-auto custom-scroll">
+                <div className="p-4 md:p-10 relative overflow-hidden flex flex-col max-h-[90vh] overflow-y-auto custom-scroll">
                     
                     {/* Header */}
-                    <h2 className="text-3xl font-bold text-center text-cyan-400 tracking-[0.3em] mb-8 border-b border-cyan-800 pb-4">
+                    <h2 className="text-xl md:text-3xl font-bold text-center text-cyan-400 tracking-[0.3em] mb-4 md:mb-8 border-b border-cyan-800 pb-2 md:pb-4">
                         {t('SETTINGS')}
-                        <span className="block text-[10px] text-gray-500 font-mono mt-1 tracking-normal">SYS.CONFIG.V4.6</span>
+                        <span className="block text-[8px] md:text-[10px] text-gray-500 font-mono mt-1 tracking-normal">SYS.CONFIG.V4.6</span>
                     </h2>
 
                     {/* Audio Section */}
-                    <div className="mb-8">
-                        <h3 className="text-xs font-mono text-gray-500 mb-4 border-l-2 border-cyan-500 pl-2">AUDIO PROTOCOLS</h3>
+                    <div className="mb-4 md:mb-8">
+                        <h3 className="text-xs font-mono text-gray-500 mb-2 md:mb-4 border-l-2 border-cyan-500 pl-2">AUDIO PROTOCOLS</h3>
                         <HoloSlider 
                             label="MASTER OUTPUT" 
                             value={audioSettings.master} 
@@ -146,31 +146,31 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                     </div>
 
                     {/* Visual Section (SURPRESA 1: Retro Optics) */}
-                    <div className="mb-8">
-                        <h3 className="text-xs font-mono text-gray-500 mb-4 border-l-2 border-cyan-500 pl-2">VISUAL OPTICS</h3>
-                        <div className="flex items-center justify-between bg-white/5 p-4 border border-white/10">
+                    <div className="mb-4 md:mb-8">
+                        <h3 className="text-xs font-mono text-gray-500 mb-2 md:mb-4 border-l-2 border-cyan-500 pl-2">VISUAL OPTICS</h3>
+                        <div className="flex items-center justify-between bg-white/5 p-2 md:p-4 border border-white/10">
                             <div className="flex flex-col">
-                                <span className="text-sm font-bold text-white tracking-widest">RETRO FILTER</span>
-                                <span className="text-[10px] text-gray-400">CRT SCANLINES & VIGNETTE</span>
+                                <span className="text-xs md:text-sm font-bold text-white tracking-widest">RETRO FILTER</span>
+                                <span className="text-[8px] md:text-[10px] text-gray-400">CRT SCANLINES & VIGNETTE</span>
                             </div>
                             <button 
                                 onClick={toggleCrt}
-                                className={`w-16 h-8 rounded-full relative transition-all duration-300 ${crtEnabled ? 'bg-cyan-900/80 border border-cyan-500' : 'bg-gray-800 border border-gray-600'}`}
+                                className={`w-12 h-6 md:w-16 md:h-8 rounded-full relative transition-all duration-300 ${crtEnabled ? 'bg-cyan-900/80 border border-cyan-500' : 'bg-gray-800 border border-gray-600'}`}
                             >
-                                <div className={`absolute top-1 bottom-1 w-6 bg-white rounded-full transition-all duration-300 shadow-[0_0_10px_white] ${crtEnabled ? 'left-8 bg-cyan-400' : 'left-1 bg-gray-500'}`}></div>
+                                <div className={`absolute top-1 bottom-1 w-4 md:w-6 bg-white rounded-full transition-all duration-300 shadow-[0_0_10px_white] ${crtEnabled ? 'left-6 md:left-8 bg-cyan-400' : 'left-1 bg-gray-500'}`}></div>
                             </button>
                         </div>
                     </div>
 
                     {/* Language Section */}
-                    <div className="mb-8">
-                        <h3 className="text-xs font-mono text-gray-500 mb-4 border-l-2 border-cyan-500 pl-2">{t('LANG')}</h3>
+                    <div className="mb-4 md:mb-8">
+                        <h3 className="text-xs font-mono text-gray-500 mb-2 md:mb-4 border-l-2 border-cyan-500 pl-2">{t('LANG')}</h3>
                         <div className="flex gap-2">
                             {(['EN', 'PT', 'ES'] as Language[]).map(l => (
                                 <button 
                                     key={l}
                                     onClick={() => onLanguageChange(l)}
-                                    className={`flex-1 py-3 font-bold text-xs tracking-widest border transition-all duration-300 flex items-center justify-center gap-2
+                                    className={`flex-1 py-2 md:py-3 font-bold text-[10px] md:text-xs tracking-widest border transition-all duration-300 flex items-center justify-center gap-2
                                     ${language === l 
                                         ? 'bg-cyan-600 text-black border-cyan-400 shadow-[0_0_15px_rgba(0,255,255,0.4)]' 
                                         : 'bg-black/40 text-cyan-700 border-cyan-900/50 hover:bg-cyan-900/20'}`}
@@ -182,10 +182,10 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                     </div>
 
                     {/* Surpresa 2: SYSTEM PURGE (Data Reset) */}
-                    <div className="mb-6 border-t border-red-900/30 pt-6">
+                    <div className="mb-4 md:mb-6 border-t border-red-900/30 pt-4 md:pt-6">
                         <button 
                             onClick={handleReset}
-                            className={`w-full py-4 border font-mono text-xs tracking-[0.2em] transition-all relative overflow-hidden group
+                            className={`w-full py-2 md:py-4 border font-mono text-[10px] md:text-xs tracking-[0.2em] transition-all relative overflow-hidden group
                                 ${resetStage === 1 
                                     ? 'bg-red-600 text-black border-red-500 animate-pulse' 
                                     : 'bg-red-950/20 text-red-500 border-red-900/50 hover:bg-red-900/40'}`}
@@ -201,7 +201,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                     {/* Footer Actions */}
                     <button 
                         onClick={onClose}
-                        className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 text-black font-bold tracking-[0.2em] transition-all shadow-[0_0_20px_rgba(0,255,255,0.3)] hover:scale-[1.02]"
+                        className="w-full py-3 md:py-4 bg-cyan-600 hover:bg-cyan-500 text-black font-bold tracking-[0.2em] text-xs md:text-base transition-all shadow-[0_0_20px_rgba(0,255,255,0.3)] hover:scale-[1.02]"
                     >
                         {t('BACK')}
                     </button>
