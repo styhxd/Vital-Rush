@@ -132,13 +132,13 @@
         will-change: background-position, transform, opacity; /* Dica para o compositor da GPU */
       }
 
-      /* PERFORMANCE OVERRIDE */
-      /* No modo de baixo desempenho, matamos a animação mas mantemos o visual estático da veia */
+      /* PERFORMANCE OVERRIDE (MODO TURBO) */
+      /* Remove apenas o Pulse e Filtros, mas MANTÉM o Flow */
       .perf-mode-low .vein-overlay {
-          animation: none !important; /* PÁRA TUDO */
-          opacity: 0.15 !important; /* Mantém visível e estático */
+          animation: flow 3s linear infinite !important; /* Mantém apenas o fluxo */
+          opacity: 0.15 !important;
           filter: none !important;
-          background-position: 0 0 !important; /* Reseta posição */
+          transform: none !important; /* Reseta escala do pulse */
       }
       
       /* Classes utilitárias de brilho para Neon */

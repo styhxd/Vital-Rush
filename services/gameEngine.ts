@@ -1295,7 +1295,8 @@ export class GameEngine {
       }
     }
     
-    const currentMaxParticles = this.isLowQuality ? 60 : 250;
+    // REDUZIDO drasticamente o número de partículas no modo low quality
+    const currentMaxParticles = this.isLowQuality ? 30 : 250;
     if (this.particles.length > currentMaxParticles) {
         const nonBg = this.particles.findIndex(p => p.id !== 'bg');
         if (nonBg !== -1) this.particles.splice(nonBg, 1);
@@ -1370,7 +1371,8 @@ export class GameEngine {
     this.ctx.fillStyle = this.colors.BG;
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    const aberration = this.adrenalineActive || this.surgeActive;
+    // OTIMIZAÇÃO: ABERRAÇÃO CROMÁTICA DESLIGADA NO MODO LOW
+    const aberration = (this.adrenalineActive || this.surgeActive) && !this.isLowQuality;
     if (aberration) {
         this.ctx.save();
         this.ctx.globalCompositeOperation = 'screen';
@@ -1408,8 +1410,13 @@ export class GameEngine {
       this.ctx.fill();
     }
 
-    // PARTICLES
-    this.ctx.globalCompositeOperation = 'screen';
+    // PARTICLES - OTIMIZAÇÃO CRÍTICA
+    // No modo Low Quality, usamos fillRect em vez de arc, e source-over em vez de screen.
+    // Isso economiza MUITA GPU.
+    if (!this.isLowQuality) {
+        this.ctx.globalCompositeOperation = 'screen';
+    }
+    
     this.particles.forEach(p => {
       if (p.id === 'ghost') {
           this.ctx.fillStyle = p.color;
@@ -1445,31 +1452,43 @@ export class GameEngine {
       } else {
         this.ctx.globalAlpha = p.id === 'bg' ? 0.3 : (p.ttl! / 20); 
         this.ctx.fillStyle = p.color;
-        this.ctx.beginPath();
-        this.ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI * 2);
-        this.ctx.fill();
+        
+        // OTIMIZAÇÃO: Desenho de Partícula
+        if (this.isLowQuality) {
+            // Low Quality: Retângulo (Mais rápido que Arc)
+            const size = p.radius * 2;
+            this.ctx.fillRect(p.pos.x - p.radius, p.pos.y - p.radius, size, size);
+        } else {
+            // High Quality: Círculo Perfeito
+            this.ctx.beginPath();
+            this.ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI * 2);
+            this.ctx.fill();
+        }
       }
     });
     this.ctx.globalCompositeOperation = 'source-over';
     this.ctx.globalAlpha = 1.0;
 
     // --- PROJÉTEIS ---
-    this.ctx.globalCompositeOperation = 'screen';
-    this.ctx.beginPath();
-    this.ctx.strokeStyle = this.colors.ANTIBODY;
-    this.ctx.lineWidth = 10; 
-    this.ctx.lineCap = 'round';
-    this.ctx.globalAlpha = 0.15; 
-    this.entities.forEach(e => {
-        if (!e.active) return;
-        if (e.type === EntityType.ANTIBODY) {
-             this.ctx.moveTo(e.pos.x, e.pos.y);
-             const tailX = e.pos.x - e.vel.x * 0.4; 
-             const tailY = e.pos.y - e.vel.y * 0.4;
-             this.ctx.lineTo(tailX, tailY);
-        }
-    });
-    this.ctx.stroke();
+    // OTIMIZAÇÃO: Rastro brilhante apenas em High Quality
+    if (!this.isLowQuality) {
+        this.ctx.globalCompositeOperation = 'screen';
+        this.ctx.beginPath();
+        this.ctx.strokeStyle = this.colors.ANTIBODY;
+        this.ctx.lineWidth = 10; 
+        this.ctx.lineCap = 'round';
+        this.ctx.globalAlpha = 0.15; 
+        this.entities.forEach(e => {
+            if (!e.active) return;
+            if (e.type === EntityType.ANTIBODY) {
+                 this.ctx.moveTo(e.pos.x, e.pos.y);
+                 const tailX = e.pos.x - e.vel.x * 0.4; 
+                 const tailY = e.pos.y - e.vel.y * 0.4;
+                 this.ctx.lineTo(tailX, tailY);
+            }
+        });
+        this.ctx.stroke();
+    }
     
     this.ctx.globalCompositeOperation = 'source-over';
     this.ctx.beginPath();
@@ -1503,15 +1522,17 @@ export class GameEngine {
     this.entities.forEach(e => {
         if (!e.active) return;
         if (e.type === EntityType.ORBITAL) {
-             const grad = this.ctx.createRadialGradient(e.pos.x, e.pos.y, e.radius * 0.2, e.pos.x, e.pos.y, e.radius * 2.0);
-             grad.addColorStop(0, hexToRgba(this.colors.ORBITAL, 0.6));
-             grad.addColorStop(1, 'rgba(0,0,0,0)');
-             
-             this.ctx.globalCompositeOperation = 'screen';
-             this.ctx.fillStyle = grad;
-             this.ctx.beginPath();
-             this.ctx.arc(e.pos.x, e.pos.y, e.radius * 2.0, 0, Math.PI*2);
-             this.ctx.fill();
+             if (!this.isLowQuality) {
+                 const grad = this.ctx.createRadialGradient(e.pos.x, e.pos.y, e.radius * 0.2, e.pos.x, e.pos.y, e.radius * 2.0);
+                 grad.addColorStop(0, hexToRgba(this.colors.ORBITAL, 0.6));
+                 grad.addColorStop(1, 'rgba(0,0,0,0)');
+                 
+                 this.ctx.globalCompositeOperation = 'screen';
+                 this.ctx.fillStyle = grad;
+                 this.ctx.beginPath();
+                 this.ctx.arc(e.pos.x, e.pos.y, e.radius * 2.0, 0, Math.PI*2);
+                 this.ctx.fill();
+             }
              
              this.ctx.globalCompositeOperation = 'source-over';
              this.ctx.strokeStyle = this.colors.ORBITAL;
@@ -1548,6 +1569,7 @@ export class GameEngine {
             this.ctx.globalAlpha = 0.6 + Math.sin(this.time/100)*0.4; 
             this.ctx.stroke();
             
+            // Otimização: Texto é caro, talvez remover no ultra low? Mantendo por enquanto.
             this.ctx.globalAlpha = 0.8;
             this.ctx.font = `${e.radius * 1.6}px var(--font-tech)`; 
             this.ctx.textAlign = 'center';
@@ -1560,16 +1582,19 @@ export class GameEngine {
             this.ctx.save();
             this.ctx.translate(e.pos.x, e.pos.y);
             
-            this.ctx.globalCompositeOperation = 'screen';
-            const pulse = 1 + Math.sin(this.time / 50) * 0.4; 
-            const grad = this.ctx.createRadialGradient(0, 0, e.radius * 0.2, 0, 0, e.radius * 2.0);
-            grad.addColorStop(0, hexToRgba(this.colors.BIO_MINE, 0.8));
-            grad.addColorStop(1, 'rgba(0,0,0,0)');
-            
-            this.ctx.fillStyle = grad;
-            this.ctx.beginPath();
-            this.ctx.arc(0, 0, e.radius * 2 * pulse, 0, Math.PI*2);
-            this.ctx.fill();
+            // OTIMIZAÇÃO: Gradients desligados no modo low
+            if (!this.isLowQuality) {
+                this.ctx.globalCompositeOperation = 'screen';
+                const pulse = 1 + Math.sin(this.time / 50) * 0.4; 
+                const grad = this.ctx.createRadialGradient(0, 0, e.radius * 0.2, 0, 0, e.radius * 2.0);
+                grad.addColorStop(0, hexToRgba(this.colors.BIO_MINE, 0.8));
+                grad.addColorStop(1, 'rgba(0,0,0,0)');
+                
+                this.ctx.fillStyle = grad;
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, e.radius * 2 * pulse, 0, Math.PI*2);
+                this.ctx.fill();
+            }
             
             this.ctx.globalCompositeOperation = 'source-over';
             this.ctx.rotate(this.time / 125); 
@@ -1592,6 +1617,7 @@ export class GameEngine {
             this.ctx.save();
             this.ctx.translate(e.pos.x, e.pos.y);
             
+            // RESTAURADO: BRILHO SEMPRE ATIVO (Ignora Low Quality)
             this.ctx.globalCompositeOperation = 'screen';
             this.ctx.fillStyle = e.isElite ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 215, 0, 0.4)';
             this.ctx.beginPath();
@@ -1612,6 +1638,7 @@ export class GameEngine {
             this.ctx.lineWidth = 1.5;
             this.ctx.stroke();
             
+            // RESTAURADO: DETALHES INTERNOS SEMPRE ATIVOS (Ignora Low Quality)
             this.ctx.beginPath();
             this.ctx.arc(0, 0, e.radius * 0.6, 0, Math.PI*2);
             this.ctx.strokeStyle = 'rgba(255,255,255,0.5)';
@@ -1633,25 +1660,28 @@ export class GameEngine {
             ? (e.type === EntityType.BOSS ? e.color : this.colors.ELITE_GLOW)
             : e.color;
             
-        if (glowColor.startsWith('#')) {
-            const glowRadius = e.radius * (e.type === EntityType.BOSS ? 2.5 : 2.0);
-            const grad = this.ctx.createRadialGradient(0, 0, e.radius * 0.2, 0, 0, glowRadius);
-            grad.addColorStop(0, hexToRgba(glowColor, 0.6)); 
-            grad.addColorStop(0.5, hexToRgba(glowColor, 0.2)); 
-            grad.addColorStop(1, 'rgba(0,0,0,0)'); 
-            
-            this.ctx.globalCompositeOperation = 'screen';
-            this.ctx.fillStyle = grad;
-            this.ctx.beginPath();
-            this.ctx.arc(0, 0, glowRadius, 0, Math.PI*2);
-            this.ctx.fill();
-        } else {
-            this.ctx.globalCompositeOperation = 'screen';
-            this.ctx.fillStyle = glowColor;
-            this.ctx.globalAlpha = 0.2;
-            this.ctx.beginPath();
-            this.ctx.arc(0, 0, e.radius * 2, 0, Math.PI*2);
-            this.ctx.fill();
+        // OTIMIZAÇÃO: Desligar glow/gradient dos inimigos no modo Low
+        if (!this.isLowQuality) {
+            if (glowColor.startsWith('#')) {
+                const glowRadius = e.radius * (e.type === EntityType.BOSS ? 2.5 : 2.0);
+                const grad = this.ctx.createRadialGradient(0, 0, e.radius * 0.2, 0, 0, glowRadius);
+                grad.addColorStop(0, hexToRgba(glowColor, 0.6)); 
+                grad.addColorStop(0.5, hexToRgba(glowColor, 0.2)); 
+                grad.addColorStop(1, 'rgba(0,0,0,0)'); 
+                
+                this.ctx.globalCompositeOperation = 'screen';
+                this.ctx.fillStyle = grad;
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, glowRadius, 0, Math.PI*2);
+                this.ctx.fill();
+            } else {
+                this.ctx.globalCompositeOperation = 'screen';
+                this.ctx.fillStyle = glowColor;
+                this.ctx.globalAlpha = 0.2;
+                this.ctx.beginPath();
+                this.ctx.arc(0, 0, e.radius * 2, 0, Math.PI*2);
+                this.ctx.fill();
+            }
         }
         
         this.ctx.globalCompositeOperation = 'source-over';
@@ -1732,16 +1762,18 @@ export class GameEngine {
 
     // --- PLAYER ---
     if (this.player.active) {
-      const glowRadius = this.isDashing ? this.player.radius * 3 : this.player.radius * 2.5;
-      const grad = this.ctx.createRadialGradient(this.player.pos.x, this.player.pos.y, this.player.radius * 0.2, this.player.pos.x, this.player.pos.y, glowRadius);
-      grad.addColorStop(0, hexToRgba(this.colors.PLAYER_CORE, this.isDashing ? 0.8 : 0.6));
-      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      if (!this.isLowQuality) {
+          const glowRadius = this.isDashing ? this.player.radius * 3 : this.player.radius * 2.5;
+          const grad = this.ctx.createRadialGradient(this.player.pos.x, this.player.pos.y, this.player.radius * 0.2, this.player.pos.x, this.player.pos.y, glowRadius);
+          grad.addColorStop(0, hexToRgba(this.colors.PLAYER_CORE, this.isDashing ? 0.8 : 0.6));
+          grad.addColorStop(1, 'rgba(0,0,0,0)');
 
-      this.ctx.globalCompositeOperation = 'screen';
-      this.ctx.fillStyle = grad;
-      this.ctx.beginPath();
-      this.ctx.arc(this.player.pos.x, this.player.pos.y, glowRadius, 0, Math.PI*2);
-      this.ctx.fill();
+          this.ctx.globalCompositeOperation = 'screen';
+          this.ctx.fillStyle = grad;
+          this.ctx.beginPath();
+          this.ctx.arc(this.player.pos.x, this.player.pos.y, glowRadius, 0, Math.PI*2);
+          this.ctx.fill();
+      }
       
       this.ctx.globalCompositeOperation = 'source-over';
       this.ctx.globalAlpha = 1.0;
