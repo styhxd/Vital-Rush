@@ -1,15 +1,14 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Language, Difficulty } from '../types';
 import { TEXTS } from '../constants';
 import { audioManager } from '../services/audioManager';
 
 // --- ARQUIVOS ESTÁTICOS ---
-// Agora apontando para a raiz (/).
-// O Vercel/Vite pega os arquivos da pasta 'public' e serve na raiz.
-const bgImg = "/background.webp";
-const vitalImg = "/vital.png";
-const virusImg = "/virus.png";
+// Definimos apenas o nome do arquivo. O componente SecureImage vai caçar o caminho correto.
+const IMG_BG = "background.webp";
+const IMG_VITAL = "vital.png";
+const IMG_VIRUS = "virus.png";
 
 // --- INTERFACE DE PROPS ---
 interface MainMenuSceneProps {
@@ -27,28 +26,42 @@ interface MainMenuSceneProps {
     onCheatInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
-// --- COMPONENTE DE IMAGEM SEGURA (DIAGNÓSTICO) ---
-const SecureImage = ({ src, alt, className, style }: any) => {
-    // Estado para controlar tentativas de carregamento
-    const [imgSrc, setImgSrc] = useState(src);
-    const [error, setError] = useState(false);
+// --- COMPONENTE DE IMAGEM INTELIGENTE (SMART LOADER) ---
+// Tenta múltiplos caminhos até achar a imagem
+const SecureImage = ({ fileName, alt, className, style }: { fileName: string, alt: string, className?: string, style?: React.CSSProperties }) => {
+    // Lista de tentativas em ordem de probabilidade para Vercel/Vite
+    const pathsToTry = [
+        `/${fileName}`,       // Tentativa 1: Raiz absoluta (Padrão Vercel/Public)
+        fileName,             // Tentativa 2: Relativo direto
+        `/public/${fileName}`,// Tentativa 3: Caminho explícito absoluto
+        `public/${fileName}`  // Tentativa 4: Caminho explícito relativo
+    ];
 
-    const handleError = () => {
-        // Log de erro para debug no console do navegador
-        console.error(`[ARCHITECT] FAILED TO LOAD: ${imgSrc}`);
-        setError(true);
+    const [currentPathIndex, setCurrentPathIndex] = useState(0);
+    const [hasError, setHasError] = useState(false);
+
+    const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
+        // Se ainda temos caminhos para tentar...
+        if (currentPathIndex < pathsToTry.length - 1) {
+            // Log discreto para debug
+            console.warn(`[ARCHITECT] Path failed: ${pathsToTry[currentPathIndex]}. Trying next...`);
+            setCurrentPathIndex(prev => prev + 1);
+        } else {
+            // Falhou em todos
+            console.error(`[ARCHITECT] CRITICAL: Could not load image ${fileName} from any known path.`);
+            setHasError(true);
+        }
     };
 
-    if (error) {
+    if (hasError) {
         return (
             <div 
                 className={`flex items-center justify-center border-2 border-red-500 bg-red-900/80 text-white font-mono text-[10px] p-2 text-center z-50 ${className}`}
-                style={{...style, minHeight: '100px', minWidth: '100px'}}
+                style={{...style, minHeight: '50px', minWidth: '50px'}}
             >
-                <div>
-                    <span className="text-red-500 font-bold block mb-1">IMAGE ERROR</span>
-                    File not found:<br/>
-                    <span className="text-yellow-300">"{src}"</span>
+                <div className="break-all">
+                    <span className="text-red-500 font-bold block mb-1">404</span>
+                    {fileName}
                 </div>
             </div>
         );
@@ -56,11 +69,12 @@ const SecureImage = ({ src, alt, className, style }: any) => {
 
     return (
         <img 
-            src={imgSrc} 
+            src={pathsToTry[currentPathIndex]} 
             alt={alt} 
             className={className} 
             style={style}
-            onError={handleError} 
+            onError={handleError}
+            // crossOrigin="anonymous" // Opcional: Ajuda em alguns casos de CDN, mas pode causar problemas locais se não configurado
         />
     );
 };
@@ -123,7 +137,7 @@ export const MainMenuScene: React.FC<MainMenuSceneProps> = ({
             {/* --- LAYER 1: BACKGROUND IMAGE --- */}
             <div className="absolute inset-0 z-0">
                 <SecureImage 
-                    src={bgImg} 
+                    fileName={IMG_BG} 
                     alt="Background" 
                     className="w-full h-full object-cover opacity-60"
                 />
@@ -136,7 +150,7 @@ export const MainMenuScene: React.FC<MainMenuSceneProps> = ({
                 {/* VITAL LOGO IMAGE */}
                 <div className="absolute right-[5%] top-[15%] h-[70%] w-[40%] flex items-center justify-center">
                     <SecureImage 
-                        src={vitalImg} 
+                        fileName={IMG_VITAL} 
                         alt="Vital Rush Logo" 
                         className="h-full w-auto object-contain anim-hero"
                     />
@@ -144,13 +158,13 @@ export const MainMenuScene: React.FC<MainMenuSceneProps> = ({
 
                 {/* VIRUS IMAGES (FLOATING) */}
                 <div className="absolute right-[10%] top-[10%] w-[100px] opacity-80 anim-virus-1">
-                    <SecureImage src={virusImg} alt="Virus" className="w-full drop-shadow-[0_0_10px_rgba(0,255,0,0.5)]" />
+                    <SecureImage fileName={IMG_VIRUS} alt="Virus" className="w-full drop-shadow-[0_0_10px_rgba(0,255,0,0.5)]" />
                 </div>
                 <div className="absolute right-[40%] bottom-[20%] w-[80px] opacity-60 anim-virus-2 blur-[1px]">
-                    <SecureImage src={virusImg} alt="Virus" className="w-full drop-shadow-[0_0_10px_rgba(255,0,0,0.5)]" />
+                    <SecureImage fileName={IMG_VIRUS} alt="Virus" className="w-full drop-shadow-[0_0_10px_rgba(255,0,0,0.5)]" />
                 </div>
                 <div className="absolute right-[-2%] top-[50%] w-[150px] opacity-90 anim-virus-3 blur-[2px]">
-                    <SecureImage src={virusImg} alt="Virus" className="w-full drop-shadow-[0_0_15px_rgba(100,255,0,0.5)]" />
+                    <SecureImage fileName={IMG_VIRUS} alt="Virus" className="w-full drop-shadow-[0_0_15px_rgba(100,255,0,0.5)]" />
                 </div>
             </div>
 
