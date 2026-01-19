@@ -1108,38 +1108,39 @@ export class GameEngine {
                    other.active = false;
                    this.sessionStats.mineKills++;
                    achievementManager.track('mine_pop_20', 1);
-                   // TEXTO DE CRÍTICO PARA MINAS
-                   this.spawnText(other.pos, "CRITICAL DETONATION", '#00ff00', 45); 
+                   // DRAMATIC FEEDBACK: Increased Shake and larger Explosion radius
+                   this.shakeIntensity = 25;
+                   this.spawnText(other.pos, "SYSTEM OVERLOAD", '#00ff00', 55); 
                    audioManager.playExplosion();
+                   audioManager.playSurge(); 
                    
                    this.particles.push({
                         id: 'mine_expl', type: EntityType.PARTICLE, pos: {...other.pos},
-                        vel: {x:0, y:0}, radius: 280, health:1, maxHealth:1, color: 'rgba(0, 255, 100, 0.4)', damage:0, active:true, ttl: 15
+                        vel: {x:0, y:0}, radius: 350, health:1, maxHealth:1, color: 'rgba(0, 255, 100, 0.5)', damage:0, active:true, ttl: 25
                    });
                    
-                   if (!this.isLowQuality) {
-                       for(let k=0; k<12; k++) {
-                           const ang = Math.random() * Math.PI * 2;
-                           const spd = Math.random() * 15 + 8;
-                           this.particles.push({
-                               id: 'spark', type: EntityType.PARTICLE, pos: {...other.pos},
-                               vel: { x: Math.cos(ang)*spd, y: Math.sin(ang)*spd },
-                               radius: 4, health:1, maxHealth:1, color: '#aaffaa', damage:0, active:true, ttl: 25
-                           });
-                       }
+                   // ALWAYS SPAWN SPARKS FOR DRAMA
+                   for(let k=0; k<18; k++) {
+                       const ang = Math.random() * Math.PI * 2;
+                       const spd = Math.random() * 20 + 10;
+                       this.particles.push({
+                           id: 'spark', type: EntityType.PARTICLE, pos: {...other.pos},
+                           vel: { x: Math.cos(ang)*spd, y: Math.sin(ang)*spd },
+                           radius: 5, health:1, maxHealth:1, color: '#aaffaa', damage:0, active:true, ttl: 35
+                       });
                    }
 
-                   // BIO-MINE BUFF: Increased Radius (150->280) and Damage (200->500)
-                   const explosionRadiusSq = 280 * 280;
+                   // BIO-MINE BUFF: Increased Radius (280->350) and Damage (500->800) for shots
+                   const explosionRadiusSq = 350 * 350;
                    this.entities.forEach(victim => {
                        if ((this.isEnemy(victim.type) || victim.type === EntityType.BOSS) && victim.active) {
                            const d = distSq(victim.pos, other.pos);
                            if (d < explosionRadiusSq) {
-                               this.damageEnemy(victim, 500, true, stats);
+                               this.damageEnemy(victim, 800, true, stats);
                                // Added Massive Knockback
                                const dist = Math.sqrt(d);
                                if (dist > 0) {
-                                   const force = 30; // Strong push
+                                   const force = 40; // Even stronger push
                                    const dx = victim.pos.x - other.pos.x;
                                    const dy = victim.pos.y - other.pos.y;
                                    victim.vel.x += (dx/dist) * force;
@@ -1268,12 +1269,12 @@ export class GameEngine {
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       if (p.id === 'mine_expl' || p.id === 'mine_expl_dash') {
-          const maxLife = 20; 
+          const maxLife = p.id === 'mine_expl' ? 25 : 20; 
           const life = p.ttl || 0;
           const progress = 1 - (life / maxLife);
           const easeOut = 1 - Math.pow(1 - progress, 3); 
 
-          const visualRadius = p.id === 'mine_expl_dash' ? p.radius * 1.5 : p.radius; 
+          const visualRadius = p.radius; 
           p.ttl = (p.ttl || 0) - 1;
           if (p.ttl <= 0) this.particles.splice(i, 1);
           continue;
@@ -1424,7 +1425,7 @@ export class GameEngine {
           // Garante Blend Mode e Alpha para a bomba mesmo no low mode
           this.ctx.globalCompositeOperation = 'screen';
           
-          const maxLife = 20; 
+          const maxLife = p.id === 'mine_expl' ? 25 : 20; 
           const life = p.ttl || 0;
           const progress = 1 - (life / maxLife);
           
@@ -1433,13 +1434,13 @@ export class GameEngine {
 
           this.ctx.beginPath();
           this.ctx.arc(p.pos.x, p.pos.y, radius * (1-Math.pow(1-progress, 3)), 0, Math.PI*2);
-          this.ctx.lineWidth = (isDashExpl ? 40 : 20) * (1 - progress); 
+          this.ctx.lineWidth = (isDashExpl ? 40 : 60) * (1 - progress); 
           
           if (isDashExpl) {
               this.ctx.strokeStyle = `rgba(0, 255, 255, ${life/maxLife})`;
               this.ctx.setLineDash([10, 20]);
           } else {
-              this.ctx.strokeStyle = `rgba(50, 255, 100, ${life/maxLife})`;
+              this.ctx.strokeStyle = `rgba(100, 255, 100, ${life/maxLife})`;
               this.ctx.setLineDash([]);
           }
           this.ctx.stroke();
