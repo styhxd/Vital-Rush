@@ -112,6 +112,7 @@ export class GameEngine {
   
   public invulnerabilityTimer: number = 0;
   private hitStopTimer: number = 0;
+  private systemGlitchActive: boolean = false; // SURPRESA 2: Disparo falha após levar dano
 
   private clearBufferTimer: number = 0; 
   private isVacuuming: boolean = false; 
@@ -402,7 +403,7 @@ export class GameEngine {
   }
 
   // --- REVISED: DAMAGE PLAYER LOGIC ---
-  private damagePlayer(amount: number, sourcePos: Vector2, onGameOver: () => void, onLifeLost: () => void, stats: PlayerStats, isEnvironmental: boolean = false) {
+  private damagePlayer(amount: number, sourcePos: Vector2, onGameOver: () => void, onLifeLost: () => void, stats: PlayerStats, isEnvironmental: boolean = false, sourceEntity?: Entity) {
       if (this.invulnerabilityTimer > 0 || this.isDashing) return;
 
       this.player.health -= amount;
@@ -418,6 +419,17 @@ export class GameEngine {
 
       // New Mechanics: Escape Feedback (Entity Collision only)
       if (!isEnvironmental) {
+          // SURPRESA 1: DANO ADAPTATIVO (Inimigo evolui no contato)
+          if (sourceEntity && sourceEntity.active) {
+              sourceEntity.radius *= 1.1;
+              sourceEntity.damage *= 1.1;
+              this.spawnText(sourceEntity.pos, "EVOLVED", sourceEntity.color, 15);
+          }
+
+          // SURPRESA 2: CHOQUE DE SISTEMA
+          // Ativa falha no próximo disparo
+          this.systemGlitchActive = true;
+
           this.invulnerabilityTimer = 0.4; // Short window to avoid multi-hits
           this.dashCooldownTimer = 0; // Instant recharge for escape
           
@@ -1199,10 +1211,10 @@ export class GameEngine {
               if (dMag < pSum * 0.8) {
                  if (this.invulnerabilityTimer <= 0 && !this.isDashing) {
                      if (stats.thorns > 0) this.damageEnemy(e, stats.thorns, false, stats);
-                     let damage = e.type === EntityType.BOSS ? 20 : (e.isElite ? 2 : 0.5);
+                     let damage = e.type === EntityType.BOSS ? 25 : (e.isElite ? 2.5 : 0.6); // Aumentado ~20%
                      damage *= this.difficultyMods.dmg;
                      // Damage from enemy collision uses protection logic
-                     this.damagePlayer(damage, e.pos, onGameOver, onLifeLost, stats, false);
+                     this.damagePlayer(damage, e.pos, onGameOver, onLifeLost, stats, false, e);
                  }
               }
           }
@@ -1243,10 +1255,9 @@ export class GameEngine {
 
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
-      if (p.id === 'mine_expl' || p.id === 'mine_expl_dash') {
+      if (p.id === 'mine_expl' || p.id === 'mine_expl_dash' || p.id === 'system_glitch') {
           const maxLife = p.id === 'mine_expl' ? 25 : 20; 
           const life = p.ttl || 0;
-          const progress = 1 - (life / maxLife);
           p.ttl = (p.ttl || 0) - 1;
           if (p.ttl <= 0) this.particles.splice(i, 1);
           continue;
@@ -1312,6 +1323,23 @@ export class GameEngine {
   }
 
   private shoot(target: Entity, stats: PlayerStats) {
+      // SURPRESA 2: CHOQUE DE SISTEMA
+      if (this.systemGlitchActive) {
+          this.systemGlitchActive = false;
+          // Spawn "Error Smoke" particles instead of bullets
+          for (let i = 0; i < 5; i++) {
+              this.particles.push({
+                  id: 'system_glitch', type: EntityType.PARTICLE,
+                  pos: { ...this.player.pos },
+                  vel: { x: (Math.random()-0.5)*10, y: (Math.random()-0.5)*10 },
+                  radius: 5 + Math.random()*5,
+                  health: 1, maxHealth: 1, color: '#888', active: true, ttl: 15, damage: 0
+              });
+          }
+          audioManager.playHit(); // Som de falha
+          return;
+      }
+
       const angle = Math.atan2(target.pos.y - this.player.pos.y, target.pos.x - this.player.pos.x);
       const count = stats.bulletCount;
       const spread = 0.15; 
@@ -1409,6 +1437,12 @@ export class GameEngine {
           this.ctx.fillStyle = p.color;
           this.ctx.beginPath();
           this.ctx.ellipse(p.pos.x, p.pos.y, p.radius * 1.5, p.radius * 0.6, 0, 0, Math.PI*2);
+          this.ctx.fill();
+      } else if (p.id === 'system_glitch') {
+          this.ctx.fillStyle = p.color;
+          this.ctx.globalAlpha = p.ttl! / 15;
+          this.ctx.beginPath();
+          this.ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI*2);
           this.ctx.fill();
       } else {
         this.ctx.globalAlpha = p.id === 'bg' ? 0.3 : (p.ttl! / 20); 
