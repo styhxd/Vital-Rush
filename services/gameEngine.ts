@@ -115,7 +115,7 @@ export class GameEngine {
 
   private clearBufferTimer: number = 0; 
   private isVacuuming: boolean = false; 
-  private vacuumTimer: number = 0; 
+  private vacuumingTimer: number = 0; 
   
   public isLowQuality: boolean = false; 
   private frameTimes: number[] = [];
@@ -223,8 +223,8 @@ export class GameEngine {
           hp = 120; dmg = 25; radius = 55; color = this.colors.PARASITE; val = 30; speed = 0.25;
       } else if (type === EntityType.VIRUS) { 
           hp = 90; dmg = 15; radius = 28; 
-          color = this.colors.VIRUS; val = 45; speed = 0.15;
-          shootTimer = 2.0; 
+          color = this.colors.VIRUS; val = 45; speed = 0.1; // Velocidade reduzida
+          shootTimer = 3.5; // Frequência reduzida (maior delay)
       }
 
       if (strain === ViralStrain.TITAN) { hp *= 2.0; radius *= 1.2; speed *= 0.7; val *= 1.5; }
@@ -473,7 +473,7 @@ export class GameEngine {
       this.spawnTimer = 0;
       this.regenTimer = 0;
       this.grid.clear(); 
-      this.vacuumTimer = 0; // Reset failsafe timer
+      this.vacuumingTimer = 0; // Reset failsafe timer
   }
 
   // ATUALIZADO: Agora aceita um delay opcional para o tutorial
@@ -486,7 +486,7 @@ export class GameEngine {
     this.spawnTimer = 0;
     this.clearBufferTimer = 0; 
     this.isVacuuming = false;  
-    this.vacuumTimer = 0;
+    this.vacuumingTimer = 0;
     
     // Configura o delay inicial (para tutorial)
     this.waveStartDelay = delay;
@@ -898,10 +898,10 @@ export class GameEngine {
       }
       
       if (this.isVacuuming) {
-          this.vacuumTimer += dtSeconds;
+          this.vacuumingTimer += dtSeconds;
           const dnaFragments = this.entities.filter(e => e.type === EntityType.DNA_FRAGMENT && e.active);
           
-          if (dnaFragments.length === 0 || this.vacuumTimer > 5.0) {
+          if (dnaFragments.length === 0 || this.vacuumingTimer > 5.0) {
               this.waveActive = false;
               this.isVacuuming = false;
               if (this.currentWaveIndex === 0 && this.sessionStats.damageTaken === 0) achievementManager.track('perfect_wave', 1);
@@ -1059,7 +1059,7 @@ export class GameEngine {
                         damage: 15 * this.difficultyMods.dmg, active: true, drag: 0
                     });
                     
-                    e.shootTimer = 3.0; 
+                    e.shootTimer = 3.5; // Frequência reduzida (era 3.0)
                 }
             }
         }
@@ -1194,7 +1194,7 @@ export class GameEngine {
                 speed *= this.difficultyMods.speed;
                 if (this.patient.strain === ViralStrain.VOLATILE) speed *= 1.3;
                 if (this.patient.strain === ViralStrain.TITAN) speed *= 0.7;
-                if (e.type === EntityType.VIRUS) speed *= 1.4;
+                if (e.type === EntityType.VIRUS) speed *= 0.8; // Velocidade de perseguicao reduzida
                 if (e.isElite) speed *= 0.7;
                 // NOTA: Velocidade do Boss agora é gerida no updateBoss
                 if (e.type === EntityType.FUNGI) speed = 0.2; 
@@ -1732,6 +1732,8 @@ export class GameEngine {
            this.ctx.closePath();
         } else if (e.type === EntityType.VIRUS) { 
             const r = e.radius;
+            // VELOCIDADE DE GIRO REDUZIDA: era this.time / 450
+            this.ctx.rotate(this.time / 900); 
             this.ctx.fillStyle = (e.hitFlash && e.hitFlash > 0) ? '#ffffff' : '#00aa00';
             this.ctx.beginPath();
             this.ctx.arc(0, 0, r, 0, Math.PI*2);
@@ -1741,7 +1743,7 @@ export class GameEngine {
             const spikes = 8;
             this.ctx.fillStyle = '#00ff00';
             for(let i=0; i<spikes; i++) {
-                const angle = (i/spikes) * Math.PI*2 + (this.time/50);
+                const angle = (i/spikes) * Math.PI*2;
                 const sx = Math.cos(angle) * (r * 1.2);
                 const sy = Math.sin(angle) * (r * 1.2);
                 this.ctx.beginPath();
