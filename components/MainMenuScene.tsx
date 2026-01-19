@@ -5,12 +5,11 @@ import { TEXTS } from '../constants';
 import { audioManager } from '../services/audioManager';
 
 // --- ARQUIVOS ESTÁTICOS ---
-// Apontando explicitamente para a pasta src/ na raiz conforme sua instrução.
-// Nota: Em alguns servidores, pode ser necessário mover isso para 'public/', 
-// mas aqui obedecemos a estrutura que você definiu.
-const bgImg = "src/background.webp";
-const vitalImg = "src/vital.png";
-const virusImg = "src/virus.png";
+// Agora apontando para a raiz (/).
+// O Vercel/Vite pega os arquivos da pasta 'public' e serve na raiz.
+const bgImg = "/background.webp";
+const vitalImg = "/vital.png";
+const virusImg = "/virus.png";
 
 // --- INTERFACE DE PROPS ---
 interface MainMenuSceneProps {
@@ -35,14 +34,9 @@ const SecureImage = ({ src, alt, className, style }: any) => {
     const [error, setError] = useState(false);
 
     const handleError = () => {
-        // Se falhar o caminho relativo "src/...", tenta com barra na frente "/src/..."
-        if (!imgSrc.startsWith('/')) {
-            setImgSrc('/' + src);
-        } else {
-            // Se falhar ambos, desiste e mostra o erro
-            console.error(`[ARCHITECT] CRITICAL: Image not found at ${src} or /${src}`);
-            setError(true);
-        }
+        // Log de erro para debug no console do navegador
+        console.error(`[ARCHITECT] FAILED TO LOAD: ${imgSrc}`);
+        setError(true);
     };
 
     if (error) {
