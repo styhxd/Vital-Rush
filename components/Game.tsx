@@ -958,7 +958,8 @@ export const Game: React.FC = () => {
       {gameState === GameState.MENU && (
         <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-          <div className="relative text-center p-6 lg:p-8 max-w-md lg:max-w-md w-full">
+          {/* REDUZIDO UM POUCO NO MOBILE (scale-90) como solicitado */}
+          <div className="relative text-center p-6 lg:p-8 max-w-md lg:max-w-md w-full scale-90 lg:scale-100">
             <h1 className={`text-6xl lg:text-9xl font-bold mb-2 lg:mb-2 tracking-tighter mix-blend-screen leading-none ${isPlatinum ? 'text-amber-400 shadow-[0_0_30px_rgba(255,170,0,0.5)]' : 'text-red-600 red-glow'}`} style={{fontFamily: 'Impact, sans-serif'}}>{t('TITLE_MAIN')}</h1>
             <h2 className="text-xl lg:text-5xl font-light text-white mb-4 lg:mb-8 tracking-[0.5em] -mt-1 lg:-mt-2 opacity-80">{t('TITLE_SUB')}</h2>
             
