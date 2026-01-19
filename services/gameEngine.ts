@@ -1418,12 +1418,12 @@ export class GameEngine {
     }
     
     this.particles.forEach(p => {
-      if (p.id === 'ghost') {
-          this.ctx.fillStyle = p.color;
-          this.ctx.beginPath();
-          this.ctx.ellipse(p.pos.x, p.pos.y, p.radius * 1.5, p.radius * 0.6, 0, 0, Math.PI*2);
-          this.ctx.fill();
-      } else if (p.id === 'mine_expl' || p.id === 'mine_expl_dash') {
+      // BOMBAS: Sempre renderizam com qualidade total para clareza de gameplay
+      if (p.id === 'mine_expl' || p.id === 'mine_expl_dash') {
+          this.ctx.save();
+          // Garante Blend Mode e Alpha para a bomba mesmo no low mode
+          this.ctx.globalCompositeOperation = 'screen';
+          
           const maxLife = 20; 
           const life = p.ttl || 0;
           const progress = 1 - (life / maxLife);
@@ -1448,6 +1448,12 @@ export class GameEngine {
           this.ctx.beginPath();
           this.ctx.arc(p.pos.x, p.pos.y, radius * 0.5 * (1-progress), 0, Math.PI*2);
           this.ctx.fillStyle = isDashExpl ? `rgba(200, 255, 255, ${life/maxLife})` : `rgba(200, 255, 200, ${life/maxLife})`;
+          this.ctx.fill();
+          this.ctx.restore();
+      } else if (p.id === 'ghost') {
+          this.ctx.fillStyle = p.color;
+          this.ctx.beginPath();
+          this.ctx.ellipse(p.pos.x, p.pos.y, p.radius * 1.5, p.radius * 0.6, 0, 0, Math.PI*2);
           this.ctx.fill();
       } else {
         this.ctx.globalAlpha = p.id === 'bg' ? 0.3 : (p.ttl! / 20); 
@@ -1734,7 +1740,7 @@ export class GameEngine {
             const spikes = 8;
             this.ctx.fillStyle = '#00ff00';
             for(let i=0; i<spikes; i++) {
-                const angle = (i/spikes) * Math.PI*2 + (this.time/500);
+                const angle = (i/spikes) * Math.PI*2 + (this.time/50);
                 const sx = Math.cos(angle) * (r * 1.2);
                 const sy = Math.sin(angle) * (r * 1.2);
                 this.ctx.beginPath();
