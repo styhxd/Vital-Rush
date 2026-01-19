@@ -9,15 +9,15 @@ import { PauseMenu } from './PauseMenu';
 import { SettingsMenu } from './SettingsMenu';
 import { LoadoutMenu } from './LoadoutMenu'; 
 
-// --- UI COMPONENTS (Versão Compacta) ---
+// --- UI COMPONENTS (Versão Compacta - Agora Aumentada para Mobile) ---
 
 const StatBar = ({ value, max, colorClass, label, animate = false }: any) => (
   <div className="flex flex-col w-full">
     <div className="flex justify-between items-end mb-0.5 px-0.5">
-        <span className="text-[6px] lg:text-xs font-bold tracking-widest text-white/70">{label}</span>
-        <span className="text-[6px] lg:text-xs font-mono text-white/70">{Math.floor(value)}/{max}</span>
+        <span className="text-[9px] lg:text-xs font-bold tracking-widest text-white/70">{label}</span>
+        <span className="text-[9px] lg:text-xs font-mono text-white/70">{Math.floor(value)}/{max}</span>
     </div>
-    <div className="h-1 lg:h-3 w-full bg-black/50 border border-white/10 rounded-sm skew-x-[-10deg] overflow-hidden backdrop-blur-sm relative">
+    <div className="h-1.5 lg:h-3 w-full bg-black/50 border border-white/10 rounded-sm skew-x-[-10deg] overflow-hidden backdrop-blur-sm relative">
       <div 
         className={`h-full ${colorClass} transition-all duration-200 origin-left ${animate && value >= max ? 'animate-pulse brightness-150' : ''}`}
         style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
@@ -30,15 +30,15 @@ const StatBar = ({ value, max, colorClass, label, animate = false }: any) => (
 const IconButton = ({ onClick, icon }: any) => (
   <button 
     onClick={onClick} 
-    className="p-1 lg:p-3 bg-black/40 border border-white/20 rounded hover:bg-white/10 active:scale-95 transition-all text-white/80"
+    className="p-1.5 lg:p-3 bg-black/40 border border-white/20 rounded hover:bg-white/10 active:scale-95 transition-all text-white/80"
   >
     {icon}
   </button>
 );
 
 const MenuButton = ({ onClick, children, variant = 'primary', selected = false }: any) => {
-  // Alterado para base muito menor. Só cresce em telas LG (Desktop).
-  const base = "w-full py-1.5 lg:py-4 font-bold text-[10px] lg:text-xl tracking-widest uppercase clip-path-polygon transition-all hover:scale-105 shadow-[0_0_10px_rgba(0,0,0,0.4)] lg:shadow-[0_0_20px_rgba(0,0,0,0.4)] relative overflow-hidden group";
+  // AUMENTADO: py-2 e text-xs no mobile
+  const base = "w-full py-2.5 lg:py-4 font-bold text-xs lg:text-xl tracking-widest uppercase clip-path-polygon transition-all hover:scale-105 shadow-[0_0_10px_rgba(0,0,0,0.4)] lg:shadow-[0_0_20px_rgba(0,0,0,0.4)] relative overflow-hidden group";
   let colors = "";
   
   if (variant === 'primary') {
@@ -60,15 +60,15 @@ const MenuButton = ({ onClick, children, variant = 'primary', selected = false }
 };
 
 const DatabaseCard = ({ title, desc, color }: any) => (
-    <div className="bg-white/5 border border-white/10 p-1.5 lg:p-4 relative overflow-hidden">
+    <div className="bg-white/5 border border-white/10 p-2 lg:p-4 relative overflow-hidden">
         <div className="absolute top-0 left-0 w-1 h-full" style={{backgroundColor: color}}></div>
-        <h3 className="text-[10px] lg:text-lg font-bold mb-0.5" style={{color: color}}>{title}</h3>
-        <p className="text-[7px] lg:text-xs text-gray-400 leading-tight">{desc}</p>
+        <h3 className="text-xs lg:text-lg font-bold mb-0.5" style={{color: color}}>{title}</h3>
+        <p className="text-[9px] lg:text-xs text-gray-400 leading-tight">{desc}</p>
     </div>
 );
 
 const IconSpeaker = ({ muted }: { muted: boolean }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 lg:h-6 lg:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 lg:h-6 lg:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         {muted ? (
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
         ) : (
@@ -79,13 +79,13 @@ const IconSpeaker = ({ muted }: { muted: boolean }) => (
 );
 
 const IconDNA = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 lg:h-6 lg:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 lg:h-6 lg:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
     </svg>
 );
 
 const IconTrophy = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 lg:h-6 lg:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 lg:h-6 lg:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
     </svg>
 );
@@ -106,49 +106,49 @@ const TutorialOverlay = ({ isMobile }: { isMobile: boolean }) => {
                 }
             `}</style>
             
-            <div className="flex gap-4 lg:gap-24 items-center scale-75 lg:scale-100 origin-center">
+            <div className="flex gap-6 lg:gap-24 items-center scale-75 lg:scale-100 origin-center">
                 {/* Movement */}
-                <div className="flex flex-col items-center gap-1 lg:gap-2 opacity-80">
-                    <div className="w-10 h-10 lg:w-24 lg:h-24 rounded-full border-2 border-cyan-500 flex items-center justify-center bg-cyan-900/20">
+                <div className="flex flex-col items-center gap-2 lg:gap-2 opacity-80">
+                    <div className="w-12 h-12 lg:w-24 lg:h-24 rounded-full border-2 border-cyan-500 flex items-center justify-center bg-cyan-900/20">
                         {isMobile ? (
-                            <div className="w-5 h-5 rounded-full bg-cyan-400/50 shadow-[0_0_15px_cyan]"></div>
+                            <div className="w-6 h-6 rounded-full bg-cyan-400/50 shadow-[0_0_15px_cyan]"></div>
                         ) : (
                             <span className="text-xl lg:text-2xl font-bold font-mono text-cyan-400">WASD</span>
                         )}
                     </div>
-                    <span className="text-[8px] lg:text-xs tracking-[0.2em] text-cyan-300 font-bold">MOVE</span>
+                    <span className="text-[10px] lg:text-xs tracking-[0.2em] text-cyan-300 font-bold">MOVE</span>
                 </div>
 
                 {/* DASH - O DESTAQUE */}
-                <div className="flex flex-col items-center gap-2 lg:gap-4 relative">
+                <div className="flex flex-col items-center gap-3 lg:gap-4 relative">
                     <div className="absolute inset-0 bg-white/10 blur-xl rounded-full animate-pulse"></div>
-                    <div className="w-14 h-14 lg:w-32 lg:h-32 rounded-full border-4 border-white flex items-center justify-center bg-white/10 shadow-[0_0_30px_white] animate-bounce">
+                    <div className="w-16 h-16 lg:w-32 lg:h-32 rounded-full border-4 border-white flex items-center justify-center bg-white/10 shadow-[0_0_30px_white] animate-bounce">
                         {isMobile ? (
-                            <span className="text-lg lg:text-2xl font-bold text-white">TAP</span>
+                            <span className="text-xl lg:text-2xl font-bold text-white">TAP</span>
                         ) : (
                             <span className="text-xl lg:text-2xl font-bold font-mono text-white">SHIFT</span>
                         )}
                     </div>
                     <div className="flex flex-col items-center">
-                        <span className="text-sm lg:text-2xl tracking-[0.3em] text-white font-black drop-shadow-[0_0_10px_white]">DASH</span>
-                        <span className="text-[7px] lg:text-xs text-yellow-300 uppercase tracking-widest bg-black/60 px-2 rounded mt-1">Invulnerability</span>
+                        <span className="text-base lg:text-2xl tracking-[0.3em] text-white font-black drop-shadow-[0_0_10px_white]">DASH</span>
+                        <span className="text-[9px] lg:text-xs text-yellow-300 uppercase tracking-widest bg-black/60 px-2 rounded mt-1">Invulnerability</span>
                     </div>
                 </div>
 
                 {/* Ultimate */}
-                <div className="flex flex-col items-center gap-1 lg:gap-2 opacity-80">
-                    <div className="w-10 h-10 lg:w-24 lg:h-24 rounded-full border-2 border-red-500 border-dashed flex items-center justify-center bg-red-900/20">
+                <div className="flex flex-col items-center gap-2 lg:gap-2 opacity-80">
+                    <div className="w-12 h-12 lg:w-24 lg:h-24 rounded-full border-2 border-red-500 border-dashed flex items-center justify-center bg-red-900/20">
                          {isMobile ? (
-                            <div className="w-6 h-6 border-2 border-red-500 rounded-full"></div>
+                            <div className="w-8 h-8 border-2 border-red-500 rounded-full"></div>
                         ) : (
                             <span className="text-lg lg:text-xl font-bold font-mono text-red-400">SPACE</span>
                         )}
                     </div>
-                    <span className="text-[8px] lg:text-xs tracking-[0.2em] text-red-300 font-bold">SURGE</span>
+                    <span className="text-[10px] lg:text-xs tracking-[0.2em] text-red-300 font-bold">SURGE</span>
                 </div>
             </div>
             
-            <div className="mt-8 lg:mt-12 text-[8px] lg:text-sm text-white/50 font-mono animate-pulse tracking-widest">
+            <div className="mt-8 lg:mt-12 text-[10px] lg:text-sm text-white/50 font-mono animate-pulse tracking-widest">
                 SYSTEMS INITIALIZED... GOOD LUCK.
             </div>
         </div>
@@ -803,79 +803,79 @@ export const Game: React.FC = () => {
 
       <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 z-[100] transition-all duration-500 ease-out ${activeAchievement ? 'translate-y-0 opacity-100' : '-translate-y-20 opacity-0'}`}>
           {activeAchievement && (
-              <div className={`flex items-center gap-2 lg:gap-4 p-2 lg:p-4 rounded border-2 shadow-[0_0_30px_rgba(0,0,0,0.8)] backdrop-blur-md min-w-[200px] lg:min-w-[300px]
+              <div className={`flex items-center gap-2 lg:gap-4 p-2 lg:p-4 rounded border-2 shadow-[0_0_30px_rgba(0,0,0,0.8)] backdrop-blur-md min-w-[220px] lg:min-w-[300px]
                   ${isPlatinum 
                       ? 'bg-purple-900/80 border-amber-400 shadow-[0_0_20px_rgba(255,215,0,0.3)]' 
                       : 'bg-black/90 border-cyan-500 shadow-[0_0_20px_rgba(0,255,255,0.3)]'}`}>
-                  <div className="text-xl lg:text-4xl animate-bounce">{activeAchievement.icon}</div>
+                  <div className="text-2xl lg:text-4xl animate-bounce">{activeAchievement.icon}</div>
                   <div>
-                      <div className={`text-[8px] lg:text-xs font-bold tracking-widest mb-1 ${isPlatinum ? 'text-amber-400' : 'text-cyan-400'}`}>{t('ACHIEVEMENTS')} UNLOCKED</div>
-                      <div className="text-xs lg:text-lg font-bold text-white">{t(activeAchievement.titleKey)}</div>
-                      <div className="text-[8px] lg:text-xs text-gray-400">{t(activeAchievement.descKey)}</div>
+                      <div className={`text-[10px] lg:text-xs font-bold tracking-widest mb-1 ${isPlatinum ? 'text-amber-400' : 'text-cyan-400'}`}>{t('ACHIEVEMENTS')} UNLOCKED</div>
+                      <div className="text-sm lg:text-lg font-bold text-white">{t(activeAchievement.titleKey)}</div>
+                      <div className="text-[10px] lg:text-xs text-gray-400">{t(activeAchievement.descKey)}</div>
                   </div>
               </div>
           )}
       </div>
 
       {(gameState === GameState.PLAYING || gameState === GameState.WAVE_CLEARED || gameState === GameState.LOADOUT) && (
-        <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between p-1 lg:p-6">
+        <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between p-2 lg:p-6">
            <div className="flex justify-between items-start">
-             <div className="flex flex-col gap-1 lg:gap-3 w-20 lg:w-64">
+             <div className="flex flex-col gap-1 lg:gap-3 w-28 lg:w-64">
                 <StatBar label={t('INTEGRITY')} value={uiData.health} max={uiData.maxHealth} colorClass={uiData.adrenaline ? "bg-red-600 animate-pulse" : (isPlatinum ? "bg-gradient-to-r from-purple-500 to-amber-400" : "bg-gradient-to-r from-red-600 to-red-400")} />
                 <StatBar label={t('SURGE_READY')} value={uiData.energy} max={uiData.maxEnergy} colorClass={isPlatinum ? "bg-gradient-to-r from-amber-400 to-white" : "bg-gradient-to-r from-cyan-600 to-cyan-400"} animate={true}/>
                 
-                <div className="flex gap-0.5 lg:gap-1 mt-1 lg:mt-2">
+                <div className="flex gap-1 lg:gap-1 mt-1 lg:mt-2">
                     {Array.from({length: INITIAL_LIVES}).map((_, i) => (
-                        <div key={i} className={`w-1.5 h-1.5 lg:w-4 lg:h-4 rounded-full flex items-center justify-center transition-all duration-500
+                        <div key={i} className={`w-2 h-2 lg:w-4 lg:h-4 rounded-full flex items-center justify-center transition-all duration-500
                             ${i < uiData.lives 
                                 ? 'bg-red-500 shadow-[0_0_10px_red] border-white/20 border' 
                                 : 'bg-black/50 border border-red-900/50 shadow-none'}`}>
                             {i < uiData.lives 
-                                ? <span className="text-[4px] lg:text-[8px]">♥</span> 
-                                : <span className="text-[4px] lg:text-[8px] text-red-900 font-bold">X</span>}
+                                ? <span className="text-[5px] lg:text-[8px]">♥</span> 
+                                : <span className="text-[5px] lg:text-[8px] text-red-900 font-bold">X</span>}
                         </div>
                     ))}
                 </div>
 
                 {uiData.adrenaline && (
-                    <div className="text-red-500 font-bold tracking-widest text-[6px] lg:text-xs animate-pulse text-glow border border-red-500/50 bg-red-900/20 px-1 py-0.5 lg:px-2 lg:py-1 mt-1 lg:mt-2">
+                    <div className="text-red-500 font-bold tracking-widest text-[8px] lg:text-xs animate-pulse text-glow border border-red-500/50 bg-red-900/20 px-1 py-0.5 lg:px-2 lg:py-1 mt-1 lg:mt-2">
                         ⚠ {t('ADRENALINE')} ⚠
                     </div>
                 )}
              </div>
 
              <div className="flex flex-col items-center">
-                 <div className="bg-black/50 border border-white/10 px-2 py-0.5 lg:px-3 lg:py-1 rounded-full backdrop-blur-md mb-1">
-                     <span className={`font-bold tracking-widest text-xs lg:text-2xl text-glow ${isPlatinum ? 'text-amber-400' : 'text-red-400'}`}>{t('WAVE')} {uiData.wave}</span>
+                 <div className="bg-black/50 border border-white/10 px-3 py-1 lg:px-3 lg:py-1 rounded-full backdrop-blur-md mb-1">
+                     <span className={`font-bold tracking-widest text-sm lg:text-2xl text-glow ${isPlatinum ? 'text-amber-400' : 'text-red-400'}`}>{t('WAVE')} {uiData.wave}</span>
                  </div>
-                 <div className="text-[8px] lg:text-xs text-white/50 tracking-widest">{(uiData.waveDuration - uiData.waveTime).toFixed(0)}s</div>
+                 <div className="text-[11px] lg:text-xs text-white/50 tracking-widest">{(uiData.waveDuration - uiData.waveTime).toFixed(0)}s</div>
                  
                  <div className={`mt-2 lg:mt-4 transition-all duration-200 ${uiData.combo > 1 ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}>
-                     <div className="text-xl lg:text-4xl font-black italic text-yellow-400 text-glow" style={{textShadow: '0 0 20px orange'}}>
+                     <div className="text-3xl lg:text-4xl font-black italic text-yellow-400 text-glow" style={{textShadow: '0 0 20px orange'}}>
                          {uiData.combo}x
                      </div>
-                     <div className="text-[6px] lg:text-xs font-bold text-yellow-600 tracking-[0.5em] text-center">{t('COMBO')}</div>
+                     <div className="text-[9px] lg:text-xs font-bold text-yellow-600 tracking-[0.5em] text-center">{t('COMBO')}</div>
                  </div>
              </div>
 
              <div className="flex flex-col items-end gap-1 lg:gap-2">
-                 <div className="pointer-events-auto flex gap-1 lg:gap-2">
+                 <div className="pointer-events-auto flex gap-1.5 lg:gap-2">
                      <IconButton onClick={openLoadout} icon={<IconDNA />} />
                      <IconButton onClick={toggleMute} icon={<IconSpeaker muted={isMuted} />} />
-                     <IconButton onClick={togglePause} icon={<span className="font-bold text-sm lg:text-xl">||</span>} />
+                     <IconButton onClick={togglePause} icon={<span className="font-bold text-base lg:text-xl">||</span>} />
                  </div>
                  <div className="text-right">
-                    <div className="text-[6px] lg:text-xs text-white/50 tracking-widest">{t('SCORE')}</div>
-                    <div className="text-xs lg:text-3xl font-bold font-mono text-white tracking-tighter cyan-glow">{uiData.score.toString().padStart(6, '0')}</div>
-                    <div className="text-[6px] lg:text-xs text-yellow-500 tracking-widest mt-0.5 lg:mt-1">{t('BIOMASS_AVAIL')}</div>
-                    <div className="text-xs lg:text-xl font-bold font-mono text-yellow-400 tracking-tighter">{uiData.biomass}</div>
+                    <div className="text-[9px] lg:text-xs text-white/50 tracking-widest">{t('SCORE')}</div>
+                    <div className="text-base lg:text-3xl font-bold font-mono text-white tracking-tighter cyan-glow">{uiData.score.toString().padStart(6, '0')}</div>
+                    <div className="text-[9px] lg:text-xs text-yellow-500 tracking-widest mt-0.5 lg:mt-1">{t('BIOMASS_AVAIL')}</div>
+                    <div className="text-base lg:text-xl font-bold font-mono text-yellow-400 tracking-tighter">{uiData.biomass}</div>
                  </div>
              </div>
            </div>
 
            {isMobile && !isPaused && (
              <div className="absolute inset-0 z-10 pointer-events-none">
-                 <div className="absolute bottom-4 right-4 pointer-events-auto flex gap-3 items-end">
+                 <div className="absolute bottom-6 right-6 pointer-events-auto flex gap-4 items-end">
                      <button 
                         onTouchStart={(e) => {
                             e.preventDefault();
@@ -884,13 +884,13 @@ export const Game: React.FC = () => {
                         }}
                         onClick={!isMobile ? triggerDash : undefined}
                         disabled={!uiData.dashReady}
-                        className={`w-10 h-10 lg:w-16 lg:h-16 rounded-full border-2 flex items-center justify-center relative transition-all duration-100 active:scale-95
+                        className={`w-14 h-14 lg:w-16 lg:h-16 rounded-full border-2 flex items-center justify-center relative transition-all duration-100 active:scale-95
                             ${uiData.dashReady
                                 ? 'border-white bg-white/20' 
                                 : 'border-white/10 bg-black/40 opacity-50'}`}
                      >
                          <div className={`absolute inset-0 bg-white/30 rounded-full transition-all duration-500 ${uiData.dashReady ? 'scale-0' : 'scale-100'}`} style={{clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0% 100%)'}}></div>
-                         <span className="font-bold text-[8px] lg:text-xs">DASH</span>
+                         <span className="font-bold text-[10px] lg:text-xs">DASH</span>
                      </button>
 
                      <button 
@@ -901,13 +901,13 @@ export const Game: React.FC = () => {
                         }}
                         onClick={!isMobile ? triggerUltimate : undefined}
                         disabled={uiData.energy < uiData.maxEnergy}
-                        className={`w-12 h-12 lg:w-24 lg:h-24 rounded-full border-2 lg:border-4 flex items-center justify-center relative transition-all duration-100 active:scale-95
+                        className={`w-16 h-16 lg:w-24 lg:h-24 rounded-full border-2 lg:border-4 flex items-center justify-center relative transition-all duration-100 active:scale-95
                             ${uiData.energy >= uiData.maxEnergy 
                                 ? (isPlatinum ? 'border-amber-400 bg-amber-900/40 shadow-[0_0_30px_rgba(255,215,0,0.4)]' : 'border-cyan-400 bg-cyan-900/40 shadow-[0_0_30px_rgba(0,255,255,0.4)]')
                                 : 'border-white/10 bg-black/40 grayscale opacity-50'}`}
                      >
                          <div className={`absolute inset-0 rounded-full border border-dashed border-white/20 ${uiData.energy >= uiData.maxEnergy ? 'animate-spin-slow' : ''}`}></div>
-                         <span className={`font-bold text-[8px] lg:text-sm tracking-widest ${uiData.energy >= uiData.maxEnergy ? (isPlatinum ? 'text-amber-200' : 'text-cyan-200') : 'text-white/30'}`}>SURGE</span>
+                         <span className={`font-bold text-[10px] lg:text-sm tracking-widest ${uiData.energy >= uiData.maxEnergy ? (isPlatinum ? 'text-amber-200' : 'text-cyan-200') : 'text-white/30'}`}>SURGE</span>
                      </button>
                  </div>
              </div>
@@ -924,22 +924,22 @@ export const Game: React.FC = () => {
                <div className="absolute bottom-0 w-full h-32 bg-gradient-to-t from-green-500/20 to-transparent"></div>
                
                {/* HUGE TEXT */}
-               <h1 className="text-3xl lg:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-b from-green-300 to-green-600 tracking-[0.1em] mb-4 lg:mb-8 animate-bounce drop-shadow-[0_0_30px_rgba(0,255,0,0.5)] text-center">
+               <h1 className="text-5xl lg:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-b from-green-300 to-green-600 tracking-[0.1em] mb-6 lg:mb-8 animate-bounce drop-shadow-[0_0_30px_rgba(0,255,0,0.5)] text-center">
                    {t('CLEARED')}
                </h1>
                
-               <div className="w-full max-w-[200px] lg:max-w-lg p-1 border-y-2 lg:border-y-4 border-green-500 bg-black/80 relative backdrop-blur-md">
-                   <div className="relative p-2 lg:p-8 text-center">
-                       <div className="w-full h-1 bg-green-500/50 mb-2 lg:mb-8"></div>
+               <div className="w-full max-w-[250px] lg:max-w-lg p-1 border-y-2 lg:border-y-4 border-green-500 bg-black/80 relative backdrop-blur-md">
+                   <div className="relative p-4 lg:p-8 text-center">
+                       <div className="w-full h-1 bg-green-500/50 mb-4 lg:mb-8"></div>
                        
-                       <div className="grid grid-cols-2 gap-2 lg:gap-4 mb-2 lg:mb-8 text-[8px] lg:text-sm font-mono tracking-widest">
+                       <div className="grid grid-cols-2 gap-2 lg:gap-4 mb-4 lg:mb-8 text-[10px] lg:text-sm font-mono tracking-widest">
                            <div className="text-right text-gray-400">{t('WAVE')}:</div>
                            <div className="text-left text-white font-bold">{uiData.wave}</div>
                            <div className="text-right text-gray-400">{t('BIOMASS_AVAIL')}:</div>
                            <div className="text-left text-yellow-400 font-bold">{uiData.biomass}</div>
                        </div>
 
-                       <div className="flex flex-col gap-2 lg:gap-4">
+                       <div className="flex flex-col gap-3 lg:gap-4">
                            <MenuButton variant="success" onClick={openShop}>
                                {t('MUTATION')}
                            </MenuButton>
@@ -958,20 +958,20 @@ export const Game: React.FC = () => {
       {gameState === GameState.MENU && (
         <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-          <div className="relative text-center p-4 lg:p-8 max-w-sm lg:max-w-md w-full">
-            <h1 className={`text-4xl lg:text-9xl font-bold mb-1 lg:mb-2 tracking-tighter mix-blend-screen leading-none ${isPlatinum ? 'text-amber-400 shadow-[0_0_30px_rgba(255,170,0,0.5)]' : 'text-red-600 red-glow'}`} style={{fontFamily: 'Impact, sans-serif'}}>{t('TITLE_MAIN')}</h1>
-            <h2 className="text-lg lg:text-5xl font-light text-white mb-2 lg:mb-8 tracking-[0.5em] -mt-1 lg:-mt-2 opacity-80">{t('TITLE_SUB')}</h2>
+          <div className="relative text-center p-6 lg:p-8 max-w-md lg:max-w-md w-full">
+            <h1 className={`text-6xl lg:text-9xl font-bold mb-2 lg:mb-2 tracking-tighter mix-blend-screen leading-none ${isPlatinum ? 'text-amber-400 shadow-[0_0_30px_rgba(255,170,0,0.5)]' : 'text-red-600 red-glow'}`} style={{fontFamily: 'Impact, sans-serif'}}>{t('TITLE_MAIN')}</h1>
+            <h2 className="text-xl lg:text-5xl font-light text-white mb-4 lg:mb-8 tracking-[0.5em] -mt-1 lg:-mt-2 opacity-80">{t('TITLE_SUB')}</h2>
             
-            {isPlatinum && <div className="text-[6px] lg:text-xs tracking-[0.5em] text-purple-400 mb-2 lg:mb-4 animate-pulse">{t('ACH_PLATINUM_MSG')}</div>}
+            {isPlatinum && <div className="text-[8px] lg:text-xs tracking-[0.5em] text-purple-400 mb-2 lg:mb-4 animate-pulse">{t('ACH_PLATINUM_MSG')}</div>}
 
-            <div className="mb-2 lg:mb-8">
-                <div className="text-[8px] lg:text-xs text-gray-500 tracking-widest mb-1 lg:mb-2">{t('DIFFICULTY')}</div>
-                <div className="grid grid-cols-4 gap-1 lg:gap-2">
+            <div className="mb-4 lg:mb-8">
+                <div className="text-[10px] lg:text-xs text-gray-500 tracking-widest mb-1 lg:mb-2">{t('DIFFICULTY')}</div>
+                <div className="grid grid-cols-4 gap-1.5 lg:gap-2">
                     {Object.values(Difficulty).map(d => (
                         <button 
                             key={d} 
                             onClick={() => setDifficulty(d)}
-                            className={`text-[6px] lg:text-[10px] font-bold py-1 lg:py-2 border transition-all ${difficulty === d ? 'bg-red-600 text-black border-red-600' : 'bg-transparent text-gray-500 border-gray-800'}`}
+                            className={`text-[9px] lg:text-[10px] font-bold py-1.5 lg:py-2 border transition-all ${difficulty === d ? 'bg-red-600 text-black border-red-600' : 'bg-transparent text-gray-500 border-gray-800'}`}
                         >
                             {t(`DIFF_${d}`)}
                         </button>
@@ -979,25 +979,25 @@ export const Game: React.FC = () => {
                 </div>
             </div>
 
-            <div className="space-y-1 lg:space-y-4">
+            <div className="space-y-2 lg:space-y-4">
                 <MenuButton onClick={() => { handleStartGame(); audioManager.startMenuMusic(); }}>{t('START')}</MenuButton>
-                <div className="grid grid-cols-2 gap-1 lg:gap-4">
+                <div className="grid grid-cols-2 gap-2 lg:gap-4">
                   <MenuButton variant="secondary" onClick={() => openControls(true)}>{t('CONTROLS')}</MenuButton>
                   <MenuButton variant="secondary" onClick={() => setGameState(GameState.MANUAL)}>{t('MANUAL')}</MenuButton>
                 </div>
-                <div className="grid grid-cols-2 gap-1 lg:gap-4">
+                <div className="grid grid-cols-2 gap-2 lg:gap-4">
                   {/* CHANGED: Now uses openSettings handler */}
                   <MenuButton variant="secondary" onClick={openSettings}>{t('SETTINGS')}</MenuButton>
                   <MenuButton variant="secondary" onClick={openAchievements}>{t('ACHIEVEMENTS')}</MenuButton>
                 </div>
                 
                 {/* REPLACED: Language Buttons now use FLAGS mapping and better styling */}
-                <div className="flex justify-center gap-1 lg:gap-2 mt-2 lg:mt-6">
+                <div className="flex justify-center gap-2 lg:gap-2 mt-4 lg:mt-6">
                     {(['EN', 'PT', 'ES'] as Language[]).map(l => (
                       <button 
                         key={l}
                         onClick={() => setLanguage(l)} 
-                        className={`text-[8px] lg:text-sm font-bold tracking-widest px-2 lg:px-3 py-1 lg:py-2 border-b-2 transition-all flex items-center gap-2
+                        className={`text-[10px] lg:text-sm font-bold tracking-widest px-3 lg:px-3 py-1.5 lg:py-2 border-b-2 transition-all flex items-center gap-2
                             ${language === l 
                                 ? 'text-white border-red-500 bg-red-900/20' 
                                 : 'text-gray-600 border-transparent hover:text-gray-400'}`}
@@ -1008,13 +1008,13 @@ export const Game: React.FC = () => {
                 </div>
             </div>
             
-            <div className="mt-4 lg:mt-8">
+            <div className="mt-6 lg:mt-8">
                 <input 
                     type="text" 
                     value={cheatInput} 
                     onChange={handleCheatInput}
                     placeholder={t('PH_ACCESS_CODE')}
-                    className="bg-transparent border-b border-gray-800 text-center text-[8px] lg:text-xs text-gray-500 focus:outline-none focus:border-red-500 w-full font-mono tracking-widest uppercase"
+                    className="bg-transparent border-b border-gray-800 text-center text-[10px] lg:text-xs text-gray-500 focus:outline-none focus:border-red-500 w-full font-mono tracking-widest uppercase"
                 />
             </div>
           </div>
@@ -1045,39 +1045,39 @@ export const Game: React.FC = () => {
       
       {gameState === GameState.ACHIEVEMENTS && (
           <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
-              <div className={`w-full max-w-6xl h-full lg:h-[90%] border p-2 lg:p-8 relative flex flex-col ${isPlatinum ? 'border-amber-500/50 bg-purple-900/10' : 'border-white/10 bg-[#1a0a0a]'}`}>
-                  <div className="flex justify-between items-center mb-2 lg:mb-4 border-b border-white/10 pb-2 flex-shrink-0">
-                      <h2 className={`text-sm lg:text-4xl font-bold tracking-widest ${isPlatinum ? 'text-amber-400' : 'text-cyan-400'}`}>{t('ACHIEVEMENTS')}</h2>
+              <div className={`w-full max-w-6xl h-full lg:h-[90%] border p-4 lg:p-8 relative flex flex-col ${isPlatinum ? 'border-amber-500/50 bg-purple-900/10' : 'border-white/10 bg-[#1a0a0a]'}`}>
+                  <div className="flex justify-between items-center mb-4 lg:mb-4 border-b border-white/10 pb-2 flex-shrink-0">
+                      <h2 className={`text-lg lg:text-4xl font-bold tracking-widest ${isPlatinum ? 'text-amber-400' : 'text-cyan-400'}`}>{t('ACHIEVEMENTS')}</h2>
                       <div className="flex items-center gap-2">
                           <IconTrophy />
-                          <span className="text-xs lg:text-xl font-mono">
+                          <span className="text-sm lg:text-xl font-mono">
                               {Object.values(achievementManager.getProgress()).filter(p => p.unlocked).length} / {ACHIEVEMENTS_LIST.length}
                           </span>
                       </div>
                   </div>
 
                   <div className="flex-1 overflow-y-auto pr-2 custom-scroll min-h-0">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-4 pb-4">
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4 pb-4">
                           {ACHIEVEMENTS_LIST.map((ach) => {
                               const progress = achievementManager.getProgress()[ach.id] || { unlocked: false, currentValue: 0 };
                               const isLocked = !progress.unlocked;
                               if (ach.secret && isLocked) {
                                   return (
-                                      <div key={ach.id} className="bg-black/60 border border-white/5 p-2 lg:p-6 flex items-center justify-center opacity-50 min-h-[40px] lg:min-h-[120px]">
-                                          <span className="text-[8px] lg:text-xs tracking-widest text-gray-600 font-mono">??? ENCRYPTED DATA ???</span>
+                                      <div key={ach.id} className="bg-black/60 border border-white/5 p-4 lg:p-6 flex items-center justify-center opacity-50 min-h-[50px] lg:min-h-[120px]">
+                                          <span className="text-[10px] lg:text-xs tracking-widest text-gray-600 font-mono">??? ENCRYPTED DATA ???</span>
                                       </div>
                                   )
                               }
 
                               return (
-                                  <div key={ach.id} className={`p-2 lg:p-6 border relative overflow-hidden transition-all group flex flex-col min-h-[50px] lg:min-h-[140px]
+                                  <div key={ach.id} className={`p-3 lg:p-6 border relative overflow-hidden transition-all group flex flex-col min-h-[60px] lg:min-h-[140px]
                                       ${isLocked ? 'border-white/10 bg-black/80 grayscale opacity-70' : 
                                         (ach.id === 'all_achievements' ? 'border-amber-500 bg-amber-900/30 shadow-[0_0_20px_rgba(255,215,0,0.2)]' : 'border-cyan-500/30 bg-cyan-900/20')}`}>
-                                      <div className="flex items-center lg:items-start gap-2 lg:gap-4 z-10 relative h-full">
-                                          <div className="text-xl lg:text-4xl filter drop-shadow-md">{ach.icon}</div>
+                                      <div className="flex items-center lg:items-start gap-3 lg:gap-4 z-10 relative h-full">
+                                          <div className="text-2xl lg:text-4xl filter drop-shadow-md">{ach.icon}</div>
                                           <div className="flex-1 flex flex-col h-full justify-center">
-                                              <h4 className={`font-bold text-[10px] lg:text-lg mb-0.5 lg:mb-1 ${isLocked ? 'text-gray-500' : 'text-white'}`}>{t(ach.titleKey)}</h4>
-                                              <p className={`text-[8px] lg:text-sm mb-0.5 lg:mb-1 leading-relaxed ${isLocked ? 'text-gray-600' : 'text-gray-300'}`}>{t(ach.descKey)}</p>
+                                              <h4 className={`font-bold text-xs lg:text-lg mb-1 lg:mb-1 ${isLocked ? 'text-gray-500' : 'text-white'}`}>{t(ach.titleKey)}</h4>
+                                              <p className={`text-[10px] lg:text-sm mb-1 lg:mb-1 leading-relaxed ${isLocked ? 'text-gray-600' : 'text-gray-300'}`}>{t(ach.descKey)}</p>
                                               
                                               <div className="mt-auto w-full">
                                                   {ach.isCumulative && !progress.unlocked && (
@@ -1086,7 +1086,7 @@ export const Game: React.FC = () => {
                                                       </div>
                                                   )}
                                                   
-                                                  <div className="flex justify-between text-[6px] lg:text-xs tracking-widest font-mono">
+                                                  <div className="flex justify-between text-[8px] lg:text-xs tracking-widest font-mono">
                                                       <span className={progress.unlocked ? 'text-green-400 font-bold' : 'text-gray-600'}>
                                                           {progress.unlocked ? 'UNLOCKED' : t('ACH_LOCKED')}
                                                       </span>
@@ -1105,7 +1105,7 @@ export const Game: React.FC = () => {
                       </div>
                   </div>
 
-                  <div className="mt-2 lg:mt-6 pt-2 lg:pt-4 border-t border-white/10 flex-shrink-0">
+                  <div className="mt-4 lg:mt-6 pt-4 lg:pt-4 border-t border-white/10 flex-shrink-0">
                       <MenuButton variant="secondary" onClick={() => setGameState(GameState.MENU)}>{t('BACK')}</MenuButton>
                   </div>
               </div>
@@ -1114,16 +1114,16 @@ export const Game: React.FC = () => {
 
       {gameState === GameState.MANUAL && (
         <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
-           <div className="w-full max-w-4xl p-4 lg:p-10 bg-[#1a0a0a] border border-white/10 relative h-[100vh] lg:h-[90vh] flex flex-col">
-              <h2 className="text-sm lg:text-3xl text-white font-bold tracking-widest mb-2 lg:mb-4 border-b border-white/10 pb-2 flex justify-between">
+           <div className="w-full max-w-4xl p-6 lg:p-10 bg-[#1a0a0a] border border-white/10 relative h-[100vh] lg:h-[90vh] flex flex-col">
+              <h2 className="text-lg lg:text-3xl text-white font-bold tracking-widest mb-4 lg:mb-4 border-b border-white/10 pb-2 flex justify-between">
                   <span>{t('MANUAL')}</span>
-                  <span className="text-cyan-500 text-[8px] lg:text-sm font-mono tracking-normal opacity-50">DB-V2.4</span>
+                  <span className="text-cyan-500 text-[10px] lg:text-sm font-mono tracking-normal opacity-50">DB-V2.4</span>
               </h2>
               
-              <div className="flex-1 overflow-y-auto custom-scroll pr-2 lg:pr-4 space-y-2 lg:space-y-8">
+              <div className="flex-1 overflow-y-auto custom-scroll pr-2 lg:pr-4 space-y-4 lg:space-y-8">
                   <section>
-                      <h4 className="text-cyan-400 font-bold tracking-[0.2em] mb-1 lg:mb-2 text-[8px] lg:text-sm border-l-2 border-cyan-500 pl-3">{t('MANUAL_HOSTILES')}</h4>
-                      <div className="grid grid-cols-2 gap-1 lg:gap-2">
+                      <h4 className="text-cyan-400 font-bold tracking-[0.2em] mb-2 lg:mb-2 text-[10px] lg:text-sm border-l-2 border-cyan-500 pl-3">{t('MANUAL_HOSTILES')}</h4>
+                      <div className="grid grid-cols-2 gap-2 lg:gap-2">
                           <DatabaseCard title="BACTERIA" desc={t('MANUAL_BAC_DESC')} color={COLORS_DEFAULT.BACTERIA} />
                           <DatabaseCard title="VIRUS" desc={t('MANUAL_VIR_DESC')} color={COLORS_DEFAULT.VIRUS} />
                           <DatabaseCard title="PARASITE" desc={t('MANUAL_PAR_DESC')} color={COLORS_DEFAULT.PARASITE} />
@@ -1134,8 +1134,8 @@ export const Game: React.FC = () => {
                   </section>
 
                   <section>
-                      <h4 className="text-white font-bold tracking-[0.2em] mb-1 lg:mb-2 text-[8px] lg:text-sm border-l-2 border-white pl-3">{t('MANUAL_MECHANICS')}</h4>
-                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-1 lg:gap-2">
+                      <h4 className="text-white font-bold tracking-[0.2em] mb-2 lg:mb-2 text-[10px] lg:text-sm border-l-2 border-white pl-3">{t('MANUAL_MECHANICS')}</h4>
+                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-2">
                            <DatabaseCard title={t('MANUAL_MECH_DASH_TITLE')} desc={t('MANUAL_MECH_DASH_DESC')} color="#fff" />
                            <DatabaseCard title={t('MANUAL_MECH_SURGE_TITLE')} desc={t('MANUAL_MECH_SURGE_DESC')} color={COLORS_DEFAULT.PLAYER_CORE} />
                            <DatabaseCard title={t('MANUAL_MECH_COMBO_TITLE')} desc={t('MANUAL_MECH_COMBO_DESC')} color={COLORS_DEFAULT.COMBO} />
@@ -1143,8 +1143,8 @@ export const Game: React.FC = () => {
                   </section>
 
                   <section>
-                      <h4 className="text-yellow-400 font-bold tracking-[0.2em] mb-1 lg:mb-2 text-[8px] lg:text-sm border-l-2 border-yellow-500 pl-3">{t('MANUAL_STRAINS')}</h4>
-                      <div className="grid grid-cols-2 gap-1 lg:gap-2">
+                      <h4 className="text-yellow-400 font-bold tracking-[0.2em] mb-2 lg:mb-2 text-[10px] lg:text-sm border-l-2 border-yellow-500 pl-3">{t('MANUAL_STRAINS')}</h4>
+                      <div className="grid grid-cols-2 gap-2 lg:gap-2">
                            <DatabaseCard title={t('STRAIN_STANDARD')} desc={t('STRAIN_STD_DESC')} color="#fff" />
                            <DatabaseCard title={t('STRAIN_SWARM')} desc={t('STRAIN_SWM_DESC')} color="#ff00ff" />
                            <DatabaseCard title={t('STRAIN_TITAN')} desc={t('STRAIN_TTN_DESC')} color="#ffaa00" />
@@ -1153,7 +1153,7 @@ export const Game: React.FC = () => {
                   </section>
               </div>
 
-              <div className="mt-2 lg:mt-6 pt-2 border-t border-white/10">
+              <div className="mt-4 lg:mt-6 pt-2 border-t border-white/10">
                   <MenuButton variant="secondary" onClick={() => setGameState(GameState.MENU)}>{t('BACK')}</MenuButton>
               </div>
            </div>
@@ -1163,27 +1163,27 @@ export const Game: React.FC = () => {
       {/* CONTROLS (Mantido compacto) */}
       {gameState === GameState.CONTROLS && (
         <div className="absolute inset-0 bg-black flex items-center justify-center z-[60]">
-           <div className="w-full max-w-3xl p-4 lg:p-8 bg-[#1a0a0a] border border-white/10 relative h-full lg:h-auto overflow-y-auto">
-              <h2 className="text-lg lg:text-3xl text-white font-bold tracking-widest mb-2 lg:mb-4 border-b border-white/10 pb-2">{t('CONTROLS')}</h2>
+           <div className="w-full max-w-3xl p-6 lg:p-8 bg-[#1a0a0a] border border-white/10 relative h-full lg:h-auto overflow-y-auto">
+              <h2 className="text-xl lg:text-3xl text-white font-bold tracking-widest mb-4 lg:mb-4 border-b border-white/10 pb-2">{t('CONTROLS')}</h2>
               
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-4 mb-2 lg:mb-4">
-                  <div className="p-2 lg:p-4 border border-white/5 bg-white/5 rounded">
-                      <div className="text-cyan-400 font-bold mb-1 tracking-widest text-[10px] lg:text-sm">{t('CTRL_MOVE')}</div>
-                      <div className="text-[8px] lg:text-xs text-gray-400">{t('CTRL_MOVE_DESC')}</div>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4 mb-4 lg:mb-4">
+                  <div className="p-4 lg:p-4 border border-white/5 bg-white/5 rounded">
+                      <div className="text-cyan-400 font-bold mb-1 tracking-widest text-xs lg:text-sm">{t('CTRL_MOVE')}</div>
+                      <div className="text-[10px] lg:text-xs text-gray-400">{t('CTRL_MOVE_DESC')}</div>
                   </div>
 
-                  <div className="p-2 lg:p-4 border border-white/5 bg-white/5 rounded">
-                      <div className="text-cyan-400 font-bold mb-1 tracking-widest text-[10px] lg:text-sm">{t('CTRL_DASH')}</div>
-                      <div className="text-[8px] lg:text-xs text-gray-400">{t('CTRL_DASH_DESC')}</div>
+                  <div className="p-4 lg:p-4 border border-white/5 bg-white/5 rounded">
+                      <div className="text-cyan-400 font-bold mb-1 tracking-widest text-xs lg:text-sm">{t('CTRL_DASH')}</div>
+                      <div className="text-[10px] lg:text-xs text-gray-400">{t('CTRL_DASH_DESC')}</div>
                   </div>
 
-                  <div className="p-2 lg:p-4 border border-white/5 bg-white/5 rounded">
-                      <div className="text-cyan-400 font-bold mb-1 tracking-widest text-[10px] lg:text-sm">{t('CTRL_SURGE')}</div>
-                      <div className="text-[8px] lg:text-xs text-gray-400">{t('CTRL_SURGE_DESC')}</div>
+                  <div className="p-4 lg:p-4 border border-white/5 bg-white/5 rounded">
+                      <div className="text-cyan-400 font-bold mb-1 tracking-widest text-xs lg:text-sm">{t('CTRL_SURGE')}</div>
+                      <div className="text-[10px] lg:text-xs text-gray-400">{t('CTRL_SURGE_DESC')}</div>
                   </div>
 
-                   <div className="p-2 lg:p-4 border border-white/5 bg-white/5 rounded flex items-center justify-center">
-                      <div className="text-[8px] lg:text-xs text-yellow-500 font-mono text-center">{t('CTRL_NOTE')}</div>
+                   <div className="p-4 lg:p-4 border border-white/5 bg-white/5 rounded flex items-center justify-center">
+                      <div className="text-[10px] lg:text-xs text-yellow-500 font-mono text-center">{t('CTRL_NOTE')}</div>
                   </div>
               </div>
 
@@ -1194,11 +1194,11 @@ export const Game: React.FC = () => {
 
       {gameState === GameState.BRIEFING && patient && (
          <div className="absolute inset-0 bg-black/95 flex items-center justify-center z-50">
-             <div className="w-full max-w-sm lg:max-w-2xl p-2 lg:p-8 border border-cyan-500/20 bg-cyan-900/10 text-center relative overflow-hidden flex flex-col items-center">
+             <div className="w-full max-w-sm lg:max-w-2xl p-4 lg:p-8 border border-cyan-500/20 bg-cyan-900/10 text-center relative overflow-hidden flex flex-col items-center">
                  <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500 shadow-[0_0_10px_#00ffff]"></div>
-                 <h2 className="text-lg lg:text-2xl text-cyan-400 tracking-[0.3em] mb-2 lg:mb-4 animate-pulse">{t('BRIEFING')}</h2>
+                 <h2 className="text-xl lg:text-2xl text-cyan-400 tracking-[0.3em] mb-4 lg:mb-4 animate-pulse">{t('BRIEFING')}</h2>
                  
-                 <div className="w-full bg-black/40 p-2 lg:p-6 border-l-2 border-cyan-500 mb-2 lg:mb-8 text-left font-mono text-[10px] lg:text-base space-y-1 lg:space-y-2">
+                 <div className="w-full bg-black/40 p-4 lg:p-6 border-l-2 border-cyan-500 mb-4 lg:mb-8 text-left font-mono text-xs lg:text-base space-y-2 lg:space-y-2">
                     <div className="flex justify-between">
                         <span className="text-gray-500">{t('PATIENT')}:</span>
                         <span className="text-white">{patient.name} [{patient.age}]</span>
@@ -1221,18 +1221,18 @@ export const Game: React.FC = () => {
                     </div>
                  </div>
 
-                 <div className="flex gap-2 lg:gap-4 w-full">
-                    <button onClick={openShop} className="flex-1 py-1.5 lg:py-4 border border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10 font-bold text-[8px] lg:text-base tracking-widest transition-all">
+                 <div className="flex gap-4 lg:gap-4 w-full">
+                    <button onClick={openShop} className="flex-1 py-2.5 lg:py-4 border border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10 font-bold text-[10px] lg:text-base tracking-widest transition-all">
                         {t('OPEN_SHOP')}
                     </button>
-                    <button onClick={deployToWave} className="flex-[2] py-1.5 lg:py-4 bg-cyan-600 text-black font-bold text-[8px] lg:text-base tracking-widest hover:bg-cyan-500 transition-all shadow-[0_0_20px_rgba(0,255,255,0.4)]">
+                    <button onClick={deployToWave} className="flex-[2] py-2.5 lg:py-4 bg-cyan-600 text-black font-bold text-[10px] lg:text-base tracking-widest hover:bg-cyan-500 transition-all shadow-[0_0_20px_rgba(0,255,255,0.4)]">
                         {t('DEPLOY')}
                     </button>
                  </div>
                  
                  <button 
                     onClick={() => setGameState(GameState.MENU)}
-                    className="mt-2 lg:mt-4 text-[8px] lg:text-xs text-red-500/40 hover:text-red-500 tracking-[0.2em] border-b border-transparent hover:border-red-500 transition-all uppercase"
+                    className="mt-4 lg:mt-4 text-[10px] lg:text-xs text-red-500/40 hover:text-red-500 tracking-[0.2em] border-b border-transparent hover:border-red-500 transition-all uppercase"
                  >
                     {t('ABORT')}
                  </button>
@@ -1241,35 +1241,35 @@ export const Game: React.FC = () => {
       )}
 
       {gameState === GameState.BIO_LAB && (
-        <div className="absolute inset-0 bg-black/95 flex items-center justify-center z-50 p-2 lg:p-4">
+        <div className="absolute inset-0 bg-black/95 flex items-center justify-center z-50 p-4 lg:p-4">
              <div className="w-full max-w-5xl h-full lg:h-[90%] flex flex-col relative">
-                <div className="flex justify-between items-center mb-2 lg:mb-6 border-b border-white/10 pb-2 lg:pb-4">
-                    <h2 className="text-sm lg:text-4xl text-yellow-400 font-bold tracking-widest text-glow">{t('MUTATION')}</h2>
+                <div className="flex justify-between items-center mb-4 lg:mb-6 border-b border-white/10 pb-4 lg:pb-4">
+                    <h2 className="text-lg lg:text-4xl text-yellow-400 font-bold tracking-widest text-glow">{t('MUTATION')}</h2>
                     <div className="text-right">
-                        <div className="text-[8px] lg:text-xs text-gray-500 tracking-widest">{t('BIOMASS_AVAIL')}</div>
-                        <div className="text-sm lg:text-3xl font-mono text-yellow-400">{uiData.biomass}</div>
+                        <div className="text-[10px] lg:text-xs text-gray-500 tracking-widest">{t('BIOMASS_AVAIL')}</div>
+                        <div className="text-lg lg:text-3xl font-mono text-yellow-400">{uiData.biomass}</div>
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-1 lg:gap-4 overflow-y-auto pb-4 custom-scroll">
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-4 overflow-y-auto pb-4 custom-scroll">
                     {upgrades.map((upgrade, idx) => {
                          const cost = Math.floor(upgrade.baseCost * Math.pow(upgrade.costMultiplier, upgrade.level));
                          const canAfford = uiData.biomass >= cost;
                          const isMaxed = upgrade.level >= upgrade.maxLevel;
 
                          return (
-                            <div key={idx} className={`p-1.5 lg:p-6 bg-[#151515] border ${upgrade.rarity === 'LEGENDARY' ? 'border-amber-500/30' : 'border-white/10'} relative group`}>
-                                <div className="flex justify-between mb-1 lg:mb-2">
-                                    <span className={`text-[6px] lg:text-[10px] px-1 lg:px-2 py-0.5 border ${upgrade.rarity === 'LEGENDARY' ? 'text-amber-400 border-amber-400/30' : 'text-gray-400 border-gray-600'}`}>{upgrade.rarity}</span>
-                                    <span className="text-[6px] lg:text-xs text-gray-500">LVL {upgrade.level}/{upgrade.maxLevel}</span>
+                            <div key={idx} className={`p-2.5 lg:p-6 bg-[#151515] border ${upgrade.rarity === 'LEGENDARY' ? 'border-amber-500/30' : 'border-white/10'} relative group`}>
+                                <div className="flex justify-between mb-1.5 lg:mb-2">
+                                    <span className={`text-[8px] lg:text-[10px] px-1.5 lg:px-2 py-0.5 border ${upgrade.rarity === 'LEGENDARY' ? 'text-amber-400 border-amber-400/30' : 'text-gray-400 border-gray-600'}`}>{upgrade.rarity}</span>
+                                    <span className="text-[8px] lg:text-xs text-gray-500">LVL {upgrade.level}/{upgrade.maxLevel}</span>
                                 </div>
-                                <h3 className="text-[10px] lg:text-xl font-bold text-white mb-0.5 lg:mb-2 leading-tight">{t(upgrade.nameKey)}</h3>
-                                <p className="text-[8px] lg:text-sm text-gray-400 mb-1 lg:mb-4 h-6 lg:h-10 leading-tight">{t(upgrade.descKey)}</p>
+                                <h3 className="text-xs lg:text-xl font-bold text-white mb-1 lg:mb-2 leading-tight">{t(upgrade.nameKey)}</h3>
+                                <p className="text-[10px] lg:text-sm text-gray-400 mb-2 lg:mb-4 h-8 lg:h-10 leading-tight">{t(upgrade.descKey)}</p>
                                 
                                 <button 
                                     onClick={() => buyUpgrade(upgrade.id)}
                                     disabled={!canAfford || isMaxed}
-                                    className={`w-full py-1 lg:py-3 font-bold tracking-widest text-[8px] lg:text-sm transition-all
+                                    className={`w-full py-2 lg:py-3 font-bold tracking-widest text-[10px] lg:text-sm transition-all
                                         ${isMaxed 
                                             ? 'bg-green-900/20 text-green-500 border border-green-500/30 cursor-default' 
                                             : canAfford 
@@ -1283,7 +1283,7 @@ export const Game: React.FC = () => {
                     })}
                 </div>
 
-                <button onClick={closeShop} className="mt-auto py-1.5 lg:py-4 w-full border-t border-white/10 text-white/50 hover:text-white hover:bg-white/5 transition-colors tracking-widest text-[10px] lg:text-base">
+                <button onClick={closeShop} className="mt-auto py-2.5 lg:py-4 w-full border-t border-white/10 text-white/50 hover:text-white hover:bg-white/5 transition-colors tracking-widest text-xs lg:text-base">
                     {t('BACK')}
                 </button>
              </div>
@@ -1294,22 +1294,22 @@ export const Game: React.FC = () => {
       
       {gameState === GameState.GAME_OVER && (
         <div className="absolute inset-0 bg-red-950/95 flex items-center justify-center z-50">
-           <div className="text-center p-4 lg:p-8 border-y-2 border-red-600 w-full bg-black/50 backdrop-blur-md max-w-sm lg:max-w-lg">
-             <h2 className="text-xl lg:text-7xl font-bold text-red-500 mb-2 tracking-widest red-glow">{t('GAME_OVER')}</h2>
+           <div className="text-center p-6 lg:p-8 border-y-2 border-red-600 w-full bg-black/50 backdrop-blur-md max-w-sm lg:max-w-lg">
+             <h2 className="text-3xl lg:text-7xl font-bold text-red-500 mb-4 tracking-widest red-glow">{t('GAME_OVER')}</h2>
              
-             <div className="grid grid-cols-2 gap-2 lg:gap-8 mx-auto mb-2 lg:mb-10 text-left mt-2 lg:mt-8">
+             <div className="grid grid-cols-2 gap-4 lg:gap-8 mx-auto mb-6 lg:mb-10 text-left mt-4 lg:mt-8">
                  <div>
-                     <div className="text-[8px] lg:text-xs text-red-400/50">{t('SCORE')}</div>
-                     <div className="text-sm lg:text-3xl font-bold text-white">{uiData.score}</div>
+                     <div className="text-[11px] lg:text-xs text-red-400/50">{t('SCORE')}</div>
+                     <div className="text-xl lg:text-3xl font-bold text-white">{uiData.score}</div>
                  </div>
                  <div>
-                     <div className="text-[8px] lg:text-xs text-red-400/50">{t('WAVE')}</div>
-                     <div className="text-sm lg:text-3xl font-bold text-white">{uiData.wave}</div>
+                     <div className="text-[11px] lg:text-xs text-red-400/50">{t('WAVE')}</div>
+                     <div className="text-xl lg:text-3xl font-bold text-white">{uiData.wave}</div>
                  </div>
              </div>
              
              {patient && (
-                 <div className="mb-2 lg:mb-8 text-[8px] lg:text-sm font-mono text-gray-400">
+                 <div className="mb-4 lg:mb-8 text-[10px] lg:text-sm font-mono text-gray-400">
                      {t('STATUS_TERM')}
                  </div>
              )}
