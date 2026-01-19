@@ -1,14 +1,26 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Language, Difficulty } from '../types';
 import { TEXTS } from '../constants';
 import { audioManager } from '../services/audioManager';
 
-// --- ARQUIVOS ESTÁTICOS ---
-// Definimos apenas o nome do arquivo. O componente SecureImage vai caçar o caminho correto.
-const IMG_BG = "background.webp";
-const IMG_VITAL = "vital.png";
-const IMG_VIRUS = "virus.png";
+// --- IMPORTAÇÃO DIRETA DE ASSETS ---
+// OBRIGATÓRIO: Os arquivos DEVEM estar na pasta raiz do projeto (src/)
+// ao lado do index.tsx ou na raiz do Playcode.
+// @ts-ignore
+import imgBg from '../background.webp';
+// @ts-ignore
+import imgVital from '../vital.png';
+// @ts-ignore
+import imgVirus from '../virus.png';
+
+// Fallback caso a importação falhe (ex: ambiente sem loader de imagem configurado)
+// Mas no Vite padrão, a importação acima é a lei.
+const ASSETS = {
+    bg: imgBg || '/background.webp',
+    vital: imgVital || '/vital.png',
+    virus: imgVirus || '/virus.png'
+};
 
 // --- INTERFACE DE PROPS ---
 interface MainMenuSceneProps {
@@ -26,42 +38,20 @@ interface MainMenuSceneProps {
     onCheatInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
-// --- COMPONENTE DE IMAGEM INTELIGENTE (SMART LOADER) ---
-// Tenta múltiplos caminhos até achar a imagem
-const SecureImage = ({ fileName, alt, className, style }: { fileName: string, alt: string, className?: string, style?: React.CSSProperties }) => {
-    // Lista de tentativas em ordem de probabilidade para Vercel/Vite
-    const pathsToTry = [
-        `/${fileName}`,       // Tentativa 1: Raiz absoluta (Padrão Vercel/Public)
-        fileName,             // Tentativa 2: Relativo direto
-        `/public/${fileName}`,// Tentativa 3: Caminho explícito absoluto
-        `public/${fileName}`  // Tentativa 4: Caminho explícito relativo
-    ];
+// --- COMPONENTE DE IMAGEM SIMPLIFICADO ---
+// Removemos a lógica complexa de caminhos. Agora confiamos no Import.
+const SecureImage = ({ src, alt, className, style }: any) => {
+    const [error, setError] = useState(false);
 
-    const [currentPathIndex, setCurrentPathIndex] = useState(0);
-    const [hasError, setHasError] = useState(false);
-
-    const handleError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
-        // Se ainda temos caminhos para tentar...
-        if (currentPathIndex < pathsToTry.length - 1) {
-            // Log discreto para debug
-            console.warn(`[ARCHITECT] Path failed: ${pathsToTry[currentPathIndex]}. Trying next...`);
-            setCurrentPathIndex(prev => prev + 1);
-        } else {
-            // Falhou em todos
-            console.error(`[ARCHITECT] CRITICAL: Could not load image ${fileName} from any known path.`);
-            setHasError(true);
-        }
-    };
-
-    if (hasError) {
+    if (error) {
         return (
             <div 
                 className={`flex items-center justify-center border-2 border-red-500 bg-red-900/80 text-white font-mono text-[10px] p-2 text-center z-50 ${className}`}
                 style={{...style, minHeight: '50px', minWidth: '50px'}}
             >
                 <div className="break-all">
-                    <span className="text-red-500 font-bold block mb-1">404</span>
-                    {fileName}
+                    <span className="text-red-500 font-bold block mb-1">ERR</span>
+                    {alt}
                 </div>
             </div>
         );
@@ -69,12 +59,14 @@ const SecureImage = ({ fileName, alt, className, style }: { fileName: string, al
 
     return (
         <img 
-            src={pathsToTry[currentPathIndex]} 
+            src={src} 
             alt={alt} 
             className={className} 
             style={style}
-            onError={handleError}
-            // crossOrigin="anonymous" // Opcional: Ajuda em alguns casos de CDN, mas pode causar problemas locais se não configurado
+            onError={(e) => {
+                console.error(`[ARCHITECT] Failed to load imported asset: ${src}`);
+                setError(true);
+            }}
         />
     );
 };
@@ -137,7 +129,7 @@ export const MainMenuScene: React.FC<MainMenuSceneProps> = ({
             {/* --- LAYER 1: BACKGROUND IMAGE --- */}
             <div className="absolute inset-0 z-0">
                 <SecureImage 
-                    fileName={IMG_BG} 
+                    src={ASSETS.bg} 
                     alt="Background" 
                     className="w-full h-full object-cover opacity-60"
                 />
@@ -150,7 +142,7 @@ export const MainMenuScene: React.FC<MainMenuSceneProps> = ({
                 {/* VITAL LOGO IMAGE */}
                 <div className="absolute right-[5%] top-[15%] h-[70%] w-[40%] flex items-center justify-center">
                     <SecureImage 
-                        fileName={IMG_VITAL} 
+                        src={ASSETS.vital} 
                         alt="Vital Rush Logo" 
                         className="h-full w-auto object-contain anim-hero"
                     />
@@ -158,20 +150,20 @@ export const MainMenuScene: React.FC<MainMenuSceneProps> = ({
 
                 {/* VIRUS IMAGES (FLOATING) */}
                 <div className="absolute right-[10%] top-[10%] w-[100px] opacity-80 anim-virus-1">
-                    <SecureImage fileName={IMG_VIRUS} alt="Virus" className="w-full drop-shadow-[0_0_10px_rgba(0,255,0,0.5)]" />
+                    <SecureImage src={ASSETS.virus} alt="Virus" className="w-full drop-shadow-[0_0_10px_rgba(0,255,0,0.5)]" />
                 </div>
                 <div className="absolute right-[40%] bottom-[20%] w-[80px] opacity-60 anim-virus-2 blur-[1px]">
-                    <SecureImage fileName={IMG_VIRUS} alt="Virus" className="w-full drop-shadow-[0_0_10px_rgba(255,0,0,0.5)]" />
+                    <SecureImage src={ASSETS.virus} alt="Virus" className="w-full drop-shadow-[0_0_10px_rgba(255,0,0,0.5)]" />
                 </div>
                 <div className="absolute right-[-2%] top-[50%] w-[150px] opacity-90 anim-virus-3 blur-[2px]">
-                    <SecureImage fileName={IMG_VIRUS} alt="Virus" className="w-full drop-shadow-[0_0_15px_rgba(100,255,0,0.5)]" />
+                    <SecureImage src={ASSETS.virus} alt="Virus" className="w-full drop-shadow-[0_0_15px_rgba(100,255,0,0.5)]" />
                 </div>
             </div>
 
             {/* --- LAYER 3: UI (LEFT SIDE) --- */}
             <div className="absolute inset-y-0 left-0 w-full lg:w-[40%] z-20 flex flex-col justify-center px-8 lg:px-16 bg-gradient-to-r from-black/90 to-transparent">
                 
-                {/* TITLE BLOCK (Mantido como texto pois o logo é lateral, mas pode ser removido se o logo vital.png já contiver o título) */}
+                {/* TITLE BLOCK */}
                 <div className="mb-8 lg:mb-12">
                     <h1 className={`text-6xl lg:text-9xl font-black tracking-tighter leading-none italic 
                         ${isPlatinum ? 'text-transparent bg-clip-text bg-gradient-to-br from-amber-300 to-amber-600 drop-shadow-[0_0_20px_rgba(255,170,0,0.5)]' 
