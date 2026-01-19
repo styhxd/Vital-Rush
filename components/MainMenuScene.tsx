@@ -1,25 +1,14 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Language, Difficulty } from '../types';
 import { TEXTS } from '../constants';
 import { audioManager } from '../services/audioManager';
 
-// --- IMPORTAÇÃO DIRETA DE ASSETS ---
-// OBRIGATÓRIO: Os arquivos DEVEM estar na pasta raiz do projeto (src/)
-// ao lado do index.tsx ou na raiz do Playcode.
-// @ts-ignore
-import imgBg from '../background.webp';
-// @ts-ignore
-import imgVital from '../vital.png';
-// @ts-ignore
-import imgVirus from '../virus.png';
-
-// Fallback caso a importação falhe (ex: ambiente sem loader de imagem configurado)
-// Mas no Vite padrão, a importação acima é a lei.
-const ASSETS = {
-    bg: imgBg || '/background.webp',
-    vital: imgVital || '/vital.png',
-    virus: imgVirus || '/virus.png'
+// --- ARQUIVOS ESTÁTICOS (DEFINIÇÃO) ---
+const FILES = {
+    bg: "background.webp",
+    vital: "vital.png",
+    virus: "virus.png"
 };
 
 // --- INTERFACE DE PROPS ---
@@ -38,35 +27,62 @@ interface MainMenuSceneProps {
     onCheatInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
-// --- COMPONENTE DE IMAGEM SIMPLIFICADO ---
-// Removemos a lógica complexa de caminhos. Agora confiamos no Import.
-const SecureImage = ({ src, alt, className, style }: any) => {
-    const [error, setError] = useState(false);
+// --- COMPONENTE DE IMAGEM BLINDADO (ARMORED IMAGE) ---
+const SecureImage = ({ filename, alt, className, style }: { filename: string, alt: string, className?: string, style?: React.CSSProperties }) => {
+    
+    // 1. Tenta resolver via import.meta.url (Vite Standard)
+    // Isso diz ao bundler: "O arquivo está uma pasta acima deste componente"
+    const resolvedUrl = useMemo(() => {
+        try {
+            return new URL(`../${filename}`, import.meta.url).href;
+        } catch (e) {
+            return filename; // Fallback para nome puro
+        }
+    }, [filename]);
 
-    if (error) {
+    // Lista de caminhos de resgate em ordem de desespero
+    const fallbacks = [
+        resolvedUrl,             // 1. O caminho calculado pelo Vite
+        `/${filename}`,          // 2. Raiz absoluta (Public folder padrão)
+        filename,                // 3. Relativo simples
+        `/public/${filename}`,   // 4. Pasta public explicita
+        `../${filename}`         // 5. Relativo ao componente
+    ];
+
+    const [currentSrcIndex, setCurrentSrcIndex] = useState(0);
+    const [hasError, setHasError] = useState(false);
+
+    const handleError = () => {
+        const nextIndex = currentSrcIndex + 1;
+        if (nextIndex < fallbacks.length) {
+            console.warn(`[ARCHITECT] Falha ao carregar ${fallbacks[currentSrcIndex]}. Tentando: ${fallbacks[nextIndex]}`);
+            setCurrentSrcIndex(nextIndex);
+        } else {
+            console.error(`[ARCHITECT] CRITICAL: Imagem ${filename} não encontrada em lugar nenhum.`);
+            setHasError(true);
+        }
+    };
+
+    if (hasError) {
         return (
             <div 
-                className={`flex items-center justify-center border-2 border-red-500 bg-red-900/80 text-white font-mono text-[10px] p-2 text-center z-50 ${className}`}
-                style={{...style, minHeight: '50px', minWidth: '50px'}}
+                className={`flex flex-col items-center justify-center border-2 border-red-500 bg-red-900/90 text-white font-mono text-[8px] p-1 text-center z-50 overflow-hidden ${className}`}
+                style={{...style, minHeight: '60px', minWidth: '60px'}}
+                title={`Failed paths: ${fallbacks.join('\n')}`}
             >
-                <div className="break-all">
-                    <span className="text-red-500 font-bold block mb-1">ERR</span>
-                    {alt}
-                </div>
+                <span className="text-red-400 font-bold">MISSING</span>
+                <span className="break-all leading-tight">{filename}</span>
             </div>
         );
     }
 
     return (
         <img 
-            src={src} 
+            src={fallbacks[currentSrcIndex]} 
             alt={alt} 
             className={className} 
             style={style}
-            onError={(e) => {
-                console.error(`[ARCHITECT] Failed to load imported asset: ${src}`);
-                setError(true);
-            }}
+            onError={handleError}
         />
     );
 };
@@ -129,7 +145,7 @@ export const MainMenuScene: React.FC<MainMenuSceneProps> = ({
             {/* --- LAYER 1: BACKGROUND IMAGE --- */}
             <div className="absolute inset-0 z-0">
                 <SecureImage 
-                    src={ASSETS.bg} 
+                    filename={FILES.bg} 
                     alt="Background" 
                     className="w-full h-full object-cover opacity-60"
                 />
@@ -142,7 +158,7 @@ export const MainMenuScene: React.FC<MainMenuSceneProps> = ({
                 {/* VITAL LOGO IMAGE */}
                 <div className="absolute right-[5%] top-[15%] h-[70%] w-[40%] flex items-center justify-center">
                     <SecureImage 
-                        src={ASSETS.vital} 
+                        filename={FILES.vital} 
                         alt="Vital Rush Logo" 
                         className="h-full w-auto object-contain anim-hero"
                     />
@@ -150,13 +166,13 @@ export const MainMenuScene: React.FC<MainMenuSceneProps> = ({
 
                 {/* VIRUS IMAGES (FLOATING) */}
                 <div className="absolute right-[10%] top-[10%] w-[100px] opacity-80 anim-virus-1">
-                    <SecureImage src={ASSETS.virus} alt="Virus" className="w-full drop-shadow-[0_0_10px_rgba(0,255,0,0.5)]" />
+                    <SecureImage filename={FILES.virus} alt="Virus" className="w-full drop-shadow-[0_0_10px_rgba(0,255,0,0.5)]" />
                 </div>
                 <div className="absolute right-[40%] bottom-[20%] w-[80px] opacity-60 anim-virus-2 blur-[1px]">
-                    <SecureImage src={ASSETS.virus} alt="Virus" className="w-full drop-shadow-[0_0_10px_rgba(255,0,0,0.5)]" />
+                    <SecureImage filename={FILES.virus} alt="Virus" className="w-full drop-shadow-[0_0_10px_rgba(255,0,0,0.5)]" />
                 </div>
                 <div className="absolute right-[-2%] top-[50%] w-[150px] opacity-90 anim-virus-3 blur-[2px]">
-                    <SecureImage src={ASSETS.virus} alt="Virus" className="w-full drop-shadow-[0_0_15px_rgba(100,255,0,0.5)]" />
+                    <SecureImage filename={FILES.virus} alt="Virus" className="w-full drop-shadow-[0_0_15px_rgba(100,255,0,0.5)]" />
                 </div>
             </div>
 
