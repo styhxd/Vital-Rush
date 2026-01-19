@@ -1,15 +1,16 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Language, Difficulty } from '../types';
 import { TEXTS } from '../constants';
 import { audioManager } from '../services/audioManager';
 
-// --- ARQUIVOS ESTÁTICOS (RESOLUÇÃO VIA URL RAIZ) ---
-// Como as imagens estão na raiz do projeto (public/root), não usamos 'import'.
-// Usamos o caminho absoluto do servidor. Isso elimina o erro de "Module Specifier".
-const bgImg = "/background.webp";
-const vitalImg = "/vital.png";
-const virusImg = "/virus.png";
+// --- ARQUIVOS ESTÁTICOS ---
+// Apontando explicitamente para a pasta src/ na raiz conforme sua instrução.
+// Nota: Em alguns servidores, pode ser necessário mover isso para 'public/', 
+// mas aqui obedecemos a estrutura que você definiu.
+const bgImg = "src/background.webp";
+const vitalImg = "src/vital.png";
+const virusImg = "src/virus.png";
 
 // --- INTERFACE DE PROPS ---
 interface MainMenuSceneProps {
@@ -27,38 +28,51 @@ interface MainMenuSceneProps {
     onCheatInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
-// --- COMPONENTE DE IMAGEM SEGURA (FAIL-SAFE) ---
-// Tenta carregar a imagem. Se falhar, mostra um diagnóstico visual estiloso.
-const SecureImage = ({ src, alt, className, style, animate = false }: any) => {
+// --- COMPONENTE DE IMAGEM SEGURA (DIAGNÓSTICO) ---
+const SecureImage = ({ src, alt, className, style }: any) => {
+    // Estado para controlar tentativas de carregamento
+    const [imgSrc, setImgSrc] = useState(src);
     const [error, setError] = useState(false);
+
+    const handleError = () => {
+        // Se falhar o caminho relativo "src/...", tenta com barra na frente "/src/..."
+        if (!imgSrc.startsWith('/')) {
+            setImgSrc('/' + src);
+        } else {
+            // Se falhar ambos, desiste e mostra o erro
+            console.error(`[ARCHITECT] CRITICAL: Image not found at ${src} or /${src}`);
+            setError(true);
+        }
+    };
 
     if (error) {
         return (
             <div 
-                className={`flex items-center justify-center border-2 border-red-500 bg-red-900/50 text-red-500 font-mono text-[10px] p-2 text-center animate-pulse ${className}`}
-                style={{...style, minHeight: '100px'}}
+                className={`flex items-center justify-center border-2 border-red-500 bg-red-900/80 text-white font-mono text-[10px] p-2 text-center z-50 ${className}`}
+                style={{...style, minHeight: '100px', minWidth: '100px'}}
             >
-                [404]<br/>{alt}
+                <div>
+                    <span className="text-red-500 font-bold block mb-1">IMAGE ERROR</span>
+                    File not found:<br/>
+                    <span className="text-yellow-300">"{src}"</span>
+                </div>
             </div>
         );
     }
 
     return (
         <img 
-            src={src} 
+            src={imgSrc} 
             alt={alt} 
             className={className} 
             style={style}
-            onError={(e) => {
-                console.error(`[ARCHITECT] Image Load Failed: ${src}`);
-                setError(true);
-            }} 
+            onError={handleError} 
         />
     );
 };
 
 // --- BOTÃO DO MENU ESTILIZADO ---
-const MenuButton = ({ onClick, children, variant = 'primary', selected = false }: any) => {
+const MenuButton = ({ onClick, children, variant = 'primary' }: any) => {
   const base = "w-full py-3 lg:py-4 font-bold text-xs lg:text-sm tracking-widest uppercase clip-path-polygon transition-all hover:translate-x-2 relative overflow-hidden group text-left px-6";
   let colors = "";
   
@@ -82,7 +96,7 @@ export const MainMenuScene: React.FC<MainMenuSceneProps> = ({
 }) => {
     const t = (key: string) => TEXTS[language][key] || key;
 
-    // CSS INJECTED FOR COMPONENT-SPECIFIC ANIMATIONS
+    // Animações CSS para as Imagens
     const menuStyles = `
         @keyframes hero-float {
             0%, 100% { transform: translateY(0) scale(1) skewX(0deg); }
@@ -112,47 +126,44 @@ export const MainMenuScene: React.FC<MainMenuSceneProps> = ({
         <div className="absolute inset-0 z-50 overflow-hidden bg-black font-sans">
             <style>{menuStyles}</style>
 
-            {/* --- LAYER 1: BACKGROUND --- */}
+            {/* --- LAYER 1: BACKGROUND IMAGE --- */}
             <div className="absolute inset-0 z-0">
                 <SecureImage 
                     src={bgImg} 
-                    alt="background.webp" 
+                    alt="Background" 
                     className="w-full h-full object-cover opacity-60"
                 />
-                {/* Vignette Overlay para focar no centro/esquerda */}
+                {/* Overlay Gradiente para garantir legibilidade do menu */}
                 <div className="absolute inset-0 bg-gradient-to-r from-black via-black/50 to-transparent"></div>
             </div>
 
-            {/* --- LAYER 2: VISUALS (RIGHT SIDE) --- */}
+            {/* --- LAYER 2: IMAGES (RIGHT SIDE) --- */}
             <div className="absolute inset-0 z-10 pointer-events-none">
-                {/* VITAL (HERO) */}
+                {/* VITAL LOGO IMAGE */}
                 <div className="absolute right-[5%] top-[15%] h-[70%] w-[40%] flex items-center justify-center">
                     <SecureImage 
                         src={vitalImg} 
-                        alt="vital.png" 
+                        alt="Vital Rush Logo" 
                         className="h-full w-auto object-contain anim-hero"
                     />
                 </div>
 
-                {/* VIRUSES (FLOATING) */}
-                {/* Top Right */}
+                {/* VIRUS IMAGES (FLOATING) */}
                 <div className="absolute right-[10%] top-[10%] w-[100px] opacity-80 anim-virus-1">
-                    <SecureImage src={virusImg} alt="virus.png" className="w-full drop-shadow-[0_0_10px_rgba(0,255,0,0.5)]" />
+                    <SecureImage src={virusImg} alt="Virus" className="w-full drop-shadow-[0_0_10px_rgba(0,255,0,0.5)]" />
                 </div>
-                {/* Bottom Center-Right */}
                 <div className="absolute right-[40%] bottom-[20%] w-[80px] opacity-60 anim-virus-2 blur-[1px]">
-                    <SecureImage src={virusImg} alt="virus.png" className="w-full drop-shadow-[0_0_10px_rgba(255,0,0,0.5)]" />
+                    <SecureImage src={virusImg} alt="Virus" className="w-full drop-shadow-[0_0_10px_rgba(255,0,0,0.5)]" />
                 </div>
-                {/* Far Right Edge */}
                 <div className="absolute right-[-2%] top-[50%] w-[150px] opacity-90 anim-virus-3 blur-[2px]">
-                    <SecureImage src={virusImg} alt="virus.png" className="w-full drop-shadow-[0_0_15px_rgba(100,255,0,0.5)]" />
+                    <SecureImage src={virusImg} alt="Virus" className="w-full drop-shadow-[0_0_15px_rgba(100,255,0,0.5)]" />
                 </div>
             </div>
 
             {/* --- LAYER 3: UI (LEFT SIDE) --- */}
             <div className="absolute inset-y-0 left-0 w-full lg:w-[40%] z-20 flex flex-col justify-center px-8 lg:px-16 bg-gradient-to-r from-black/90 to-transparent">
                 
-                {/* TITLE BLOCK */}
+                {/* TITLE BLOCK (Mantido como texto pois o logo é lateral, mas pode ser removido se o logo vital.png já contiver o título) */}
                 <div className="mb-8 lg:mb-12">
                     <h1 className={`text-6xl lg:text-9xl font-black tracking-tighter leading-none italic 
                         ${isPlatinum ? 'text-transparent bg-clip-text bg-gradient-to-br from-amber-300 to-amber-600 drop-shadow-[0_0_20px_rgba(255,170,0,0.5)]' 
@@ -219,7 +230,7 @@ export const MainMenuScene: React.FC<MainMenuSceneProps> = ({
                     </div>
                 </div>
 
-                {/* CHEAT INPUT (Hidden-ish) */}
+                {/* CHEAT INPUT */}
                 <div className="absolute bottom-8 left-8 lg:left-16 w-64 opacity-30 hover:opacity-100 transition-opacity">
                     <input 
                         type="text" 
