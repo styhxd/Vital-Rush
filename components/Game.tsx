@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from '../services/gameEngine';
 import { audioManager } from '../services/audioManager';
@@ -954,24 +955,22 @@ export const Game: React.FC = () => {
         </div>
       )}
 
-      {/* NEW: MAIN MENU COMPONENT REPLACES INLINE MENU */}
-      {gameState === GameState.MENU && (
-          <MainMenu 
-              onStart={handleStartGame}
-              onSettings={openSettings}
-              onControls={() => openControls(true)}
-              onManual={() => setGameState(GameState.MANUAL)}
-              onAchievements={openAchievements}
-              difficulty={difficulty}
-              setDifficulty={setDifficulty}
-              language={language}
-              setLanguage={setLanguage}
-              cheatInput={cheatInput}
-              setCheatInput={setCheatInput}
-              handleCheatInput={handleCheatInput}
-              isPlatinum={isPlatinum}
-          />
-      )}
+      {/* COMPONENTE MAIN MENU - SUBSTITUIU O BLOCO ANTERIOR */}
+      <MainMenu 
+          isVisible={gameState === GameState.MENU}
+          language={language}
+          difficulty={difficulty}
+          isPlatinum={isPlatinum}
+          cheatInput={cheatInput}
+          onStart={() => { handleStartGame(); audioManager.startMenuMusic(); }}
+          onControls={() => openControls(true)}
+          onManual={() => setGameState(GameState.MANUAL)}
+          onSettings={openSettings}
+          onAchievements={openAchievements}
+          onLanguageChange={setLanguage}
+          onDifficultyChange={setDifficulty}
+          onCheatInput={handleCheatInput}
+      />
 
       {/* REPLACED: New Settings Menu Component Rendering */}
       <SettingsMenu 
