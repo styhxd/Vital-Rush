@@ -4,11 +4,11 @@ import { Difficulty, Language } from '../types';
 import { TEXTS } from '../constants';
 import { audioManager } from '../services/audioManager';
 
-// CORREÇÃO: Uso de caminhos absolutos a partir da raiz (/) para evitar erros de resolução relativa
-// e erros de "bare specifier" no navegador.
-import bgImg from '/src/assets/background.webp';
-import vitalImg from '/src/assets/vital.png';
-import virusImg from '/src/assets/virus.png';
+// CORREÇÃO: Uso de caminhos relativos para garantir que o bundler encontre os arquivos
+// independentemente da configuração de base URL ou ambiente (Dev/Prod).
+import bgImg from '../src/assets/background.webp';
+import vitalImg from '../src/assets/vital.png';
+import virusImg from '../src/assets/virus.png';
 
 // Botão reutilizável (Mantido local para isolamento)
 const MenuButton = ({ onClick, children, variant = 'primary', selected = false }: any) => {
