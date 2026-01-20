@@ -1,30 +1,29 @@
-import React, { useMemo } from 'react';
+
+import React from 'react';
 import { Difficulty, Language } from '../types';
 import { TEXTS } from '../constants';
 import { audioManager } from '../services/audioManager';
 
-// FIX: Uso de caminhos relativos (../src/assets/) para garantir compatibilidade
-// e evitar erros de "bare module specifier" no navegador.
-import bgImg from './src/assets/background.webp';
-import vitalImg from './src/assets/vital.png';
-import virusImg from './src/assets/virus.png';
-
-// Botão reutilizável (Mantido local para isolamento)
+// Duplicamos o MenuButton aqui para garantir isolamento total sem criar dependências circulares
+// ou refatorações arriscadas no Game.tsx para os outros menus (Game Over/Wave Cleared).
 const MenuButton = ({ onClick, children, variant = 'primary', selected = false }: any) => {
-    const base = "w-full py-3 lg:py-4 font-bold text-xs lg:text-xl tracking-widest uppercase clip-path-polygon transition-all hover:translate-x-2 shadow-[0_0_10px_rgba(0,0,0,0.4)] relative overflow-hidden group text-left px-6 border-l-4";
+    const base = "w-full py-2.5 lg:py-4 font-bold text-xs lg:text-xl tracking-widest uppercase clip-path-polygon transition-all hover:scale-105 shadow-[0_0_10px_rgba(0,0,0,0.4)] lg:shadow-[0_0_20px_rgba(0,0,0,0.4)] relative overflow-hidden group";
     let colors = "";
     
     if (variant === 'primary') {
-        colors = "bg-gradient-to-r from-red-900/80 to-transparent border-red-500 text-white hover:border-red-400 hover:from-red-800/80";
+        colors = "bg-red-600 hover:bg-red-500 text-black shadow-[0_0_10px_rgba(255,0,0,0.4)]";
     } else if (variant === 'secondary') {
         colors = selected 
-          ? "bg-gradient-to-r from-white/20 to-transparent border-white text-white"
-          : "bg-gradient-to-r from-gray-900/50 to-transparent border-gray-700 text-gray-400 hover:text-white hover:border-white/50";
+          ? "bg-white text-black border border-white shadow-[0_0_10px_white]"
+          : "bg-white/10 hover:bg-white/20 text-white border border-white/10";
+    } else if (variant === 'success') {
+        colors = "bg-green-600 hover:bg-green-500 text-black shadow-[0_0_10px_rgba(0,255,0,0.4)]";
     }
     
     return (
-      <button onClick={onClick} className={`${base} ${colors}`} style={{clipPath: 'polygon(0 0, 100% 0, 95% 100%, 0% 100%)'}}>
-        <span className="relative z-10 drop-shadow-md">{children}</span>
+      <button onClick={onClick} className={`${base} ${colors}`} style={{clipPath: 'polygon(5% 0, 100% 0, 100% 70%, 95% 100%, 0 100%, 0 30%)'}}>
+        <span className="relative z-10">{children}</span>
+        <div className="absolute inset-0 bg-white/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
       </button>
     );
 };
@@ -64,188 +63,68 @@ export const MainMenu: React.FC<MainMenuProps> = ({
 
     const t = (key: string) => TEXTS[language][key] || key;
 
-    // Gerar posições aleatórias para os vírus flutuantes (Memoizado para não pular a cada render)
-    const floatingViruses = useMemo(() => {
-        return Array.from({ length: 5 }).map((_, i) => ({
-            id: i,
-            top: `${Math.random() * 80 + 10}%`,
-            left: `${Math.random() * 40 + 50}%`, // Apenas no lado direito
-            size: Math.random() * 60 + 40,
-            delay: Math.random() * 5,
-            duration: Math.random() * 3 + 4
-        }));
-    }, []);
-
     return (
-        <div className="absolute inset-0 z-50 overflow-hidden bg-black">
-            {/* --- CSS INLINE PARA ANIMAÇÕES ESPECÍFICAS --- */}
-            <style>{`
-                @keyframes organic-breathe {
-                    0%, 100% { transform: scale(1) rotate(0deg); filter: drop-shadow(0 0 15px rgba(0, 255, 255, 0.3)); }
-                    50% { transform: scale(1.03, 0.97) rotate(1deg); filter: drop-shadow(0 0 25px rgba(0, 255, 255, 0.6)); }
-                }
-                @keyframes float-virus {
-                    0%, 100% { transform: translateY(0) rotate(0deg); }
-                    50% { transform: translateY(-20px) rotate(10deg); }
-                }
-                @keyframes dust-particles {
-                    0% { transform: translateY(0); opacity: 0; }
-                    50% { opacity: 0.5; }
-                    100% { transform: translateY(-100px); opacity: 0; }
-                }
-                .anim-vital {
-                    animation: organic-breathe 6s ease-in-out infinite;
-                }
-                .anim-virus {
-                    animation: float-virus 5s ease-in-out infinite;
-                }
-            `}</style>
-
-            {/* --- BACKGROUND IMAGE --- */}
-            <div 
-                className="absolute inset-0 z-0 bg-cover bg-center transition-all duration-1000"
-                style={{ 
-                    backgroundImage: `url(${bgImg})`,
-                    filter: 'brightness(0.6) contrast(1.1)' 
-                }}
-            ></div>
+        <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
+          {/* REDUZIDO UM POUCO NO MOBILE (scale-90) */}
+          <div className="relative text-center p-6 lg:p-8 max-w-md lg:max-w-md w-full scale-90 lg:scale-100">
+            <h1 className={`text-6xl lg:text-9xl font-bold mb-2 lg:mb-2 tracking-tighter mix-blend-screen leading-none ${isPlatinum ? 'text-amber-400 shadow-[0_0_30px_rgba(255,170,0,0.5)]' : 'text-red-600 red-glow'}`} style={{fontFamily: 'Impact, sans-serif'}}>{t('TITLE_MAIN')}</h1>
+            <h2 className="text-xl lg:text-5xl font-light text-white mb-4 lg:mb-8 tracking-[0.5em] -mt-1 lg:-mt-2 opacity-80">{t('TITLE_SUB')}</h2>
             
-            {/* Overlay Gradiente para legibilidade do menu à esquerda */}
-            <div className="absolute inset-0 z-0 bg-gradient-to-r from-black via-black/80 to-transparent"></div>
+            {isPlatinum && <div className="text-[8px] lg:text-xs tracking-[0.5em] text-purple-400 mb-2 lg:mb-4 animate-pulse">{t('ACH_PLATINUM_MSG')}</div>}
 
-            {/* Scanlines Effect */}
-            <div className="absolute inset-0 z-[1] opacity-20 pointer-events-none bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-[length:100%_4px,3px_100%]"></div>
-
-            {/* --- VISUAL LAYER (RIGHT SIDE) --- */}
-            <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
-                {/* VÍRUS FLUTUANTES (Fundo) */}
-                {floatingViruses.map((v) => (
-                    <img 
-                        key={v.id}
-                        src={virusImg}
-                        alt="virus"
-                        className="absolute opacity-60 anim-virus"
-                        style={{
-                            top: v.top,
-                            left: v.left,
-                            width: `${v.size}px`,
-                            animationDelay: `${v.delay}s`,
-                            animationDuration: `${v.duration}s`,
-                            filter: 'drop-shadow(0 0 10px rgba(100, 0, 100, 0.5)) blur(1px)'
-                        }}
-                    />
-                ))}
-
-                {/* PERSONAGEM PRINCIPAL (VITAL) */}
-                <div className="absolute right-[-5%] bottom-[-5%] h-[85vh] w-[85vh] lg:h-[95vh] lg:w-[95vh] flex items-end justify-end transition-all duration-500">
-                    <img 
-                        src={vitalImg} 
-                        alt="Vital Character" 
-                        className="w-full h-full object-contain object-bottom anim-vital"
-                        style={{
-                            // Efeito extra de iluminação no CSS inline
-                            maskImage: 'linear-gradient(to bottom, black 80%, transparent 100%)' 
-                        }}
-                    />
+            <div className="mb-4 lg:mb-8">
+                <div className="text-[10px] lg:text-xs text-gray-500 tracking-widest mb-1 lg:mb-2">{t('DIFFICULTY')}</div>
+                <div className="grid grid-cols-4 gap-1.5 lg:gap-2">
+                    {Object.values(Difficulty).map(d => (
+                        <button 
+                            key={d} 
+                            onClick={() => onDifficultyChange(d)}
+                            className={`text-[9px] lg:text-[10px] font-bold py-1.5 lg:py-2 border transition-all ${difficulty === d ? 'bg-red-600 text-black border-red-600' : 'bg-transparent text-gray-500 border-gray-800'}`}
+                        >
+                            {t(`DIFF_${d}`)}
+                        </button>
+                    ))}
                 </div>
             </div>
 
-            {/* --- UI LAYER (LEFT SIDE) --- */}
-            <div className="absolute inset-y-0 left-0 z-20 w-full lg:w-[45%] flex flex-col justify-center px-8 lg:px-16 py-12">
+            <div className="space-y-2 lg:space-y-4">
+                <MenuButton onClick={() => { onStart(); audioManager.startMenuMusic(); }}>{t('START')}</MenuButton>
+                <div className="grid grid-cols-2 gap-2 lg:gap-4">
+                  <MenuButton variant="secondary" onClick={onControls}>{t('CONTROLS')}</MenuButton>
+                  <MenuButton variant="secondary" onClick={onManual}>{t('MANUAL')}</MenuButton>
+                </div>
+                <div className="grid grid-cols-2 gap-2 lg:gap-4">
+                  <MenuButton variant="secondary" onClick={onSettings}>{t('SETTINGS')}</MenuButton>
+                  <MenuButton variant="secondary" onClick={onAchievements}>{t('ACHIEVEMENTS')}</MenuButton>
+                </div>
                 
-                {/* TÍTULO */}
-                <div className="mb-8 lg:mb-12 relative">
-                    <h1 className={`text-6xl lg:text-9xl font-black tracking-tighter leading-none italic transform -skew-x-6 
-                        ${isPlatinum 
-                            ? 'text-transparent bg-clip-text bg-gradient-to-br from-amber-300 via-yellow-500 to-amber-700 drop-shadow-[0_0_15px_rgba(255,215,0,0.5)]' 
-                            : 'text-white drop-shadow-[0_0_10px_rgba(255,0,0,0.8)]'}`}
-                    >
-                        VITAL
-                        <br />
-                        <span className={isPlatinum ? 'text-white' : 'text-red-600'}>RUSH</span>
-                    </h1>
-                    <div className="h-2 w-32 bg-current mt-2 skew-x-[-20deg]" style={{ color: isPlatinum ? '#fbbf24' : '#dc2626' }}></div>
-                    
-                    {isPlatinum && (
-                        <div className="absolute top-0 right-0 text-[10px] text-purple-400 border border-purple-500 px-2 py-1 bg-black/80 tracking-widest animate-pulse">
-                            APEX MODE ACTIVE
-                        </div>
-                    )}
-                </div>
-
-                {/* BOTÕES PRINCIPAIS */}
-                <div className="flex flex-col gap-4 w-full max-w-md">
-                    <MenuButton onClick={() => { onStart(); audioManager.startMenuMusic(); }} variant="primary">
-                        <div className="flex items-center gap-4">
-                            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
-                            {t('START')}
-                        </div>
-                    </MenuButton>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <MenuButton variant="secondary" onClick={onControls}>{t('CONTROLS')}</MenuButton>
-                        <MenuButton variant="secondary" onClick={onManual}>{t('MANUAL')}</MenuButton>
-                        <MenuButton variant="secondary" onClick={onSettings}>{t('SETTINGS')}</MenuButton>
-                        <MenuButton variant="secondary" onClick={onAchievements}>{t('ACHIEVEMENTS')}</MenuButton>
-                    </div>
-                </div>
-
-                {/* SELETORES DE RODAPÉ */}
-                <div className="mt-12 space-y-6 max-w-md">
-                    {/* DIFICULDADE */}
-                    <div>
-                        <div className="text-[10px] text-gray-500 tracking-[0.2em] mb-2 uppercase border-b border-gray-800 pb-1 w-full">
-                            {t('DIFFICULTY')}
-                        </div>
-                        <div className="flex gap-2">
-                            {Object.values(Difficulty).map(d => (
-                                <button 
-                                    key={d} 
-                                    onClick={() => onDifficultyChange(d)}
-                                    className={`flex-1 text-[9px] font-bold py-2 border border-l-4 transition-all uppercase text-center
-                                    ${difficulty === d 
-                                        ? 'bg-white/10 border-red-500 text-white' 
-                                        : 'bg-transparent border-gray-800 text-gray-600 hover:border-gray-600'}`}
-                                >
-                                    {t(`DIFF_${d}`)}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* IDIOMA */}
-                    <div className="flex items-center gap-4">
-                        <div className="text-[10px] text-gray-500 tracking-[0.2em] uppercase">
-                            {t('LANG')} //
-                        </div>
-                        <div className="flex gap-2">
-                            {(['EN', 'PT', 'ES'] as Language[]).map(l => (
-                                <button 
-                                    key={l}
-                                    onClick={() => onLanguageChange(l)} 
-                                    className={`text-[10px] font-bold px-3 py-1 transition-all
-                                        ${language === l 
-                                            ? 'bg-red-600 text-black' 
-                                            : 'text-gray-600 hover:text-white'}`}
-                                >
-                                    {l}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* CHEAT INPUT */}
-                    <div className="pt-4 border-t border-gray-900">
-                        <input 
-                            type="text" 
-                            value={cheatInput} 
-                            onChange={onCheatInput}
-                            placeholder={t('PH_ACCESS_CODE')}
-                            className="w-full bg-transparent text-[10px] text-gray-600 focus:text-red-500 placeholder-gray-800 focus:outline-none tracking-[0.5em] text-center uppercase transition-colors"
-                        />
-                    </div>
+                <div className="flex justify-center gap-2 lg:gap-2 mt-4 lg:mt-6">
+                    {(['EN', 'PT', 'ES'] as Language[]).map(l => (
+                      <button 
+                        key={l}
+                        onClick={() => onLanguageChange(l)} 
+                        className={`text-[10px] lg:text-sm font-bold tracking-widest px-3 lg:px-3 py-1.5 lg:py-2 border-b-2 transition-all flex items-center gap-2
+                            ${language === l 
+                                ? 'text-white border-red-500 bg-red-900/20' 
+                                : 'text-gray-600 border-transparent hover:text-gray-400'}`}
+                      >
+                        {l}
+                      </button>
+                    ))}
                 </div>
             </div>
+            
+            <div className="mt-6 lg:mt-8">
+                <input 
+                    type="text" 
+                    value={cheatInput} 
+                    onChange={onCheatInput}
+                    placeholder={t('PH_ACCESS_CODE')}
+                    className="bg-transparent border-b border-gray-800 text-center text-[10px] lg:text-xs text-gray-500 focus:outline-none focus:border-red-500 w-full font-mono tracking-widest uppercase"
+                />
+            </div>
+          </div>
         </div>
     );
 };
