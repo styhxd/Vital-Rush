@@ -250,7 +250,9 @@ export class GameEngine {
           speed *= 0.85;
       }
 
-      hp *= (1 + this.currentWaveIndex * 0.35);
+      // SCALING AJUSTADO: Antes era 0.35 (35%) por Wave.
+      // Agora com 20 waves, mudamos para 0.12 (12%) para manter jogável.
+      hp *= (1 + this.currentWaveIndex * 0.12);
 
       this.entities.push({
           id: `e_${Date.now()}_${Math.random()}`,
@@ -272,7 +274,8 @@ export class GameEngine {
   
   public spawnBoss(config: WaveConfig) {
       const mutation = BossArchitect.mutate();
-      let hp = 1500 * this.difficultyMods.hp * (1 + this.currentWaveIndex * 0.5);
+      // SCALING AJUSTADO: Bosses agora escalam 25% por wave ao invés de 50%
+      let hp = 1500 * this.difficultyMods.hp * (1 + this.currentWaveIndex * 0.25);
       if (mutation.traits.includes(BossTrait.JUGGERNAUT)) hp *= 2.5;
 
       const dmg = 50 * this.difficultyMods.dmg;
@@ -543,7 +546,8 @@ export class GameEngine {
 
     const waveNum = waveIndex + 1; 
     audioManager.setGameState(waveNum, 1.0);
-    this.bloodFlow.x = -2.5 - (waveIndex * 0.5); 
+    // SCALING AJUSTADO: Antes acelerava 0.5 por Wave. Agora 0.12 para não ficar incontrolável.
+    this.bloodFlow.x = -2.5 - (waveIndex * 0.12); 
     if (waveIndex === 4) achievementManager.track('wave_5', 5);
     if (waveIndex === 9) achievementManager.track('wave_10', 10);
   }

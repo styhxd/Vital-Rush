@@ -483,7 +483,7 @@ export const TEXTS: TranslationMap = {
     UP_ORBITAL_NAME: "NANO-GUARDIÕES",
     UP_ORBITAL_DESC: "Adiciona +1 Drone de Defesa Autônomo",
     UP_DASH_NAME: "RASTRO DE PLASMA",
-    UP_DASH_DESC: "Dash causa 15 de Dano ao atravessar inimigos",
+    UP_DASH_DESC: "Dash causa 15 de Dano ao atravesar inimigos",
     UP_CRIT_NAME: "ÓPTICA DE PRECISÃO",
     UP_CRIT_DESC: "+4% Chance Crítica, +0.15x Dano Crítico",
     UP_THORNS_NAME: "CARAPAÇA DE ESPINHOS",
@@ -627,7 +627,7 @@ export const TEXTS: TranslationMap = {
     STRAIN_SWARM: "ENJAMBRE MASIVO",
     STRAIN_TITAN: "TITÁN BLINDADO",
     STRAIN_VOLATILE: "MUTACIÓN VOLÁTIL",
-    STRAIN_STD_DESC: "Parámetros de infección basales.",
+    STRAIN_STD_DESC: "Parámetros de infección basais.",
     STRAIN_SWM_DESC: "Alto número de enemigos, menos vida individual.",
     STRAIN_TTN_DESC: "Enemigos con +100% Vida. Spawns más lentos.",
     STRAIN_VOL_DESC: "Enemigos mueven 30% más rápido. Alta agresión.",
@@ -718,7 +718,7 @@ export const TEXTS: TranslationMap = {
     ACH_MINE_POP_20_DESC: "Detona 20 Bio-Minas.",
     ACH_BIOMASS_10K_TITLE: "Acaparador",
     ACH_BIOMASS_10K_DESC: "Recolecta un total de 10.000 de Biomasa.",
-    ACH_WAVE_5_TITLE: "Sobreviviente",
+    ACH_WAVE_5_TITLE: "Sobrevivente",
     ACH_WAVE_5_DESC: "Llega a la Oleada 5.",
     ACH_WAVE_10_TITLE: "Inmersión Profunda",
     ACH_WAVE_10_DESC: "Llega a la Oleada 10 (Modo Infinito).",
@@ -762,11 +762,40 @@ export const TEXTS: TranslationMap = {
 // Configuração das Ondas.
 // Ajustado para o modo "Pesadelo". Spawns mais rápidos desde o começo.
 export const WAVES: WaveConfig[] = [
-  { waveNumber: 1, duration: 40, spawnRate: 600, enemyTypes: [EntityType.BACTERIA], flowSpeed: -0.4, hasBoss: false }, // Flow reduzido
-  { waveNumber: 2, duration: 55, spawnRate: 500, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI], flowSpeed: -0.6, hasBoss: false }, // SWAP
-  { waveNumber: 3, duration: 60, spawnRate: 400, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS], flowSpeed: -0.8, hasBoss: true }, // SWAP
-  { waveNumber: 4, duration: 80, spawnRate: 350, enemyTypes: [EntityType.FUNGI, EntityType.PARASITE, EntityType.VIRUS], flowSpeed: -1.0, hasBoss: false }, // SWAP
-  { waveNumber: 5, duration: 999, spawnRate: 150, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.PARASITE, EntityType.VIRUS], flowSpeed: -1.4, hasBoss: true }, // SWAP
+    // WAVE 1: Intro (Bacteria) - 30s
+    { waveNumber: 1, duration: 30, spawnRate: 600, enemyTypes: [EntityType.BACTERIA], flowSpeed: -0.4, hasBoss: false },
+    // WAVE 2: Intro (Fungi) - 35s
+    { waveNumber: 2, duration: 35, spawnRate: 550, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI], flowSpeed: -0.5, hasBoss: false },
+    // WAVE 3: Mix - 40s
+    { waveNumber: 3, duration: 40, spawnRate: 500, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI], flowSpeed: -0.6, hasBoss: false },
+    // WAVE 4: Intro (Virus - Shooter) - 45s
+    { waveNumber: 4, duration: 45, spawnRate: 500, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -0.7, hasBoss: false },
+    // WAVE 5: First Boss (Mini-check) - 50s
+    { waveNumber: 5, duration: 50, spawnRate: 450, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS], flowSpeed: -0.8, hasBoss: true },
+    // WAVE 6: Intro (Parasite - Tank) - 50s
+    { waveNumber: 6, duration: 50, spawnRate: 450, enemyTypes: [EntityType.FUNGI, EntityType.PARASITE], flowSpeed: -0.9, hasBoss: false },
+    // WAVE 7: Swarm Chaos (Fungi + Bacteria) - 55s
+    { waveNumber: 7, duration: 55, spawnRate: 350, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI], flowSpeed: -1.0, hasBoss: false },
+    // WAVE 8: Heavy Hitters (Virus + Parasite) - 60s
+    { waveNumber: 8, duration: 60, spawnRate: 400, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.1, hasBoss: false },
+    // WAVE 9: Pre-Boss Intensity - 60s
+    { waveNumber: 9, duration: 60, spawnRate: 350, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.2, hasBoss: false },
+    // WAVE 10: Major Boss - 60s
+    { waveNumber: 10, duration: 60, spawnRate: 300, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS], flowSpeed: -1.3, hasBoss: true },
+    // WAVE 11-14: Escalation
+    { waveNumber: 11, duration: 65, spawnRate: 300, enemyTypes: [EntityType.BACTERIA, EntityType.PARASITE], flowSpeed: -1.4, hasBoss: false },
+    { waveNumber: 12, duration: 65, spawnRate: 280, enemyTypes: [EntityType.FUNGI, EntityType.VIRUS], flowSpeed: -1.5, hasBoss: false },
+    { waveNumber: 13, duration: 70, spawnRate: 260, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.PARASITE], flowSpeed: -1.6, hasBoss: false },
+    { waveNumber: 14, duration: 70, spawnRate: 250, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.7, hasBoss: false },
+    // WAVE 15: Boss
+    { waveNumber: 15, duration: 75, spawnRate: 240, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.8, hasBoss: true },
+    // WAVE 16-19: High Speed
+    { waveNumber: 16, duration: 75, spawnRate: 220, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI], flowSpeed: -2.0, hasBoss: false },
+    { waveNumber: 17, duration: 80, spawnRate: 200, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -2.2, hasBoss: false },
+    { waveNumber: 18, duration: 80, spawnRate: 190, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS], flowSpeed: -2.4, hasBoss: false },
+    { waveNumber: 19, duration: 85, spawnRate: 180, enemyTypes: [EntityType.FUNGI, EntityType.PARASITE], flowSpeed: -2.6, hasBoss: false },
+    // WAVE 20: ENDLESS (The Wall)
+    { waveNumber: 20, duration: 9999, spawnRate: 150, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.PARASITE, EntityType.VIRUS], flowSpeed: -3.0, hasBoss: true },
 ];
 
 // O "Shopping" do jogo.
