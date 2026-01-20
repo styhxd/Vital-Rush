@@ -1135,7 +1135,9 @@ export class GameEngine {
                         vel: {x:0, y:0}, radius: 350, health:1, maxHealth:1, color: 'rgba(0, 255, 100, 0.5)', damage:0, active:true, ttl: 25
                    });
                    
-                   for(let k=0; k<18; k++) {
+                   // REDUZIDO DE 18 PARA 5 NO MODO LOW QUALITY PRA GARANTIR QUE A EXPLOSAO GRANDE APARECA
+                   const sparkCount = this.isLowQuality ? 5 : 18;
+                   for(let k=0; k<sparkCount; k++) {
                        const ang = Math.random() * Math.PI * 2;
                        const spd = Math.random() * 20 + 10;
                        this.particles.push({
@@ -1291,9 +1293,15 @@ export class GameEngine {
     
     const currentMaxParticles = this.isLowQuality ? 30 : 250;
     if (this.particles.length > currentMaxParticles) {
-        const nonBg = this.particles.findIndex(p => p.id !== 'bg');
-        if (nonBg !== -1) this.particles.splice(nonBg, 1);
-        else this.particles.pop();
+        // MUDANÇA: Protege as particulas de explosao de minas de serem deletadas pelo limite de low quality
+        const removableIndex = this.particles.findIndex(p => p.id !== 'bg' && p.id !== 'mine_expl' && p.id !== 'mine_expl_dash');
+        if (removableIndex !== -1) this.particles.splice(removableIndex, 1);
+        else {
+             // Se só temos particulas criticas, removemos BG como ultimo recurso
+             const bgIndex = this.particles.findIndex(p => p.id === 'bg');
+             if (bgIndex !== -1) this.particles.splice(bgIndex, 1);
+             else this.particles.pop();
+        }
     }
     
     if (!this.isLowQuality && this.particles.length < 30) this.spawnBackgroundCell();
