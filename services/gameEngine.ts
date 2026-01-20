@@ -357,7 +357,7 @@ export class GameEngine {
           
           if (target.type === EntityType.BOSS) {
               this.sessionStats.bossesKilled++;
-              this.spawnText(target.pos, this.t('POPUP_BOSS_DOWN'), '#f00', 50);
+              this.spawnText(target.pos, "BOSS DOWN", '#f00', 50);
               achievementManager.track('boss_1', 1);
               achievementManager.track('boss_10', 1);
               achievementManager.track('boss_50', 1);
@@ -438,7 +438,7 @@ export class GameEngine {
           if (sourceEntity && sourceEntity.active) {
               sourceEntity.radius *= 1.1;
               sourceEntity.damage *= 1.1;
-              this.spawnText(sourceEntity.pos, this.t('POPUP_EVOLVED'), sourceEntity.color, 15);
+              this.spawnText(sourceEntity.pos, "EVOLVED", sourceEntity.color, 15);
           }
 
           // SURPRESA 2: CHOQUE DE SISTEMA
@@ -495,7 +495,7 @@ export class GameEngine {
               this.player.health = this.player.maxHealth;
               this.energy = 0; 
               this.invulnerabilityTimer = 3.0;
-              this.spawnText(this.player.pos, this.t('POPUP_CRITICAL_FAILURE'), '#ff0000', 50);
+              this.spawnText(this.player.pos, "CRITICAL FAILURE", '#ff0000', 50);
               
               this.screenShake = {x: 40, y: 40}; 
               this.shakeIntensity = 40;
@@ -825,7 +825,7 @@ export class GameEngine {
                     e.active = false;
                     this.sessionStats.mineKills++;
                     achievementManager.track('mine_pop_20', 1);
-                    this.spawnText(e.pos, this.t('POPUP_OVERLOAD'), '#00ffff', 45); 
+                    this.spawnText(e.pos, "OVERLOAD!", '#00ffff', 45); 
                     // VARIETY: SOUND CALL FOR MINE EXPLOSION (DASH)
                     audioManager.playMineExplosionDash();
                     audioManager.playSurge(); 
@@ -1160,7 +1160,7 @@ export class GameEngine {
                    this.sessionStats.mineKills++;
                    achievementManager.track('mine_pop_20', 1);
                    this.shakeIntensity = 25;
-                   this.spawnText(other.pos, this.t('POPUP_SYSTEM_OVERLOAD'), '#00ff00', 55); 
+                   this.spawnText(other.pos, "SYSTEM OVERLOAD", '#00ff00', 55); 
                    // VARIETY: SOUND CALL FOR MINE EXPLOSION (SHOT)
                    audioManager.playMineExplosionShot();
                    audioManager.playSurge(); 

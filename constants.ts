@@ -1,7 +1,5 @@
 
 
-
-
 /**
  * ------------------------------------------------------------------
  * COPYRIGHT (c) 2026 ESTÚDIO CRIA
@@ -216,9 +214,9 @@ export const TEXTS: TranslationMap = {
     MANUAL_STRAINS: "VIRAL STRAINS",
     MANUAL_MECHANICS: "BATTLE MECHANICS",
     MANUAL_BAC_DESC: "Standard pathogen. Common, predictable movement.",
-    MANUAL_VIR_DESC: "Stationary turret. Shoots tracking spikes.", 
+    MANUAL_VIR_DESC: "Stationary turret. Shoots tracking spikes.", // SWAPPED
     MANUAL_PAR_DESC: "Heavy tank. Slow, high HP, absorbs damage.",
-    MANUAL_FUNGI_DESC: "Fast attacker. Erratic zig-zag movement.", 
+    MANUAL_FUNGI_DESC: "Fast attacker. Erratic zig-zag movement.", // ALTERADO
     MANUAL_BOSS_DESC: "Massive anomaly. Requires extreme firepower.",
     MANUAL_MECH_DASH_TITLE: "Evasive Dash",
     MANUAL_MECH_DASH_DESC: "Grants momentary invulnerability. Use to pass through enemies.",
@@ -358,41 +356,7 @@ export const TEXTS: TranslationMap = {
     ACH_PLAY_TIME_5H_TITLE: "Specialist",
     ACH_PLAY_TIME_5H_DESC: "Play for 5 hours (Total).",
     ACH_ALL_TITLE: "THE APEX VIRUS",
-    ACH_ALL_DESC: "Unlock all other achievements.",
-    // NEW POPUPS & TUTORIAL
-    POPUP_EVOLVED: "EVOLVED",
-    POPUP_BOSS_DOWN: "BOSS DOWN",
-    POPUP_CRITICAL_FAILURE: "CRITICAL FAILURE",
-    POPUP_OVERLOAD: "OVERLOAD!",
-    POPUP_SYSTEM_OVERLOAD: "SYSTEM OVERLOAD",
-    PAUSE_FOOTER: "SYSTEM HALTED // WAITING INPUT",
-    TUTORIAL_MOVE: "MOVE",
-    TUTORIAL_TAP: "TAP",
-    TUTORIAL_SHIFT: "SHIFT",
-    TUTORIAL_INVULNERABILITY: "Invulnerability",
-    TUTORIAL_SPACE: "SPACE",
-    TUTORIAL_INIT: "SYSTEMS INITIALIZED... GOOD LUCK.",
-    WARN_HEADER: "WARNING",
-    WARN_SUB: "BIOLOGICAL THREAT DETECTED",
-    WARN_BOSS_NAME: "ANOMALY // BOSS",
-    ACH_UNLOCKED_HEADER: "UNLOCKED",
-    ACH_ENCRYPTED: "??? ENCRYPTED DATA ???",
-    LOADOUT_GENOME: "GENOME SEQUENCE",
-    LOADOUT_METRICS: "VIRAL METRICS",
-    LOADOUT_MUTATIONS: "ACTIVE MUTATIONS",
-    STAT_DMG: "DAMAGE",
-    STAT_RATE: "FIRE RATE",
-    STAT_SPD: "SPEED",
-    STAT_HP: "MAX HP",
-    STAT_CRIT_C: "CRIT CHANCE",
-    STAT_CRIT_M: "CRIT MULT",
-    STAT_PROJ: "PROJECTILES",
-    STAT_MAG: "MAGNET",
-    STAT_THORN: "THORNS",
-    STAT_ORB: "ORBITALS",
-    STAT_ENG: "MAX ENERGY",
-    STAT_LVL: "LVL",
-    SETTINGS_VERSION: "SYS.CONFIG.V4.6"
+    ACH_ALL_DESC: "Unlock all other achievements."
   },
   PT: {
     TITLE_MAIN: "VITAL",
@@ -453,9 +417,9 @@ export const TEXTS: TranslationMap = {
     MANUAL_STRAINS: "CEPAS VIRAIS",
     MANUAL_MECHANICS: "MECÂNICAS DE COMBATE",
     MANUAL_BAC_DESC: "Patógeno padrão. Movimento comum e previsível.",
-    MANUAL_VIR_DESC: "Torreta estacionária. Dispara espinas teledirigidas.", 
+    MANUAL_VIR_DESC: "Torreta estacionária. Dispara espinas teledirigidas.", // SWAPPED
     MANUAL_PAR_DESC: "Tanque pesado. Lento, muita vida, absorve dano.",
-    MANUAL_FUNGI_DESC: "Atacante rápido. Movimento errático em zigue-zague.", 
+    MANUAL_FUNGI_DESC: "Atacante rápido. Movimento errático em zigue-zague.", // ALTERADO
     MANUAL_BOSS_DESC: "Anomalia massiva. Requer poder de fogo extremo.",
     MANUAL_MECH_DASH_TITLE: "Esquiva (Dash)",
     MANUAL_MECH_DASH_DESC: "Concede invulnerabilidade momentânea. Use para atravessar inimigos.",
@@ -595,41 +559,7 @@ export const TEXTS: TranslationMap = {
     ACH_PLAY_TIME_5H_TITLE: "Especialista",
     ACH_PLAY_TIME_5H_DESC: "Jogue por 5 horas (Total).",
     ACH_ALL_TITLE: "O VÍRUS APEX",
-    ACH_ALL_DESC: "Desbloqueie todas as outras conquistas.",
-    // NEW POPUPS & TUTORIAL
-    POPUP_EVOLVED: "EVOLUIU",
-    POPUP_BOSS_DOWN: "CHEFE ABATIDO",
-    POPUP_CRITICAL_FAILURE: "FALHA CRÍTICA",
-    POPUP_OVERLOAD: "SOBRECARGA!",
-    POPUP_SYSTEM_OVERLOAD: "SOBRECARGA DE SISTEMA",
-    PAUSE_FOOTER: "SISTEMA PARADO // AGUARDANDO INPUT",
-    TUTORIAL_MOVE: "MOVER",
-    TUTORIAL_TAP: "TOQUE",
-    TUTORIAL_SHIFT: "SHIFT",
-    TUTORIAL_INVULNERABILITY: "Invulnerabilidade",
-    TUTORIAL_SPACE: "ESPAÇO",
-    TUTORIAL_INIT: "SISTEMAS INICIALIZADOS... BOA SORTE.",
-    WARN_HEADER: "PERIGO",
-    WARN_SUB: "AMEAÇA BIOLÓGICA DETECTADA",
-    WARN_BOSS_NAME: "ANOMALIA // CHEFE",
-    ACH_UNLOCKED_HEADER: "DESBLOQUEADO",
-    ACH_ENCRYPTED: "??? DADOS CRIPTOGRAFADOS ???",
-    LOADOUT_GENOME: "SEQUÊNCIA GENÔMICA",
-    LOADOUT_METRICS: "MÉTRICAS VIRAIS",
-    LOADOUT_MUTATIONS: "MUTAÇÕES ATIVAS",
-    STAT_DMG: "DANO",
-    STAT_RATE: "CADÊNCIA",
-    STAT_SPD: "VELOCIDADE",
-    STAT_HP: "VIDA MÁX",
-    STAT_CRIT_C: "CHANCE CRÍT",
-    STAT_CRIT_M: "MULT CRÍT",
-    STAT_PROJ: "PROJÉTEIS",
-    STAT_MAG: "ÍMÃ",
-    STAT_THORN: "ESPINHOS",
-    STAT_ORB: "ORBITAIS",
-    STAT_ENG: "ENERGIA MÁX",
-    STAT_LVL: "NÍVEL",
-    SETTINGS_VERSION: "SIS.CONFIG.V4.6"
+    ACH_ALL_DESC: "Desbloqueie todas as outras conquistas."
   },
   ES: {
     TITLE_MAIN: "VITAL",
@@ -690,9 +620,9 @@ export const TEXTS: TranslationMap = {
     MANUAL_STRAINS: "CEPAS VIRALES",
     MANUAL_MECHANICS: "MECÁNICA DE BATALLA",
     MANUAL_BAC_DESC: "Patógeno estándar. Movimiento común y predecible.",
-    MANUAL_VIR_DESC: "Torreta estacionaria. Dispara espinas teledirigidas.", 
+    MANUAL_VIR_DESC: "Torreta estacionaria. Dispara espinas teledirigidas.", // SWAPPED
     MANUAL_PAR_DESC: "Tanque pesado. Lento, mucha vida, absorve daño.",
-    MANUAL_FUNGI_DESC: "Atacante rápido. Movimiento errático en zig-zag.", 
+    MANUAL_FUNGI_DESC: "Atacante rápido. Movimiento errático en zig-zag.", // ALTERADO
     MANUAL_BOSS_DESC: "Anomalia masiva. Requiere potencia de fuego extrema.",
     MANUAL_MECH_DASH_TITLE: "Evasión (Dash)",
     MANUAL_MECH_DASH_DESC: "Otorga invulnerabilidade momentánea. Úsalo para atravesar enemigos.",
@@ -832,41 +762,7 @@ export const TEXTS: TranslationMap = {
     ACH_PLAY_TIME_5H_TITLE: "Especialista",
     ACH_PLAY_TIME_5H_DESC: "Juega durante 5 horas (Total).",
     ACH_ALL_TITLE: "EL VIRUS APEX",
-    ACH_ALL_DESC: "Desbloquea todos los demás logros.",
-    // NEW POPUPS & TUTORIAL
-    POPUP_EVOLVED: "EVOLUCIONADO",
-    POPUP_BOSS_DOWN: "JEFE CAÍDO",
-    POPUP_CRITICAL_FAILURE: "FALLO CRÍTICO",
-    POPUP_OVERLOAD: "¡SOBRECARGA!",
-    POPUP_SYSTEM_OVERLOAD: "SOBRECARGA DEL SISTEMA",
-    PAUSE_FOOTER: "SISTEMA DETENIDO // ESPERANDO ENTRADA",
-    TUTORIAL_MOVE: "MOVER",
-    TUTORIAL_TAP: "TOQUE",
-    TUTORIAL_SHIFT: "SHIFT",
-    TUTORIAL_INVULNERABILITY: "Invulnerabilidad",
-    TUTORIAL_SPACE: "ESPACIO",
-    TUTORIAL_INIT: "SISTEMAS INICIALIZADOS... BUENA SUERTE.",
-    WARN_HEADER: "PELIGRO",
-    WARN_SUB: "AMENAZA BIOLÓGICA DETECTADA",
-    WARN_BOSS_NAME: "ANOMALÍA // JEFE",
-    ACH_UNLOCKED_HEADER: "DESBLOQUEADO",
-    ACH_ENCRYPTED: "??? DATOS ENCRIPTADOS ???",
-    LOADOUT_GENOME: "SECUENCIA GENÓMICA",
-    LOADOUT_METRICS: "MÉTRICAS VIRALES",
-    LOADOUT_MUTATIONS: "MUTACIONES ACTIVAS",
-    STAT_DMG: "DAÑO",
-    STAT_RATE: "CADENCIA",
-    STAT_SPD: "VELOCIDAD",
-    STAT_HP: "VIDA MÁX",
-    STAT_CRIT_C: "PROB CRÍT",
-    STAT_CRIT_M: "MULT CRÍT",
-    STAT_PROJ: "PROYECTILES",
-    STAT_MAG: "IMÁN",
-    STAT_THORN: "ESPINAS",
-    STAT_ORB: "ORBITALES",
-    STAT_ENG: "ENERGÍA MÁX",
-    STAT_LVL: "NIVEL",
-    SETTINGS_VERSION: "SIS.CONFIG.V4.6"
+    ACH_ALL_DESC: "Desbloquea todos los demás logros."
   }
 };
 
