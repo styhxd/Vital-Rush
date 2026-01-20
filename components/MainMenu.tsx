@@ -5,9 +5,9 @@ import { audioManager } from '../services/audioManager';
 
 // FIX: Uso de caminhos relativos (../src/assets/) para garantir compatibilidade
 // e evitar erros de "bare module specifier" no navegador.
-import bgImg from '../src/assets/background.webp';
-import vitalImg from '../src/assets/vital.png';
-import virusImg from '../src/assets/virus.png';
+import bgImg from '/src/assets/background.webp';
+import vitalImg from '/src/assets/vital.png';
+import virusImg from '/src/assets/virus.png';
 
 // Botão reutilizável (Mantido local para isolamento)
 const MenuButton = ({ onClick, children, variant = 'primary', selected = false }: any) => {
