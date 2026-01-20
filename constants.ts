@@ -1,3 +1,4 @@
+
 /**
  * ------------------------------------------------------------------
  * COPYRIGHT (c) 2026 ESTÚDIO CRIA
@@ -250,6 +251,16 @@ export const TEXTS: TranslationMap = {
     MSG_BOOM: "BOOM!",
     MSG_COMBO_X: "COMBO!",
     NO_MUTATIONS: "NO ACTIVE MUTATIONS DETECTED",
+    // Settings Keys
+    AUDIO_PROTOCOLS: "AUDIO PROTOCOLS",
+    MASTER_OUTPUT: "MASTER OUTPUT",
+    MUSIC_STREAM: "MUSIC STREAM",
+    SFX_FEEDBACK: "SFX FEEDBACK",
+    VISUAL_OPTICS: "VISUAL OPTICS",
+    RETRO_FILTER: "RETRO FILTER",
+    CRT_DESC: "CRT SCANLINES & VIGNETTE",
+    SYSTEM_PURGE: "SYSTEM PURGE (RESET DATA)",
+    CONFIRM_PURGE: "⚠️ CONFIRM PURGE? ⚠️",
     // Upgrades
     UP_MITOSIS_NAME: "RAPID MITOSIS",
     UP_MITOSIS_DESC: "+6% Fire Rate",
@@ -396,7 +407,7 @@ export const TEXTS: TranslationMap = {
     MANUAL_STRAINS: "CEPAS VIRAIS",
     MANUAL_MECHANICS: "MECÂNICAS DE COMBATE",
     MANUAL_BAC_DESC: "Patógeno padrão. Movimento comum e previsível.",
-    MANUAL_VIR_DESC: "Torreta estacionária. Dispara espinhos teleguiados.", // SWAPPED
+    MANUAL_VIR_DESC: "Torreta estacionária. Dispara espinas teledirigidas.", // SWAPPED
     MANUAL_PAR_DESC: "Tanque pesado. Lento, muita vida, absorve dano.",
     MANUAL_FUNGI_DESC: "Atacante rápido. Pouca vida, mas ataca em enxame.", // SWAPPED
     MANUAL_BOSS_DESC: "Anomalia massiva. Requer poder de fogo extremo.",
@@ -441,6 +452,16 @@ export const TEXTS: TranslationMap = {
     MSG_BOOM: "BOOM!",
     MSG_COMBO_X: "COMBO!",
     NO_MUTATIONS: "NENHUMA MUTAÇÃO ATIVA DETECTADA",
+    // Settings Keys
+    AUDIO_PROTOCOLS: "PROTOCOLOS DE ÁUDIO",
+    MASTER_OUTPUT: "VOLUME GERAL",
+    MUSIC_STREAM: "MÚSICA",
+    SFX_FEEDBACK: "EFEITOS (SFX)",
+    VISUAL_OPTICS: "ÓPTICA VISUAL",
+    RETRO_FILTER: "FILTRO RETRÔ",
+    CRT_DESC: "SCANLINES & VINHETA",
+    SYSTEM_PURGE: "PURGAR SISTEMA (APAGAR)",
+    CONFIRM_PURGE: "⚠️ CONFIRMAR PURGA? ⚠️",
     // Upgrades
     UP_MITOSIS_NAME: "MITOSE RÁPIDA",
     UP_MITOSIS_DESC: "+6% Cadência de Tiro",
@@ -632,6 +653,16 @@ export const TEXTS: TranslationMap = {
     MSG_BOOM: "¡BOOM!",
     MSG_COMBO_X: "¡COMBO!",
     NO_MUTATIONS: "NO SE DETECTARON MUTACIONES ACTIVAS",
+    // Settings Keys
+    AUDIO_PROTOCOLS: "PROTOCOLOS DE AUDIO",
+    MASTER_OUTPUT: "VOLUMEN GENERAL",
+    MUSIC_STREAM: "MÚSICA",
+    SFX_FEEDBACK: "EFECTOS (SFX)",
+    VISUAL_OPTICS: "ÓPTICA VISUAL",
+    RETRO_FILTER: "FILTRO RETRO",
+    CRT_DESC: "LÍNEAS CRT Y VIÑETA",
+    SYSTEM_PURGE: "PURGAR SISTEMA (BORRAR)",
+    CONFIRM_PURGE: "⚠️ ¿CONFIRMAR PURGA? ⚠️",
     // Upgrades
     UP_MITOSIS_NAME: "MITOSIS RÁPIDA",
     UP_MITOSIS_DESC: "+6% Cadencia de Tiro",

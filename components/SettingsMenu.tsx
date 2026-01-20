@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { TEXTS } from '../constants';
 import { Language } from '../types';
@@ -127,19 +128,19 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
 
                     {/* Audio Section */}
                     <div className="mb-4 lg:mb-8">
-                        <h3 className="text-[10px] lg:text-xs font-mono text-gray-500 mb-2 lg:mb-4 border-l-2 border-cyan-500 pl-2">AUDIO PROTOCOLS</h3>
+                        <h3 className="text-[10px] lg:text-xs font-mono text-gray-500 mb-2 lg:mb-4 border-l-2 border-cyan-500 pl-2">{t('AUDIO_PROTOCOLS')}</h3>
                         <HoloSlider 
-                            label="MASTER OUTPUT" 
+                            label={t('MASTER_OUTPUT')}
                             value={audioSettings.master} 
                             onChange={(v) => onUpdateAudio('master', v)} 
                         />
                         <HoloSlider 
-                            label="MUSIC STREAM" 
+                            label={t('MUSIC_STREAM')}
                             value={audioSettings.music} 
                             onChange={(v) => onUpdateAudio('music', v)} 
                         />
                         <HoloSlider 
-                            label="SFX FEEDBACK" 
+                            label={t('SFX_FEEDBACK')}
                             value={audioSettings.sfx} 
                             onChange={(v) => onUpdateAudio('sfx', v)} 
                         />
@@ -147,11 +148,11 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
 
                     {/* Visual Section (SURPRESA 1: Retro Optics) */}
                     <div className="mb-4 lg:mb-8">
-                        <h3 className="text-[10px] lg:text-xs font-mono text-gray-500 mb-2 lg:mb-4 border-l-2 border-cyan-500 pl-2">VISUAL OPTICS</h3>
+                        <h3 className="text-[10px] lg:text-xs font-mono text-gray-500 mb-2 lg:mb-4 border-l-2 border-cyan-500 pl-2">{t('VISUAL_OPTICS')}</h3>
                         <div className="flex items-center justify-between bg-white/5 p-4 lg:p-4 border border-white/10">
                             <div className="flex flex-col">
-                                <span className="text-xs lg:text-sm font-bold text-white tracking-widest">RETRO FILTER</span>
-                                <span className="text-[8px] lg:text-[10px] text-gray-400">CRT SCANLINES & VIGNETTE</span>
+                                <span className="text-xs lg:text-sm font-bold text-white tracking-widest">{t('RETRO_FILTER')}</span>
+                                <span className="text-[8px] lg:text-[10px] text-gray-400">{t('CRT_DESC')}</span>
                             </div>
                             <button 
                                 onClick={toggleCrt}
@@ -191,7 +192,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                                     : 'bg-red-950/20 text-red-500 border-red-900/50 hover:bg-red-900/40'}`}
                         >
                             <span className="relative z-10 flex items-center justify-center gap-2">
-                                {resetStage === 1 ? '⚠️ CONFIRM PURGE? ⚠️' : 'SYSTEM PURGE (RESET DATA)'}
+                                {resetStage === 1 ? t('CONFIRM_PURGE') : t('SYSTEM_PURGE')}
                             </span>
                             {/* Barra de progresso visual para o reset */}
                             <div className={`absolute bottom-0 left-0 h-1 bg-red-500 transition-all duration-[3000ms] ease-linear ${resetStage === 1 ? 'w-full' : 'w-0'}`}></div>
