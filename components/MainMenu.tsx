@@ -4,10 +4,12 @@ import { Difficulty, Language } from '../types';
 import { TEXTS } from '../constants';
 import { audioManager } from '../services/audioManager';
 
-// Importação direta dos Assets (Caminho relativo para garantir compatibilidade com Vite padrão)
-import bgImg from '../assets/background.webp';
-import vitalImg from '../assets/vital.png';
-import virusImg from '../assets/virus.png';
+// CORREÇÃO CRÍTICA DE PATHS: 
+// Como 'components' está na raiz e 'assets' está dentro de 'src', 
+// precisamos sair de components (..) e entrar em src (src/assets).
+import bgImg from '../src/assets/background.webp';
+import vitalImg from '../src/assets/vital.png';
+import virusImg from '../src/assets/virus.png';
 
 // Botão reutilizável (Mantido local para isolamento)
 const MenuButton = ({ onClick, children, variant = 'primary', selected = false }: any) => {
