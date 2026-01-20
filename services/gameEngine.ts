@@ -250,9 +250,11 @@ export class GameEngine {
           speed *= 0.85;
       }
 
-      // SCALING AJUSTADO: Antes era 0.35 (35%) por Wave.
-      // Agora com 20 waves, mudamos para 0.12 (12%) para manter jogável.
+      // SCALING AJUSTADO PELO ARQUITETO
+      // HP Escala: 12% por wave
+      // Dano Escala: 15% por wave (Aumento de letalidade progressiva)
       hp *= (1 + this.currentWaveIndex * 0.12);
+      dmg *= (1 + this.currentWaveIndex * 0.15);
 
       this.entities.push({
           id: `e_${Date.now()}_${Math.random()}`,
@@ -278,7 +280,7 @@ export class GameEngine {
       let hp = 1500 * this.difficultyMods.hp * (1 + this.currentWaveIndex * 0.25);
       if (mutation.traits.includes(BossTrait.JUGGERNAUT)) hp *= 2.5;
 
-      const dmg = 50 * this.difficultyMods.dmg;
+      const dmg = 50 * this.difficultyMods.dmg * (1 + this.currentWaveIndex * 0.1);
       
       this.entities.push({
           id: `boss_${Date.now()}`,
@@ -311,6 +313,11 @@ export class GameEngine {
           finalDamage *= stats.critMultiplier;
           this.sessionStats.critHits++;
           achievementManager.track('crit_master', 1);
+      }
+
+      // ARMOR LOGIC PARA PARASITAS (Tanky bois)
+      if (target.type === EntityType.PARASITE) {
+          finalDamage *= 0.8; // 20% redução de dano nativa
       }
       
       if (finalDamage > 500) achievementManager.track('overkill', 1);
@@ -1059,6 +1066,11 @@ export class GameEngine {
         e.pos.x += (e.vel.x + (this.bloodFlow.x * (1 - drag) * flowInfluence)) * tick;
         e.pos.y += (e.vel.y + (this.bloodFlow.y * (1 - drag) * flowInfluence)) * tick;
         
+        // VARIETY INJECTION: ZIG-ZAG FUNGI
+        if (e.type === EntityType.FUNGI && this.player.active) {
+            e.vel.y += Math.sin(this.time * 0.005 + e.pos.x * 0.01) * 0.5;
+        }
+
         if (e.type === EntityType.BOSS) {
             this.updateBoss(e, dtSeconds, stats); 
             e.vel.x *= 0.95; 
@@ -1084,6 +1096,18 @@ export class GameEngine {
                     
                     e.shootTimer = 3.5; 
                 }
+            }
+        }
+        
+        // VARIETY INJECTION: TRACKING PROJECTILES (WEAK HOMING)
+        if (e.type === EntityType.ENEMY_PROJECTILE && this.player.active) {
+            const dx = this.player.pos.x - e.pos.x;
+            const dy = this.player.pos.y - e.pos.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            if (dist > 0 && dist < 400) { // Só curva se estiver perto
+                const homingForce = 0.2;
+                e.vel.x += (dx/dist) * homingForce;
+                e.vel.y += (dy/dist) * homingForce;
             }
         }
 
@@ -1208,7 +1232,10 @@ export class GameEngine {
               const dMag = Math.sqrt(dx*dx + dy*dy);
               
               if (dMag > 0) {
-                let speed = (0.5 + (this.currentWaveIndex * 0.1));
+                // SCALING FIX: Speed Cap
+                let waveSpeedFactor = Math.min(1.2, this.currentWaveIndex * 0.05); // Cap em +1.2
+                let speed = (0.5 + waveSpeedFactor);
+                
                 speed *= 0.7; 
                 speed *= this.difficultyMods.speed;
                 if (this.patient.strain === ViralStrain.VOLATILE) speed *= 1.3;

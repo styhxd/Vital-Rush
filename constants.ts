@@ -92,12 +92,12 @@ export const INITIAL_STATS = {
 };
 
 // Multiplicadores de dificuldade.
-// REDUÇÃO DE VELOCIDADE (SPEED) EM TODOS OS NÍVEIS
+// ATUALIZAÇÃO DO ARQUITETO: Dano maciço, velocidade controlada.
 export const DIFFICULTY_MODIFIERS = {
-  [Difficulty.EASY]: { hp: 0.8, dmg: 0.8, speed: 0.6, score: 0.8 }, // Muito lento
-  [Difficulty.NORMAL]: { hp: 1.5, dmg: 1.2, speed: 0.85, score: 1.0 }, // Lento (era 1.2)
-  [Difficulty.HARD]: { hp: 2.5, dmg: 2.0, speed: 1.1, score: 1.5 }, // Médio (era 1.4)
-  [Difficulty.APEX]: { hp: 4.5, dmg: 4.0, speed: 1.35, score: 3.0 } // Rápido (era 1.7)
+  [Difficulty.EASY]: { hp: 0.8, dmg: 0.8, speed: 0.6, score: 0.8 }, 
+  [Difficulty.NORMAL]: { hp: 1.5, dmg: 1.5, speed: 0.85, score: 1.0 }, // Dano aumentado (era 1.2)
+  [Difficulty.HARD]: { hp: 2.5, dmg: 3.0, speed: 0.95, score: 1.5 }, // Dano Brutal (era 2.0), Speed Nerfado (era 1.1)
+  [Difficulty.APEX]: { hp: 4.5, dmg: 6.0, speed: 1.1, score: 3.0 } // Dano Letal (era 4.0), Speed Nerfado (era 1.35)
 };
 
 export const PATIENT_NAMES_FIRST = ["J.", "A.", "M.", "K.", "R.", "S.", "T.", "L.", "C.", "B."];
@@ -209,7 +209,7 @@ export const TEXTS: TranslationMap = {
     MANUAL_BAC_DESC: "Standard pathogen. Common, predictable movement.",
     MANUAL_VIR_DESC: "Stationary turret. Shoots tracking spikes.", // SWAPPED
     MANUAL_PAR_DESC: "Heavy tank. Slow, high HP, absorbs damage.",
-    MANUAL_FUNGI_DESC: "Fast attacker. Low HP but swarms quickly.", // SWAPPED
+    MANUAL_FUNGI_DESC: "Fast attacker. Erratic zig-zag movement.", // ALTERADO
     MANUAL_BOSS_DESC: "Massive anomaly. Requires extreme firepower.",
     MANUAL_MECH_DASH_TITLE: "Evasive Dash",
     MANUAL_MECH_DASH_DESC: "Grants momentary invulnerability. Use to pass through enemies.",
@@ -412,7 +412,7 @@ export const TEXTS: TranslationMap = {
     MANUAL_BAC_DESC: "Patógeno padrão. Movimento comum e previsível.",
     MANUAL_VIR_DESC: "Torreta estacionária. Dispara espinas teledirigidas.", // SWAPPED
     MANUAL_PAR_DESC: "Tanque pesado. Lento, muita vida, absorve dano.",
-    MANUAL_FUNGI_DESC: "Atacante rápido. Pouca vida, mas ataca em enxame.", // SWAPPED
+    MANUAL_FUNGI_DESC: "Atacante rápido. Movimento errático em zigue-zague.", // ALTERADO
     MANUAL_BOSS_DESC: "Anomalia massiva. Requer poder de fogo extremo.",
     MANUAL_MECH_DASH_TITLE: "Esquiva (Dash)",
     MANUAL_MECH_DASH_DESC: "Concede invulnerabilidade momentânea. Use para atravessar inimigos.",
@@ -615,7 +615,7 @@ export const TEXTS: TranslationMap = {
     MANUAL_BAC_DESC: "Patógeno estándar. Movimiento común y predecible.",
     MANUAL_VIR_DESC: "Torreta estacionaria. Dispara espinas teledirigidas.", // SWAPPED
     MANUAL_PAR_DESC: "Tanque pesado. Lento, mucha vida, absorve daño.",
-    MANUAL_FUNGI_DESC: "Atacante rápido. Poca vida, pero ataca en enjambre.", // SWAPPED
+    MANUAL_FUNGI_DESC: "Atacante rápido. Movimiento errático en zig-zag.", // ALTERADO
     MANUAL_BOSS_DESC: "Anomalia masiva. Requiere potencia de fuego extrema.",
     MANUAL_MECH_DASH_TITLE: "Evasión (Dash)",
     MANUAL_MECH_DASH_DESC: "Otorga invulnerabilidade momentánea. Úsalo para atravesar enemigos.",
