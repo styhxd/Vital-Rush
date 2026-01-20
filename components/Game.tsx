@@ -1,5 +1,7 @@
 
 
+
+
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from '../services/gameEngine';
 import { audioManager } from '../services/audioManager';
@@ -94,7 +96,8 @@ const IconTrophy = () => (
 );
 
 // --- TELA DE TUTORIAL (NOVA) ---
-const TutorialOverlay = ({ isMobile }: { isMobile: boolean }) => {
+const TutorialOverlay = ({ isMobile, language }: { isMobile: boolean, language: Language }) => {
+    const t = (key: string) => TEXTS[language][key] || key;
     return (
         <div className="absolute inset-0 z-40 pointer-events-none flex flex-col items-center justify-center anim-tutorial-fade">
             <style>{`
@@ -119,7 +122,7 @@ const TutorialOverlay = ({ isMobile }: { isMobile: boolean }) => {
                             <span className="text-xl lg:text-2xl font-bold font-mono text-cyan-400">WASD</span>
                         )}
                     </div>
-                    <span className="text-[10px] lg:text-xs tracking-[0.2em] text-cyan-300 font-bold">MOVE</span>
+                    <span className="text-[10px] lg:text-xs tracking-[0.2em] text-cyan-300 font-bold">{t('TUTORIAL_MOVE')}</span>
                 </div>
 
                 {/* DASH - O DESTAQUE */}
@@ -127,14 +130,14 @@ const TutorialOverlay = ({ isMobile }: { isMobile: boolean }) => {
                     <div className="absolute inset-0 bg-white/10 blur-xl rounded-full animate-pulse"></div>
                     <div className="w-16 h-16 lg:w-32 lg:h-32 rounded-full border-4 border-white flex items-center justify-center bg-white/10 shadow-[0_0_30px_white] animate-bounce">
                         {isMobile ? (
-                            <span className="text-xl lg:text-2xl font-bold text-white">TAP</span>
+                            <span className="text-xl lg:text-2xl font-bold text-white">{t('TUTORIAL_TAP')}</span>
                         ) : (
-                            <span className="text-xl lg:text-2xl font-bold font-mono text-white">SHIFT</span>
+                            <span className="text-xl lg:text-2xl font-bold font-mono text-white">{t('TUTORIAL_SHIFT')}</span>
                         )}
                     </div>
                     <div className="flex flex-col items-center">
                         <span className="text-base lg:text-2xl tracking-[0.3em] text-white font-black drop-shadow-[0_0_10px_white]">DASH</span>
-                        <span className="text-[9px] lg:text-xs text-yellow-300 uppercase tracking-widest bg-black/60 px-2 rounded mt-1">Invulnerability</span>
+                        <span className="text-[9px] lg:text-xs text-yellow-300 uppercase tracking-widest bg-black/60 px-2 rounded mt-1">{t('TUTORIAL_INVULNERABILITY')}</span>
                     </div>
                 </div>
 
@@ -144,7 +147,7 @@ const TutorialOverlay = ({ isMobile }: { isMobile: boolean }) => {
                          {isMobile ? (
                             <div className="w-8 h-8 border-2 border-red-500 rounded-full"></div>
                         ) : (
-                            <span className="text-lg lg:text-xl font-bold font-mono text-red-400">SPACE</span>
+                            <span className="text-lg lg:text-xl font-bold font-mono text-red-400">{t('TUTORIAL_SPACE')}</span>
                         )}
                     </div>
                     <span className="text-[10px] lg:text-xs tracking-[0.2em] text-red-300 font-bold">SURGE</span>
@@ -152,7 +155,7 @@ const TutorialOverlay = ({ isMobile }: { isMobile: boolean }) => {
             </div>
             
             <div className="mt-8 lg:mt-12 text-[10px] lg:text-sm text-white/50 font-mono animate-pulse tracking-widest">
-                SYSTEMS INITIALIZED... GOOD LUCK.
+                {t('TUTORIAL_INIT')}
             </div>
         </div>
     );
@@ -760,7 +763,7 @@ export const Game: React.FC = () => {
                       </svg>
                   </div>
                   <div className="absolute inset-0 flex items-center justify-center">
-                      <h1 className="text-4xl md:text-6xl font-black text-red-500 tracking-[1em] anim-glitch opacity-80 mix-blend-overlay">CRITICAL</h1>
+                      <h1 className="text-4xl md:text-6xl font-black text-red-500 tracking-[1em] anim-glitch opacity-80 mix-blend-overlay">{t('POPUP_CRITICAL_FAILURE')}</h1>
                   </div>
               </div>
               <div className="absolute inset-0 bg-red-900/20 mix-blend-overlay animate-pulse"></div>
@@ -769,7 +772,7 @@ export const Game: React.FC = () => {
 
       {/* TUTORIAL OVERLAY (FANTASMA) */}
       {showTutorial && gameState === GameState.PLAYING && (
-          <TutorialOverlay isMobile={isMobile} />
+          <TutorialOverlay isMobile={isMobile} language={language} />
       )}
 
       {/* BOSS WARNING OVERLAY */}
@@ -778,10 +781,10 @@ export const Game: React.FC = () => {
               <div className="w-full bg-red-600/20 backdrop-blur-sm border-y-8 border-red-600 py-10 md:py-20 flex flex-col items-center justify-center relative overflow-hidden">
                   <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-30 mix-blend-overlay"></div>
                   <h1 className="text-3xl lg:text-9xl font-black text-red-500 tracking-[0.2em] anim-glitch drop-shadow-[0_0_20px_red]">
-                      WARNING
+                      {t('WARN_HEADER')}
                   </h1>
                   <h2 className="text-sm lg:text-4xl text-white font-mono tracking-widest mt-2 lg:mt-4 blink">
-                      BIOLOGICAL THREAT DETECTED
+                      {t('WARN_SUB')}
                   </h2>
                   <div className="w-[200%] h-2 bg-red-500 absolute top-0 animate-[flow_2s_linear_infinite]"></div>
                   <div className="w-[200%] h-2 bg-red-500 absolute bottom-0 animate-[flow_2s_linear_infinite_reverse]"></div>
@@ -793,7 +796,7 @@ export const Game: React.FC = () => {
       {bossEntity && !showBossIntro && (
           <div className="absolute top-24 lg:top-36 left-1/2 -translate-x-1/2 z-30 w-[80%] lg:w-[50%] flex flex-col items-center pointer-events-none anim-tutorial-fade" style={{animationDuration: '0.5s'}}>
               <div className="flex justify-between w-full text-red-500 font-bold font-mono text-[8px] lg:text-xs mb-1 tracking-[0.3em]">
-                  <span className="anim-glitch">ANOMALY // BOSS</span>
+                  <span className="anim-glitch">{t('WARN_BOSS_NAME')}</span>
                   <span>{Math.ceil(bossEntity.hp)}/{bossEntity.max}</span>
               </div>
               <div className="w-full h-2 lg:h-6 bg-black/80 border-2 border-red-900 relative skew-x-[-20deg] overflow-hidden">
@@ -816,7 +819,7 @@ export const Game: React.FC = () => {
                       : 'bg-black/90 border-cyan-500 shadow-[0_0_20px_rgba(0,255,255,0.3)]'}`}>
                   <div className="text-2xl lg:text-4xl animate-bounce">{activeAchievement.icon}</div>
                   <div>
-                      <div className={`text-[10px] lg:text-xs font-bold tracking-widest mb-1 ${isPlatinum ? 'text-amber-400' : 'text-cyan-400'}`}>{t('ACHIEVEMENTS')} UNLOCKED</div>
+                      <div className={`text-[10px] lg:text-xs font-bold tracking-widest mb-1 ${isPlatinum ? 'text-amber-400' : 'text-cyan-400'}`}>{t('ACHIEVEMENTS')} {t('ACH_UNLOCKED_HEADER')}</div>
                       <div className="text-sm lg:text-lg font-bold text-white">{t(activeAchievement.titleKey)}</div>
                       <div className="text-[10px] lg:text-xs text-gray-400">{t(activeAchievement.descKey)}</div>
                   </div>
@@ -1027,7 +1030,7 @@ export const Game: React.FC = () => {
                               if (ach.secret && isLocked) {
                                   return (
                                       <div key={ach.id} className="bg-black/60 border border-white/5 p-4 lg:p-6 flex items-center justify-center opacity-50 min-h-[50px] lg:min-h-[120px]">
-                                          <span className="text-[10px] lg:text-xs tracking-widest text-gray-600 font-mono">??? ENCRYPTED DATA ???</span>
+                                          <span className="text-[10px] lg:text-xs tracking-widest text-gray-600 font-mono">{t('ACH_ENCRYPTED')}</span>
                                       </div>
                                   )
                               }
@@ -1051,7 +1054,7 @@ export const Game: React.FC = () => {
                                                   
                                                   <div className="flex justify-between text-[8px] lg:text-xs tracking-widest font-mono">
                                                       <span className={progress.unlocked ? 'text-green-400 font-bold' : 'text-gray-600'}>
-                                                          {progress.unlocked ? 'UNLOCKED' : t('ACH_LOCKED')}
+                                                          {progress.unlocked ? t('ACH_UNLOCKED_HEADER') : t('ACH_LOCKED')}
                                                       </span>
                                                       {ach.isCumulative && (
                                                           <span className="text-gray-500">
@@ -1224,7 +1227,7 @@ export const Game: React.FC = () => {
                             <div key={idx} className={`p-2.5 lg:p-6 bg-[#151515] border ${upgrade.rarity === 'LEGENDARY' ? 'border-amber-500/30' : 'border-white/10'} relative group`}>
                                 <div className="flex justify-between mb-1.5 lg:mb-2">
                                     <span className={`text-[8px] lg:text-[10px] px-1.5 lg:px-2 py-0.5 border ${upgrade.rarity === 'LEGENDARY' ? 'text-amber-400 border-amber-400/30' : 'text-gray-400 border-gray-600'}`}>{upgrade.rarity}</span>
-                                    <span className="text-[8px] lg:text-xs text-gray-500">LVL {upgrade.level}/{upgrade.maxLevel}</span>
+                                    <span className="text-[8px] lg:text-xs text-gray-500">{t('STAT_LVL')} {upgrade.level}/{upgrade.maxLevel}</span>
                                 </div>
                                 <h3 className="text-xs lg:text-xl font-bold text-white mb-1 lg:mb-2 leading-tight">{t(upgrade.nameKey)}</h3>
                                 <p className="text-[10px] lg:text-sm text-gray-400 mb-2 lg:mb-4 h-8 lg:h-10 leading-tight">{t(upgrade.descKey)}</p>
@@ -1294,8 +1297,3 @@ export const Game: React.FC = () => {
           onQuit={() => {
               togglePause(); // Unpause logic
               setGameState(GameState.MENU);
-          }}
-      />
-    </div>
-  );
-};
