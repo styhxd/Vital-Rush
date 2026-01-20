@@ -695,7 +695,8 @@ export class GameEngine {
               e.vel.x = (dx / dMag) * dashMag;
               e.vel.y = (dy / dMag) * dashMag;
               m.dashTimer = 4.0;
-              audioManager.playSurge();
+              // VARIETY: SOUND CALL FOR BOSS DASH
+              audioManager.playBossDash();
           }
       }
 
@@ -725,6 +726,8 @@ export class GameEngine {
                   });
               }
               m.shootTimer = 2.5;
+              // VARIETY: SOUND CALL FOR ENEMY SHOOT (BOSS)
+              audioManager.playEnemyShoot();
           }
       }
   }
@@ -823,7 +826,8 @@ export class GameEngine {
                     this.sessionStats.mineKills++;
                     achievementManager.track('mine_pop_20', 1);
                     this.spawnText(e.pos, "OVERLOAD!", '#00ffff', 45); 
-                    audioManager.playExplosion();
+                    // VARIETY: SOUND CALL FOR MINE EXPLOSION
+                    audioManager.playMineExplosion();
                     audioManager.playSurge(); 
 
                     this.particles.push({
@@ -1095,6 +1099,8 @@ export class GameEngine {
                     });
                     
                     e.shootTimer = 3.5; 
+                    // VARIETY: SOUND CALL FOR ENEMY SHOOT
+                    audioManager.playEnemyShoot();
                 }
             }
         }
@@ -1155,7 +1161,8 @@ export class GameEngine {
                    achievementManager.track('mine_pop_20', 1);
                    this.shakeIntensity = 25;
                    this.spawnText(other.pos, "SYSTEM OVERLOAD", '#00ff00', 55); 
-                   audioManager.playExplosion();
+                   // VARIETY: SOUND CALL FOR MINE EXPLOSION
+                   audioManager.playMineExplosion();
                    audioManager.playSurge(); 
                    
                    this.particles.push({

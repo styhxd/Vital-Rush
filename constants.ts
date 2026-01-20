@@ -94,10 +94,17 @@ export const INITIAL_STATS = {
 // Multiplicadores de dificuldade.
 // ATUALIZAÇÃO DO ARQUITETO: Dano maciço, velocidade controlada.
 export const DIFFICULTY_MODIFIERS = {
-  [Difficulty.EASY]: { hp: 0.8, dmg: 0.8, speed: 0.6, score: 0.8 }, 
-  [Difficulty.NORMAL]: { hp: 1.5, dmg: 1.5, speed: 0.85, score: 1.0 }, // Dano aumentado (era 1.2)
-  [Difficulty.HARD]: { hp: 2.5, dmg: 3.0, speed: 0.95, score: 1.5 }, // Dano Brutal (era 2.0), Speed Nerfado (era 1.1)
-  [Difficulty.APEX]: { hp: 4.5, dmg: 6.0, speed: 1.1, score: 3.0 } // Dano Letal (era 4.0), Speed Nerfado (era 1.35)
+  // TRIAGE (Fácil): Facilitado levemente
+  [Difficulty.EASY]: { hp: 0.7, dmg: 0.7, speed: 0.55, score: 0.8 }, 
+  
+  // RESIDENT (Normal): Mantido original
+  [Difficulty.NORMAL]: { hp: 1.5, dmg: 1.5, speed: 0.85, score: 1.0 }, 
+  
+  // SPECIALIST (Difícil): Levemente aumentado
+  [Difficulty.HARD]: { hp: 3.0, dmg: 3.5, speed: 1.0, score: 1.5 }, 
+  
+  // APEX (Pesadelo): Aumentado a brutalidade
+  [Difficulty.APEX]: { hp: 6.0, dmg: 7.0, speed: 1.25, score: 3.0 } 
 };
 
 export const PATIENT_NAMES_FIRST = ["J.", "A.", "M.", "K.", "R.", "S.", "T.", "L.", "C.", "B."];

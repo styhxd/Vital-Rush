@@ -1,3 +1,5 @@
+
+
 /**
  * ------------------------------------------------------------------
  * COPYRIGHT (c) 2026 ESTÚDIO CRIA
@@ -187,6 +189,72 @@ export class AudioManager {
           osc.start();
       });
 
+      // --- NOVOS SONS (VARIEDADE) ---
+
+      // Mine Explosion: Grave e profundo (Deep Bass Boom)
+      this.buffers['mine_expl'] = await this.renderOffline(0.6, (c) => {
+          const bufferSize = c.sampleRate * 0.6;
+          const noiseBuffer = c.createBuffer(1, bufferSize, c.sampleRate);
+          const data = noiseBuffer.getChannelData(0);
+          for(let i=0; i<bufferSize; i++) data[i] = Math.random()*2 - 1;
+          const src = c.createBufferSource();
+          src.buffer = noiseBuffer;
+          
+          const f = c.createBiquadFilter();
+          f.type = 'lowpass';
+          f.frequency.setValueAtTime(300, 0); // Começa baixo
+          f.frequency.exponentialRampToValueAtTime(10, 0.5); // Desce pra sub-bass
+          
+          const g = c.createGain();
+          g.gain.setValueAtTime(0.8, 0);
+          g.gain.exponentialRampToValueAtTime(0.01, 0.6);
+          
+          src.connect(f);
+          f.connect(g);
+          g.connect(c.destination);
+          src.start();
+      });
+
+      // Boss Dash: Whoosh de baixa frequencia
+      this.buffers['boss_dash'] = await this.renderOffline(0.5, (c) => {
+          const bufferSize = c.sampleRate * 0.5;
+          const noiseBuffer = c.createBuffer(1, bufferSize, c.sampleRate);
+          const data = noiseBuffer.getChannelData(0);
+          for(let i=0; i<bufferSize; i++) data[i] = Math.random()*2 - 1;
+          const src = c.createBufferSource();
+          src.buffer = noiseBuffer;
+
+          const f = c.createBiquadFilter();
+          f.type = 'bandpass';
+          f.Q.value = 1;
+          f.frequency.setValueAtTime(100, 0);
+          f.frequency.linearRampToValueAtTime(400, 0.2); // Sobe
+          f.frequency.linearRampToValueAtTime(50, 0.5); // Desce
+
+          const g = c.createGain();
+          g.gain.setValueAtTime(0.5, 0);
+          g.gain.linearRampToValueAtTime(0, 0.5);
+
+          src.connect(f);
+          f.connect(g);
+          g.connect(c.destination);
+          src.start();
+      });
+
+      // Enemy Shoot: Agudo e digital
+      this.buffers['enemy_shoot'] = await this.renderOffline(0.1, (c) => {
+          const osc = c.createOscillator();
+          const g = c.createGain();
+          osc.type = 'square'; // Som mais digital 8-bit
+          osc.frequency.setValueAtTime(800, 0);
+          osc.frequency.exponentialRampToValueAtTime(200, 0.1);
+          g.gain.setValueAtTime(0.2, 0);
+          g.gain.exponentialRampToValueAtTime(0.01, 0.1);
+          osc.connect(g);
+          g.connect(c.destination);
+          osc.start();
+      });
+
       // --- INSTRUMENTOS MUSICAIS (SAMPLES SINTÉTICOS) ---
 
       // KICK: Curto, grave, seco.
@@ -305,6 +373,11 @@ export class AudioManager {
   public playExplosion() { this.playBuffer('expl', 0.8, 0, 100); }
   public playPowerUp() { this.playBuffer('power', 0.5, 0, 80); }
   public playSurge() { this.playBuffer('surge', 0.6, 0, 500); }
+  
+  // NOVOS MÉTODOS DE ÁUDIO
+  public playMineExplosion() { this.playBuffer('mine_expl', 0.9, 0, 150); }
+  public playBossDash() { this.playBuffer('boss_dash', 0.7, 0, 300); }
+  public playEnemyShoot() { this.playBuffer('enemy_shoot', 0.4, Math.random()*2, 80); }
 
   // --- O MAESTRO (Music Scheduler) ---
   
