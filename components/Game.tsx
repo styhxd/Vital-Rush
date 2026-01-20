@@ -8,7 +8,6 @@ import { Joystick } from './Joystick';
 import { PauseMenu } from './PauseMenu';
 import { SettingsMenu } from './SettingsMenu';
 import { LoadoutMenu } from './LoadoutMenu'; 
-import { MainMenu } from './MainMenu'; // IMPORTADO O NOVO MENU
 
 // --- UI COMPONENTS (Versão Compacta - Agora Aumentada para Mobile) ---
 
@@ -954,22 +953,73 @@ export const Game: React.FC = () => {
         </div>
       )}
 
-      {/* REPLACED: OLD MENU WITH NEW MAINMENU COMPONENT */}
+      {/* (MANTIDO O RESTANTE DOS MENUS) */}
+      
       {gameState === GameState.MENU && (
-        <MainMenu
-          onStart={handleStartGame}
-          onSettings={openSettings}
-          onControls={() => openControls(true)}
-          onManual={() => setGameState(GameState.MANUAL)}
-          onAchievements={openAchievements}
-          language={language}
-          setLanguage={setLanguage}
-          difficulty={difficulty}
-          setDifficulty={setDifficulty}
-          isPlatinum={isPlatinum}
-          cheatInput={cheatInput}
-          onCheatInput={handleCheatInput}
-        />
+        <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
+          {/* REDUZIDO UM POUCO NO MOBILE (scale-90) como solicitado */}
+          <div className="relative text-center p-6 lg:p-8 max-w-md lg:max-w-md w-full scale-90 lg:scale-100">
+            <h1 className={`text-6xl lg:text-9xl font-bold mb-2 lg:mb-2 tracking-tighter mix-blend-screen leading-none ${isPlatinum ? 'text-amber-400 shadow-[0_0_30px_rgba(255,170,0,0.5)]' : 'text-red-600 red-glow'}`} style={{fontFamily: 'Impact, sans-serif'}}>{t('TITLE_MAIN')}</h1>
+            <h2 className="text-xl lg:text-5xl font-light text-white mb-4 lg:mb-8 tracking-[0.5em] -mt-1 lg:-mt-2 opacity-80">{t('TITLE_SUB')}</h2>
+            
+            {isPlatinum && <div className="text-[8px] lg:text-xs tracking-[0.5em] text-purple-400 mb-2 lg:mb-4 animate-pulse">{t('ACH_PLATINUM_MSG')}</div>}
+
+            <div className="mb-4 lg:mb-8">
+                <div className="text-[10px] lg:text-xs text-gray-500 tracking-widest mb-1 lg:mb-2">{t('DIFFICULTY')}</div>
+                <div className="grid grid-cols-4 gap-1.5 lg:gap-2">
+                    {Object.values(Difficulty).map(d => (
+                        <button 
+                            key={d} 
+                            onClick={() => setDifficulty(d)}
+                            className={`text-[9px] lg:text-[10px] font-bold py-1.5 lg:py-2 border transition-all ${difficulty === d ? 'bg-red-600 text-black border-red-600' : 'bg-transparent text-gray-500 border-gray-800'}`}
+                        >
+                            {t(`DIFF_${d}`)}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div className="space-y-2 lg:space-y-4">
+                <MenuButton onClick={() => { handleStartGame(); audioManager.startMenuMusic(); }}>{t('START')}</MenuButton>
+                <div className="grid grid-cols-2 gap-2 lg:gap-4">
+                  <MenuButton variant="secondary" onClick={() => openControls(true)}>{t('CONTROLS')}</MenuButton>
+                  <MenuButton variant="secondary" onClick={() => setGameState(GameState.MANUAL)}>{t('MANUAL')}</MenuButton>
+                </div>
+                <div className="grid grid-cols-2 gap-2 lg:gap-4">
+                  {/* CHANGED: Now uses openSettings handler */}
+                  <MenuButton variant="secondary" onClick={openSettings}>{t('SETTINGS')}</MenuButton>
+                  <MenuButton variant="secondary" onClick={openAchievements}>{t('ACHIEVEMENTS')}</MenuButton>
+                </div>
+                
+                {/* REPLACED: Language Buttons now use FLAGS mapping and better styling */}
+                <div className="flex justify-center gap-2 lg:gap-2 mt-4 lg:mt-6">
+                    {(['EN', 'PT', 'ES'] as Language[]).map(l => (
+                      <button 
+                        key={l}
+                        onClick={() => setLanguage(l)} 
+                        className={`text-[10px] lg:text-sm font-bold tracking-widest px-3 lg:px-3 py-1.5 lg:py-2 border-b-2 transition-all flex items-center gap-2
+                            ${language === l 
+                                ? 'text-white border-red-500 bg-red-900/20' 
+                                : 'text-gray-600 border-transparent hover:text-gray-400'}`}
+                      >
+                        {l}
+                      </button>
+                    ))}
+                </div>
+            </div>
+            
+            <div className="mt-6 lg:mt-8">
+                <input 
+                    type="text" 
+                    value={cheatInput} 
+                    onChange={handleCheatInput}
+                    placeholder={t('PH_ACCESS_CODE')}
+                    className="bg-transparent border-b border-gray-800 text-center text-[10px] lg:text-xs text-gray-500 focus:outline-none focus:border-red-500 w-full font-mono tracking-widest uppercase"
+                />
+            </div>
+          </div>
+        </div>
       )}
 
       {/* REPLACED: New Settings Menu Component Rendering */}
