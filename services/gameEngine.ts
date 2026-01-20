@@ -826,8 +826,8 @@ export class GameEngine {
                     this.sessionStats.mineKills++;
                     achievementManager.track('mine_pop_20', 1);
                     this.spawnText(e.pos, "OVERLOAD!", '#00ffff', 45); 
-                    // VARIETY: SOUND CALL FOR MINE EXPLOSION
-                    audioManager.playMineExplosion();
+                    // VARIETY: SOUND CALL FOR MINE EXPLOSION (DASH)
+                    audioManager.playMineExplosionDash();
                     audioManager.playSurge(); 
 
                     this.particles.push({
@@ -1161,8 +1161,8 @@ export class GameEngine {
                    achievementManager.track('mine_pop_20', 1);
                    this.shakeIntensity = 25;
                    this.spawnText(other.pos, "SYSTEM OVERLOAD", '#00ff00', 55); 
-                   // VARIETY: SOUND CALL FOR MINE EXPLOSION
-                   audioManager.playMineExplosion();
+                   // VARIETY: SOUND CALL FOR MINE EXPLOSION (SHOT)
+                   audioManager.playMineExplosionShot();
                    audioManager.playSurge(); 
                    
                    this.particles.push({

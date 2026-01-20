@@ -6,11 +6,11 @@
  * DIRETOR: PAULO GABRIEL DE L. S.
  * ------------------------------------------------------------------
  * 
- * AUDIO MANAGER V5: "THE PROCEDURAL MAESTRO"
+ * AUDIO MANAGER V6: "SONIC DISTINCTION"
  * 
- * Agora o áudio não é apenas um loop estático.
- * Ele compõe música em tempo real baseada no estresse do jogador.
- * Inclui baking de sons sintetizados para performance zero-custo.
+ * Centralização total da lógica de áudio.
+ * Reversão do tiro do player para o clássico Arcade.
+ * Separação drástica entre tipos de explosão de minas.
  */
 
 export class AudioManager {
@@ -35,9 +35,8 @@ export class AudioManager {
   private nextNoteTime: number = 0;
   private current16thNote: number = 0;
   
-  // Estado do Jogo (O Maestro precisa saber o que está acontecendo)
+  // Estado do Jogo
   private currentWave: number = 1;
-  private currentHealthRatio: number = 1.0;
   
   private timerID: number | null = null;
 
@@ -47,10 +46,10 @@ export class AudioManager {
     sfx: 0.7
   };
 
-  // Escalas Musicais (Intervalos em semitons)
-  private readonly SCALE_MAJOR = [0, 4, 7, 12]; // Heroico
-  private readonly SCALE_MINOR = [0, 3, 7, 10]; // Ação Padrão
-  private readonly SCALE_DARK  = [0, 1, 6, 8];  // Terror/Caos (Phrygian/Locrian)
+  // Escalas Musicais
+  private readonly SCALE_MAJOR = [0, 4, 7, 12]; 
+  private readonly SCALE_MINOR = [0, 3, 7, 10]; 
+  private readonly SCALE_DARK  = [0, 1, 6, 8]; 
 
   constructor() {}
 
@@ -67,21 +66,18 @@ export class AudioManager {
     this.musicGain = this.ctx.createGain();
     this.sfxGain = this.ctx.createGain();
 
-    // Configuração da Cadeia de Efeitos Musicais
     this.musicFilter = this.ctx.createBiquadFilter();
     this.musicFilter.type = 'lowpass';
-    this.musicFilter.frequency.value = 22000; // Aberto por padrão
+    this.musicFilter.frequency.value = 22000; 
     this.musicFilter.Q.value = 1;
 
     this.compressor = this.ctx.createDynamicsCompressor();
     this.compressor.threshold.value = -12;
-    this.compressor.ratio.value = 8; // Compressão pesada pra dar "punch"
+    this.compressor.ratio.value = 8;
     
-    // Routing: Music -> Filter -> Compressor -> Master
     this.musicGain.connect(this.musicFilter);
     this.musicFilter.connect(this.compressor);
     
-    // Routing: SFX -> Compressor -> Master
     this.sfxGain.connect(this.compressor);
     
     this.compressor.connect(this.masterGain);
@@ -91,20 +87,13 @@ export class AudioManager {
     this.updateVolumes();
   }
 
-  // Atualiza o estado para o compositor reagir
   public setGameState(wave: number, healthRatio: number) {
       this.currentWave = wave;
-      
-      // Suaviza a transição do filtro de vida (Low Pass)
       if (this.musicFilter && this.ctx) {
-          // Se vida < 30%, fecha o filtro (som abafado). Se > 30%, abre.
           let targetFreq = 22000;
           if (healthRatio < 0.3) {
-              // Mapeia 0.0-0.3 para 200Hz-800Hz
               targetFreq = 200 + (healthRatio / 0.3) * 600; 
           }
-          
-          // Transição suave para não dar "pop"
           this.musicFilter.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.5);
       }
   }
@@ -112,37 +101,109 @@ export class AudioManager {
   private async bakeSounds() {
       if (!this.ctx) return;
       
-      // --- SFX BASICOS ---
-      this.buffers['shoot'] = await this.renderOffline(0.12, (c) => {
+      // --- REVERSÃO DO TIRO DO PLAYER (CLASSIC PEW) ---
+      // Oscilador Triangular com decaimento rápido de pitch.
+      // Removemos a síntese FM complicada.
+      this.buffers['shoot'] = await this.renderOffline(0.15, (c) => {
           const osc = c.createOscillator();
           const g = c.createGain();
-          osc.type = 'triangle';
-          osc.frequency.setValueAtTime(600, 0);
-          osc.frequency.exponentialRampToValueAtTime(50, 0.1);
-          g.gain.setValueAtTime(0.3, 0);
+          
+          osc.type = 'triangle'; // Clássico de arcade, menos irritante que Square
+          osc.frequency.setValueAtTime(900, 0); 
+          osc.frequency.exponentialRampToValueAtTime(300, 0.15); // Sweep rápido
+          
+          g.gain.setValueAtTime(0.25, 0);
           g.gain.exponentialRampToValueAtTime(0.01, 0.1);
+          
           osc.connect(g);
           g.connect(c.destination);
           osc.start();
       });
 
+      // --- EXPLOSÃO DE MINA 1: TIRO (IMPACTANTE) ---
+      // Heavy Bass + Noise. Uma explosão "suja" e forte.
+      this.buffers['mine_expl_heavy'] = await this.renderOffline(0.7, (c) => {
+          // Camada 1: Impacto Grave (Square Wave distorcida)
+          const osc = c.createOscillator();
+          const gOsc = c.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(150, 0);
+          osc.frequency.exponentialRampToValueAtTime(10, 0.5);
+          gOsc.gain.setValueAtTime(0.8, 0);
+          gOsc.gain.exponentialRampToValueAtTime(0.01, 0.5);
+
+          // Camada 2: Ruído de Detonação
+          const bufferSize = c.sampleRate * 0.5;
+          const noiseBuffer = c.createBuffer(1, bufferSize, c.sampleRate);
+          const data = noiseBuffer.getChannelData(0);
+          for(let i=0; i<bufferSize; i++) data[i] = Math.random()*2 - 1;
+          const srcNoise = c.createBufferSource();
+          srcNoise.buffer = noiseBuffer;
+          const gNoise = c.createGain();
+          const fNoise = c.createBiquadFilter();
+          fNoise.type = 'lowpass';
+          fNoise.frequency.setValueAtTime(1000, 0);
+          fNoise.frequency.linearRampToValueAtTime(100, 0.4);
+          gNoise.gain.setValueAtTime(0.6, 0);
+          gNoise.gain.exponentialRampToValueAtTime(0.01, 0.4);
+
+          srcNoise.connect(fNoise);
+          fNoise.connect(gNoise);
+          osc.connect(gOsc);
+          
+          gOsc.connect(c.destination);
+          gNoise.connect(c.destination);
+          
+          osc.start();
+          srcNoise.start();
+      });
+
+      // --- EXPLOSÃO DE MINA 2: DASH (ENERGIA/VÁCUO) ---
+      // Sine Wave pura. Limpa. Soa como uma implosão de energia ou bolha.
+      this.buffers['mine_expl_dash'] = await this.renderOffline(0.6, (c) => {
+          const osc = c.createOscillator();
+          const g = c.createGain();
+          
+          osc.type = 'sine'; // Sem harmônicos, som "redondo"
+          osc.frequency.setValueAtTime(400, 0);
+          osc.frequency.exponentialRampToValueAtTime(50, 0.4); // Drop rápido
+          
+          g.gain.setValueAtTime(0.8, 0);
+          g.gain.exponentialRampToValueAtTime(0.01, 0.6);
+          
+          // Phaser Effect (Leve stereo ou modulação de volume)
+          const lfo = c.createOscillator();
+          lfo.frequency.value = 20;
+          const lfoGain = c.createGain();
+          lfoGain.gain.value = 200;
+          lfo.connect(lfoGain);
+          // Não conectamos LFO na frequência principal para manter o som limpo, 
+          // apenas mantemos simples para diferenciar do tiro.
+          
+          osc.connect(g);
+          g.connect(c.destination);
+          osc.start();
+      });
+
+      // HIT: Impacto físico
       this.buffers['hit'] = await this.renderOffline(0.1, (c) => {
           const osc = c.createOscillator();
           const g = c.createGain();
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(150, 0);
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(200, 0);
           osc.frequency.exponentialRampToValueAtTime(10, 0.1);
           g.gain.setValueAtTime(0.2, 0);
           g.gain.exponentialRampToValueAtTime(0.01, 0.1);
           const f = c.createBiquadFilter();
           f.type = 'lowpass';
-          f.frequency.value = 1000;
+          f.frequency.value = 800; 
           osc.connect(f);
           f.connect(g);
           g.connect(c.destination);
           osc.start();
       });
       
+      // EXPLOSÃO PADRÃO
       this.buffers['expl'] = await this.renderOffline(0.4, (c) => {
           const bufferSize = c.sampleRate * 0.4;
           const noiseBuffer = c.createBuffer(1, bufferSize, c.sampleRate);
@@ -152,7 +213,7 @@ export class AudioManager {
           src.buffer = noiseBuffer;
           const f = c.createBiquadFilter();
           f.type = 'lowpass';
-          f.frequency.setValueAtTime(800, 0);
+          f.frequency.setValueAtTime(1200, 0);
           f.frequency.exponentialRampToValueAtTime(50, 0.4);
           const g = c.createGain();
           g.gain.setValueAtTime(0.6, 0);
@@ -163,12 +224,14 @@ export class AudioManager {
           src.start();
       });
       
+      // POWER UP
       this.buffers['power'] = await this.renderOffline(0.3, (c) => {
           const osc = c.createOscillator();
           const g = c.createGain();
-          osc.type = 'square';
+          osc.type = 'sine';
           osc.frequency.setValueAtTime(440, 0);
-          osc.frequency.setValueAtTime(880, 0.1);
+          osc.frequency.linearRampToValueAtTime(880, 0.1);
+          osc.frequency.linearRampToValueAtTime(1760, 0.3);
           g.gain.setValueAtTime(0.1, 0);
           g.gain.linearRampToValueAtTime(0, 0.3);
           osc.connect(g);
@@ -176,88 +239,75 @@ export class AudioManager {
           osc.start();
       });
       
+      // SURGE
       this.buffers['surge'] = await this.renderOffline(0.8, (c) => {
-          const osc = c.createOscillator();
+          const osc1 = c.createOscillator();
+          const osc2 = c.createOscillator();
           const g = c.createGain();
-          osc.type = 'sawtooth';
-          osc.frequency.setValueAtTime(100, 0);
-          osc.frequency.linearRampToValueAtTime(600, 0.8);
-          g.gain.setValueAtTime(0.2, 0);
+          osc1.type = 'sawtooth';
+          osc2.type = 'sawtooth';
+          osc1.frequency.setValueAtTime(100, 0);
+          osc1.frequency.linearRampToValueAtTime(400, 0.8);
+          osc2.frequency.setValueAtTime(105, 0); 
+          osc2.frequency.linearRampToValueAtTime(410, 0.8);
+          g.gain.setValueAtTime(0.15, 0);
           g.gain.linearRampToValueAtTime(0, 0.8);
-          osc.connect(g);
-          g.connect(c.destination);
-          osc.start();
-      });
-
-      // --- NOVOS SONS (VARIEDADE) ---
-
-      // Mine Explosion: Grave e profundo (Deep Bass Boom)
-      this.buffers['mine_expl'] = await this.renderOffline(0.6, (c) => {
-          const bufferSize = c.sampleRate * 0.6;
-          const noiseBuffer = c.createBuffer(1, bufferSize, c.sampleRate);
-          const data = noiseBuffer.getChannelData(0);
-          for(let i=0; i<bufferSize; i++) data[i] = Math.random()*2 - 1;
-          const src = c.createBufferSource();
-          src.buffer = noiseBuffer;
-          
           const f = c.createBiquadFilter();
-          f.type = 'lowpass';
-          f.frequency.setValueAtTime(300, 0); // Começa baixo
-          f.frequency.exponentialRampToValueAtTime(10, 0.5); // Desce pra sub-bass
-          
-          const g = c.createGain();
-          g.gain.setValueAtTime(0.8, 0);
-          g.gain.exponentialRampToValueAtTime(0.01, 0.6);
-          
-          src.connect(f);
+          f.type = 'highpass';
+          f.frequency.value = 500;
+          osc1.connect(f);
+          osc2.connect(f);
           f.connect(g);
           g.connect(c.destination);
-          src.start();
+          osc1.start();
+          osc2.start();
       });
 
-      // Boss Dash: Whoosh de baixa frequencia
-      this.buffers['boss_dash'] = await this.renderOffline(0.5, (c) => {
-          const bufferSize = c.sampleRate * 0.5;
-          const noiseBuffer = c.createBuffer(1, bufferSize, c.sampleRate);
-          const data = noiseBuffer.getChannelData(0);
-          for(let i=0; i<bufferSize; i++) data[i] = Math.random()*2 - 1;
-          const src = c.createBufferSource();
-          src.buffer = noiseBuffer;
-
-          const f = c.createBiquadFilter();
-          f.type = 'bandpass';
-          f.Q.value = 1;
-          f.frequency.setValueAtTime(100, 0);
-          f.frequency.linearRampToValueAtTime(400, 0.2); // Sobe
-          f.frequency.linearRampToValueAtTime(50, 0.5); // Desce
-
-          const g = c.createGain();
-          g.gain.setValueAtTime(0.5, 0);
-          g.gain.linearRampToValueAtTime(0, 0.5);
-
-          src.connect(f);
-          f.connect(g);
-          g.connect(c.destination);
-          src.start();
-      });
-
-      // Enemy Shoot: Agudo e digital
-      this.buffers['enemy_shoot'] = await this.renderOffline(0.1, (c) => {
+      // BOSS DASH
+      this.buffers['boss_dash'] = await this.renderOffline(0.6, (c) => {
           const osc = c.createOscillator();
           const g = c.createGain();
-          osc.type = 'square'; // Som mais digital 8-bit
-          osc.frequency.setValueAtTime(800, 0);
-          osc.frequency.exponentialRampToValueAtTime(200, 0.1);
-          g.gain.setValueAtTime(0.2, 0);
-          g.gain.exponentialRampToValueAtTime(0.01, 0.1);
-          osc.connect(g);
+          const f = c.createBiquadFilter();
+          osc.type = 'sawtooth';
+          osc.frequency.value = 60;
+          f.type = 'lowpass';
+          f.Q.value = 5; 
+          f.frequency.setValueAtTime(100, 0);
+          f.frequency.linearRampToValueAtTime(600, 0.3); 
+          f.frequency.linearRampToValueAtTime(100, 0.6); 
+          g.gain.setValueAtTime(0, 0);
+          g.gain.linearRampToValueAtTime(0.6, 0.3);
+          g.gain.linearRampToValueAtTime(0, 0.6);
+          osc.connect(f);
+          f.connect(g);
           g.connect(c.destination);
           osc.start();
       });
 
-      // --- INSTRUMENTOS MUSICAIS (SAMPLES SINTÉTICOS) ---
+      // ENEMY SHOOT
+      this.buffers['enemy_shoot'] = await this.renderOffline(0.2, (c) => {
+          const carrier = c.createOscillator();
+          const modulator = c.createOscillator();
+          const modGain = c.createGain();
+          const masterGain = c.createGain();
+          carrier.type = 'sine';
+          carrier.frequency.setValueAtTime(600, 0);
+          carrier.frequency.exponentialRampToValueAtTime(200, 0.2);
+          modulator.type = 'square'; 
+          modulator.frequency.value = 150; 
+          modGain.gain.setValueAtTime(1000, 0);
+          modGain.gain.exponentialRampToValueAtTime(10, 0.2);
+          masterGain.gain.setValueAtTime(0.3, 0);
+          masterGain.gain.exponentialRampToValueAtTime(0.01, 0.2);
+          modulator.connect(modGain);
+          modGain.connect(carrier.frequency);
+          carrier.connect(masterGain);
+          masterGain.connect(c.destination);
+          carrier.start();
+          modulator.start();
+      });
 
-      // KICK: Curto, grave, seco.
+      // --- INSTRUMENTOS MUSICAIS ---
       this.buffers['kick'] = await this.renderOffline(0.15, (c) => {
           const osc = c.createOscillator();
           const g = c.createGain();
@@ -265,7 +315,6 @@ export class AudioManager {
           osc.frequency.exponentialRampToValueAtTime(40, 0.15);
           g.gain.setValueAtTime(0.9, 0);
           g.gain.exponentialRampToValueAtTime(0.01, 0.15);
-          // Leve distorção pra dar "gritty"
           const dist = c.createWaveShaper();
           dist.curve = new Float32Array([-0.5, 0.5]); 
           osc.connect(dist);
@@ -274,7 +323,6 @@ export class AudioManager {
           osc.start();
       });
 
-      // HI-HAT: Ruído filtrado
       this.buffers['hat'] = await this.renderOffline(0.05, (c) => {
           const bufferSize = c.sampleRate * 0.05;
           const b = c.createBuffer(1, bufferSize, c.sampleRate);
@@ -294,25 +342,20 @@ export class AudioManager {
           src.start();
       });
 
-      // BASS/SYNTH: Sawtooth filtrada. A chave para a melodia.
       this.buffers['bass'] = await this.renderOffline(0.25, (c) => {
           const osc = c.createOscillator();
-          const osc2 = c.createOscillator(); // Detune
+          const osc2 = c.createOscillator(); 
           const g = c.createGain();
           const f = c.createBiquadFilter();
-          
           osc.type = 'sawtooth';
           osc2.type = 'sawtooth';
-          osc.frequency.value = 110; // Lá (A2) base
-          osc2.frequency.value = 110.5; // Leve detune pra dar "gordura"
-          
+          osc.frequency.value = 110; 
+          osc2.frequency.value = 110.5; 
           f.type = 'lowpass';
           f.frequency.setValueAtTime(800, 0);
           f.frequency.exponentialRampToValueAtTime(100, 0.2);
-          
           g.gain.setValueAtTime(0.4, 0);
           g.gain.linearRampToValueAtTime(0, 0.25);
-          
           osc.connect(f);
           osc2.connect(f);
           f.connect(g);
@@ -328,7 +371,6 @@ export class AudioManager {
       return offlineCtx.startRendering();
   }
 
-  // Toca buffer com variação de Pitch (semitones)
   private playBuffer(name: string, vol: number = 1.0, pitchSemitones: number = 0, throttleMs: number = 0) {
       if (!this.ctx || this.ctx.state !== 'running') return;
       if (!this.buffers[name]) return;
@@ -342,7 +384,6 @@ export class AudioManager {
       const source = this.ctx.createBufferSource();
       source.buffer = this.buffers[name];
       
-      // Matemática de Pitch: 2^(semitons/12)
       if (pitchSemitones !== 0) {
           source.playbackRate.value = Math.pow(2, pitchSemitones / 12);
       }
@@ -374,13 +415,13 @@ export class AudioManager {
   public playPowerUp() { this.playBuffer('power', 0.5, 0, 80); }
   public playSurge() { this.playBuffer('surge', 0.6, 0, 500); }
   
-  // NOVOS MÉTODOS DE ÁUDIO
-  public playMineExplosion() { this.playBuffer('mine_expl', 0.9, 0, 150); }
+  // NOVOS MÉTODOS DE ÁUDIO DIFERENCIADOS
+  public playMineExplosionShot() { this.playBuffer('mine_expl_heavy', 1.0, 0, 150); } // Tiro = Impacto Forte
+  public playMineExplosionDash() { this.playBuffer('mine_expl_dash', 0.9, 0, 150); } // Dash = Energia/Limpo
+  
   public playBossDash() { this.playBuffer('boss_dash', 0.7, 0, 300); }
   public playEnemyShoot() { this.playBuffer('enemy_shoot', 0.4, Math.random()*2, 80); }
 
-  // --- O MAESTRO (Music Scheduler) ---
-  
   public stopMusic() {
     this.isPlaying = false;
     this.currentTrack = 'NONE';
@@ -405,13 +446,8 @@ export class AudioManager {
       this.scheduler();
   }
 
-  // Calcula o BPM baseado na adrenalina e na onda atual
   private getCurrentBPM(): number {
       if (this.currentTrack === 'MENU') return 90;
-      
-      // Base: 125 BPM
-      // Cada onda adiciona 2 BPM.
-      // Cap em 160 BPM pra não virar Speedcore (ou vira? não, melhor segurar).
       return Math.min(160, 125 + (this.currentWave * 2));
   }
 
@@ -421,25 +457,17 @@ export class AudioManager {
       const ahead = 0.1; 
       const now = this.ctx.currentTime;
       
-      // PARANOID FAILSAFE #1: DETECÇÃO DE DESSINCRONIA (O "Chronos Breaker")
-      // Se o nextNoteTime ficou muito para trás (ex: tab ficou em background),
-      // não tente tocar todas as notas perdidas. Pule direto para o agora.
-      // Isso impede o "thundering herd" de áudio que trava a CPU.
       if (this.nextNoteTime < now - 0.2) {
           this.nextNoteTime = now;
       }
 
-      // PARANOID FAILSAFE #2: LOOP CAP
-      // Garante que nunca tentaremos agendar mais do que 4 notas em um único frame de JS.
-      // Se o sistema estiver engasgando, o áudio vai falhar elegantemente em vez de travar o browser.
       let iterations = 0;
-      
       while (this.nextNoteTime < now + ahead && iterations < 8) {
           this.playProceduralNote(this.current16thNote);
           
           const bpm = this.getCurrentBPM();
           const secondsPerBeat = 60.0 / bpm;
-          this.nextNoteTime += 0.25 * secondsPerBeat; // Semicolcheia
+          this.nextNoteTime += 0.25 * secondsPerBeat; 
           
           this.current16thNote = (this.current16thNote + 1) % 16;
           iterations++;
@@ -448,77 +476,55 @@ export class AudioManager {
       this.timerID = window.setTimeout(() => this.scheduler(), 25);
   }
 
-  // A Alma da Música. Escolhe notas baseado no estado do jogo.
   private playProceduralNote(beat: number) {
       if (this.currentTrack === 'MENU') {
-          // Ambient Chill
           if (beat === 0) this.playBuffer('kick', 0.5, -5); 
           if (beat % 4 === 2) this.playBuffer('hat', 0.1, 0);
-          if (beat % 8 === 0) this.playBuffer('bass', 0.3, 0); // Nota raiz
+          if (beat % 8 === 0) this.playBuffer('bass', 0.3, 0); 
           return;
       }
 
-      // --- GAME MUSIC LOGIC ---
-      
-      // 1. Definição da Escala Baseada na Onda
       let scale = this.SCALE_MAJOR;
-      let rootKey = 0; // C (Dó)
+      let rootKey = 0; 
       
       if (this.currentWave >= 3) {
           scale = this.SCALE_MINOR;
-          rootKey = 3; // Eb (Mib) - Tom mais sério
+          rootKey = 3; 
       }
       if (this.currentWave >= 6) {
           scale = this.SCALE_DARK;
-          rootKey = 1; // C# (Dó Sustenido) - Tenso
+          rootKey = 1; 
       }
 
-      // 2. Bateria (Drum Machine)
-      // Kick: Batida 4x4 clássica (Techno)
       if (beat % 4 === 0) {
           this.playBuffer('kick', 0.8, 0);
       }
       
-      // Off-beat Bass Kick (Psytrance style em ondas altas)
       if (this.currentWave > 4 && beat % 4 === 2) {
            this.playBuffer('kick', 0.5, -2);
       }
 
-      // Hats
       if (beat % 4 === 2) {
-          this.playBuffer('hat', 0.4, 0); // Open Hat
+          this.playBuffer('hat', 0.4, 0); 
       } else {
-          // Closed hat frenético em ondas altas
           if (this.currentWave > 2 || beat % 2 === 0) {
             this.playBuffer('hat', 0.15, 12); 
           }
       }
 
-      // 3. O Sintetizador Arpejador (Melodia Procedural)
-      // Toca em colcheias (beats pares)
       if (beat % 2 === 0) {
-          // Algoritmo de Arpejo Simples
-          // "Pergunta e Resposta" baseado no compasso
-          
           let noteIndex = 0;
-          
           if (beat < 8) {
-              // Pergunta (Sobe)
               noteIndex = (beat / 2) % scale.length;
           } else {
-              // Resposta (Desce ou varia)
               if (this.currentWave % 2 === 0) {
-                  noteIndex = scale.length - 1 - ((beat / 2) % scale.length); // Desce
+                  noteIndex = scale.length - 1 - ((beat / 2) % scale.length); 
               } else {
-                  noteIndex = Math.floor(Math.random() * scale.length); // Aleatório (Caos)
+                  noteIndex = Math.floor(Math.random() * scale.length); 
               }
           }
-          
           const semitone = scale[noteIndex] + rootKey;
-          
-          // Oitava oscila pra dar movimento
           const octave = (beat % 4 === 0) ? -12 : 0; 
-          
           this.playBuffer('bass', 0.25, semitone + octave);
       }
   }
