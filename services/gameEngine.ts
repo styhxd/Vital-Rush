@@ -1442,8 +1442,24 @@ export class GameEngine {
     }
 
     if (this.surgeActive) {
-      this.ctx.beginPath();
       const r = this.deathSurgeActive ? this.surgeRadius * (0.9 + Math.random()*0.2) : this.surgeRadius;
+      
+      // VISUAL UPGRADE: Inner ripple
+      this.ctx.beginPath();
+      this.ctx.arc(this.player.pos.x, this.player.pos.y, r * 0.6, 0, Math.PI * 2);
+      this.ctx.strokeStyle = this.deathSurgeActive ? 'rgba(255, 0, 0, 0.5)' : 'rgba(0, 255, 255, 0.5)';
+      this.ctx.lineWidth = 2;
+      this.ctx.stroke();
+
+      // VISUAL UPGRADE: Outer echo
+      this.ctx.beginPath();
+      this.ctx.arc(this.player.pos.x, this.player.pos.y, r * 1.1, 0, Math.PI * 2);
+      this.ctx.strokeStyle = this.deathSurgeActive ? 'rgba(255, 0, 0, 0.2)' : 'rgba(0, 255, 255, 0.2)';
+      this.ctx.lineWidth = 1;
+      this.ctx.stroke();
+
+      // Main Ring
+      this.ctx.beginPath();
       this.ctx.arc(this.player.pos.x, this.player.pos.y, r, 0, Math.PI * 2);
       
       this.ctx.globalAlpha = 0.3;

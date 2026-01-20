@@ -101,21 +101,29 @@ export class AudioManager {
   private async bakeSounds() {
       if (!this.ctx) return;
       
-      // --- REVERSÃO DO TIRO DO PLAYER (CLASSIC PEW) ---
-      // Oscilador Triangular com decaimento rápido de pitch.
-      // Removemos a síntese FM complicada.
-      this.buffers['shoot'] = await this.renderOffline(0.15, (c) => {
+      // --- REVERSÃO DO TIRO DO PLAYER (V7: LOW FREQUENCY PULSE) ---
+      // Reduzido o pitch drasticamente para evitar fadiga auditiva.
+      // Adicionado um filtro LowPass para "arredondar" o ataque.
+      this.buffers['shoot'] = await this.renderOffline(0.1, (c) => {
           const osc = c.createOscillator();
           const g = c.createGain();
-          
-          osc.type = 'triangle'; // Clássico de arcade, menos irritante que Square
-          osc.frequency.setValueAtTime(900, 0); 
-          osc.frequency.exponentialRampToValueAtTime(300, 0.15); // Sweep rápido
-          
+          const f = c.createBiquadFilter();
+
+          osc.type = 'triangle'; 
+          // Frequência muito mais baixa: de 900Hz para 330Hz (Mais grave e agradável)
+          osc.frequency.setValueAtTime(330, 0); 
+          osc.frequency.exponentialRampToValueAtTime(60, 0.1); // Drop profundo
+
+          // Filtro remove o "estalo" agudo inicial
+          f.type = 'lowpass';
+          f.frequency.setValueAtTime(3000, 0);
+          f.frequency.exponentialRampToValueAtTime(500, 0.1);
+
           g.gain.setValueAtTime(0.25, 0);
           g.gain.exponentialRampToValueAtTime(0.01, 0.1);
           
-          osc.connect(g);
+          osc.connect(f);
+          f.connect(g);
           g.connect(c.destination);
           osc.start();
       });
@@ -239,28 +247,42 @@ export class AudioManager {
           osc.start();
       });
       
-      // SURGE
+      // SURGE (REWORKED: Mais "Sci-Fi Scanner")
       this.buffers['surge'] = await this.renderOffline(0.8, (c) => {
-          const osc1 = c.createOscillator();
-          const osc2 = c.createOscillator();
+          const osc = c.createOscillator();
           const g = c.createGain();
-          osc1.type = 'sawtooth';
-          osc2.type = 'sawtooth';
-          osc1.frequency.setValueAtTime(100, 0);
-          osc1.frequency.linearRampToValueAtTime(400, 0.8);
-          osc2.frequency.setValueAtTime(105, 0); 
-          osc2.frequency.linearRampToValueAtTime(410, 0.8);
-          g.gain.setValueAtTime(0.15, 0);
-          g.gain.linearRampToValueAtTime(0, 0.8);
           const f = c.createBiquadFilter();
-          f.type = 'highpass';
-          f.frequency.value = 500;
-          osc1.connect(f);
-          osc2.connect(f);
+
+          // Complex wave for texture
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(50, 0);
+          osc.frequency.exponentialRampToValueAtTime(300, 0.8);
+
+          // Filter sweep (The "Wah" effect)
+          f.type = 'lowpass';
+          f.Q.value = 10; // High resonance for "sci-fi" feel
+          f.frequency.setValueAtTime(100, 0);
+          f.frequency.exponentialRampToValueAtTime(2000, 0.8);
+
+          g.gain.setValueAtTime(0.3, 0);
+          g.gain.linearRampToValueAtTime(0, 0.8);
+
+          osc.connect(f);
           f.connect(g);
           g.connect(c.destination);
-          osc1.start();
-          osc2.start();
+          osc.start();
+
+          // Sub layer for body
+          const sub = c.createOscillator();
+          const subG = c.createGain();
+          sub.type = 'sine';
+          sub.frequency.setValueAtTime(30, 0);
+          sub.frequency.linearRampToValueAtTime(100, 0.8);
+          subG.gain.setValueAtTime(0.5, 0);
+          subG.gain.linearRampToValueAtTime(0, 0.8);
+          sub.connect(subG);
+          subG.connect(c.destination);
+          sub.start();
       });
 
       // BOSS DASH
@@ -416,7 +438,8 @@ export class AudioManager {
   public playSurge() { this.playBuffer('surge', 0.6, 0, 500); }
   
   // NOVOS MÉTODOS DE ÁUDIO DIFERENCIADOS
-  public playMineExplosionShot() { this.playBuffer('mine_expl_heavy', 1.0, 0, 150); } // Tiro = Impacto Forte
+  // REDUZIDO de 1.0 para 0.6 conforme solicitação
+  public playMineExplosionShot() { this.playBuffer('mine_expl_heavy', 0.6, 0, 150); } 
   public playMineExplosionDash() { this.playBuffer('mine_expl_dash', 0.9, 0, 150); } // Dash = Energia/Limpo
   
   public playBossDash() { this.playBuffer('boss_dash', 0.7, 0, 300); }
