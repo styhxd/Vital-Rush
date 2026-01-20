@@ -4,12 +4,11 @@ import { Difficulty, Language } from '../types';
 import { TEXTS } from '../constants';
 import { audioManager } from '../services/audioManager';
 
-// CORREÇÃO CRÍTICA DE PATHS: 
-// Como 'components' está na raiz e 'assets' está dentro de 'src', 
-// precisamos sair de components (..) e entrar em src (src/assets).
-import bgImg from '../src/assets/background.webp';
-import vitalImg from '../src/assets/vital.png';
-import virusImg from '../src/assets/virus.png';
+// CORREÇÃO: Uso de caminhos absolutos a partir da raiz (/) para evitar erros de resolução relativa
+// e erros de "bare specifier" no navegador.
+import bgImg from '/src/assets/background.webp';
+import vitalImg from '/src/assets/vital.png';
+import virusImg from '/src/assets/virus.png';
 
 // Botão reutilizável (Mantido local para isolamento)
 const MenuButton = ({ onClick, children, variant = 'primary', selected = false }: any) => {
