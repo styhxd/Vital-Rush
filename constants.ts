@@ -1,4 +1,5 @@
 
+
 /**
  * ------------------------------------------------------------------
  * COPYRIGHT (c) 2026 ESTÚDIO CRIA
@@ -261,6 +262,8 @@ export const TEXTS: TranslationMap = {
     CRT_DESC: "CRT SCANLINES & VIGNETTE",
     SYSTEM_PURGE: "SYSTEM PURGE (RESET DATA)",
     CONFIRM_PURGE: "⚠️ CONFIRM PURGE? ⚠️",
+    HIGH_QUALITY: "FORCE HIGH QUALITY",
+    HQ_WARNING: "WARNING: Disabling performance mode may cause severe lag on this device.",
     // Upgrades
     UP_MITOSIS_NAME: "RAPID MITOSIS",
     UP_MITOSIS_DESC: "+6% Fire Rate",
@@ -462,6 +465,8 @@ export const TEXTS: TranslationMap = {
     CRT_DESC: "SCANLINES & VINHETA",
     SYSTEM_PURGE: "PURGAR SISTEMA (APAGAR)",
     CONFIRM_PURGE: "⚠️ CONFIRMAR PURGA? ⚠️",
+    HIGH_QUALITY: "FORÇAR ALTA QUALIDADE",
+    HQ_WARNING: "AVISO: Desativar o modo desempenho pode causar lentidão severa neste dispositivo.",
     // Upgrades
     UP_MITOSIS_NAME: "MITOSE RÁPIDA",
     UP_MITOSIS_DESC: "+6% Cadência de Tiro",
@@ -663,6 +668,8 @@ export const TEXTS: TranslationMap = {
     CRT_DESC: "LÍNEAS CRT Y VIÑETA",
     SYSTEM_PURGE: "PURGAR SISTEMA (BORRAR)",
     CONFIRM_PURGE: "⚠️ ¿CONFIRMAR PURGA? ⚠️",
+    HIGH_QUALITY: "FORZAR ALTA CALIDAD",
+    HQ_WARNING: "AVISO: Desactivar el modo de rendimiento puede causar lag severo en este dispositivo.",
     // Upgrades
     UP_MITOSIS_NAME: "MITOSIS RÁPIDA",
     UP_MITOSIS_DESC: "+6% Cadencia de Tiro",

@@ -1,3 +1,5 @@
+
+
 /**
  * ------------------------------------------------------------------
  * COPYRIGHT (c) 2026 ESTÚDIO CRIA
@@ -119,6 +121,8 @@ export class GameEngine {
   private vacuumingTimer: number = 0; 
   
   public isLowQuality: boolean = false; 
+  public forceHighQuality: boolean = false; // Override flag
+
   private frameTimes: number[] = [];
   private perfCheckTimer: number = 0;
   
@@ -138,6 +142,7 @@ export class GameEngine {
     this.player = this.createPlayer(initialStats);
     this.lastInputTime = Date.now();
     
+    // Default low quality check on start (unless forced later)
     if (window.innerWidth < 768) {
         this.isLowQuality = true;
     }
@@ -716,17 +721,22 @@ export class GameEngine {
   public update(dt: number, stats: PlayerStats, onWaveClear: () => void, onGameOver: () => void, onLifeLost: () => void, onBossSpawn?: () => void) {
     if (dt > 32) dt = 32; 
 
-    this.perfCheckTimer += dt;
-    if (this.perfCheckTimer > 500) { 
-        const avgFrameTime = this.frameTimes.reduce((a,b) => a+b, 0) / (this.frameTimes.length || 1);
-        if (avgFrameTime > 20) {
-            this.isLowQuality = true;
-        } else if (avgFrameTime < 14) {
-            this.isLowQuality = false;
+    if (!this.forceHighQuality) {
+        this.perfCheckTimer += dt;
+        if (this.perfCheckTimer > 500) { 
+            const avgFrameTime = this.frameTimes.reduce((a,b) => a+b, 0) / (this.frameTimes.length || 1);
+            if (avgFrameTime > 20) {
+                this.isLowQuality = true;
+            } else if (avgFrameTime < 14) {
+                this.isLowQuality = false;
+            }
+            this.frameTimes = [];
+            this.perfCheckTimer = 0;
         }
-        this.frameTimes = [];
-        this.perfCheckTimer = 0;
+    } else {
+        this.isLowQuality = false;
     }
+    
     this.frameTimes.push(dt);
 
     if (this.hitStopTimer > 0) {

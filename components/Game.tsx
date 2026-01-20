@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine } from '../services/gameEngine';
 import { audioManager } from '../services/audioManager';
@@ -185,6 +186,8 @@ export const Game: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [isPortrait, setIsPortrait] = useState(false);
   const [isLowPerfMode, setIsLowPerfMode] = useState(false); 
+  const [forceHighQuality, setForceHighQuality] = useState(false); // NEW: Force High Quality State
+
   const [patient, setPatient] = useState<PatientProfile | null>(null);
   const [audioSettings, setAudioSettings] = useState(audioManager.settings);
   const [isMuted, setIsMuted] = useState(false);
@@ -423,6 +426,7 @@ export const Game: React.FC = () => {
           if (canvasRef.current) {
               engineRef.current = new GameEngine(canvasRef.current, godStats, newPatient, difficulty, colors);
               engineRef.current.setLanguage(language);
+              engineRef.current.forceHighQuality = forceHighQuality; // Apply existing setting
               
               setStats(godStats);
               setUpgrades(maxedUpgrades);
@@ -555,6 +559,7 @@ export const Game: React.FC = () => {
      if (canvasRef.current) {
          engineRef.current = new GameEngine(canvasRef.current, INITIAL_STATS, newPatient, difficulty, colors);
          engineRef.current.setLanguage(language);
+         engineRef.current.forceHighQuality = forceHighQuality; // Apply existing setting
          
          setStats(INITIAL_STATS);
          setUpgrades(UPGRADES.map(u => ({...u}))); 
@@ -977,9 +982,16 @@ export const Game: React.FC = () => {
           isVisible={gameState === GameState.SETTINGS}
           language={language}
           audioSettings={audioSettings}
+          forceHighQuality={forceHighQuality} // Passa o estado
           onUpdateAudio={updateAudio}
           onLanguageChange={setLanguage}
           onSystemPurge={handleSystemPurge} // WIRING UP THE SOFT RESET
+          onToggleHighQuality={() => { // Função de toggle
+              const newVal = !forceHighQuality;
+              setForceHighQuality(newVal);
+              if (engineRef.current) engineRef.current.forceHighQuality = newVal;
+              if (newVal) audioManager.playPowerUp(); else audioManager.playHit();
+          }}
           onClose={closeSettings}
       />
 

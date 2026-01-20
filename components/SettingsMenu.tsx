@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { TEXTS } from '../constants';
 import { Language } from '../types';
@@ -8,9 +9,11 @@ interface SettingsMenuProps {
     isVisible: boolean;
     language: Language;
     audioSettings: { master: number; music: number; sfx: number };
+    forceHighQuality: boolean; // NEW PROP
     onUpdateAudio: (type: 'master' | 'music' | 'sfx', val: number) => void;
     onLanguageChange: (lang: Language) => void;
-    onSystemPurge: () => void; // New Prop for soft reset
+    onSystemPurge: () => void;
+    onToggleHighQuality: () => void; // NEW PROP
     onClose: () => void;
 }
 
@@ -18,9 +21,11 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
     isVisible, 
     language, 
     audioSettings, 
+    forceHighQuality,
     onUpdateAudio, 
     onLanguageChange,
     onSystemPurge,
+    onToggleHighQuality,
     onClose 
 }) => {
     // FAILSAFE 1: Verificação lógica de entrada
@@ -146,10 +151,12 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                         />
                     </div>
 
-                    {/* Visual Section (SURPRESA 1: Retro Optics) */}
+                    {/* Visual Section (SURPRESA 1: Retro Optics & High Quality) */}
                     <div className="mb-4 lg:mb-8">
                         <h3 className="text-[10px] lg:text-xs font-mono text-gray-500 mb-2 lg:mb-4 border-l-2 border-cyan-500 pl-2">{t('VISUAL_OPTICS')}</h3>
-                        <div className="flex items-center justify-between bg-white/5 p-4 lg:p-4 border border-white/10">
+                        
+                        {/* CRT TOGGLE */}
+                        <div className="flex items-center justify-between bg-white/5 p-4 lg:p-4 border border-white/10 mb-3">
                             <div className="flex flex-col">
                                 <span className="text-xs lg:text-sm font-bold text-white tracking-widest">{t('RETRO_FILTER')}</span>
                                 <span className="text-[8px] lg:text-[10px] text-gray-400">{t('CRT_DESC')}</span>
@@ -160,6 +167,22 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                             >
                                 <div className={`absolute top-0.5 bottom-0.5 w-6 lg:w-6 bg-white rounded-full transition-all duration-300 shadow-[0_0_10px_white] ${crtEnabled ? 'left-7 lg:left-8 bg-cyan-400' : 'left-0.5 bg-gray-500'}`}></div>
                             </button>
+                        </div>
+
+                        {/* HIGH QUALITY TOGGLE */}
+                        <div className="flex flex-col bg-white/5 p-4 lg:p-4 border border-white/10">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="flex flex-col">
+                                    <span className="text-xs lg:text-sm font-bold text-white tracking-widest">{t('HIGH_QUALITY')}</span>
+                                </div>
+                                <button 
+                                    onClick={onToggleHighQuality}
+                                    className={`w-14 h-6 lg:w-16 lg:h-8 rounded-full relative transition-all duration-300 ${forceHighQuality ? 'bg-red-900/80 border border-red-500' : 'bg-gray-800 border border-gray-600'}`}
+                                >
+                                    <div className={`absolute top-0.5 bottom-0.5 w-6 lg:w-6 bg-white rounded-full transition-all duration-300 shadow-[0_0_10px_white] ${forceHighQuality ? 'left-7 lg:left-8 bg-red-500' : 'left-0.5 bg-gray-500'}`}></div>
+                                </button>
+                            </div>
+                             <span className="text-[8px] lg:text-[10px] text-red-400">{t('HQ_WARNING')}</span>
                         </div>
                     </div>
 
