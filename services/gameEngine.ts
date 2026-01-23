@@ -1,4 +1,5 @@
 
+
 /**
  * ------------------------------------------------------------------
  * COPYRIGHT (c) 2026 ESTÚDIO CRIA
@@ -1538,39 +1539,62 @@ export class GameEngine {
     this.ctx.globalCompositeOperation = 'source-over';
     this.ctx.globalAlpha = 1.0;
 
+    // --- LASER RENDERER V2 (HIGH VISIBILITY) ---
+    // Pass 1: Glow / Bloom (Screen Blend)
     if (!this.isLowQuality) {
         this.ctx.globalCompositeOperation = 'screen';
         this.ctx.beginPath();
-        this.ctx.strokeStyle = this.colors.ANTIBODY;
-        this.ctx.lineWidth = 10; 
+        this.ctx.strokeStyle = this.colors.PLAYER_CORE; // Cyan glow
+        this.ctx.lineWidth = 14; 
         this.ctx.lineCap = 'round';
-        this.ctx.globalAlpha = 0.15; 
+        this.ctx.globalAlpha = 0.5; // High visibility
+        this.ctx.shadowBlur = 10;
+        this.ctx.shadowColor = this.colors.PLAYER_CORE;
+        
         this.entities.forEach(e => {
             if (!e.active) return;
             if (e.type === EntityType.ANTIBODY) {
                  this.ctx.moveTo(e.pos.x, e.pos.y);
-                 const tailX = e.pos.x - e.vel.x * 0.4; 
-                 const tailY = e.pos.y - e.vel.y * 0.4;
+                 const tailX = e.pos.x - e.vel.x * 0.8; // Longer trail
+                 const tailY = e.pos.y - e.vel.y * 0.8;
                  this.ctx.lineTo(tailX, tailY);
             }
         });
         this.ctx.stroke();
+        this.ctx.shadowBlur = 0; 
     }
     
+    // Pass 2: Solid Core (Source Over)
     this.ctx.globalCompositeOperation = 'source-over';
-    this.ctx.beginPath();
-    this.ctx.lineWidth = 3; 
     this.ctx.globalAlpha = 1.0;
-    this.ctx.strokeStyle = '#fff';
+    
+    // Draw Antibodies (Laser Core)
+    this.ctx.beginPath();
+    this.ctx.lineWidth = 4; // Thicker core
+    this.ctx.strokeStyle = '#ffffff'; 
+    this.ctx.lineCap = 'round';
+    
     this.entities.forEach(e => {
         if (!e.active) return;
         if (e.type === EntityType.ANTIBODY) {
              this.ctx.moveTo(e.pos.x, e.pos.y);
-             const tailX = e.pos.x - e.vel.x * 0.4; 
-             const tailY = e.pos.y - e.vel.y * 0.4;
+             const tailX = e.pos.x - e.vel.x * 0.8; 
+             const tailY = e.pos.y - e.vel.y * 0.8;
              this.ctx.lineTo(tailX, tailY);
+             
+             // "Head" flare
+             this.ctx.moveTo(e.pos.x, e.pos.y);
+             this.ctx.lineTo(e.pos.x + e.vel.x * 0.1, e.pos.y + e.vel.y * 0.1);
         }
-        else if (e.type === EntityType.ENEMY_PROJECTILE) {
+    });
+    this.ctx.stroke();
+
+    // Draw Enemy Projectiles (Separated Loop)
+    this.ctx.lineWidth = 3; 
+    this.ctx.strokeStyle = '#fff';
+    this.entities.forEach(e => {
+        if (!e.active) return;
+        if (e.type === EntityType.ENEMY_PROJECTILE) {
             this.ctx.fillStyle = e.color;
             this.ctx.beginPath();
             const spikes = 8;
@@ -1581,9 +1605,9 @@ export class GameEngine {
             }
             this.ctx.closePath();
             this.ctx.fill();
+            this.ctx.stroke();
         }
     });
-    this.ctx.stroke();
 
     this.entities.forEach(e => {
         if (!e.active) return;
