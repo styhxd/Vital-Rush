@@ -5,10 +5,11 @@ import { TEXTS } from '../constants';
 import { audioManager } from '../services/audioManager';
 
 // --- ASSETS CONFIGURATION ---
+// Links atualizados conforme solicitação do usuário
 const ASSETS = {
-    BG: "https://raw.githubusercontent.com/styhxd/Vital-Rush/main/src/assets/background.webp",
-    HERO: "https://raw.githubusercontent.com/styhxd/Vital-Rush/main/src/assets/vital.png",
-    VIRUS: "https://raw.githubusercontent.com/styhxd/Vital-Rush/main/src/assets/virus.png"
+    BG: "https://drive.google.com/file/d/1i4NAyU7cvCCdQP-P0PPFlYWiOxtzu2lG/view?usp=sharing",
+    HERO: "https://drive.google.com/file/d/1_8HXUSoXuVXtjb33hb_uRZ1hvOn7VItc/view?usp=sharing",
+    VIRUS: "https://drive.google.com/file/d/187XZfpHZ1eTC50lflWK_wD6z20AFLUUt/view?usp=sharing"
 };
 
 // --- SUB-COMPONENTS ---
@@ -54,42 +55,83 @@ interface MainMenuProps {
 export const MainMenu: React.FC<MainMenuProps> = (props) => {
     const { isVisible, language, isPlatinum } = props;
     
-    // States for granular asset loading
     const [graphicMode, setGraphicMode] = useState(false);
-    const [heroLoaded, setHeroLoaded] = useState(false);
-    const [virusLoaded, setVirusLoaded] = useState(false);
+    
+    const [resolvedBg, setResolvedBg] = useState<string | null>(null);
+    const [resolvedHero, setResolvedHero] = useState<string | null>(null);
+    const [resolvedVirus, setResolvedVirus] = useState<string | null>(null);
 
-    // ADAPTIVE LOADING: FAULT TOLERANT STRATEGY
+    // --- PROTOCOLO DE RESOLUÇÃO EM CASCATA V5.0 ---
     useEffect(() => {
         let isMounted = true;
-        
-        // 1. Critical: Background
-        const bgImg = new Image();
-        bgImg.src = ASSETS.BG;
-        
-        bgImg.onload = () => {
-            if (!isMounted) return;
-            console.log("[Vital Rush] Background Loaded. Enabling Graphic Mode.");
-            setGraphicMode(true);
 
-            // 2. Optional: Hero
-            const heroImg = new Image();
-            heroImg.src = ASSETS.HERO;
-            heroImg.onload = () => isMounted && setHeroLoaded(true);
-            heroImg.onerror = () => console.warn("[Vital Rush] Hero asset failed. Continuing without it.");
-
-            // 3. Optional: Virus
-            const virusImg = new Image();
-            virusImg.src = ASSETS.VIRUS;
-            virusImg.onload = () => isMounted && setVirusLoaded(true);
-            virusImg.onerror = () => console.warn("[Vital Rush] Virus asset failed. Continuing without it.");
+        // 1. Extração Cirúrgica do ID
+        const getDriveId = (url: string) => {
+            const matchFile = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+            if (matchFile) return matchFile[1];
+            const matchParam = url.match(/id=([a-zA-Z0-9_-]+)/);
+            if (matchParam) return matchParam[1];
+            return null;
         };
 
-        bgImg.onerror = (e) => {
-            if (!isMounted) return;
-            console.warn("[Vital Rush] Background Failed. Fallback to Classic Mode.", e);
-            setGraphicMode(false);
+        // 2. Teste de Carga de Imagem
+        const tryLoad = (url: string): Promise<string> => {
+            return new Promise((resolve, reject) => {
+                const img = new Image();
+                img.referrerPolicy = "no-referrer";
+                img.src = url;
+                img.onload = () => resolve(url);
+                img.onerror = () => reject(url);
+            });
         };
+
+        // 3. O Waterfall (Tentativa Sequencial)
+        const resolveUrl = async (rawUrl: string, assetName: string): Promise<string> => {
+            const id = getDriveId(rawUrl);
+            
+            // Lista de Candidatos (Estratégias de Ataque)
+            const candidates = [
+                // Opção 0: Do jeito que veio (Provavelmente falha em <img>, mas solicitado)
+                rawUrl, 
+                // Opção 1: LH3 CDN (Rápido, cacheado pelo Google)
+                id ? `https://lh3.googleusercontent.com/d/${id}` : null,
+                // Opção 2: Export View Padrão
+                id ? `https://drive.google.com/uc?export=view&id=${id}` : null,
+                // Opção 3: Thumbnail de Alta Resolução (Hack de largura de banda)
+                id ? `https://drive.google.com/thumbnail?id=${id}&sz=w1920` : null,
+                // Opção 4: Download Stream Direto
+                id ? `https://drive.usercontent.google.com/download?id=${id}&export=download` : null
+            ].filter(Boolean) as string[];
+
+            for (let i = 0; i < candidates.length; i++) {
+                try {
+                    console.log(`[Vital Rush] Trying ${assetName} strategy ${i+1}: ${candidates[i]}`);
+                    const validUrl = await tryLoad(candidates[i]);
+                    console.log(`[Vital Rush] Success on strategy ${i+1} for ${assetName}!`);
+                    return validUrl;
+                } catch (e) {
+                    continue; // Falhou, tenta o próximo
+                }
+            }
+            throw new Error(`All strategies failed for ${assetName}`);
+        };
+
+        // Inicia o processo para o Background (Prioridade Crítica)
+        resolveUrl(ASSETS.BG, "Background")
+            .then(url => {
+                if (!isMounted) return;
+                setResolvedBg(url);
+                setGraphicMode(true); // Ativa o modo gráfico assim que o BG vive
+
+                // Carrega os secundários em paralelo
+                resolveUrl(ASSETS.HERO, "Hero").then(u => isMounted && setResolvedHero(u)).catch(() => {});
+                resolveUrl(ASSETS.VIRUS, "Virus").then(u => isMounted && setResolvedVirus(u)).catch(() => {});
+            })
+            .catch((e) => {
+                if (!isMounted) return;
+                console.warn("[Vital Rush] Critical Asset Failure. Fallback to Classic Mode active.");
+                setGraphicMode(false);
+            });
 
         return () => { isMounted = false; };
     }, []);
@@ -113,33 +155,36 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                 .anim-float-3 { animation: virus-float 6s ease-in-out infinite; animation-delay: 2s; }
             `}</style>
 
-            {graphicMode ? (
-                // --- GRAPHIC MODE (LEFT ALIGNED + ASSETS) ---
+            {graphicMode && resolvedBg ? (
+                // --- GRAPHIC MODE (RESOLVED) ---
                 <div className="absolute inset-0 w-full h-full">
                     {/* Background Layer */}
                     <div 
                         className="absolute inset-0 bg-cover bg-center z-0 transition-opacity duration-1000"
-                        style={{ backgroundImage: `url(${ASSETS.BG})` }}
+                        style={{ backgroundImage: `url(${resolvedBg})` }}
                     />
                     
-                    {/* Gradient Overlay: Ensures text on left is readable */}
+                    {/* Gradient Overlay */}
                     <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent z-10"></div>
 
                     {/* VIRUSES LAYER (Conditional) */}
-                    {virusLoaded && (
+                    {resolvedVirus && (
                         <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
                             <img 
-                                src={ASSETS.VIRUS} 
+                                src={resolvedVirus} 
+                                referrerPolicy="no-referrer"
                                 alt="virus"
                                 className="absolute top-[20%] right-[30%] w-24 lg:w-48 opacity-80 anim-float-1 drop-shadow-[0_0_15px_rgba(0,255,0,0.5)]"
                             />
                             <img 
-                                src={ASSETS.VIRUS} 
+                                src={resolvedVirus} 
+                                referrerPolicy="no-referrer"
                                 alt="virus"
                                 className="absolute bottom-[30%] right-[10%] w-16 lg:w-32 opacity-60 anim-float-2 drop-shadow-[0_0_15px_rgba(0,255,0,0.5)] blur-[1px]"
                             />
                             <img 
-                                src={ASSETS.VIRUS} 
+                                src={resolvedVirus} 
+                                referrerPolicy="no-referrer"
                                 alt="virus"
                                 className="absolute top-[10%] right-[10%] w-32 lg:w-64 opacity-40 anim-float-3 drop-shadow-[0_0_15px_rgba(0,255,0,0.5)] blur-[2px]"
                             />
@@ -147,10 +192,11 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     )}
 
                     {/* HERO LAYER (Conditional) */}
-                    {heroLoaded && (
+                    {resolvedHero && (
                         <div className="absolute right-[-5%] lg:right-[5%] bottom-[-5%] h-[70%] lg:h-[90%] z-20 pointer-events-none flex items-end justify-end">
                              <img 
-                                src={ASSETS.HERO} 
+                                src={resolvedHero} 
+                                referrerPolicy="no-referrer"
                                 alt="Vital Hero"
                                 className="h-full object-contain anim-vital"
                                 style={{ 
@@ -168,7 +214,7 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     </div>
                 </div>
             ) : (
-                // --- CLASSIC MODE (CENTERED CSS FALLBACK) ---
+                // --- CLASSIC MODE (FALLBACK) ---
                 <div className="absolute inset-0 flex items-center justify-center">
                     <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
                     <div className="relative text-center p-6 lg:p-8 max-w-md lg:max-w-md w-full scale-90 lg:scale-100">
