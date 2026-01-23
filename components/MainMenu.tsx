@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { Difficulty, Language } from '../types';
 import { TEXTS } from '../constants';
@@ -15,7 +16,8 @@ const ASSETS = {
 // --- SUB-COMPONENTS ---
 
 const MenuButton = ({ onClick, children, variant = 'primary', selected = false }: any) => {
-    const base = "w-full py-2.5 lg:py-4 font-bold text-xs lg:text-xl tracking-widest uppercase clip-path-polygon transition-all hover:scale-105 shadow-[0_0_10px_rgba(0,0,0,0.4)] lg:shadow-[0_0_20px_rgba(0,0,0,0.4)] relative overflow-hidden group";
+    // ARQUITETO: Reduzido py-2.5 para py-2 e text-xs para text-[10px] no mobile para ganhar espaço vertical
+    const base = "w-full py-2 lg:py-4 font-bold text-[10px] lg:text-xl tracking-widest uppercase clip-path-polygon transition-all hover:scale-105 shadow-[0_0_10px_rgba(0,0,0,0.4)] lg:shadow-[0_0_20px_rgba(0,0,0,0.4)] relative overflow-hidden group";
     let colors = "";
     
     if (variant === 'primary') {
@@ -286,8 +288,8 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                         </div>
                     )}
 
-                    {/* MENU CONTAINER (Left Aligned) - Animação ajustada para deslize suave */}
-                    <div className="absolute left-0 top-0 h-full w-full lg:w-[45%] z-30 flex flex-col justify-center p-6 lg:p-16 scale-90 lg:scale-100 origin-left entry-menu">
+                    {/* MENU CONTAINER (Left Aligned) - ARQUITETO: Padding reduzido de p-6 para p-4 no mobile */}
+                    <div className="absolute left-0 top-0 h-full w-full lg:w-[45%] z-30 flex flex-col justify-center p-4 lg:p-16 scale-90 lg:scale-100 origin-left entry-menu">
                         <MenuContent {...props} align="left" />
                     </div>
                 </div>
@@ -318,27 +320,32 @@ const MenuContent = (props: MainMenuProps & { align: 'left' | 'center' }) => {
 
     return (
         <div className={`flex flex-col ${isLeft ? 'items-start text-left' : 'items-center text-center'}`}>
+            {/* ARQUITETO: Redução de text-6xl para text-5xl no mobile */}
             <h1 
-                className={`text-6xl lg:text-9xl font-bold mb-0 lg:mb-0 tracking-tighter mix-blend-screen leading-none 
+                className={`text-5xl lg:text-9xl font-bold mb-0 lg:mb-0 tracking-tighter mix-blend-screen leading-none 
                 ${isPlatinum ? 'text-amber-400 shadow-[0_0_30px_rgba(255,170,0,0.5)]' : 'text-red-600 red-glow'}`} 
                 style={{fontFamily: 'Impact, sans-serif'}}
             >
                 {t('TITLE_MAIN')}
             </h1>
-            <h2 className={`text-xl lg:text-5xl font-light text-white mb-4 lg:mb-8 tracking-[0.5em] -mt-1 lg:-mt-2 opacity-80 ${isLeft ? 'ml-1' : ''}`}>
+            
+            {/* ARQUITETO: Redução de margem inferior de mb-4 para mb-2 */}
+            <h2 className={`text-lg lg:text-5xl font-light text-white mb-2 lg:mb-8 tracking-[0.5em] -mt-1 lg:-mt-2 opacity-80 ${isLeft ? 'ml-1' : ''}`}>
                 {t('TITLE_SUB')}
             </h2>
             
-            {isPlatinum && <div className="text-[8px] lg:text-xs tracking-[0.5em] text-purple-400 mb-2 lg:mb-4 animate-pulse">{t('ACH_PLATINUM_MSG')}</div>}
+            {isPlatinum && <div className="text-[8px] lg:text-xs tracking-[0.5em] text-purple-400 mb-1 lg:mb-4 animate-pulse">{t('ACH_PLATINUM_MSG')}</div>}
 
-            <div className={`mb-4 lg:mb-8 w-full ${isLeft ? 'max-w-md' : ''}`}>
-                <div className={`text-[10px] lg:text-xs text-gray-500 tracking-widest mb-1 lg:mb-2 ${isLeft ? 'text-left' : 'text-center'}`}>{t('DIFFICULTY')}</div>
+            {/* ARQUITETO: Compactação de margens (mb-2 vs mb-4) */}
+            <div className={`mb-2 lg:mb-8 w-full ${isLeft ? 'max-w-md' : ''}`}>
+                <div className={`text-[10px] lg:text-xs text-gray-500 tracking-widest mb-0.5 lg:mb-2 ${isLeft ? 'text-left' : 'text-center'}`}>{t('DIFFICULTY')}</div>
                 <div className="grid grid-cols-4 gap-1.5 lg:gap-2">
                     {Object.values(Difficulty).map(d => (
                         <button 
                             key={d} 
                             onClick={() => onDifficultyChange(d)}
-                            className={`text-[9px] lg:text-[10px] font-bold py-1.5 lg:py-2 border transition-all ${difficulty === d ? 'bg-red-600 text-black border-red-600' : 'bg-transparent text-gray-500 border-gray-800'}`}
+                            // ARQUITETO: Reduzido py-1.5 para py-1 no mobile
+                            className={`text-[9px] lg:text-[10px] font-bold py-1 lg:py-2 border transition-all ${difficulty === d ? 'bg-red-600 text-black border-red-600' : 'bg-transparent text-gray-500 border-gray-800'}`}
                         >
                             {t(`DIFF_${d}`)}
                         </button>
@@ -346,7 +353,8 @@ const MenuContent = (props: MainMenuProps & { align: 'left' | 'center' }) => {
                 </div>
             </div>
 
-            <div className={`space-y-2 lg:space-y-4 w-full ${isLeft ? 'max-w-md' : ''}`}>
+            {/* ARQUITETO: Compactação de espaçamento (space-y-1.5 vs space-y-2) */}
+            <div className={`space-y-1.5 lg:space-y-4 w-full ${isLeft ? 'max-w-md' : ''}`}>
                 <MenuButton onClick={() => { onStart(); audioManager.startMenuMusic(); }}>{t('START')}</MenuButton>
                 <div className="grid grid-cols-2 gap-2 lg:gap-4">
                   <MenuButton variant="secondary" onClick={onControls}>{t('CONTROLS')}</MenuButton>
@@ -357,12 +365,14 @@ const MenuContent = (props: MainMenuProps & { align: 'left' | 'center' }) => {
                   <MenuButton variant="secondary" onClick={onAchievements}>{t('ACHIEVEMENTS')}</MenuButton>
                 </div>
                 
-                <div className={`flex gap-2 lg:gap-2 mt-4 lg:mt-6 ${isLeft ? 'justify-start' : 'justify-center'}`}>
+                {/* ARQUITETO: Compactação de margem mt-2 vs mt-4 */}
+                <div className={`flex gap-2 lg:gap-2 mt-2 lg:mt-6 ${isLeft ? 'justify-start' : 'justify-center'}`}>
                     {(['EN', 'PT', 'ES'] as Language[]).map(l => (
                       <button 
                         key={l}
                         onClick={() => onLanguageChange(l)} 
-                        className={`text-[10px] lg:text-sm font-bold tracking-widest px-3 lg:px-3 py-1.5 lg:py-2 border-b-2 transition-all flex items-center gap-2
+                        // ARQUITETO: Reduzido py-1.5 para py-1 no mobile
+                        className={`text-[10px] lg:text-sm font-bold tracking-widest px-3 lg:px-3 py-1 lg:py-2 border-b-2 transition-all flex items-center gap-2
                             ${language === l 
                                 ? 'text-white border-red-500 bg-red-900/20' 
                                 : 'text-gray-600 border-transparent hover:text-gray-400'}`}
@@ -373,7 +383,8 @@ const MenuContent = (props: MainMenuProps & { align: 'left' | 'center' }) => {
                 </div>
             </div>
             
-            <div className={`mt-6 lg:mt-8 w-full ${isLeft ? 'max-w-md' : ''}`}>
+            {/* ARQUITETO: Compactação de margem mt-2 vs mt-6 */}
+            <div className={`mt-2 lg:mt-8 w-full ${isLeft ? 'max-w-md' : ''}`}>
                 <input 
                     type="text" 
                     value={cheatInput} 
