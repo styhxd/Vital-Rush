@@ -196,6 +196,19 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     }
                 }
 
+                @keyframes menu-slide-in {
+                    0% { 
+                        opacity: 0; 
+                        transform: translateX(-50px); 
+                        filter: blur(5px);
+                    }
+                    100% { 
+                        opacity: 1; 
+                        transform: translateX(0); 
+                        filter: blur(0);
+                    }
+                }
+
                 /* CLASSES DE UTILITÁRIO */
                 .anim-vital { animation: vital-breath 4s ease-in-out infinite; }
                 .anim-float-1 { animation: virus-float 5s ease-in-out infinite; }
@@ -206,6 +219,7 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                 .entry-vein { animation: reveal-vein 2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
                 .entry-hero { animation: hero-arrival 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; animation-delay: 0.5s; opacity: 0; }
                 .entry-virus { animation: virus-spawn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; opacity: 0; }
+                .entry-menu { animation: menu-slide-in 1s cubic-bezier(0.22, 1, 0.36, 1) forwards; animation-delay: 0.5s; opacity: 0; }
             `}</style>
 
             {graphicMode && resolvedBg ? (
@@ -272,8 +286,8 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                         </div>
                     )}
 
-                    {/* MENU CONTAINER (Left Aligned) - Fade simples para não brigar com o resto */}
-                    <div className="absolute left-0 top-0 h-full w-full lg:w-[45%] z-30 flex flex-col justify-center p-6 lg:p-16 scale-90 lg:scale-100 origin-left animate-[fadeIn_1s_ease-out_0.5s_both]">
+                    {/* MENU CONTAINER (Left Aligned) - Animação ajustada para deslize suave */}
+                    <div className="absolute left-0 top-0 h-full w-full lg:w-[45%] z-30 flex flex-col justify-center p-6 lg:p-16 scale-90 lg:scale-100 origin-left entry-menu">
                         <MenuContent {...props} align="left" />
                     </div>
                 </div>
