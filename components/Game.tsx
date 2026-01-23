@@ -786,12 +786,12 @@ export const Game: React.FC = () => {
       {/* BOSS WARNING OVERLAY */}
       {showBossIntro && (
           <div className="absolute inset-0 z-[60] pointer-events-none flex flex-col items-center justify-center anim-pulse-red">
-              <div className="w-full bg-red-600/20 backdrop-blur-sm border-y-8 border-red-600 py-10 md:py-20 flex flex-col items-center justify-center relative overflow-hidden">
+              <div className="w-full bg-red-600/20 backdrop-blur-sm border-y-8 border-red-600 py-6 md:py-20 flex flex-col items-center justify-center relative overflow-hidden">
                   <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-30 mix-blend-overlay"></div>
-                  <h1 className="text-3xl lg:text-9xl font-black text-red-500 tracking-[0.2em] anim-glitch drop-shadow-[0_0_20px_red]">
+                  <h1 className="text-3xl lg:text-9xl font-black text-red-500 tracking-[0.2em] anim-glitch drop-shadow-[0_0_20px_red] text-center">
                       WARNING
                   </h1>
-                  <h2 className="text-sm lg:text-4xl text-white font-mono tracking-widest mt-2 lg:mt-4 blink">
+                  <h2 className="text-sm lg:text-4xl text-white font-mono tracking-widest mt-2 lg:mt-4 blink text-center">
                       BIOLOGICAL THREAT DETECTED
                   </h2>
                   <div className="w-[200%] h-2 bg-red-500 absolute top-0 animate-[flow_2s_linear_infinite]"></div>
@@ -802,7 +802,7 @@ export const Game: React.FC = () => {
 
       {/* BOSS HEALTH BAR */}
       {bossEntity && !showBossIntro && (
-          <div className="absolute top-24 lg:top-36 left-1/2 -translate-x-1/2 z-30 w-[80%] lg:w-[50%] flex flex-col items-center pointer-events-none anim-tutorial-fade" style={{animationDuration: '0.5s'}}>
+          <div className="absolute top-14 lg:top-36 left-1/2 -translate-x-1/2 z-30 w-[60%] lg:w-[50%] flex flex-col items-center pointer-events-none anim-tutorial-fade" style={{animationDuration: '0.5s'}}>
               <div className="flex justify-between w-full text-red-500 font-bold font-mono text-[8px] lg:text-xs mb-1 tracking-[0.3em]">
                   <span className="anim-glitch">ANOMALY // BOSS</span>
                   <span>{Math.ceil(bossEntity.hp)}/{bossEntity.max}</span>
