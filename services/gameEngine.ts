@@ -1,3 +1,4 @@
+
 /**
  * ------------------------------------------------------------------
  * COPYRIGHT (c) 2026 ESTÚDIO CRIA
@@ -829,7 +830,7 @@ export class GameEngine {
                     e.active = false;
                     this.sessionStats.mineKills++;
                     achievementManager.track('mine_pop_20', 1);
-                    this.spawnText(e.pos, "OVERLOAD!", '#00ffff', 45); 
+                    this.spawnText(e.pos, "OVERLOAD!", '#ffcc00', 45); // UPDATED COLOR
                     // VARIETY: SOUND CALL FOR MINE EXPLOSION (DASH)
                     audioManager.playMineExplosionDash();
                     audioManager.playSurge(); 
@@ -1164,14 +1165,14 @@ export class GameEngine {
                    this.sessionStats.mineKills++;
                    achievementManager.track('mine_pop_20', 1);
                    this.shakeIntensity = 25;
-                   this.spawnText(other.pos, "SYSTEM OVERLOAD", '#00ff00', 55); 
+                   this.spawnText(other.pos, "SYSTEM OVERLOAD", '#ffcc00', 55); 
                    // VARIETY: SOUND CALL FOR MINE EXPLOSION (SHOT)
                    audioManager.playMineExplosionShot();
                    audioManager.playSurge(); 
                    
                    this.particles.push({
                         id: 'mine_expl', type: EntityType.PARTICLE, pos: {...other.pos},
-                        vel: {x:0, y:0}, radius: 350, health:1, maxHealth:1, color: 'rgba(0, 255, 100, 0.5)', damage:0, active:true, ttl: 25
+                        vel: {x:0, y:0}, radius: 350, health:1, maxHealth:1, color: 'rgba(255, 170, 0, 0.6)', damage:0, active:true, ttl: 25
                    });
                    
                    // REDUZIDO DE 18 PARA 5 NO MODO LOW QUALITY PRA GARANTIR QUE A EXPLOSAO GRANDE APARECA
@@ -1182,7 +1183,7 @@ export class GameEngine {
                        this.particles.push({
                            id: 'spark', type: EntityType.PARTICLE, pos: {...other.pos},
                            vel: { x: Math.cos(ang)*spd, y: Math.sin(ang)*spd },
-                           radius: 5, health:1, maxHealth:1, color: '#aaffaa', damage:0, active:true, ttl: 35
+                           radius: 5, health:1, maxHealth:1, color: '#ffeeaa', damage:0, active:true, ttl: 35
                        });
                    }
 
@@ -1499,14 +1500,15 @@ export class GameEngine {
               this.ctx.strokeStyle = `rgba(0, 255, 255, ${life/maxLife})`;
               this.ctx.setLineDash([10, 20]);
           } else {
-              this.ctx.strokeStyle = `rgba(100, 255, 100, ${life/maxLife})`;
+              // EXPLOSÃO DE MINA PADRÃO: AGORA DOURADA/BRANCA (Térmica)
+              this.ctx.strokeStyle = `rgba(255, 220, 100, ${life/maxLife})`;
               this.ctx.setLineDash([]);
           }
           this.ctx.stroke();
           this.ctx.setLineDash([]); 
           this.ctx.beginPath();
           this.ctx.arc(p.pos.x, p.pos.y, radius * 0.5 * (1-progress), 0, Math.PI*2);
-          this.ctx.fillStyle = isDashExpl ? `rgba(200, 255, 255, ${life/maxLife})` : `rgba(200, 255, 200, ${life/maxLife})`;
+          this.ctx.fillStyle = isDashExpl ? `rgba(200, 255, 255, ${life/maxLife})` : `rgba(255, 150, 0, ${life/maxLife})`;
           this.ctx.fill();
           this.ctx.restore();
       } else if (p.id === 'ghost') {
@@ -1635,32 +1637,54 @@ export class GameEngine {
             this.ctx.globalAlpha = 1.0;
         }
         else if (e.type === EntityType.BIO_MINE) {
+            // --- REDESIGN COMPLETO DA BIO-MINA: NÚCLEO DE FUSÃO INSTÁVEL ---
             this.ctx.save();
             this.ctx.translate(e.pos.x, e.pos.y);
+            
+            // 1. Núcleo Pulsante (O "Coração" Dourado)
+            const pulse = 1 + Math.sin(this.time / 40) * 0.15; // Pulso rápido e nervoso
+            
             if (!this.isLowQuality) {
+                // Glow de Alta Qualidade (Screen Blend)
                 this.ctx.globalCompositeOperation = 'screen';
-                const pulse = 1 + Math.sin(this.time / 50) * 0.4; 
-                const grad = this.ctx.createRadialGradient(0, 0, e.radius * 0.2, 0, 0, e.radius * 2.0);
-                grad.addColorStop(0, hexToRgba(this.colors.BIO_MINE, 0.8));
+                const grad = this.ctx.createRadialGradient(0, 0, e.radius * 0.3, 0, 0, e.radius * 2.5);
+                grad.addColorStop(0, '#ffffaa'); // Centro Branco-Quente
+                grad.addColorStop(0.4, hexToRgba(this.colors.BIO_MINE, 0.8)); // Meio Âmbar
                 grad.addColorStop(1, 'rgba(0,0,0,0)');
                 this.ctx.fillStyle = grad;
                 this.ctx.beginPath();
-                this.ctx.arc(0, 0, e.radius * 2 * pulse, 0, Math.PI*2);
+                this.ctx.arc(0, 0, e.radius * 2.2 * pulse, 0, Math.PI*2);
                 this.ctx.fill();
             }
+
+            // 2. Anéis de Contenção Rotativos (O "Hazard")
             this.ctx.globalCompositeOperation = 'source-over';
-            this.ctx.rotate(this.time / 125); 
-            this.ctx.fillStyle = this.colors.BIO_MINE;
+            this.ctx.rotate(this.time / 80); // Rotação rápida
+            
+            this.ctx.strokeStyle = '#ffd700'; // Ouro puro
+            this.ctx.lineWidth = 3;
             this.ctx.beginPath();
-            this.ctx.moveTo(0, -e.radius);
-            this.ctx.lineTo(e.radius, 0);
-            this.ctx.lineTo(0, e.radius);
-            this.ctx.lineTo(-e.radius, 0);
-            this.ctx.closePath();
-            this.ctx.fill();
-            this.ctx.strokeStyle = '#fff';
-            this.ctx.lineWidth = 2;
+            // Desenha 3 arcos (símbolo de radiação/perigo)
+            for(let i=0; i<3; i++) {
+                const startAngle = (i * (Math.PI * 2 / 3));
+                const endAngle = startAngle + (Math.PI / 2);
+                this.ctx.arc(0, 0, e.radius * 0.8, startAngle, endAngle);
+            }
             this.ctx.stroke();
+
+            // 3. Núcleo Sólido
+            this.ctx.rotate(-(this.time / 40)); // Contra-rotação
+            this.ctx.fillStyle = '#ffaa00'; // Âmbar Sólido
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, e.radius * 0.5 * pulse, 0, Math.PI*2);
+            this.ctx.fill();
+
+            // 4. Detalhe Central (Ponto Branco)
+            this.ctx.fillStyle = '#ffffff';
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, e.radius * 0.2, 0, Math.PI*2);
+            this.ctx.fill();
+
             this.ctx.restore();
         }
         else if (e.type === EntityType.DNA_FRAGMENT) {

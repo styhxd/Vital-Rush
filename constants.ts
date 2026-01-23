@@ -1,5 +1,4 @@
 
-
 /**
  * ------------------------------------------------------------------
  * COPYRIGHT (c) 2026 ESTÚDIO CRIA
@@ -36,7 +35,7 @@ export const COLORS_DEFAULT: ThemePalette = {
   SURGE: 'rgba(0, 255, 255, 0.3)',
   COMBO: '#ffaa00',
   ORBITAL: '#0088ff',
-  BIO_MINE: '#00ff44', 
+  BIO_MINE: '#ffaa00', // ATUALIZADO: ÂMBAR RADIOATIVO/DOURADO (Explosivo e Valioso)
   ACID_POOL: '#bf00ff' 
 };
 
@@ -58,7 +57,7 @@ export const COLORS_PLATINUM: ThemePalette = {
   SURGE: 'rgba(255, 215, 0, 0.3)', 
   COMBO: '#ffffff',
   ORBITAL: '#ffd700',
-  BIO_MINE: '#ff4081',
+  BIO_MINE: '#ff4500', // PLATINA: Laranja Neon Intenso
   ACID_POOL: '#7c4dff'
 };
 
