@@ -141,6 +141,7 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
     return (
         <div className="absolute inset-0 bg-black flex items-center justify-center z-50 overflow-hidden">
             <style>{`
+                /* ANIMAÇÕES DE LOOP (JÁ EXISTENTES) */
                 @keyframes vital-breath {
                     0%, 100% { transform: scale(1, 1) translateY(0); }
                     50% { transform: scale(1.02, 0.98) translateY(5px); }
@@ -149,51 +150,114 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     0%, 100% { transform: translateY(0) rotate(0deg); }
                     50% { transform: translateY(-20px) rotate(5deg); }
                 }
+                
+                /* NOVAS ANIMAÇÕES DE ENTRADA CINEMÁTICA */
+                @keyframes reveal-vein {
+                    0% { 
+                        opacity: 0; 
+                        transform: scale(1.2); 
+                        filter: brightness(0) sepia(1) hue-rotate(-50deg) saturate(5); /* Vermelho Escuro/Preto */
+                    }
+                    40% {
+                        opacity: 1;
+                        filter: brightness(0.5) sepia(0.5) hue-rotate(-50deg) saturate(3);
+                    }
+                    100% { 
+                        opacity: 1; 
+                        transform: scale(1); 
+                        filter: brightness(1) sepia(0) hue-rotate(0) saturate(1); 
+                    }
+                }
+
+                @keyframes hero-arrival {
+                    0% { 
+                        opacity: 0; 
+                        transform: translate(100px, 100px) scale(0.8); 
+                        filter: blur(20px) grayscale(1);
+                    }
+                    100% { 
+                        opacity: 1; 
+                        transform: translate(0, 0) scale(1); 
+                        filter: blur(0) grayscale(0);
+                    }
+                }
+
+                @keyframes virus-spawn {
+                    0% { 
+                        opacity: 0; 
+                        transform: scale(0); 
+                    }
+                    60% {
+                        transform: scale(1.2);
+                    }
+                    100% { 
+                        opacity: 1; 
+                        transform: scale(1); 
+                    }
+                }
+
+                /* CLASSES DE UTILITÁRIO */
                 .anim-vital { animation: vital-breath 4s ease-in-out infinite; }
                 .anim-float-1 { animation: virus-float 5s ease-in-out infinite; }
                 .anim-float-2 { animation: virus-float 7s ease-in-out infinite; animation-delay: 1s; }
                 .anim-float-3 { animation: virus-float 6s ease-in-out infinite; animation-delay: 2s; }
+
+                /* CLASSES DE ENTRADA */
+                .entry-vein { animation: reveal-vein 2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+                .entry-hero { animation: hero-arrival 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; animation-delay: 0.5s; opacity: 0; }
+                .entry-virus { animation: virus-spawn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; opacity: 0; }
             `}</style>
 
             {graphicMode && resolvedBg ? (
                 // --- GRAPHIC MODE (RESOLVED) ---
                 <div className="absolute inset-0 w-full h-full">
-                    {/* Background Layer */}
+                    {/* Background Layer - VEIA HUMANA */}
                     <div 
-                        className="absolute inset-0 bg-cover bg-center z-0 transition-opacity duration-1000"
+                        className="absolute inset-0 bg-cover bg-center z-0 entry-vein"
                         style={{ backgroundImage: `url(${resolvedBg})` }}
                     />
                     
-                    {/* Gradient Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent z-10"></div>
+                    {/* Gradient Overlay (para legibilidade) */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent z-10 animate-[fadeIn_2s_ease-out]"></div>
 
                     {/* VIRUSES LAYER (Conditional) */}
                     {resolvedVirus && (
                         <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
-                            <img 
-                                src={resolvedVirus} 
-                                referrerPolicy="no-referrer"
-                                alt="virus"
-                                className="absolute top-[20%] right-[30%] w-24 lg:w-48 opacity-80 anim-float-1 drop-shadow-[0_0_15px_rgba(0,255,0,0.5)]"
-                            />
-                            <img 
-                                src={resolvedVirus} 
-                                referrerPolicy="no-referrer"
-                                alt="virus"
-                                className="absolute bottom-[30%] right-[10%] w-16 lg:w-32 opacity-60 anim-float-2 drop-shadow-[0_0_15px_rgba(0,255,0,0.5)] blur-[1px]"
-                            />
-                            <img 
-                                src={resolvedVirus} 
-                                referrerPolicy="no-referrer"
-                                alt="virus"
-                                className="absolute top-[10%] right-[10%] w-32 lg:w-64 opacity-40 anim-float-3 drop-shadow-[0_0_15px_rgba(0,255,0,0.5)] blur-[2px]"
-                            />
+                            {/* Vírus 1 - Top Right */}
+                            <div className="absolute top-[20%] right-[30%] entry-virus" style={{ animationDelay: '1.2s' }}>
+                                <img 
+                                    src={resolvedVirus} 
+                                    referrerPolicy="no-referrer"
+                                    alt="virus"
+                                    className="w-24 lg:w-48 opacity-80 anim-float-1 drop-shadow-[0_0_15px_rgba(0,255,0,0.5)]"
+                                />
+                            </div>
+                            
+                            {/* Vírus 2 - Bottom Right */}
+                            <div className="absolute bottom-[30%] right-[10%] entry-virus" style={{ animationDelay: '1.5s' }}>
+                                <img 
+                                    src={resolvedVirus} 
+                                    referrerPolicy="no-referrer"
+                                    alt="virus"
+                                    className="w-16 lg:w-32 opacity-60 anim-float-2 drop-shadow-[0_0_15px_rgba(0,255,0,0.5)] blur-[1px]"
+                                />
+                            </div>
+
+                            {/* Vírus 3 - Top Far Right */}
+                            <div className="absolute top-[10%] right-[10%] entry-virus" style={{ animationDelay: '1.8s' }}>
+                                <img 
+                                    src={resolvedVirus} 
+                                    referrerPolicy="no-referrer"
+                                    alt="virus"
+                                    className="w-32 lg:w-64 opacity-40 anim-float-3 drop-shadow-[0_0_15px_rgba(0,255,0,0.5)] blur-[2px]"
+                                />
+                            </div>
                         </div>
                     )}
 
-                    {/* HERO LAYER (Conditional) */}
+                    {/* HERO LAYER (Conditional) - ROBÔ AZUL */}
                     {resolvedHero && (
-                        <div className="absolute right-[-5%] lg:right-[5%] bottom-[-5%] h-[70%] lg:h-[90%] z-20 pointer-events-none flex items-end justify-end">
+                        <div className="absolute right-[-5%] lg:right-[5%] bottom-[-5%] h-[70%] lg:h-[90%] z-20 pointer-events-none flex items-end justify-end entry-hero">
                              <img 
                                 src={resolvedHero} 
                                 referrerPolicy="no-referrer"
@@ -208,8 +272,8 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                         </div>
                     )}
 
-                    {/* MENU CONTAINER (Left Aligned) - SCALED DOWN ON MOBILE */}
-                    <div className="absolute left-0 top-0 h-full w-full lg:w-[45%] z-30 flex flex-col justify-center p-6 lg:p-16 scale-90 lg:scale-100 origin-left">
+                    {/* MENU CONTAINER (Left Aligned) - Fade simples para não brigar com o resto */}
+                    <div className="absolute left-0 top-0 h-full w-full lg:w-[45%] z-30 flex flex-col justify-center p-6 lg:p-16 scale-90 lg:scale-100 origin-left animate-[fadeIn_1s_ease-out_0.5s_both]">
                         <MenuContent {...props} align="left" />
                     </div>
                 </div>
