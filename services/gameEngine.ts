@@ -1,5 +1,3 @@
-
-
 /**
  * ------------------------------------------------------------------
  * COPYRIGHT (c) 2026 ESTÚDIO CRIA
@@ -730,6 +728,12 @@ export class GameEngine {
               audioManager.playEnemyShoot();
           }
       }
+  }
+
+  public getDashProgress(stats: PlayerStats): number {
+      if (this.dashCooldownTimer <= 0) return 1;
+      const totalCooldown = stats.dashCooldown / 1000;
+      return Math.max(0, Math.min(1, 1 - (this.dashCooldownTimer / totalCooldown)));
   }
 
   public update(dt: number, stats: PlayerStats, onWaveClear: () => void, onGameOver: () => void, onLifeLost: () => void, onBossSpawn?: () => void) {

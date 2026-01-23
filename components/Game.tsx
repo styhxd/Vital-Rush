@@ -180,7 +180,7 @@ export const Game: React.FC = () => {
   const [uiData, setUiData] = useState({ 
     health: 100, maxHealth: 100, score: 0, biomass: 0, 
     wave: 0, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100,
-    combo: 0, dashReady: true, adrenaline: false, lives: INITIAL_LIVES
+    combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES
   });
   
   const [isMobile, setIsMobile] = useState(false);
@@ -261,7 +261,7 @@ export const Game: React.FC = () => {
       setUiData({ 
         health: 100, maxHealth: 100, score: 0, biomass: 0, 
         wave: 0, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100,
-        combo: 0, dashReady: true, adrenaline: false, lives: INITIAL_LIVES
+        combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES
       });
       setDifficulty(Difficulty.NORMAL);
       setPatient(null);
@@ -433,7 +433,7 @@ export const Game: React.FC = () => {
               setUiData({ 
                 health: godStats.maxHealth, maxHealth: godStats.maxHealth, score: 0, biomass: 0, 
                 wave: 1, waveTime: 0, waveDuration: 1, energy: godStats.maxEnergy, maxEnergy: godStats.maxEnergy, 
-                combo: 0, dashReady: true, adrenaline: false, lives: INITIAL_LIVES
+                combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES
               });
               
               engineRef.current.startWave(0); // Wave 1 start
@@ -516,6 +516,7 @@ export const Game: React.FC = () => {
             maxEnergy: stats.maxEnergy,
             combo: eng.comboCount,
             dashReady: eng.dashCooldownTimer <= 0,
+            dashProgress: eng.getDashProgress(stats), // GET PROGRESS
             adrenaline: eng.adrenalineActive,
             lives: eng.lives
           });
@@ -565,7 +566,7 @@ export const Game: React.FC = () => {
          setUpgrades(UPGRADES.map(u => ({...u}))); 
          setUiData({ 
            health: 100, maxHealth: 100, score: 0, biomass: 0, 
-           wave: 1, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100, combo: 0, dashReady: true, adrenaline: false, lives: INITIAL_LIVES
+           wave: 1, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100, combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES
          });
          
          setGameState(GameState.BRIEFING);
@@ -614,7 +615,17 @@ export const Game: React.FC = () => {
   };
 
   const handleJoystickMove = (vec: {x: number, y: number}) => {
-    if (engineRef.current) engineRef.current.inputVector = vec;
+    if (engineRef.current) {
+        // CORREÇÃO CRÍTICA PARA ROTAÇÃO CSS NO IPHONE
+        // Se estivermos em modo retrato E mobile, o jogo está rotacionado 90 graus via CSS.
+        // O vetor de entrada "Cima" (Y negativo) na tela corresponde ao lado "Esquerdo" (X negativo) no jogo rotacionado.
+        // Matriz de rotação -90 graus: x' = y, y' = -x
+        if (isPortrait && isMobile) {
+            engineRef.current.inputVector = { x: vec.y, y: -vec.x };
+        } else {
+            engineRef.current.inputVector = vec;
+        }
+    }
   };
 
   const togglePause = () => {
@@ -830,7 +841,9 @@ export const Game: React.FC = () => {
              <div className="flex flex-col gap-1 lg:gap-3 w-28 lg:w-64">
                 <StatBar label={t('INTEGRITY')} value={uiData.health} max={uiData.maxHealth} colorClass={uiData.adrenaline ? "bg-red-600 animate-pulse" : (isPlatinum ? "bg-gradient-to-r from-purple-500 to-amber-400" : "bg-gradient-to-r from-red-600 to-red-400")} />
                 <StatBar label={t('SURGE_READY')} value={uiData.energy} max={uiData.maxEnergy} colorClass={isPlatinum ? "bg-gradient-to-r from-amber-400 to-white" : "bg-gradient-to-r from-cyan-600 to-cyan-400"} animate={true}/>
-                
+                {/* GLOBAL DASH INDICATOR (NEW) */}
+                <StatBar label="DASH" value={uiData.dashProgress * 100} max={100} colorClass="bg-white/90 shadow-[0_0_10px_white]" animate={uiData.dashReady} />
+
                 <div className="flex gap-1 lg:gap-1 mt-1 lg:mt-2">
                     {Array.from({length: INITIAL_LIVES}).map((_, i) => (
                         <div key={i} className={`w-2 h-2 lg:w-4 lg:h-4 rounded-full flex items-center justify-center transition-all duration-500
