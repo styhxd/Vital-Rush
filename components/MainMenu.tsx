@@ -208,8 +208,8 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                         </div>
                     )}
 
-                    {/* MENU CONTAINER (Left Aligned) */}
-                    <div className="absolute left-0 top-0 h-full w-full lg:w-[45%] z-30 flex flex-col justify-center p-8 lg:p-16">
+                    {/* MENU CONTAINER (Left Aligned) - SCALED DOWN ON MOBILE */}
+                    <div className="absolute left-0 top-0 h-full w-full lg:w-[45%] z-30 flex flex-col justify-center p-6 lg:p-16 scale-90 lg:scale-100 origin-left">
                         <MenuContent {...props} align="left" />
                     </div>
                 </div>
@@ -217,7 +217,8 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                 // --- CLASSIC MODE (FALLBACK) ---
                 <div className="absolute inset-0 flex items-center justify-center">
                     <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-                    <div className="relative text-center p-6 lg:p-8 max-w-md lg:max-w-md w-full scale-90 lg:scale-100">
+                    {/* Fallback scaled down even more for safety */}
+                    <div className="relative text-center p-6 lg:p-8 max-w-md lg:max-w-md w-full scale-75 lg:scale-100">
                         <MenuContent {...props} align="center" />
                     </div>
                 </div>
