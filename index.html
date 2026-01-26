@@ -33,6 +33,31 @@
     <!-- O Tailwind está aqui. Sim, via script. Julgue-me. -->
     <script src="https://cdn.tailwindcss.com"></script>
     
+    <script>
+      // BLOQUEIO NUCLEAR DE ZOOM PARA SAFARI (iOS)
+      // O Safari moderno ignora o user-scalable=no por "acessibilidade".
+      // Para um jogo twitch-shooter, isso é fatal. Desativamos via JS.
+      document.addEventListener('gesturestart', function (e) {
+        e.preventDefault();
+      });
+      document.addEventListener('gesturechange', function (e) {
+        e.preventDefault();
+      }); 
+      document.addEventListener('gestureend', function (e) {
+        e.preventDefault();
+      });
+      
+      // Bloqueio de Double-Tap Zoom (caso o touch-action falhe em algum browser legado)
+      var lastTouchEnd = 0;
+      document.addEventListener('touchend', function (event) {
+        var now = (new Date()).getTime();
+        if (now - lastTouchEnd <= 300) {
+          event.preventDefault();
+        }
+        lastTouchEnd = now;
+      }, false);
+    </script>
+
     <style>
       /* 
        * PILHA DE FONTES DO SISTEMA
