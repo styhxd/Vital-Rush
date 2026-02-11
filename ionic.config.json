@@ -1,0 +1,7 @@
+{
+  "name": "Vital Rush",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "react-vite"
+}

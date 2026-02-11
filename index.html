@@ -4,39 +4,26 @@
   DIRETOR: PAULO GABRIEL DE L. S.
   PROJETO: VITAL RUSH - A FUNDAÇÃO
   ------------------------------------------------------------------
-
-  Este é o esqueleto. O chassi. A carcaça.
-  Tudo começa aqui. Se este arquivo não carregar, o resto é apenas
-  zeros e uns chorando no vácuo digital.
-
-  Nós usamos Tailwind via CDN porque configurar Webpack/PostCSS 
-  para um arquivo só é coisa de gente que tem tempo livre demais.
 -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <!-- 
-      Viewport configurado para impedir que o usuário dê zoom e quebre a imersão.
-      "user-scalable=no" é a nossa maneira educada de dizer: "Jogue como eu desenhei".
-    -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     
     <!-- Meta tags para App-Like experience (Fullscreen) -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#0f0505">
+    <meta name="theme-color" content="#000000">
 
     <title>VITAL RUSH</title>
     
-    <!-- O Tailwind está aqui. Sim, via script. Julgue-me. -->
+    <!-- Scripts de Tailwind via CDN ainda funcionam, mas no futuro moveremos para PostCSS local -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <script>
       // BLOQUEIO NUCLEAR DE ZOOM PARA SAFARI (iOS)
-      // O Safari moderno ignora o user-scalable=no por "acessibilidade".
-      // Para um jogo twitch-shooter, isso é fatal. Desativamos via JS.
       document.addEventListener('gesturestart', function (e) {
         e.preventDefault();
       });
@@ -47,7 +34,6 @@
         e.preventDefault();
       });
       
-      // Bloqueio de Double-Tap Zoom (caso o touch-action falhe em algum browser legado)
       var lastTouchEnd = 0;
       document.addEventListener('touchend', function (event) {
         var now = (new Date()).getTime();
@@ -59,55 +45,48 @@
     </script>
 
     <style>
-      /* 
-       * PILHA DE FONTES DO SISTEMA
-       * Não baixamos fontes externas. 1) Para economizar requisição HTTP. 
-       * 2) Para parecer que o jogo faz parte do sistema operacional do usuário.
-       * 3) Porque a internet pode cair, mas o jogo tem que rodar.
-       */
       :root {
         --font-tech: 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', sans-serif;
         --font-mono: 'Consolas', 'Monaco', 'Courier New', monospace;
       }
 
-      body {
-        /* Desativa comportamento elástico do scroll no Mac/iOS. Ninguém merece. */
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden; /* CRITICAL: No Scrollbars */
+        background-color: #000000;
         overscroll-behavior: none;
         user-select: none;
-        -webkit-user-select: none; /* Safari sendo Safari */
-        background-color: #0f0505; /* Um preto quase vermelho, pra dar clima de sangue coagulado */
-        overflow: hidden; /* Nada de barras de rolagem */
-        touch-action: none; /* O jogo controla o toque, não o navegador */
+        -webkit-user-select: none; 
+        touch-action: none; 
         font-family: var(--font-tech);
       }
       
+      #root {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
       h1, h2, h3, button {
         font-family: var(--font-tech);
-        text-transform: uppercase; /* GRITAR É TECNOLÓGICO */
+        text-transform: uppercase; 
       }
 
       .font-mono {
         font-family: var(--font-mono);
       }
       
-      /* 
-       * EFEITO VIGNETTE
-       * Escurece as bordas. Dá a sensação de estar olhando por um microscópio
-       * ou por uma câmera de segurança suja. Esconde a falta de anti-aliasing nas bordas também.
-       */
       .vignette {
         position: absolute;
         top: 0; left: 0; right: 0; bottom: 0;
         background: radial-gradient(circle, transparent 40%, rgba(0,0,0,0.9) 100%);
-        pointer-events: none; /* Deixa o clique passar para o jogo */
+        pointer-events: none; 
         z-index: 10;
       }
 
-      /* 
-       * SCANLINES CRT
-       * Linhas horizontais falsas para simular monitores velhos.
-       * Adiciona +10 pontos de Estética Cyberpunk e disfarça a baixa resolução.
-       */
       .scanlines {
         position: absolute;
         top: 0; left: 0; right: 0; bottom: 0;
@@ -118,55 +97,41 @@
           rgba(0,0,0,0.2) 50%,
           rgba(0,0,0,0.2)
         );
-        background-size: 100% 4px; /* Tamanho da linha */
+        background-size: 100% 4px; 
         z-index: 11;
         pointer-events: none;
         opacity: 0.3;
       }
 
-      /* Animação de pulso para a sobreposição de veias */
       @keyframes pulse {
         0% { opacity: 0.08; transform: scale(1); }
-        50% { opacity: 0.15; transform: scale(1.02); } /* Respira... */
+        50% { opacity: 0.15; transform: scale(1.02); } 
         100% { opacity: 0.08; transform: scale(1); }
       }
 
-      /* 
-       * FLUXO SANGUÍNEO (HEMODYNAMICS)
-       * Move o background infinitamente para a esquerda.
-       * A imagem é 100px, então mover 100px cria um loop perfeito.
-       */
       @keyframes flow {
         from { background-position: 0 0; }
-        to { background-position: -200px 0; } /* 2x o tamanho do padrão para suavidade */
+        to { background-position: -200px 0; } 
       }
       
-      /* 
-       * VEIA GIGANTE NO FUNDO
-       * SVG encodado em Base64 direto no CSS.
-       * Adicionada animação 'flow' para simular movimento constante.
-       */
       .vein-overlay {
         position: absolute;
-        top: -10%; left: -10%; right: -10%; bottom: -10%; /* Margem extra para evitar bordas brancas no scale */
+        top: -10%; left: -10%; right: -10%; bottom: -10%; 
         width: 120%; height: 120%;
-        background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ff0000' fill-opacity='0.15' fill-rule='evenodd'/%3E%3C/svg%3E");
-        animation: pulse 4s ease-in-out infinite, flow 3s linear infinite; /* Animação dupla */
+        background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 1.79 4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 2.24 5 5 2.24 5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 2.24 5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ff0000' fill-opacity='0.15' fill-rule='evenodd'/%3E%3C/svg%3E");
+        animation: pulse 4s ease-in-out infinite, flow 3s linear infinite; 
         pointer-events: none;
         z-index: 5;
-        will-change: background-position, transform, opacity; /* Dica para o compositor da GPU */
+        will-change: background-position, transform, opacity; 
       }
 
-      /* PERFORMANCE OVERRIDE (MODO TURBO) */
-      /* Remove apenas o Pulse e Filtros, mas MANTÉM o Flow */
       .perf-mode-low .vein-overlay {
-          animation: flow 3s linear infinite !important; /* Mantém apenas o fluxo */
+          animation: flow 3s linear infinite !important; 
           opacity: 0.15 !important;
           filter: none !important;
-          transform: none !important; /* Reseta escala do pulse */
+          transform: none !important; 
       }
       
-      /* Classes utilitárias de brilho para Neon */
       .text-glow {
         text-shadow: 0 0 10px rgba(255,255,255,0.5);
       }
@@ -177,7 +142,6 @@
         text-shadow: 0 0 15px rgba(0, 255, 255, 0.7);
       }
       
-      /* Customização da barra de rolagem para o manual */
       .custom-scroll::-webkit-scrollbar {
         width: 8px;
       }
@@ -189,26 +153,22 @@
         border-radius: 4px;
       }
     </style>
-    
-    <!-- Import Maps: Porque módulos ES são o futuro (e o presente) -->
-    <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@^19.2.3",
-        "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-        "react/": "https://esm.sh/react@^19.2.3/"
-      }
-    }
-    </script>
-  </head>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.4",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "@capacitor/screen-orientation": "https://esm.sh/@capacitor/screen-orientation@^8.0.0",
+    "@capacitor/status-bar": "https://esm.sh/@capacitor/status-bar@^8.0.0",
+    "vite": "https://esm.sh/vite@^7.3.1",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^5.1.4"
+  }
+}
+</script>
+</head>
   <body>
-    <!-- Onde o React é injetado. A caverna do dragão. -->
     <div id="root"></div>
-    <!-- 
-        A PEÇA QUE FALTA:
-        O script abaixo diz ao navegador para carregar o index.tsx como um módulo.
-        Sem isso, o código JS nunca é executado e a div #root fica vazia (só o fundo aparece).
-    -->
     <script type="module" src="/index.tsx"></script>
   </body>
 </html>

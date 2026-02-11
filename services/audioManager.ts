@@ -1,16 +1,13 @@
-
-
 /**
  * ------------------------------------------------------------------
  * COPYRIGHT (c) 2026 ESTÚDIO CRIA
  * DIRETOR: PAULO GABRIEL DE L. S.
  * ------------------------------------------------------------------
  * 
- * AUDIO MANAGER V6: "SONIC DISTINCTION"
+ * AUDIO MANAGER V7: "IMMEDIATE EXECUTION"
  * 
  * Centralização total da lógica de áudio.
- * Reversão do tiro do player para o clássico Arcade.
- * Separação drástica entre tipos de explosão de minas.
+ * Ajustado para iniciar imediatamente sem esperar interação se possível (WebAudio Policy).
  */
 
 export class AudioManager {
@@ -54,8 +51,11 @@ export class AudioManager {
   constructor() {}
 
   public async init() {
+    // Se já existe e está rodando, não faz nada
     if (this.ctx) {
-        if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+        if (this.ctx.state === 'suspended') {
+            await this.ctx.resume().catch(() => {});
+        }
         return;
     }
 
@@ -83,8 +83,24 @@ export class AudioManager {
     this.compressor.connect(this.masterGain);
     this.masterGain.connect(this.ctx.destination);
     
-    await this.bakeSounds();
-    this.updateVolumes();
+    // Tenta carregar sons. Se falhar por segurança do browser, não quebra a app.
+    try {
+        await this.bakeSounds();
+        this.updateVolumes();
+        // Tenta iniciar imediatamente
+        if (this.ctx.state === 'suspended') {
+            await this.ctx.resume().catch(() => {});
+        }
+    } catch (e) {
+        console.warn("Audio init deferred until user gesture.");
+    }
+  }
+
+  // Novo Helper para forçar resume em eventos de toque
+  public resume() {
+      if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume().catch(() => {});
+      }
   }
 
   public setGameState(wave: number, healthRatio: number) {
@@ -101,20 +117,16 @@ export class AudioManager {
   private async bakeSounds() {
       if (!this.ctx) return;
       
-      // --- REVERSÃO DO TIRO DO PLAYER (V7: LOW FREQUENCY PULSE) ---
-      // Reduzido o pitch drasticamente para evitar fadiga auditiva.
-      // Adicionado um filtro LowPass para "arredondar" o ataque.
+      // SHOOT: 330Hz Triangle -> Lowpass Sweep
       this.buffers['shoot'] = await this.renderOffline(0.1, (c) => {
           const osc = c.createOscillator();
           const g = c.createGain();
           const f = c.createBiquadFilter();
 
           osc.type = 'triangle'; 
-          // Frequência muito mais baixa: de 900Hz para 330Hz (Mais grave e agradável)
           osc.frequency.setValueAtTime(330, 0); 
-          osc.frequency.exponentialRampToValueAtTime(60, 0.1); // Drop profundo
+          osc.frequency.exponentialRampToValueAtTime(60, 0.1); 
 
-          // Filtro remove o "estalo" agudo inicial
           f.type = 'lowpass';
           f.frequency.setValueAtTime(3000, 0);
           f.frequency.exponentialRampToValueAtTime(500, 0.1);
@@ -128,10 +140,8 @@ export class AudioManager {
           osc.start();
       });
 
-      // --- EXPLOSÃO DE MINA 1: TIRO (IMPACTANTE) ---
-      // Heavy Bass + Noise. Uma explosão "suja" e forte.
+      // MINE HEAVY
       this.buffers['mine_expl_heavy'] = await this.renderOffline(0.7, (c) => {
-          // Camada 1: Impacto Grave (Square Wave distorcida)
           const osc = c.createOscillator();
           const gOsc = c.createGain();
           osc.type = 'square';
@@ -140,7 +150,6 @@ export class AudioManager {
           gOsc.gain.setValueAtTime(0.8, 0);
           gOsc.gain.exponentialRampToValueAtTime(0.01, 0.5);
 
-          // Camada 2: Ruído de Detonação
           const bufferSize = c.sampleRate * 0.5;
           const noiseBuffer = c.createBuffer(1, bufferSize, c.sampleRate);
           const data = noiseBuffer.getChannelData(0);
@@ -158,42 +167,27 @@ export class AudioManager {
           srcNoise.connect(fNoise);
           fNoise.connect(gNoise);
           osc.connect(gOsc);
-          
           gOsc.connect(c.destination);
           gNoise.connect(c.destination);
-          
           osc.start();
           srcNoise.start();
       });
 
-      // --- EXPLOSÃO DE MINA 2: DASH (ENERGIA/VÁCUO) ---
-      // Sine Wave pura. Limpa. Soa como uma implosão de energia ou bolha.
+      // MINE DASH
       this.buffers['mine_expl_dash'] = await this.renderOffline(0.6, (c) => {
           const osc = c.createOscillator();
           const g = c.createGain();
-          
-          osc.type = 'sine'; // Sem harmônicos, som "redondo"
+          osc.type = 'sine'; 
           osc.frequency.setValueAtTime(400, 0);
-          osc.frequency.exponentialRampToValueAtTime(50, 0.4); // Drop rápido
-          
+          osc.frequency.exponentialRampToValueAtTime(50, 0.4); 
           g.gain.setValueAtTime(0.8, 0);
           g.gain.exponentialRampToValueAtTime(0.01, 0.6);
-          
-          // Phaser Effect (Leve stereo ou modulação de volume)
-          const lfo = c.createOscillator();
-          lfo.frequency.value = 20;
-          const lfoGain = c.createGain();
-          lfoGain.gain.value = 200;
-          lfo.connect(lfoGain);
-          // Não conectamos LFO na frequência principal para manter o som limpo, 
-          // apenas mantemos simples para diferenciar do tiro.
-          
           osc.connect(g);
           g.connect(c.destination);
           osc.start();
       });
 
-      // HIT: Impacto físico
+      // HIT
       this.buffers['hit'] = await this.renderOffline(0.1, (c) => {
           const osc = c.createOscillator();
           const g = c.createGain();
@@ -211,7 +205,7 @@ export class AudioManager {
           osc.start();
       });
       
-      // EXPLOSÃO PADRÃO
+      // EXPLOSION
       this.buffers['expl'] = await this.renderOffline(0.4, (c) => {
           const bufferSize = c.sampleRate * 0.4;
           const noiseBuffer = c.createBuffer(1, bufferSize, c.sampleRate);
@@ -232,7 +226,7 @@ export class AudioManager {
           src.start();
       });
       
-      // POWER UP
+      // POWER
       this.buffers['power'] = await this.renderOffline(0.3, (c) => {
           const osc = c.createOscillator();
           const g = c.createGain();
@@ -247,32 +241,25 @@ export class AudioManager {
           osc.start();
       });
       
-      // SURGE (REWORKED: Mais "Sci-Fi Scanner")
+      // SURGE
       this.buffers['surge'] = await this.renderOffline(0.8, (c) => {
           const osc = c.createOscillator();
           const g = c.createGain();
           const f = c.createBiquadFilter();
-
-          // Complex wave for texture
           osc.type = 'sawtooth';
           osc.frequency.setValueAtTime(50, 0);
           osc.frequency.exponentialRampToValueAtTime(300, 0.8);
-
-          // Filter sweep (The "Wah" effect)
           f.type = 'lowpass';
-          f.Q.value = 10; // High resonance for "sci-fi" feel
+          f.Q.value = 10; 
           f.frequency.setValueAtTime(100, 0);
           f.frequency.exponentialRampToValueAtTime(2000, 0.8);
-
           g.gain.setValueAtTime(0.3, 0);
           g.gain.linearRampToValueAtTime(0, 0.8);
-
           osc.connect(f);
           f.connect(g);
           g.connect(c.destination);
           osc.start();
 
-          // Sub layer for body
           const sub = c.createOscillator();
           const subG = c.createGain();
           sub.type = 'sine';
@@ -329,7 +316,7 @@ export class AudioManager {
           modulator.start();
       });
 
-      // --- INSTRUMENTOS MUSICAIS ---
+      // MUSIC: KICK
       this.buffers['kick'] = await this.renderOffline(0.15, (c) => {
           const osc = c.createOscillator();
           const g = c.createGain();
@@ -345,6 +332,7 @@ export class AudioManager {
           osc.start();
       });
 
+      // MUSIC: HAT
       this.buffers['hat'] = await this.renderOffline(0.05, (c) => {
           const bufferSize = c.sampleRate * 0.05;
           const b = c.createBuffer(1, bufferSize, c.sampleRate);
@@ -364,6 +352,7 @@ export class AudioManager {
           src.start();
       });
 
+      // MUSIC: BASS
       this.buffers['bass'] = await this.renderOffline(0.25, (c) => {
           const osc = c.createOscillator();
           const osc2 = c.createOscillator(); 
@@ -437,10 +426,8 @@ export class AudioManager {
   public playPowerUp() { this.playBuffer('power', 0.5, 0, 80); }
   public playSurge() { this.playBuffer('surge', 0.6, 0, 500); }
   
-  // NOVOS MÉTODOS DE ÁUDIO DIFERENCIADOS
-  // REDUZIDO de 1.0 para 0.6 conforme solicitação
   public playMineExplosionShot() { this.playBuffer('mine_expl_heavy', 0.6, 0, 150); } 
-  public playMineExplosionDash() { this.playBuffer('mine_expl_dash', 0.9, 0, 150); } // Dash = Energia/Limpo
+  public playMineExplosionDash() { this.playBuffer('mine_expl_dash', 0.9, 0, 150); }
   
   public playBossDash() { this.playBuffer('boss_dash', 0.7, 0, 300); }
   public playEnemyShoot() { this.playBuffer('enemy_shoot', 0.4, Math.random()*2, 80); }
@@ -487,15 +474,12 @@ export class AudioManager {
       let iterations = 0;
       while (this.nextNoteTime < now + ahead && iterations < 8) {
           this.playProceduralNote(this.current16thNote);
-          
           const bpm = this.getCurrentBPM();
           const secondsPerBeat = 60.0 / bpm;
           this.nextNoteTime += 0.25 * secondsPerBeat; 
-          
           this.current16thNote = (this.current16thNote + 1) % 16;
           iterations++;
       }
-      
       this.timerID = window.setTimeout(() => this.scheduler(), 25);
   }
 
@@ -509,42 +493,20 @@ export class AudioManager {
 
       let scale = this.SCALE_MAJOR;
       let rootKey = 0; 
-      
-      if (this.currentWave >= 3) {
-          scale = this.SCALE_MINOR;
-          rootKey = 3; 
-      }
-      if (this.currentWave >= 6) {
-          scale = this.SCALE_DARK;
-          rootKey = 1; 
-      }
+      if (this.currentWave >= 3) { scale = this.SCALE_MINOR; rootKey = 3; }
+      if (this.currentWave >= 6) { scale = this.SCALE_DARK; rootKey = 1; }
 
-      if (beat % 4 === 0) {
-          this.playBuffer('kick', 0.8, 0);
-      }
-      
-      if (this.currentWave > 4 && beat % 4 === 2) {
-           this.playBuffer('kick', 0.5, -2);
-      }
-
-      if (beat % 4 === 2) {
-          this.playBuffer('hat', 0.4, 0); 
-      } else {
-          if (this.currentWave > 2 || beat % 2 === 0) {
-            this.playBuffer('hat', 0.15, 12); 
-          }
-      }
+      if (beat % 4 === 0) this.playBuffer('kick', 0.8, 0);
+      if (this.currentWave > 4 && beat % 4 === 2) this.playBuffer('kick', 0.5, -2);
+      if (beat % 4 === 2) this.playBuffer('hat', 0.4, 0); 
+      else if (this.currentWave > 2 || beat % 2 === 0) this.playBuffer('hat', 0.15, 12);
 
       if (beat % 2 === 0) {
           let noteIndex = 0;
-          if (beat < 8) {
-              noteIndex = (beat / 2) % scale.length;
-          } else {
-              if (this.currentWave % 2 === 0) {
-                  noteIndex = scale.length - 1 - ((beat / 2) % scale.length); 
-              } else {
-                  noteIndex = Math.floor(Math.random() * scale.length); 
-              }
+          if (beat < 8) noteIndex = (beat / 2) % scale.length;
+          else {
+              if (this.currentWave % 2 === 0) noteIndex = scale.length - 1 - ((beat / 2) % scale.length); 
+              else noteIndex = Math.floor(Math.random() * scale.length); 
           }
           const semitone = scale[noteIndex] + rootKey;
           const octave = (beat % 4 === 0) ? -12 : 0; 
