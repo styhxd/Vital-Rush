@@ -5,13 +5,12 @@
  * PROJETO: VITAL RUSH - PROTOCOLO APEX
  * ------------------------------------------------------------------
  * 
- * Este é o ponto de entrada. O "Big Bang" do nosso universo microscópico.
- * Basicamente, só segura o canvas preto e chama o jogo.
+ * THE GATEKEEPER (APP ENTRY)
  * 
- * ATUALIZAÇÃO:
- * - Trava Orientação: Landscape
- * - Esconde Status Bar
- * - Inicializa Áudio Imediatamente
+ * Fullscreen Enforcement Strategy:
+ * 1. Capacitor Native Plugins (Status Bar + Orientation)
+ * 2. Web Fullscreen API (Immersive Mode for Android Nav Bar)
+ * 3. Failsafe Event Listeners (Resume/Focus/Click)
  */
 
 import React, { useEffect } from 'react';
@@ -23,48 +22,77 @@ import { audioManager } from './services/audioManager';
 export default function App() {
 
   useEffect(() => {
-    // RITUAL DE INICIALIZAÇÃO NATIVA
-    const initNative = async () => {
+    // --- STRATEGY A: NATIVE PLUGIN ENFORCEMENT ---
+    const enforceNativeFullscreen = async () => {
       try {
-        // 1. Tenta travar a tela em Landscape (Deitada)
+        // 1. Orientation Lock (Landscape)
         await ScreenOrientation.lock({ orientation: 'landscape' }).catch(() => {
-          console.log("Screen Orientation lock falhou (Provavelmente estamos no Browser)");
+            console.warn("Orientation lock skipped (Browser env?)");
         });
 
-        // 2. Tenta esconder a barra de status (Full Immersion)
+        // 2. Status Bar Config
+        // Overlay ensures the WebView goes UNDER the status bar area, removing black bars.
+        await StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
         await StatusBar.hide().catch(() => {});
         
-        // 3. Inicializa o motor de áudio imediatamente.
-        // No Android/iOS (Webview), isso geralmente é permitido no boot.
-        await audioManager.init();
-        
       } catch (e) {
-        console.error("Erro na inicialização nativa:", e);
+        console.error("Native fullscreen error:", e);
       }
     };
 
-    initNative();
+    // --- STRATEGY B: WEB API IMMERSIVE MODE ---
+    // This is crucial for Android Navigation Bar (Bottom Buttons).
+    // It requires a user gesture, so we try it here but also bind it to global clicks.
+    const requestWebFullscreen = async () => {
+        const elem = document.documentElement;
+        if (!document.fullscreenElement) {
+            if (elem.requestFullscreen) {
+                await elem.requestFullscreen().catch(() => {});
+            } else if ((elem as any).webkitRequestFullscreen) {
+                (elem as any).webkitRequestFullscreen();
+            }
+        }
+    };
 
-    // Fallback global de toque para garantir o áudio caso o autoplay falhe
-    const handleTouch = () => {
-        audioManager.resume();
-        window.removeEventListener('touchstart', handleTouch);
-        window.removeEventListener('click', handleTouch);
+    // --- STRATEGY C: FAILSAFE LOOP & EVENTS ---
+    const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+            // Re-apply on app resume
+            setTimeout(enforceNativeFullscreen, 100);
+            setTimeout(enforceNativeFullscreen, 1000); // Double-tap insurance
+        }
     };
     
-    window.addEventListener('touchstart', handleTouch);
-    window.addEventListener('click', handleTouch);
+    // Attempt Initial Launch
+    enforceNativeFullscreen();
+    // Initialize Audio
+    audioManager.init();
+
+    // Listeners
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Global Gesture Interceptor for Audio & Fullscreen
+    // This catches the very first tap anywhere to ensure full immersion.
+    const handleInteraction = () => {
+        audioManager.resume();
+        requestWebFullscreen();
+        enforceNativeFullscreen();
+        // We don't remove this listener immediately to ensure persistence if the user exits fullscreen
+    };
+    
+    window.addEventListener('touchstart', handleInteraction, { passive: true });
+    window.addEventListener('click', handleInteraction);
     
     return () => {
-        window.removeEventListener('touchstart', handleTouch);
-        window.removeEventListener('click', handleTouch);
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('touchstart', handleInteraction);
+        window.removeEventListener('click', handleInteraction);
     }
   }, []);
 
   return (
-    // Fundo preto absoluto. Porque o espaço (e o interior do corpo humano) é escuro.
-    // E também porque economiza bateria em telas OLED. Engenharia, baby.
-    <div className="w-full h-screen bg-black select-none overflow-hidden touch-none">
+    // CSS Failsafe: 100dvh handles dynamic viewport height on mobile browsers
+    <div className="w-full h-[100dvh] bg-black select-none overflow-hidden touch-none fixed inset-0">
       <Game />
     </div>
   );

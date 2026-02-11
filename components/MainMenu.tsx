@@ -120,6 +120,20 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
         return () => { isMounted = false; };
     }, []);
 
+    // FAILSAFE: Trigger Fullscreen on Start
+    const handleStartWithFullscreen = () => {
+        // Tentativa de Modo Imersivo via Web API
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen().catch(() => {});
+        } else if ((elem as any).webkitRequestFullscreen) {
+            (elem as any).webkitRequestFullscreen();
+        }
+        
+        props.onStart();
+        audioManager.startMenuMusic();
+    };
+
     // Se a Intro estiver ativa, mostra ela e bloqueia o resto
     if (showIntro) {
         return <IntroSequence onComplete={() => setShowIntro(false)} />;
@@ -194,14 +208,14 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     )}
 
                     <div className="absolute left-0 top-0 h-full w-full lg:w-[45%] z-30 flex flex-col justify-center p-4 lg:p-16 scale-90 lg:scale-100 origin-left entry-menu">
-                        <MenuContent {...props} align="left" />
+                        <MenuContent {...props} onStart={handleStartWithFullscreen} align="left" />
                     </div>
                 </div>
             ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
                     <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
                     <div className="relative text-center p-6 lg:p-8 max-w-md lg:max-w-md w-full scale-75 lg:scale-100">
-                        <MenuContent {...props} align="center" />
+                        <MenuContent {...props} onStart={handleStartWithFullscreen} align="center" />
                     </div>
                 </div>
             )}
@@ -242,7 +256,7 @@ const MenuContent = (props: MainMenuProps & { align: 'left' | 'center' }) => {
             </div>
 
             <div className={`space-y-1.5 lg:space-y-4 w-full ${isLeft ? 'max-w-md' : ''}`}>
-                <MenuButton onClick={() => { onStart(); audioManager.startMenuMusic(); }}>{t('START')}</MenuButton>
+                <MenuButton onClick={onStart}>{t('START')}</MenuButton>
                 <div className="grid grid-cols-2 gap-2 lg:gap-4">
                   <MenuButton variant="secondary" onClick={onControls}>{t('CONTROLS')}</MenuButton>
                   <MenuButton variant="secondary" onClick={onManual}>{t('MANUAL')}</MenuButton>
