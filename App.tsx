@@ -2,97 +2,84 @@
  * ------------------------------------------------------------------
  * COPYRIGHT (c) 2026 ESTÚDIO CRIA
  * DIRETOR: PAULO GABRIEL DE L. S.
- * PROJETO: VITAL RUSH - PROTOCOLO APEX
+ * PROJETO: VITAL RUSH - PROTOCOLO HÍBRIDO V2
  * ------------------------------------------------------------------
  * 
  * THE GATEKEEPER (APP ENTRY)
  * 
- * Fullscreen Enforcement Strategy:
- * 1. Capacitor Native Plugins (Status Bar + Orientation)
- * 2. Web Fullscreen API (Immersive Mode for Android Nav Bar)
- * 3. Failsafe Event Listeners (Resume/Focus/Click)
+ * RETORNO ÀS ORIGENS:
+ * Utilizamos a ponte nativa do Capacitor para garantir controle absoluto
+ * sobre a StatusBar e Orientação.
  */
 
 import React, { useEffect } from 'react';
-import { Game } from './components/Game';
-import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { StatusBar } from '@capacitor/status-bar';
+import { ScreenOrientation } from '@capacitor/screen-orientation';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Game } from './components/Game';
 import { audioManager } from './services/audioManager';
 
 export default function App() {
 
   useEffect(() => {
-    // --- STRATEGY A: NATIVE PLUGIN ENFORCEMENT ---
-    const enforceNativeFullscreen = async () => {
+    const enforceImmersion = async () => {
+      // 1. Tenta travar a orientação (Nativo)
       try {
-        // 1. Orientation Lock (Landscape)
-        await ScreenOrientation.lock({ orientation: 'landscape' }).catch(() => {
-            console.warn("Orientation lock skipped (Browser env?)");
-        });
-
-        // 2. Status Bar Config
-        // Overlay ensures the WebView goes UNDER the status bar area, removing black bars.
-        await StatusBar.setOverlaysWebView({ overlay: true }).catch(() => {});
-        await StatusBar.hide().catch(() => {});
-        
+        await ScreenOrientation.lock({ orientation: 'landscape' });
       } catch (e) {
-        console.error("Native fullscreen error:", e);
+        // Fallback silencioso para navegadores desktop que não suportam lock
       }
-    };
 
-    // --- STRATEGY B: WEB API IMMERSIVE MODE ---
-    // This is crucial for Android Navigation Bar (Bottom Buttons).
-    // It requires a user gesture, so we try it here but also bind it to global clicks.
-    const requestWebFullscreen = async () => {
-        const elem = document.documentElement;
+      // 2. Esconde a StatusBar e faz o App desenhar "em cima" dela (Nativo)
+      try {
+        await StatusBar.setOverlaysWebView({ overlay: true });
+        await StatusBar.hide();
+      } catch (e) {
+        // Ignora erros se não estiver em ambiente nativo
+      }
+
+      // 3. Fallback Web Puro (Para testes no navegador)
+      try {
+        const elem = document.documentElement as any;
         if (!document.fullscreenElement) {
-            if (elem.requestFullscreen) {
-                await elem.requestFullscreen().catch(() => {});
-            } else if ((elem as any).webkitRequestFullscreen) {
-                (elem as any).webkitRequestFullscreen();
-            }
+           // Nota: Isso geralmente requer interação do usuário, então pode falhar no load inicial
+           // mas funciona nos cliques subsequentes
+           if (elem.requestFullscreen) elem.requestFullscreen({ navigationUI: "hide" });
         }
+      } catch (e) {}
     };
 
-    // --- STRATEGY C: FAILSAFE LOOP & EVENTS ---
-    const handleVisibilityChange = () => {
-        if (document.visibilityState === 'visible') {
-            // Re-apply on app resume
-            setTimeout(enforceNativeFullscreen, 100);
-            setTimeout(enforceNativeFullscreen, 1000); // Double-tap insurance
-        }
-    };
-    
-    // Attempt Initial Launch
-    enforceNativeFullscreen();
-    // Initialize Audio
+    // Executa imediatamente ao montar
+    enforceImmersion();
     audioManager.init();
 
-    // Listeners
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    // Global Gesture Interceptor for Audio & Fullscreen
-    // This catches the very first tap anywhere to ensure full immersion.
-    const handleInteraction = () => {
+    // Listener para quando o app volta do background (Crucial para Android)
+    const appListener = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) {
+        // Delay pequeno para garantir que a UI do Android acordou
+        setTimeout(enforceImmersion, 100);
         audioManager.resume();
-        requestWebFullscreen();
-        enforceNativeFullscreen();
-        // We don't remove this listener immediately to ensure persistence if the user exits fullscreen
+      }
+    });
+
+    // Reforço em interações
+    const handleInteraction = () => {
+      enforceImmersion();
+      audioManager.resume();
     };
-    
-    window.addEventListener('touchstart', handleInteraction, { passive: true });
+
     window.addEventListener('click', handleInteraction);
-    
+    window.addEventListener('touchstart', handleInteraction, { passive: true });
+
     return () => {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-        window.removeEventListener('touchstart', handleInteraction);
-        window.removeEventListener('click', handleInteraction);
-    }
+      appListener.then(handle => handle.remove());
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+    };
   }, []);
 
   return (
-    // CSS Failsafe: 100dvh handles dynamic viewport height on mobile browsers
-    <div className="w-full h-[100dvh] bg-black select-none overflow-hidden touch-none fixed inset-0">
+    <div className="w-full h-screen bg-black select-none overflow-hidden touch-none fixed inset-0">
       <Game />
     </div>
   );
