@@ -1591,9 +1591,8 @@ export class GameEngine {
         for (let i = 0; i < this.particles.length; i++) {
             const p = this.particles[i];
             if (p.id !== 'bg') continue;
-            const squash = 0.45 + ((p.vel.y % 1) + 1) % 1 * 0.35;
             this.ctx.beginPath();
-            this.ctx.ellipse(p.pos.x, p.pos.y, p.radius * 1.45, Math.max(1.2, p.radius * squash), p.vel.y, 0, Math.PI * 2);
+            this.ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI * 2);
             this.ctx.fill();
         }
     }
