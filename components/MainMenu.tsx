@@ -93,59 +93,37 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     from { transform: rotate(0deg) translateX(clamp(100px, 13vw, 190px)) rotate(0deg); }
                     to { transform: rotate(360deg) translateX(clamp(100px, 13vw, 190px)) rotate(-360deg); }
                 }
-                @keyframes reveal-vein {
-                    0% { opacity: 0; transform: scale(1.2); filter: brightness(0) sepia(1) hue-rotate(-50deg) saturate(5); }
-                    40% { opacity: 1; filter: brightness(0.5) sepia(0.5) hue-rotate(-50deg) saturate(3); }
-                    100% { opacity: 1; transform: scale(1); filter: none; }
-                }
-                @keyframes hero-arrival {
-                    0% { opacity: 0; transform: translate(100px, 100px) scale(0.8); filter: blur(20px) grayscale(1); }
-                    100% { opacity: 1; transform: translate(0, 0) scale(1); filter: none; }
-                }
-                @keyframes virus-spawn {
-                    0% { opacity: 0; transform: scale(0); }
-                    60% { transform: scale(1.2); }
-                    100% { opacity: 1; transform: scale(1); }
-                }
-                @keyframes menu-slide-in {
-                    0% { opacity: 0; transform: translateX(-50px); filter: blur(5px); }
-                    100% { opacity: 1; transform: translateX(0); filter: none; }
-                }
                 .anim-vital { animation: vital-breath 4s ease-in-out infinite; }
                 .anim-float-1 { animation: virus-float 5.5s ease-in-out infinite; }
                 .anim-float-2 { animation: virus-float-wide 6.8s ease-in-out infinite; }
                 .anim-orbit { animation: virus-orbit 22s linear infinite; }
-                .entry-vein { animation: reveal-vein 2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
-                .entry-hero { animation: hero-arrival 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; animation-delay: 0.5s; opacity: 0; }
-                .entry-virus { animation: virus-spawn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; opacity: 0; }
-                .entry-menu { animation: menu-slide-in 1s cubic-bezier(0.22, 1, 0.36, 1) forwards; animation-delay: 0.5s; opacity: 0; }
             `}</style>
 
             <div className="absolute inset-0 w-full h-full">
-                    <div className="absolute inset-0 bg-cover bg-center z-0 entry-vein" style={{ backgroundImage: `url(${BACKGROUND})` }} />
+                    <div className="absolute inset-0 bg-cover bg-center z-0" style={{ backgroundImage: `url(${BACKGROUND})` }} />
                     <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent z-10 animate-[fadeIn_2s_ease-out]"></div>
 
                     <div className="absolute inset-0 z-[16] pointer-events-none overflow-hidden">
-                        <div className="absolute top-[6%] left-[28%] lg:left-[36%] entry-virus" style={{ animationDelay: '1.1s' }}>
+                        <div className="absolute top-[6%] left-[28%] lg:left-[36%]">
                             <img src={VIRUS} alt="" className="w-28 lg:w-52 opacity-90 anim-float-1 drop-shadow-[0_0_28px_rgba(0,255,0,0.55)]" />
                         </div>
-                        <div className="absolute top-[34%] left-[42%] lg:left-[50%] entry-virus" style={{ animationDelay: '1.45s' }}>
+                        <div className="absolute top-[34%] left-[42%] lg:left-[50%]">
                             <img src={VIRUS} alt="" className="w-16 lg:w-36 opacity-75 anim-float-2 drop-shadow-[0_0_22px_rgba(0,255,0,0.45)]" />
                         </div>
-                        <div className="absolute right-[20%] lg:right-[26%] top-[38%] w-0 h-0 entry-virus" style={{ animationDelay: '1.2s' }}>
+                        <div className="absolute right-[20%] lg:right-[26%] top-[38%] w-0 h-0">
                             <div className="anim-orbit">
                                 <img src={VIRUS} alt="" className="absolute w-20 lg:w-40 max-w-none -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_0_24px_rgba(0,255,0,0.5)]" />
                             </div>
                         </div>
                     </div>
 
-                    <div className="absolute right-[-5%] lg:right-[5%] bottom-[-5%] h-[70%] lg:h-[90%] z-20 pointer-events-none flex items-end justify-end entry-hero">
+                    <div className="absolute right-[-5%] lg:right-[5%] bottom-[-5%] h-[70%] lg:h-[90%] z-20 pointer-events-none flex items-end justify-end">
                          <img src={VITAL_HERO} alt="Vital" className="h-full w-auto max-w-none object-contain anim-vital"
                             style={{ filter: isPlatinum ? 'drop-shadow(0 0 30px rgba(255, 215, 0, 0.4))' : 'drop-shadow(0 0 30px rgba(0, 255, 255, 0.3))' }}
                          />
                     </div>
 
-                    <div className="absolute left-0 top-0 h-full w-full lg:w-[45%] z-30 flex flex-col justify-center p-4 lg:p-16 scale-90 lg:scale-100 origin-left entry-menu">
+                    <div className="absolute left-0 top-0 h-full w-full lg:w-[45%] z-30 flex flex-col justify-center p-4 lg:p-16 scale-90 lg:scale-100 origin-left">
                         <MenuContent {...props} onStart={handleStartWithFullscreen} align="left" />
                     </div>
                 </div>

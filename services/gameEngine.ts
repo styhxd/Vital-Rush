@@ -1501,15 +1501,15 @@ export class GameEngine {
               this.ctx.strokeStyle = `rgba(0, 255, 255, ${life/maxLife})`;
               this.ctx.setLineDash([10, 20]);
           } else {
-              // EXPLOSÃO DE MINA PADRÃO: AGORA DOURADA/BRANCA (Térmica)
-              this.ctx.strokeStyle = `rgba(255, 220, 100, ${life/maxLife})`;
+              // EXPLOSÃO DE MINA: anel vermelho, miolo claro
+              this.ctx.strokeStyle = `rgba(255, 70, 60, ${life/maxLife})`;
               this.ctx.setLineDash([]);
           }
           this.ctx.stroke();
           this.ctx.setLineDash([]); 
           this.ctx.beginPath();
           this.ctx.arc(p.pos.x, p.pos.y, radius * 0.5 * (1-progress), 0, Math.PI*2);
-          this.ctx.fillStyle = isDashExpl ? `rgba(200, 255, 255, ${life/maxLife})` : `rgba(255, 150, 0, ${life/maxLife})`;
+          this.ctx.fillStyle = isDashExpl ? `rgba(200, 255, 255, ${life/maxLife})` : `rgba(255, 228, 220, ${life/maxLife})`;
           this.ctx.fill();
           this.ctx.restore();
       } else if (p.id === 'ghost') {
@@ -1661,53 +1661,41 @@ export class GameEngine {
             this.ctx.globalAlpha = 1.0;
         }
         else if (e.type === EntityType.BIO_MINE) {
-            // --- REDESIGN COMPLETO DA BIO-MINA: NÚCLEO DE FUSÃO INSTÁVEL ---
             this.ctx.save();
             this.ctx.translate(e.pos.x, e.pos.y);
-            
-            // 1. Núcleo Pulsante (O "Coração" Dourado)
-            const pulse = 1 + Math.sin(this.time / 40) * 0.15; // Pulso rápido e nervoso
-            
+            const pulse = 1 + Math.sin(this.time / 40) * 0.1;
+            const mine = this.colors.BIO_MINE;
+
             if (!this.isLowQuality) {
-                // Glow de Alta Qualidade (Screen Blend)
                 this.ctx.globalCompositeOperation = 'screen';
-                const grad = this.ctx.createRadialGradient(0, 0, e.radius * 0.3, 0, 0, e.radius * 2.5);
-                grad.addColorStop(0, '#ffffaa'); // Centro Branco-Quente
-                grad.addColorStop(0.4, hexToRgba(this.colors.BIO_MINE, 0.8)); // Meio Âmbar
+                const grad = this.ctx.createRadialGradient(0, 0, e.radius * 0.2, 0, 0, e.radius * 1.8);
+                grad.addColorStop(0, hexToRgba(mine, 0.55));
                 grad.addColorStop(1, 'rgba(0,0,0,0)');
                 this.ctx.fillStyle = grad;
                 this.ctx.beginPath();
-                this.ctx.arc(0, 0, e.radius * 2.2 * pulse, 0, Math.PI*2);
+                this.ctx.arc(0, 0, e.radius * 1.7 * pulse, 0, Math.PI * 2);
                 this.ctx.fill();
             }
 
-            // 2. Anéis de Contenção Rotativos (O "Hazard")
             this.ctx.globalCompositeOperation = 'source-over';
-            this.ctx.rotate(this.time / 80); // Rotação rápida
-            
-            this.ctx.strokeStyle = '#ffd700'; // Ouro puro
-            this.ctx.lineWidth = 3;
+            this.ctx.fillStyle = '#1c1012';
             this.ctx.beginPath();
-            // Desenha 3 arcos (símbolo de radiação/perigo)
-            for(let i=0; i<3; i++) {
-                const startAngle = (i * (Math.PI * 2 / 3));
-                const endAngle = startAngle + (Math.PI / 2);
-                this.ctx.arc(0, 0, e.radius * 0.8, startAngle, endAngle);
-            }
+            this.ctx.arc(0, 0, e.radius * 0.92 * pulse, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.strokeStyle = mine;
+            this.ctx.lineWidth = 3;
             this.ctx.stroke();
 
-            // 3. Núcleo Sólido
-            this.ctx.rotate(-(this.time / 40)); // Contra-rotação
-            this.ctx.fillStyle = '#ffaa00'; // Âmbar Sólido
+            this.ctx.strokeStyle = '#f4efe6';
+            this.ctx.lineWidth = Math.max(3, e.radius * 0.18);
+            this.ctx.lineCap = 'round';
+            const arm = e.radius * 0.42;
             this.ctx.beginPath();
-            this.ctx.arc(0, 0, e.radius * 0.5 * pulse, 0, Math.PI*2);
-            this.ctx.fill();
-
-            // 4. Detalhe Central (Ponto Branco)
-            this.ctx.fillStyle = '#ffffff';
-            this.ctx.beginPath();
-            this.ctx.arc(0, 0, e.radius * 0.2, 0, Math.PI*2);
-            this.ctx.fill();
+            this.ctx.moveTo(-arm, -arm);
+            this.ctx.lineTo(arm, arm);
+            this.ctx.moveTo(arm, -arm);
+            this.ctx.lineTo(-arm, arm);
+            this.ctx.stroke();
 
             this.ctx.restore();
         }

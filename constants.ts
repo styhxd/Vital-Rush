@@ -35,7 +35,7 @@ export const COLORS_DEFAULT: ThemePalette = {
   SURGE: 'rgba(0, 255, 255, 0.3)',
   COMBO: '#ffaa00',
   ORBITAL: '#0088ff',
-  BIO_MINE: '#ffaa00', // ATUALIZADO: ÂMBAR RADIOATIVO/DOURADO (Explosivo e Valioso)
+  BIO_MINE: '#ff3b30', // VERMELHO DE ALERTA — o corpo da mina é escuro, para não parecer moeda
   ACID_POOL: '#bf00ff' 
 };
 
@@ -57,7 +57,7 @@ export const COLORS_PLATINUM: ThemePalette = {
   SURGE: 'rgba(255, 215, 0, 0.3)', 
   COMBO: '#ffffff',
   ORBITAL: '#ffd700',
-  BIO_MINE: '#ff4500', // PLATINA: Laranja Neon Intenso
+  BIO_MINE: '#ff5c33', // PLATINA: coral, ainda longe do dourado da moeda
   ACID_POOL: '#7c4dff'
 };
 
@@ -182,6 +182,15 @@ export const TEXTS: TranslationMap = {
     SURGE_READY: "SURGE",
     DEPLOY: "DEPLOY",
     BRIEFING: "PATIENT CHART",
+    CHART_TITLE: "PATIENT FILE",
+    CHART_PATIENT: "PATIENT",
+    CHART_AGE: "YRS",
+    CHART_PLAY: "PLAY",
+    CHART_LAB: "UPGRADES",
+    CHART_BACK: "BACK",
+    CHART_STAMP: "CONFIDENTIAL",
+    CHART_STAMP_OK: "STABLE",
+    CHART_STAMP_LOST: "LOST",
     BOSS_WARNING: "ANOMALY DETECTED",
     OPEN_SHOP: "OPEN BIO-LAB",
     PURCHASE: "EVOLVE",
@@ -389,6 +398,15 @@ export const TEXTS: TranslationMap = {
     SURGE_READY: "SURTO",
     DEPLOY: "IMPLANTAR",
     BRIEFING: "PRONTUÁRIO",
+    CHART_TITLE: "PRONTUÁRIO",
+    CHART_PATIENT: "PACIENTE",
+    CHART_AGE: "ANOS",
+    CHART_PLAY: "JOGAR",
+    CHART_LAB: "MELHORIAS",
+    CHART_BACK: "VOLTAR",
+    CHART_STAMP: "CONFIDENCIAL",
+    CHART_STAMP_OK: "ESTÁVEL",
+    CHART_STAMP_LOST: "PERDIDO",
     BOSS_WARNING: "ANOMALIA DETECTADA",
     OPEN_SHOP: "ABRIR BIO-LAB",
     PURCHASE: "EVOLUIR",
@@ -596,6 +614,15 @@ export const TEXTS: TranslationMap = {
     SURGE_READY: "SURGE",
     DEPLOY: "DESPLEGAR",
     BRIEFING: "EXPEDIENTE",
+    CHART_TITLE: "FICHA",
+    CHART_PATIENT: "PACIENTE",
+    CHART_AGE: "AÑOS",
+    CHART_PLAY: "JUGAR",
+    CHART_LAB: "MEJORAS",
+    CHART_BACK: "VOLVER",
+    CHART_STAMP: "CONFIDENCIAL",
+    CHART_STAMP_OK: "ESTABLE",
+    CHART_STAMP_LOST: "PERDIDO",
     BOSS_WARNING: "ANOMALÍA DETECTADA",
     OPEN_SHOP: "ABRIR BIO-LAB",
     PURCHASE: "EVOLUCIONAR",

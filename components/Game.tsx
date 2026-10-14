@@ -11,6 +11,7 @@ import { PauseMenu } from './PauseMenu';
 import { SettingsMenu } from './SettingsMenu';
 import { LoadoutMenu } from './LoadoutMenu'; 
 import { MainMenu } from './MainMenu';
+import { OutcomeChart, PatientChart } from './PatientChart';
 
 const systemLanguage = (): Language => {
   const tags = typeof navigator === 'undefined'
@@ -949,41 +950,17 @@ export const Game: React.FC = () => {
       )}
       
       {gameState === GameState.WAVE_CLEARED && (
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 animate-pulse">
-           <div className="w-full h-full flex flex-col items-center justify-center relative overflow-hidden">
-               {/* DRAMATIC BACKGROUND */}
-               <div className="absolute inset-0 bg-green-500/10 mix-blend-overlay animate-pulse"></div>
-               <div className="absolute top-0 w-full h-32 bg-gradient-to-b from-green-500/20 to-transparent"></div>
-               <div className="absolute bottom-0 w-full h-32 bg-gradient-to-t from-green-500/20 to-transparent"></div>
-               
-               {/* HUGE TEXT */}
-               <h1 className="text-5xl lg:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-b from-green-300 to-green-600 tracking-[0.1em] mb-6 lg:mb-8 animate-bounce drop-shadow-[0_0_30px_rgba(0,255,0,0.5)] text-center">
-                   {t('CLEARED')}
-               </h1>
-               
-               <div className="w-full max-w-[250px] lg:max-w-lg p-1 border-y-2 lg:border-y-4 border-green-500 bg-black/80 relative backdrop-blur-md">
-                   <div className="relative p-4 lg:p-8 text-center">
-                       <div className="w-full h-1 bg-green-500/50 mb-4 lg:mb-8"></div>
-                       
-                       <div className="grid grid-cols-2 gap-2 lg:gap-4 mb-4 lg:mb-8 text-[10px] lg:text-sm font-mono tracking-widest">
-                           <div className="text-right text-gray-400">{t('WAVE')}:</div>
-                           <div className="text-left text-white font-bold">{uiData.wave}</div>
-                           <div className="text-right text-gray-400">{t('BIOMASS_AVAIL')}:</div>
-                           <div className="text-left text-yellow-400 font-bold">{uiData.biomass}</div>
-                       </div>
-
-                       <div className="flex flex-col gap-3 lg:gap-4">
-                           <MenuButton variant="success" onClick={openShop}>
-                               {t('MUTATION')}
-                           </MenuButton>
-                           <MenuButton variant="secondary" onClick={() => setGameState(GameState.BRIEFING)}>
-                               {t('NEXT')}
-                           </MenuButton>
-                       </div>
-                   </div>
-               </div>
-           </div>
-        </div>
+        <OutcomeChart
+            variant="cleared"
+            patient={patient}
+            language={language}
+            isPlatinum={isPlatinum}
+            wave={uiData.wave}
+            biomass={uiData.biomass}
+            score={uiData.score}
+            onPrimary={() => setGameState(GameState.BRIEFING)}
+            onSecondary={openShop}
+        />
       )}
 
       {/* COMPONENTE MAIN MENU - SUBSTITUIU O BLOCO ANTERIOR */}
@@ -1182,51 +1159,15 @@ export const Game: React.FC = () => {
       )}
 
       {gameState === GameState.BRIEFING && patient && (
-         <div className="absolute inset-0 bg-black/95 flex items-center justify-center z-50">
-             <div className="w-full max-w-sm lg:max-w-2xl p-4 lg:p-8 border border-cyan-500/20 bg-cyan-900/10 text-center relative overflow-hidden flex flex-col items-center">
-                 <div className="absolute top-0 left-0 w-full h-1 bg-cyan-500 shadow-[0_0_10px_#00ffff]"></div>
-                 <h2 className="text-xl lg:text-2xl text-cyan-400 tracking-[0.3em] mb-4 lg:mb-4 animate-pulse">{t('BRIEFING')}</h2>
-                 
-                 <div className="w-full bg-black/40 p-4 lg:p-6 border-l-2 border-cyan-500 mb-4 lg:mb-8 text-left font-mono text-xs lg:text-base space-y-2 lg:space-y-2">
-                    <div className="flex justify-between">
-                        <span className="text-gray-500">{t('PATIENT')}:</span>
-                        <span className="text-white">{patient.name} [{patient.age}]</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-gray-500">{t('LABEL_ID')}:</span>
-                        <span className="text-white">#{patient.id}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-gray-500">{t('LABEL_SYMPTOMS')}:</span>
-                        <span className="text-red-400">{t(patient.symptoms)}</span>
-                    </div>
-                    <div className="flex justify-between border-t border-white/10 pt-2 mt-2">
-                        <span className="text-gray-500">{t('STRAIN')}:</span>
-                        <span className="text-yellow-400 font-bold">{t(`STRAIN_${patient.strain}`)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                        <span className="text-gray-500">{t('DIFFICULTY')}:</span>
-                        <span className="text-red-500 font-bold">{t(`DIFF_${difficulty}`)}</span>
-                    </div>
-                 </div>
-
-                 <div className="flex gap-4 lg:gap-4 w-full">
-                    <button onClick={openShop} className="flex-1 py-2.5 lg:py-4 border border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10 font-bold text-[10px] lg:text-base tracking-widest transition-all">
-                        {t('OPEN_SHOP')}
-                    </button>
-                    <button onClick={deployToWave} className="flex-[2] py-2.5 lg:py-4 bg-cyan-600 text-black font-bold text-[10px] lg:text-base tracking-widest hover:bg-cyan-500 transition-all shadow-[0_0_20px_rgba(0,255,255,0.4)]">
-                        {t('DEPLOY')}
-                    </button>
-                 </div>
-                 
-                 <button 
-                    onClick={() => setGameState(GameState.MENU)}
-                    className="mt-4 lg:mt-4 text-[10px] lg:text-xs text-red-500/40 hover:text-red-500 tracking-[0.2em] border-b border-transparent hover:border-red-500 transition-all uppercase"
-                 >
-                    {t('ABORT')}
-                 </button>
-             </div>
-         </div>
+         <PatientChart
+            patient={patient}
+            language={language}
+            difficulty={difficulty}
+            isPlatinum={isPlatinum}
+            onPlay={deployToWave}
+            onLab={openShop}
+            onBack={() => setGameState(GameState.MENU)}
+         />
       )}
 
       {gameState === GameState.BIO_LAB && (
@@ -1282,30 +1223,16 @@ export const Game: React.FC = () => {
       {/* (LOADOUT, SETTINGS, CREDITS, PAUSED, GAME_OVER) mantidos */}
       
       {gameState === GameState.GAME_OVER && (
-        <div className="absolute inset-0 bg-red-950/95 flex items-center justify-center z-50">
-           <div className="text-center p-6 lg:p-8 border-y-2 border-red-600 w-full bg-black/50 backdrop-blur-md max-w-sm lg:max-w-lg">
-             <h2 className="text-3xl lg:text-7xl font-bold text-red-500 mb-4 tracking-widest red-glow">{t('GAME_OVER')}</h2>
-             
-             <div className="grid grid-cols-2 gap-4 lg:gap-8 mx-auto mb-6 lg:mb-10 text-left mt-4 lg:mt-8">
-                 <div>
-                     <div className="text-[11px] lg:text-xs text-red-400/50">{t('SCORE')}</div>
-                     <div className="text-xl lg:text-3xl font-bold text-white">{uiData.score}</div>
-                 </div>
-                 <div>
-                     <div className="text-[11px] lg:text-xs text-red-400/50">{t('WAVE')}</div>
-                     <div className="text-xl lg:text-3xl font-bold text-white">{uiData.wave}</div>
-                 </div>
-             </div>
-             
-             {patient && (
-                 <div className="mb-4 lg:mb-8 text-[10px] lg:text-sm font-mono text-gray-400">
-                     {t('STATUS_TERM')}
-                 </div>
-             )}
-
-             <MenuButton onClick={handleStartGame}>{t('RETRY')}</MenuButton>
-           </div>
-        </div>
+        <OutcomeChart
+            variant="lost"
+            patient={patient}
+            language={language}
+            isPlatinum={isPlatinum}
+            wave={uiData.wave}
+            biomass={uiData.biomass}
+            score={uiData.score}
+            onPrimary={handleStartGame}
+        />
       )}
 
       {isMobile && !isPaused && gameState === GameState.PLAYING && <Joystick onMove={handleJoystickMove} />}
