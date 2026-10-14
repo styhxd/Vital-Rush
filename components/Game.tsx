@@ -13,6 +13,7 @@ import { LoadoutMenu } from './LoadoutMenu';
 import { MainMenu } from './MainMenu';
 import { OutcomeChart, PatientChart } from './PatientChart';
 import { motionClass, ScreenPresence } from './screenPresence';
+import { BioLab, SerumOffer, mutationCardStyles, rollSerumOffers, SERUM_WINDOW_MS } from './MutationCards';
 
 const systemLanguage = (): Language => {
   const tags = typeof navigator === 'undefined'
@@ -178,7 +179,13 @@ export const Game: React.FC = () => {
   const engineRef = useRef<GameEngine | null>(null);
   const animationFrameRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
-  const uiUpdateAccumulatorRef = useRef<number>(0); 
+  const uiUpdateAccumulatorRef = useRef<number>(0);
+  const upgradesRef = useRef<Upgrade[]>(UPGRADES.map(u => ({...u})));
+  const statsRef = useRef<PlayerStats>(INITIAL_STATS);
+  const levelRef = useRef<Record<string, number>>({});
+  const serumLockRef = useRef(false);
+  const serumResolvedRef = useRef(false);
+  const grantRef = useRef<(id: string, free: boolean) => boolean>(() => false); 
   
   const [gameState, setGameState] = useState<GameState>(GameState.MENU);
   const [lastGameState, setLastGameState] = useState<GameState>(GameState.MENU);
@@ -214,6 +221,10 @@ export const Game: React.FC = () => {
   const [showTutorial, setShowTutorial] = useState(false);
   const [showBossIntro, setShowBossIntro] = useState(false);
   const [bossEntity, setBossEntity] = useState<{hp: number, max: number, name: string} | null>(null);
+  const [labPulse, setLabPulse] = useState<{id: string, kind: 'ok' | 'no', token: number, cost: number} | null>(null);
+  const [serum, setSerum] = useState<{ids: string[], endsAt: number} | null>(null);
+  const [serumNow, setSerumNow] = useState(0);
+  const [serumCollapse, setSerumCollapse] = useState<string | null>(null);
 
   const t = (key: string) => TEXTS[language][key] || key;
 
@@ -466,7 +477,7 @@ export const Game: React.FC = () => {
         return;
     }
 
-    if (gameState !== GameState.PLAYING || isPaused) {
+    if (gameState !== GameState.PLAYING || isPaused || serumLockRef.current) {
         lastTimeRef.current = time;
         animationFrameRef.current = requestAnimationFrame(loop);
         return;
@@ -476,6 +487,7 @@ export const Game: React.FC = () => {
     lastTimeRef.current = time;
 
     if (engineRef.current) {
+          engineRef.current.allowSerum = upgradesRef.current.some(u => u.level < u.maxLevel);
           engineRef.current.update(
             dt, 
             stats, 
@@ -493,6 +505,16 @@ export const Game: React.FC = () => {
             },
             handleBossSpawn
           );
+      if (engineRef.current.consumeSerum()) {
+          const ids = rollSerumOffers(upgradesRef.current);
+          if (ids.length > 0) {
+              serumResolvedRef.current = false;
+              serumLockRef.current = true;
+              setSerumCollapse(null);
+              setSerum({ ids, endsAt: performance.now() + SERUM_WINDOW_MS });
+              setSerumNow(performance.now());
+          }
+      }
       
       engineRef.current.draw();
       
@@ -587,43 +609,117 @@ export const Game: React.FC = () => {
      }
   };
 
-  const buyUpgrade = (upgradeId: string) => {
-      if (!engineRef.current) return;
-      const upgIdx = upgrades.findIndex(u => u.id === upgradeId);
-      if (upgIdx === -1) return;
-      
-      const upgState = upgrades[upgIdx];
-      const upgDef = UPGRADES.find(u => u.id === upgradeId);
-      if (!upgDef) return;
+  statsRef.current = stats;
+  levelRef.current = Object.fromEntries(upgrades.map(u => [u.id, u.level]));
+  upgradesRef.current = upgrades;
 
-      const cost = Math.floor(upgState.baseCost * Math.pow(upgState.costMultiplier, upgState.level));
-      
-      if (engineRef.current.biomass >= cost && upgState.level < upgState.maxLevel) {
-          const prevStats = {...stats};
-          try {
-              engineRef.current.biomass -= cost;
-              const newStats = upgDef.apply(stats);
-              setStats(newStats);
-              audioManager.playPowerUp();
-              
-              const newUpgrades = [...upgrades];
-              newUpgrades[upgIdx] = {
-                  ...newUpgrades[upgIdx],
-                  level: newUpgrades[upgIdx].level + 1
-              };
-              setUpgrades(newUpgrades);
-              setUiData(prev => ({...prev, biomass: engineRef.current!.biomass}));
-              
-              if (newUpgrades[upgIdx].level >= newUpgrades[upgIdx].maxLevel) {
-                  if (upgradeId === 'mitosis') achievementManager.track('fire_rate_max', 1);
-              }
-              const boughtCount = newUpgrades.filter(u => u.level > 0).length;
-              achievementManager.set('unlock_all_upgrades', boughtCount);
-          } catch (e) {
-              engineRef.current.biomass += cost;
-              setStats(prevStats);
+  const grantUpgrade = (upgradeId: string, free: boolean) => {
+      if (!engineRef.current) return false;
+      const upgState = UPGRADES.find(u => u.id === upgradeId);
+      if (!upgState) return false;
+
+      const level = levelRef.current[upgradeId] ?? 0;
+      if (level >= upgState.maxLevel) return false;
+
+      const cost = Math.floor(upgState.baseCost * Math.pow(upgState.costMultiplier, level));
+      if (!free && engineRef.current.biomass < cost) return false;
+
+      const prevStats = {...statsRef.current};
+      const prevLevels = {...levelRef.current};
+      const prevBiomass = engineRef.current.biomass;
+      try {
+          if (!free) engineRef.current.biomass -= cost;
+          const newStats = upgState.apply(statsRef.current);
+          statsRef.current = newStats;
+          const nextLevel = level + 1;
+          levelRef.current = { ...levelRef.current, [upgradeId]: nextLevel };
+
+          const eng = engineRef.current;
+          eng.player.maxHealth = newStats.maxHealth;
+          if (upgradeId === 'membrane' || upgradeId === 'giga_blast') {
+              eng.player.health = newStats.maxHealth;
+          } else {
+              eng.player.health = Math.min(eng.player.health, newStats.maxHealth);
           }
+          if (eng.energy > newStats.maxEnergy) eng.energy = newStats.maxEnergy;
+          if (eng.player.maxHealth >= 200) achievementManager.track('max_hp_200', Math.floor(eng.player.maxHealth));
+          setStats(newStats);
+          audioManager.playPowerUp();
+
+          const nextUpgrades = upgradesRef.current.map(u => u.id === upgradeId ? { ...u, level: nextLevel } : u);
+          upgradesRef.current = nextUpgrades;
+          setUpgrades(nextUpgrades);
+          setUiData(prev => ({
+              ...prev,
+              biomass: eng.biomass,
+              health: Math.floor(eng.player.health),
+              maxHealth: eng.player.maxHealth,
+              maxEnergy: newStats.maxEnergy,
+          }));
+
+          if (nextLevel >= upgState.maxLevel && upgradeId === 'mitosis') {
+              achievementManager.track('fire_rate_max', 1);
+          }
+          achievementManager.set('unlock_all_upgrades', nextUpgrades.filter(u => u.level > 0).length);
+          eng.sessionStats.upgradesBought++;
+          return true;
+      } catch (e) {
+          engineRef.current.biomass = prevBiomass;
+          statsRef.current = prevStats;
+          levelRef.current = prevLevels;
+          setStats(prevStats);
+          return false;
       }
+  };
+  grantRef.current = grantUpgrade;
+
+  const buyUpgrade = (upgradeId: string) => {
+      const current = UPGRADES.find(u => u.id === upgradeId);
+      const level = levelRef.current[upgradeId] ?? 0;
+      const cost = current ? Math.floor(current.baseCost * Math.pow(current.costMultiplier, level)) : 0;
+      const ok = grantUpgrade(upgradeId, false);
+      setLabPulse({ id: upgradeId, kind: ok ? 'ok' : 'no', token: Date.now(), cost });
+  };
+
+  const closeSerum = (id: string) => {
+      grantRef.current(id, true);
+      serumLockRef.current = false;
+      serumResolvedRef.current = true;
+      setSerum(null);
+      setSerumCollapse(null);
+      lastTimeRef.current = performance.now();
+  };
+
+  useEffect(() => {
+      upgradesRef.current = upgrades;
+  }, [upgrades]);
+
+  useEffect(() => {
+      if (gameState !== GameState.PLAYING && serumLockRef.current) {
+          serumLockRef.current = false;
+          setSerum(null);
+          setSerumCollapse(null);
+      }
+  }, [gameState]);
+
+  useEffect(() => {
+      if (!serum) return;
+      const timer = window.setInterval(() => {
+          const now = performance.now();
+          setSerumNow(now);
+          if (now < serum.endsAt || serumResolvedRef.current) return;
+          serumResolvedRef.current = true;
+          const id = serum.ids[Math.floor(Math.random() * serum.ids.length)];
+          setSerumCollapse(id);
+          window.setTimeout(() => closeSerum(id), 420);
+      }, 80);
+      return () => window.clearInterval(timer);
+  }, [serum]);
+
+  const pickSerum = (id: string) => {
+      if (!serum || serumResolvedRef.current) return;
+      serumResolvedRef.current = true;
+      closeSerum(id);
   };
 
   const handleJoystickMove = (vec: {x: number, y: number}) => {
@@ -773,6 +869,7 @@ export const Game: React.FC = () => {
             animation: heart-pulse 1.25s ease-in-out infinite;
         }
         .heart-gone { color: #4a1518; }
+        ${mutationCardStyles}
       `}</style>
 
       <div className="vignette"></div>
@@ -1200,53 +1297,17 @@ export const Game: React.FC = () => {
 
       <ScreenPresence show={gameState === GameState.BIO_LAB}>
         {(phase) => (
-        <div className={`absolute inset-0 bg-black/95 flex items-center justify-center z-50 p-4 lg:p-4 ${motionClass(phase)}`}>
-             <div className="w-full max-w-5xl h-full lg:h-[90%] flex flex-col relative">
-                <div className="flex justify-between items-center mb-4 lg:mb-6 border-b border-white/10 pb-4 lg:pb-4">
-                    <h2 className="text-lg lg:text-4xl text-yellow-400 font-bold tracking-widest text-glow">{t('MUTATION')}</h2>
-                    <div className="text-right">
-                        <div className="text-[10px] lg:text-xs text-gray-500 tracking-widest">{t('BIOMASS_AVAIL')}</div>
-                        <div className="text-lg lg:text-3xl font-mono text-yellow-400">{uiData.biomass}</div>
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-4 overflow-y-auto pb-4 custom-scroll">
-                    {upgrades.map((upgrade, idx) => {
-                         const cost = Math.floor(upgrade.baseCost * Math.pow(upgrade.costMultiplier, upgrade.level));
-                         const canAfford = uiData.biomass >= cost;
-                         const isMaxed = upgrade.level >= upgrade.maxLevel;
-
-                         return (
-                            <div key={idx} className={`p-2.5 lg:p-6 bg-[#151515] border ${upgrade.rarity === 'LEGENDARY' ? 'border-amber-500/30' : 'border-white/10'} relative group`}>
-                                <div className="flex justify-between mb-1.5 lg:mb-2">
-                                    <span className={`text-[8px] lg:text-[10px] px-1.5 lg:px-2 py-0.5 border ${upgrade.rarity === 'LEGENDARY' ? 'text-amber-400 border-amber-400/30' : 'text-gray-400 border-gray-600'}`}>{upgrade.rarity}</span>
-                                    <span className="text-[8px] lg:text-xs text-gray-500">LVL {upgrade.level}/{upgrade.maxLevel}</span>
-                                </div>
-                                <h3 className="text-xs lg:text-xl font-bold text-white mb-1 lg:mb-2 leading-tight">{t(upgrade.nameKey)}</h3>
-                                <p className="text-[10px] lg:text-sm text-gray-400 mb-2 lg:mb-4 h-8 lg:h-10 leading-tight">{t(upgrade.descKey)}</p>
-                                
-                                <button 
-                                    onClick={() => buyUpgrade(upgrade.id)}
-                                    disabled={!canAfford || isMaxed}
-                                    className={`w-full py-2 lg:py-3 font-bold tracking-widest text-[10px] lg:text-sm transition-all
-                                        ${isMaxed 
-                                            ? 'bg-green-900/20 text-green-500 border border-green-500/30 cursor-default' 
-                                            : canAfford 
-                                                ? 'bg-yellow-600 hover:bg-yellow-500 text-black shadow-[0_0_10px_rgba(255,170,0,0.3)]' 
-                                                : 'bg-white/5 text-white/20 cursor-not-allowed'}`}
-                                >
-                                    {isMaxed ? t('MAXED') : `${t('PURCHASE')} [${cost}]`}
-                                </button>
-                            </div>
-                         )
-                    })}
-                </div>
-
-                <button onClick={closeShop} className="mt-auto py-2.5 lg:py-4 w-full border-t border-white/10 text-white/50 hover:text-white hover:bg-white/5 transition-colors tracking-widest text-xs lg:text-base">
-                    {t('BACK')}
-                </button>
-             </div>
-        </div>
+          <div className={`absolute inset-0 z-50 ${motionClass(phase)}`}>
+            <BioLab
+              upgrades={upgrades}
+              biomass={uiData.biomass}
+              language={language}
+              t={t}
+              pulse={labPulse}
+              onBuy={buyUpgrade}
+              onClose={closeShop}
+            />
+          </div>
         )}
       </ScreenPresence>
 
@@ -1268,7 +1329,20 @@ export const Game: React.FC = () => {
         )}
       </ScreenPresence>
 
-      {isMobile && !isPaused && gameState === GameState.PLAYING && <Joystick onMove={handleJoystickMove} />}
+      {serum && gameState === GameState.PLAYING && (
+        <SerumOffer
+          ids={serum.ids}
+          upgrades={upgrades}
+          language={language}
+          t={t}
+          now={serumNow}
+          endsAt={serum.endsAt}
+          collapseId={serumCollapse}
+          onPick={pickSerum}
+        />
+      )}
+
+      {isMobile && !isPaused && !serum && gameState === GameState.PLAYING && <Joystick onMove={handleJoystickMove} />}
       
       {/* NEW PAUSE MENU IMPLEMENTATION */}
       <PauseMenu 

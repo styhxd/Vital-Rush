@@ -28,6 +28,7 @@ export enum EntityType {
   ENEMY_PROJECTILE, // NOVO: O que o Fungi atira
   ANTIBODY,       // Sua munição
   DNA_FRAGMENT,   // Dinheiro (biomassa)
+  SERUM,          // Power-up voando: escolha uma mutação
   PARTICLE,       // Efeitos visuais para fritar a GPU
   TEXT_POPUP,     // Números de dano subindo
   BOSS,           // O cara que vai te matar

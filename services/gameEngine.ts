@@ -130,6 +130,12 @@ export class GameEngine {
   
   public isLowQuality: boolean = false; 
   public forceHighQuality: boolean = false; // Override flag
+  public allowSerum: boolean = true;
+
+  private serumClock: number = 8;
+  private serumIntroduced: boolean = false;
+  private serumReady: boolean = false;
+  private hpMilestoneSent: boolean = false;
 
   private frameTimes: number[] = [];
   private perfCheckTimer: number = 0;
@@ -156,6 +162,12 @@ export class GameEngine {
 
   public setLanguage(lang: Language) { this.language = lang; }
   private t(key: string): string { return TEXTS[this.language][key] || key; }
+
+  public consumeSerum(): boolean {
+      if (!this.serumReady) return false;
+      this.serumReady = false;
+      return true;
+  }
 
   private createPlayer(stats: PlayerStats): Entity {
     return {
@@ -336,11 +348,6 @@ export class GameEngine {
       const knockback = target.type === EntityType.BOSS || target.type === EntityType.VIRUS ? 0.1 : 2; 
       target.pos.x += knockback; 
 
-      if (isCrit && stats.lifesteal > 0) {
-          this.player.health = Math.min(this.player.health + 2, this.player.maxHealth);
-          this.spawnText(this.player.pos, this.t('MSG_HP_PLUS'), '#00ff00', 16);
-      }
-
       const txtColor = isCrit ? '#ffff00' : '#fff';
       const txtSize = isCrit ? (finalDamage > 30 ? 40 : 28) : (finalDamage > 20 ? 32 : 20);
       this.spawnText({x: target.pos.x + (Math.random()-0.5)*20, y: target.pos.y - 20}, Math.floor(finalDamage).toString() + (isCrit ? "!" : ""), txtColor, txtSize);
@@ -403,8 +410,16 @@ export class GameEngine {
           this.score += scoreGain;
           if (this.score >= 50000) achievementManager.track('score_50k', 50000);
           
+          if (isCrit && stats.lifesteal > 0) {
+              const heal = stats.lifesteal;
+              this.player.health = Math.min(this.player.maxHealth, this.player.health + heal);
+              this.spawnText(this.player.pos, `+${heal}`, '#00ff00', 18);
+          }
+
           audioManager.playExplosion();
 
+          // O power-up voando cobre parte da progressão, então a biomassa cai um pouco.
+          const dnaYield = 0.8;
           this.entities.push({
               id: `dna_${Date.now()}`,
               type: EntityType.DNA_FRAGMENT,
@@ -415,7 +430,7 @@ export class GameEngine {
               color: this.colors.DNA,
               damage: 0, active: true,
               drag: 0.05,
-              value: Math.ceil((target.value || 10) * Math.min(3, comboMult)),
+              value: Math.max(1, Math.ceil((target.value || 10) * Math.min(3, comboMult) * dnaYield)),
               isElite: target.isElite
           });
           
@@ -639,6 +654,7 @@ export class GameEngine {
               const angleIdx = ((this.time / 10 * speed) + (e.orbitOffset || 0));
               e.pos.x = this.player.pos.x + getCos(angleIdx) * radius;
               e.pos.y = this.player.pos.y + getSin(angleIdx) * radius;
+              e.damage = stats.damage * 0.5;
           }
       }
   }
@@ -957,6 +973,17 @@ export class GameEngine {
               });
           }
 
+          if (this.allowSerum && this.waveStartDelay <= 0 && !this.isVacuuming && this.waveTimer > 1) {
+              const serumLive = this.entities.some(e => e.type === EntityType.SERUM && e.active);
+              if (!serumLive) {
+                  this.serumClock -= dtSeconds;
+                  if (this.serumClock <= 0) {
+                      this.spawnSerum();
+                      this.serumClock = 46 + Math.random() * 16;
+                  }
+              }
+          }
+
           const enemiesRemaining = this.entities.some(e => e.active && (this.isEnemy(e.type) || e.type === EntityType.BOSS));
           const bossRemaining = this.entities.some(e => e.active && e.type === EntityType.BOSS);
           
@@ -1031,7 +1058,15 @@ export class GameEngine {
       }
     }
 
-    if (this.player.active) {
+      if (this.player.active) {
+      if (this.player.maxHealth !== stats.maxHealth) {
+          this.player.maxHealth = stats.maxHealth;
+          this.player.health = Math.min(this.player.health, this.player.maxHealth);
+      }
+      if (!this.hpMilestoneSent && this.player.maxHealth >= 200) {
+          this.hpMilestoneSent = true;
+          achievementManager.track('max_hp_200', Math.floor(this.player.maxHealth));
+      }
       if (!this.isDashing) {
           const moveScale = this.adrenalineActive ? tick * 1.5 : tick; 
           this.player.vel.x += this.inputVector.x * stats.speed * 0.2 * moveScale; 
@@ -1115,6 +1150,11 @@ export class GameEngine {
     for (let i = this.entities.length - 1; i >= 0; i--) {
       const e = this.entities[i];
       if (!e.active) continue;
+
+      if (e.type === EntityType.SERUM) {
+          this.updateSerum(e, tick);
+          continue;
+      }
 
       if (e.hitFlash && e.hitFlash > 0) e.hitFlash--;
 
@@ -1432,6 +1472,134 @@ export class GameEngine {
   
   private isEnemy(t: EntityType) {
     return t === EntityType.BACTERIA || t === EntityType.VIRUS || t === EntityType.PARASITE || t === EntityType.FUNGI;
+  }
+
+  private spawnSerum() {
+      const intro = !this.serumIntroduced;
+      this.serumIntroduced = true;
+      const y = intro
+          ? this.player.pos.y
+          : 140 + Math.random() * (CANVAS_HEIGHT - 280);
+      this.entities.push({
+          id: `serum_${Date.now()}`,
+          type: EntityType.SERUM,
+          pos: { x: CANVAS_WIDTH + 70, y },
+          vel: { x: 0, y: 0 },
+          radius: 42,
+          health: 1,
+          maxHealth: 1,
+          color: '#ff4ad4',
+          damage: intro ? 18 : 76,
+          active: true,
+          value: y,
+          orbitOffset: Math.random() * Math.PI * 2
+      });
+  }
+
+  private updateSerum(e: Entity, tick: number) {
+      const anchor = e.value || e.pos.y;
+      const amp = e.damage || 0;
+      e.pos.x -= 3.55 * tick;
+      e.pos.y = anchor + Math.sin(this.time / 240 + (e.orbitOffset || 0)) * amp;
+
+      if (!this.isLowQuality && Math.random() < 0.7) {
+          this.particles.push({
+              id: 'spark',
+              type: EntityType.PARTICLE,
+              pos: { x: e.pos.x + 18, y: e.pos.y },
+              vel: { x: 1.5 + Math.random() * 2, y: (Math.random() - 0.5) * 2 },
+              radius: 2 + Math.random() * 2,
+              health: 1, maxHealth: 1,
+              color: Math.random() < 0.5 ? '#ff4ad4' : '#7af7ff',
+              damage: 0, active: true, ttl: 14
+          });
+      }
+
+      if (this.player.active) {
+          const reach = this.player.radius + e.radius;
+          if (distSq(this.player.pos, e.pos) < reach * reach) {
+              e.active = false;
+              this.serumReady = true;
+              audioManager.playPowerUp();
+              return;
+          }
+      }
+      if (e.pos.x < -140) e.active = false;
+  }
+
+  private drawSerum(e: Entity) {
+      const pulse = 0.86 + 0.14 * Math.sin(this.time / 90);
+      const R = e.radius * pulse;
+      const x = e.pos.x;
+      const y = e.pos.y;
+
+      this.ctx.save();
+      this.ctx.translate(x, y);
+      this.ctx.globalCompositeOperation = 'screen';
+      this.drawGlow('#ff3df2', R * 3.3, 0.7, 0.22, 0.02);
+      this.drawGlow('#3df6ff', R * 2.15, 0.85, null, 0.08);
+      this.ctx.globalCompositeOperation = 'source-over';
+
+      this.ctx.save();
+      this.ctx.rotate(this.time / 680);
+      this.ctx.beginPath();
+      const spikes = 12;
+      for (let i = 0; i < spikes; i++) {
+          const a = (i / spikes) * Math.PI * 2;
+          const rad = i % 2 === 0 ? R * 1.72 : R * 0.92;
+          const px = Math.cos(a) * rad;
+          const py = Math.sin(a) * rad;
+          if (i === 0) this.ctx.moveTo(px, py);
+          else this.ctx.lineTo(px, py);
+      }
+      this.ctx.closePath();
+      const burst = this.ctx.createLinearGradient(-R, -R, R, R);
+      burst.addColorStop(0, '#7af7ff');
+      burst.addColorStop(0.5, '#ffffff');
+      burst.addColorStop(1, '#ff4ad4');
+      this.ctx.fillStyle = burst;
+      this.ctx.strokeStyle = '#1a0614';
+      this.ctx.lineWidth = 4;
+      this.ctx.fill();
+      this.ctx.stroke();
+      this.ctx.restore();
+
+      this.ctx.beginPath();
+      this.ctx.arc(0, 0, R * 0.72, 0, Math.PI * 2);
+      const grad = this.ctx.createRadialGradient(-R * 0.2, -R * 0.28, R * 0.08, 0, 0, R * 0.72);
+      grad.addColorStop(0, '#fff7fd');
+      grad.addColorStop(0.42, '#ff4ad4');
+      grad.addColorStop(1, '#5b16e0');
+      this.ctx.fillStyle = grad;
+      this.ctx.fill();
+      this.ctx.lineWidth = 5;
+      this.ctx.strokeStyle = '#ffffff';
+      this.ctx.stroke();
+
+      this.ctx.fillStyle = '#ffffff';
+      const arm = R * 0.42;
+      const thick = R * 0.15;
+      this.ctx.fillRect(-thick, -arm, thick * 2, arm * 2);
+      this.ctx.fillRect(-arm, -thick, arm * 2, thick * 2);
+      this.ctx.restore();
+
+      const tag = this.t('SERUM_TAG');
+      this.ctx.save();
+      this.ctx.font = '900 28px sans-serif';
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      const plateW = this.ctx.measureText(tag).width + 36;
+      const ly = y - e.radius * 2.45;
+      this.ctx.fillStyle = 'rgba(12, 0, 18, 0.88)';
+      this.ctx.strokeStyle = '#ff4ad4';
+      this.ctx.lineWidth = 3;
+      this.ctx.beginPath();
+      this.ctx.rect(x - plateW / 2, ly - 20, plateW, 40);
+      this.ctx.fill();
+      this.ctx.stroke();
+      this.ctx.fillStyle = '#ffffff';
+      this.ctx.fillText(tag, x, ly);
+      this.ctx.restore();
   }
 
   private findTarget(): Entity | null {
@@ -2028,6 +2196,10 @@ export class GameEngine {
       }
       this.ctx.globalAlpha = 1.0;
     }
+
+    this.entities.forEach(e => {
+      if (e.type === EntityType.SERUM && e.active) this.drawSerum(e);
+    });
 
     this.entities.forEach(e => {
       if (e.type === EntityType.TEXT_POPUP) {
