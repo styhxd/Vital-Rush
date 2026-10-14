@@ -200,7 +200,7 @@ export const Game: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [isPortrait, setIsPortrait] = useState(false);
   const [isLowPerfMode, setIsLowPerfMode] = useState(false); 
-  const [forceHighQuality, setForceHighQuality] = useState(false); // NEW: Force High Quality State
+  const [forceHighQuality, setForceHighQuality] = useState(true);
 
   const [patient, setPatient] = useState<PatientProfile | null>(null);
   const [audioSettings, setAudioSettings] = useState(audioManager.settings);

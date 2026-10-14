@@ -81,50 +81,106 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     0%, 100% { transform: scale(1, 1) translateY(0); }
                     50% { transform: scale(1.02, 0.98) translateY(5px); }
                 }
-                @keyframes virus-float {
-                    0%, 100% { transform: translate3d(0, 0, 0) rotate(-4deg); }
-                    50% { transform: translate3d(18px, -54px, 0) rotate(8deg); }
+                @keyframes vital-arrive {
+                    from { opacity: 0; transform: translateY(8%); }
+                    to { opacity: 1; transform: translateY(0); }
                 }
-                @keyframes virus-float-wide {
-                    0%, 100% { transform: translate3d(0, 0, 0) rotate(5deg); }
-                    50% { transform: translate3d(-24px, -46px, 0) rotate(-7deg); }
+                @keyframes bg-arrive {
+                    from { opacity: 0; transform: scale(1.05); }
+                    to { opacity: 1; transform: scale(1); }
                 }
-                @keyframes virus-orbit {
-                    from { transform: rotate(0deg) translateX(clamp(100px, 13vw, 190px)) rotate(0deg); }
-                    to { transform: rotate(360deg) translateX(clamp(100px, 13vw, 190px)) rotate(-360deg); }
+                @keyframes menu-arrive {
+                    from { opacity: 0; transform: translateX(-28px); }
+                    to { opacity: 1; transform: translateX(0); }
+                }
+                @keyframes virus-arrive {
+                    from { opacity: 0; transform: scale(0.7); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+                @keyframes virus-route {
+                    0%, 16%  { left: 44%; top: 7%; }
+                    25%, 41% { left: 87%; top: 15%; }
+                    50%, 66% { left: 92%; top: 84%; }
+                    75%, 91% { left: 44%; top: 88%; }
+                    100%     { left: 47%; top: 8%; }
+                }
+                @keyframes virus-depth {
+                    0%, 43% { z-index: 24; }
+                    43.01%, 48% { z-index: 15; }
+                    48.01%, 68% { z-index: 24; }
+                    68.01%, 74% { z-index: 15; }
+                    74.01%, 100% { z-index: 24; }
+                }
+                @keyframes virus-hover-a {
+                    0%, 100% { transform: translate(-50%, -50%) rotate(-6deg); }
+                    50% { transform: translate(-50%, -50%) translate3d(10px, -18px, 0) rotate(8deg); }
+                }
+                @keyframes virus-hover-b {
+                    0%, 100% { transform: translate(-50%, -50%) rotate(7deg); }
+                    50% { transform: translate(-50%, -50%) translate3d(-14px, -16px, 0) rotate(-5deg); }
+                }
+                @keyframes virus-hover-c {
+                    0%, 100% { transform: translate(-50%, -50%) rotate(4deg); }
+                    50% { transform: translate(-50%, -50%) translate3d(12px, -14px, 0) rotate(-8deg); }
+                }
+                @keyframes virus-hover-d {
+                    0%, 100% { transform: translate(-50%, -50%) rotate(-8deg); }
+                    50% { transform: translate(-50%, -50%) translate3d(-8px, -20px, 0) rotate(6deg); }
                 }
                 .anim-vital { animation: vital-breath 4s ease-in-out infinite; }
-                .anim-float-1 { animation: virus-float 5.5s ease-in-out infinite; }
-                .anim-float-2 { animation: virus-float-wide 6.8s ease-in-out infinite; }
-                .anim-orbit { animation: virus-orbit 22s linear infinite; }
+                .vital-arrive { animation: vital-arrive 1.05s cubic-bezier(0.16, 1, 0.3, 1) both; }
+                .bg-arrive { animation: bg-arrive 1.1s cubic-bezier(0.16, 1, 0.3, 1) both; }
+                .menu-arrive { animation: menu-arrive 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.16s both; }
+                .virus-route {
+                    position: absolute;
+                    width: 0;
+                    height: 0;
+                    pointer-events: none;
+                    animation-name: virus-route, virus-depth;
+                    animation-duration: 52s, 52s;
+                    animation-timing-function: cubic-bezier(0.45, 0.02, 0.55, 0.98), step-end;
+                    animation-iteration-count: infinite, infinite;
+                    animation-delay: var(--route-delay), var(--route-delay);
+                }
+                .virus-arrive { animation: virus-arrive 0.9s cubic-bezier(0.16, 1, 0.3, 1) both; }
+                .virus-hover-a { animation: virus-hover-a 5.4s ease-in-out infinite; }
+                .virus-hover-b { animation: virus-hover-b 6.3s ease-in-out infinite; }
+                .virus-hover-c { animation: virus-hover-c 5.8s ease-in-out infinite; }
+                .virus-hover-d { animation: virus-hover-d 6.8s ease-in-out infinite; }
             `}</style>
 
             <div className="absolute inset-0 w-full h-full">
-                    <div className="absolute inset-0 bg-cover bg-center z-0" style={{ backgroundImage: `url(${BACKGROUND})` }} />
-                    <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent z-10 animate-[fadeIn_2s_ease-out]"></div>
+                    <div className="absolute inset-0 bg-cover bg-center z-0 bg-arrive" style={{ backgroundImage: `url(${BACKGROUND})` }} />
+                    <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent z-10 bg-arrive"></div>
 
-                    <div className="absolute inset-0 z-[16] pointer-events-none overflow-hidden">
-                        <div className="absolute top-[6%] left-[28%] lg:left-[36%]">
-                            <img src={VIRUS} alt="" className="w-28 lg:w-52 opacity-90 anim-float-1 drop-shadow-[0_0_28px_rgba(0,255,0,0.55)]" />
-                        </div>
-                        <div className="absolute top-[34%] left-[42%] lg:left-[50%]">
-                            <img src={VIRUS} alt="" className="w-16 lg:w-36 opacity-75 anim-float-2 drop-shadow-[0_0_22px_rgba(0,255,0,0.45)]" />
-                        </div>
-                        <div className="absolute right-[20%] lg:right-[26%] top-[38%] w-0 h-0">
-                            <div className="anim-orbit">
-                                <img src={VIRUS} alt="" className="absolute w-20 lg:w-40 max-w-none -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_0_24px_rgba(0,255,0,0.5)]" />
+                    {([
+                        { size: 'clamp(104px, 24vh, 230px)', delay: '0s', hover: 'virus-hover-a', arrive: '0.2s' },
+                        { size: 'clamp(80px, 18vh, 175px)', delay: '-13s', hover: 'virus-hover-b', arrive: '0.34s' },
+                        { size: 'clamp(72px, 16vh, 155px)', delay: '-26s', hover: 'virus-hover-c', arrive: '0.48s' },
+                        { size: 'clamp(78px, 17vh, 165px)', delay: '-39s', hover: 'virus-hover-d', arrive: '0.4s' },
+                    ] as const).map((virus) => (
+                        <div key={virus.delay} className="virus-route" style={{ ['--route-delay' as string]: virus.delay }}>
+                            <div className="virus-arrive" style={{ animationDelay: virus.arrive }}>
+                                <img
+                                    src={VIRUS}
+                                    alt=""
+                                    style={{ width: virus.size }}
+                                    className={`absolute max-w-none h-auto ${virus.hover} drop-shadow-[0_0_22px_rgba(0,255,0,0.5)]`}
+                                />
                             </div>
                         </div>
-                    </div>
+                    ))}
 
-                    <div className="absolute right-[-5%] lg:right-[5%] bottom-[-5%] h-[70%] lg:h-[90%] z-20 pointer-events-none flex items-end justify-end">
+                    <div className="absolute right-[-5%] lg:right-[5%] bottom-[-5%] h-[70%] lg:h-[90%] z-20 pointer-events-none flex items-end justify-end vital-arrive">
                          <img src={VITAL_HERO} alt="Vital" className="h-full w-auto max-w-none object-contain anim-vital"
                             style={{ filter: isPlatinum ? 'drop-shadow(0 0 30px rgba(255, 215, 0, 0.4))' : 'drop-shadow(0 0 30px rgba(0, 255, 255, 0.3))' }}
                          />
                     </div>
 
                     <div className="absolute left-0 top-0 h-full w-full lg:w-[45%] z-30 flex flex-col justify-center p-4 lg:p-16 scale-90 lg:scale-100 origin-left">
-                        <MenuContent {...props} onStart={handleStartWithFullscreen} align="left" />
+                        <div className="menu-arrive w-full">
+                            <MenuContent {...props} onStart={handleStartWithFullscreen} align="left" />
+                        </div>
                     </div>
                 </div>
         </div>

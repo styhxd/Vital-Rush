@@ -141,11 +141,7 @@ export class GameEngine {
     
     this.player = this.createPlayer(initialStats);
     this.lastInputTime = Date.now();
-    
-    // Default low quality check on start (unless forced later)
-    if (window.innerWidth < 768) {
-        this.isLowQuality = true;
-    }
+    this.forceHighQuality = true;
     
     for(let i=0; i<30; i++) this.spawnBackgroundCell(true);
   }
@@ -1424,6 +1420,37 @@ export class GameEngine {
       this.player.vel.y -= Math.sin(angle) * 0.5;
   }
 
+  private glowSprites = new Map<string, HTMLCanvasElement>();
+
+  private glowSprite(color: string, innerAlpha: number, midAlpha: number | null, innerRatio: number): HTMLCanvasElement {
+      const key = `${color}|${innerAlpha}|${midAlpha ?? 'x'}|${innerRatio}`;
+      const cached = this.glowSprites.get(key);
+      if (cached) return cached;
+
+      const size = 256;
+      const sprite = document.createElement('canvas');
+      sprite.width = size;
+      sprite.height = size;
+      const g = sprite.getContext('2d')!;
+      const c = size / 2;
+      const grad = g.createRadialGradient(c, c, c * innerRatio, c, c, c);
+      grad.addColorStop(0, hexToRgba(color, innerAlpha));
+      if (midAlpha !== null) grad.addColorStop(0.5, hexToRgba(color, midAlpha));
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = grad;
+      g.beginPath();
+      g.arc(c, c, c, 0, Math.PI * 2);
+      g.fill();
+      this.glowSprites.set(key, sprite);
+      return sprite;
+  }
+
+  private drawGlow(color: string, radius: number, innerAlpha: number, midAlpha: number | null, innerRatio: number, x = 0, y = 0) {
+      const sprite = this.glowSprite(color, innerAlpha, midAlpha, innerRatio);
+      const d = radius * 2;
+      this.ctx.drawImage(sprite, x - radius, y - radius, d, d);
+  }
+
   public draw() {
     this.ctx.fillStyle = this.colors.BG;
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -1483,9 +1510,20 @@ export class GameEngine {
 
     if (!this.isLowQuality) {
         this.ctx.globalCompositeOperation = 'screen';
+        this.ctx.globalAlpha = 0.3;
+        this.ctx.fillStyle = this.colors.BLOOD_PARTICLE;
+        this.ctx.beginPath();
+        for (let i = 0; i < this.particles.length; i++) {
+            const p = this.particles[i];
+            if (p.id !== 'bg') continue;
+            this.ctx.moveTo(p.pos.x + p.radius, p.pos.y);
+            this.ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI * 2);
+        }
+        this.ctx.fill();
     }
-    
+
     this.particles.forEach(p => {
+      if (p.id === 'bg' && !this.isLowQuality) return;
       if (p.id === 'mine_expl' || p.id === 'mine_expl_dash') {
           this.ctx.save();
           this.ctx.globalCompositeOperation = 'screen';
@@ -1501,15 +1539,14 @@ export class GameEngine {
               this.ctx.strokeStyle = `rgba(0, 255, 255, ${life/maxLife})`;
               this.ctx.setLineDash([10, 20]);
           } else {
-              // EXPLOSÃO DE MINA: anel vermelho, miolo claro
-              this.ctx.strokeStyle = `rgba(255, 70, 60, ${life/maxLife})`;
+              this.ctx.strokeStyle = `rgba(110, 243, 255, ${life/maxLife})`;
               this.ctx.setLineDash([]);
           }
           this.ctx.stroke();
           this.ctx.setLineDash([]); 
           this.ctx.beginPath();
           this.ctx.arc(p.pos.x, p.pos.y, radius * 0.5 * (1-progress), 0, Math.PI*2);
-          this.ctx.fillStyle = isDashExpl ? `rgba(200, 255, 255, ${life/maxLife})` : `rgba(255, 228, 220, ${life/maxLife})`;
+          this.ctx.fillStyle = isDashExpl ? `rgba(200, 255, 255, ${life/maxLife})` : `rgba(220, 255, 255, ${life/maxLife})`;
           this.ctx.fill();
           this.ctx.restore();
       } else if (p.id === 'ghost') {
@@ -1543,25 +1580,24 @@ export class GameEngine {
     // Pass 1: Glow / Bloom (Screen Blend)
     if (!this.isLowQuality) {
         this.ctx.globalCompositeOperation = 'screen';
-        this.ctx.beginPath();
-        this.ctx.strokeStyle = this.colors.PLAYER_CORE; // Cyan glow
-        this.ctx.lineWidth = 14; 
         this.ctx.lineCap = 'round';
-        this.ctx.globalAlpha = 0.5; // High visibility
-        this.ctx.shadowBlur = 10;
-        this.ctx.shadowColor = this.colors.PLAYER_CORE;
-        
+        this.ctx.strokeStyle = this.colors.PLAYER_CORE;
+        this.ctx.shadowBlur = 0;
+        this.ctx.beginPath();
         this.entities.forEach(e => {
-            if (!e.active) return;
-            if (e.type === EntityType.ANTIBODY) {
-                 this.ctx.moveTo(e.pos.x, e.pos.y);
-                 const tailX = e.pos.x - e.vel.x * 0.8; // Longer trail
-                 const tailY = e.pos.y - e.vel.y * 0.8;
-                 this.ctx.lineTo(tailX, tailY);
-            }
+            if (!e.active || e.type !== EntityType.ANTIBODY) return;
+            this.ctx.moveTo(e.pos.x, e.pos.y);
+            this.ctx.lineTo(e.pos.x - e.vel.x * 0.8, e.pos.y - e.vel.y * 0.8);
         });
+        this.ctx.globalAlpha = 0.1;
+        this.ctx.lineWidth = 34;
         this.ctx.stroke();
-        this.ctx.shadowBlur = 0; 
+        this.ctx.globalAlpha = 0.22;
+        this.ctx.lineWidth = 22;
+        this.ctx.stroke();
+        this.ctx.globalAlpha = 0.5;
+        this.ctx.lineWidth = 14;
+        this.ctx.stroke(); 
     }
     
     // Pass 2: Solid Core (Source Over)
@@ -1663,38 +1699,62 @@ export class GameEngine {
         else if (e.type === EntityType.BIO_MINE) {
             this.ctx.save();
             this.ctx.translate(e.pos.x, e.pos.y);
-            const pulse = 1 + Math.sin(this.time / 40) * 0.1;
-            const mine = this.colors.BIO_MINE;
+            const r = e.radius;
+            const body = (e.hitFlash && e.hitFlash > 0) ? '#ffffff' : this.colors.BIO_MINE;
+            const spark = 0.55 + Math.sin(this.time / 90) * 0.45;
 
             if (!this.isLowQuality) {
                 this.ctx.globalCompositeOperation = 'screen';
-                const grad = this.ctx.createRadialGradient(0, 0, e.radius * 0.2, 0, 0, e.radius * 1.8);
-                grad.addColorStop(0, hexToRgba(mine, 0.55));
+                const grad = this.ctx.createRadialGradient(0, r * 0.1, r * 0.2, 0, r * 0.1, r * 2.1);
+                grad.addColorStop(0, hexToRgba(this.colors.BIO_MINE, 0.5));
                 grad.addColorStop(1, 'rgba(0,0,0,0)');
                 this.ctx.fillStyle = grad;
                 this.ctx.beginPath();
-                this.ctx.arc(0, 0, e.radius * 1.7 * pulse, 0, Math.PI * 2);
+                this.ctx.arc(0, r * 0.1, r * 2, 0, Math.PI * 2);
                 this.ctx.fill();
             }
 
             this.ctx.globalCompositeOperation = 'source-over';
-            this.ctx.fillStyle = '#1c1012';
+            this.ctx.lineCap = 'round';
             this.ctx.beginPath();
-            this.ctx.arc(0, 0, e.radius * 0.92 * pulse, 0, Math.PI * 2);
-            this.ctx.fill();
-            this.ctx.strokeStyle = mine;
-            this.ctx.lineWidth = 3;
+            this.ctx.moveTo(0, -r * 0.5);
+            this.ctx.lineTo(0, -r * 1.35);
+            this.ctx.strokeStyle = '#10282c';
+            this.ctx.lineWidth = Math.max(7, r * 0.34);
+            this.ctx.stroke();
+            this.ctx.strokeStyle = '#f6f1e4';
+            this.ctx.lineWidth = Math.max(3, r * 0.16);
             this.ctx.stroke();
 
-            this.ctx.strokeStyle = '#f4efe6';
-            this.ctx.lineWidth = Math.max(3, e.radius * 0.18);
-            this.ctx.lineCap = 'round';
-            const arm = e.radius * 0.42;
+            const sparkR = r * (0.34 + spark * 0.08);
+            this.ctx.fillStyle = `rgba(255, 214, 80, ${0.7 + spark * 0.3})`;
             this.ctx.beginPath();
-            this.ctx.moveTo(-arm, -arm);
-            this.ctx.lineTo(arm, arm);
-            this.ctx.moveTo(arm, -arm);
-            this.ctx.lineTo(-arm, arm);
+            this.ctx.arc(0, -r * 1.48, sparkR, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.strokeStyle = '#10282c';
+            this.ctx.lineWidth = 2;
+            this.ctx.stroke();
+            this.ctx.fillStyle = '#fffaf0';
+            this.ctx.beginPath();
+            this.ctx.arc(0, -r * 1.48, sparkR * 0.4, 0, Math.PI * 2);
+            this.ctx.fill();
+
+            this.ctx.fillStyle = body;
+            this.ctx.strokeStyle = '#10282c';
+            this.ctx.lineWidth = Math.max(3, r * 0.14);
+            this.ctx.beginPath();
+            this.ctx.arc(0, r * 0.12, r * 0.9, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.stroke();
+
+            this.ctx.strokeStyle = '#ffffff';
+            this.ctx.lineWidth = Math.max(3, r * 0.16);
+            const arm = r * 0.32;
+            this.ctx.beginPath();
+            this.ctx.moveTo(-arm, r * 0.12);
+            this.ctx.lineTo(arm, r * 0.12);
+            this.ctx.moveTo(0, r * 0.12 - arm);
+            this.ctx.lineTo(0, r * 0.12 + arm);
             this.ctx.stroke();
 
             this.ctx.restore();
@@ -1734,26 +1794,18 @@ export class GameEngine {
         const glowColor = e.isElite || e.type === EntityType.BOSS 
             ? (e.type === EntityType.BOSS ? e.color : this.colors.ELITE_GLOW)
             : e.color;
-        if (!this.isLowQuality) {
-            if (glowColor.startsWith('#')) {
-                const glowRadius = e.radius * (e.type === EntityType.BOSS ? 2.5 : 2.0);
-                const grad = this.ctx.createRadialGradient(0, 0, e.radius * 0.2, 0, 0, glowRadius);
-                grad.addColorStop(0, hexToRgba(glowColor, 0.6)); 
-                grad.addColorStop(0.5, hexToRgba(glowColor, 0.2)); 
-                grad.addColorStop(1, 'rgba(0,0,0,0)'); 
-                this.ctx.globalCompositeOperation = 'screen';
-                this.ctx.fillStyle = grad;
-                this.ctx.beginPath();
-                this.ctx.arc(0, 0, glowRadius, 0, Math.PI*2);
-                this.ctx.fill();
-            } else {
-                this.ctx.globalCompositeOperation = 'screen';
-                this.ctx.fillStyle = glowColor;
-                this.ctx.globalAlpha = 0.2;
-                this.ctx.beginPath();
-                this.ctx.arc(0, 0, e.radius * 2, 0, Math.PI*2);
-                this.ctx.fill();
-            }
+        if (!this.isLowQuality && glowColor.startsWith('#')) {
+            const isBoss = e.type === EntityType.BOSS;
+            const glowRadius = e.radius * (isBoss ? 2.5 : 2.0);
+            this.ctx.globalCompositeOperation = 'screen';
+            this.drawGlow(glowColor, glowRadius, 0.6, 0.2, isBoss ? 0.08 : 0.1);
+        } else if (!this.isLowQuality) {
+            this.ctx.globalCompositeOperation = 'screen';
+            this.ctx.fillStyle = glowColor;
+            this.ctx.globalAlpha = 0.2;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, e.radius * 2, 0, Math.PI*2);
+            this.ctx.fill();
         }
         this.ctx.globalCompositeOperation = 'source-over';
         this.ctx.globalAlpha = 1.0;
@@ -1826,15 +1878,18 @@ export class GameEngine {
 
     if (this.player.active) {
       if (!this.isLowQuality) {
-          const glowRadius = (this.isDashing || this.invulnerabilityTimer > 0) ? this.player.radius * 3 : this.player.radius * 2.5;
-          const grad = this.ctx.createRadialGradient(this.player.pos.x, this.player.pos.y, this.player.radius * 0.2, this.player.pos.x, this.player.pos.y, glowRadius);
-          grad.addColorStop(0, hexToRgba(this.colors.PLAYER_CORE, (this.isDashing || this.invulnerabilityTimer > 0) ? 0.8 : 0.6));
-          grad.addColorStop(1, 'rgba(0,0,0,0)');
+          const boosted = this.isDashing || this.invulnerabilityTimer > 0;
+          const glowRadius = this.player.radius * (boosted ? 3 : 2.5);
           this.ctx.globalCompositeOperation = 'screen';
-          this.ctx.fillStyle = grad;
-          this.ctx.beginPath();
-          this.ctx.arc(this.player.pos.x, this.player.pos.y, glowRadius, 0, Math.PI*2);
-          this.ctx.fill();
+          this.drawGlow(
+              this.colors.PLAYER_CORE,
+              glowRadius,
+              boosted ? 0.8 : 0.6,
+              null,
+              boosted ? 0.067 : 0.08,
+              this.player.pos.x,
+              this.player.pos.y
+          );
       }
       this.ctx.globalCompositeOperation = 'source-over';
       this.ctx.globalAlpha = 1.0;

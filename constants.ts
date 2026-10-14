@@ -35,7 +35,7 @@ export const COLORS_DEFAULT: ThemePalette = {
   SURGE: 'rgba(0, 255, 255, 0.3)',
   COMBO: '#ffaa00',
   ORBITAL: '#0088ff',
-  BIO_MINE: '#ff3b30', // VERMELHO DE ALERTA — o corpo da mina é escuro, para não parecer moeda
+  BIO_MINE: '#6ef3ff', // Ciano aliado — bomba útil, longe do dourado da moeda
   ACID_POOL: '#bf00ff' 
 };
 
@@ -57,7 +57,7 @@ export const COLORS_PLATINUM: ThemePalette = {
   SURGE: 'rgba(255, 215, 0, 0.3)', 
   COMBO: '#ffffff',
   ORBITAL: '#ffd700',
-  BIO_MINE: '#ff5c33', // PLATINA: coral, ainda longe do dourado da moeda
+  BIO_MINE: '#d7fff6', // PLATINA: clara, ainda com pavio para não virar moeda
   ACID_POOL: '#7c4dff'
 };
 
