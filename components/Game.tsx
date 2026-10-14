@@ -729,7 +729,7 @@ export const Game: React.FC = () => {
         className={`select-none ${isPlatinum ? 'bg-[#0a0a1a]' : 'bg-[#0f0505]'} ${isLowPerfMode ? 'perf-mode-low' : ''}`} 
         style={{...containerStyle, fontFamily: 'var(--font-tech)'}}
     >
-      <canvas ref={canvasRef} className="block w-full h-full object-contain" />
+      <canvas ref={canvasRef} className="relative z-[1] block w-full h-full object-contain" />
       
       {/* CSS Injection for Dynamic Keyframes */}
       <style>{`

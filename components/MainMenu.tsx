@@ -102,8 +102,8 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
         <div className={`absolute inset-0 bg-black flex items-center justify-center z-50 overflow-hidden ${present.phase === 'out' ? 'screen-out' : ''}`}>
             <style>{`
                 @keyframes vital-breath {
-                    0%, 100% { transform: translateY(0) scale(1); }
-                    50% { transform: translateY(3px) scale(1.012); }
+                    0%, 100% { transform: scale(1) translateY(0); }
+                    50% { transform: scale(1.012) translateY(2px); }
                 }
                 @keyframes vital-arrive {
                     from { opacity: 0; transform: translate3d(34%, 10%, 0); }
@@ -163,7 +163,7 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     0%, 100% { transform: translate(-50%, -50%) rotate(-8deg); }
                     50% { transform: translate(-50%, -50%) translate3d(-8px, -20px, 0) rotate(6deg); }
                 }
-                .anim-vital { animation: vital-breath 6.5s cubic-bezier(0.37, 0, 0.63, 1) infinite; }
+                .anim-vital { animation: vital-breath 8s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
                 .vital-arrive { animation: vital-arrive 1.25s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both; }
                 .bg-arrive { animation: bg-arrive 1.2s cubic-bezier(0.16, 1, 0.3, 1) both; }
                 .menu-arrive { animation: menu-arrive 0.95s cubic-bezier(0.16, 1, 0.3, 1) 0.22s both; }
