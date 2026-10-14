@@ -6,9 +6,10 @@ import { audioManager } from '../services/audioManager';
 import { IntroSequence } from './IntroSequence';
 
 // --- ASSETS CONFIGURATION ---
+const VITAL_HERO = new URL('../src/assets/vital.png', import.meta.url).href;
+
 const ASSETS = {
     BG: "https://drive.google.com/file/d/1i4NAyU7cvCCdQP-P0PPFlYWiOxtzu2lG/view?usp=sharing",
-    HERO: "https://drive.google.com/file/d/1_8HXUSoXuVXtjb33hb_uRZ1hvOn7VItc/view?usp=sharing",
     VIRUS: "https://drive.google.com/file/d/187XZfpHZ1eTC50lflWK_wD6z20AFLUUt/view?usp=sharing"
 };
 
@@ -57,7 +58,6 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
     const [graphicMode, setGraphicMode] = useState(false);
     
     const [resolvedBg, setResolvedBg] = useState<string | null>(null);
-    const [resolvedHero, setResolvedHero] = useState<string | null>(null);
     const [resolvedVirus, setResolvedVirus] = useState<string | null>(null);
 
     // --- ASSET LOADING LOGIC ---
@@ -108,8 +108,7 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
             .then(url => {
                 if (!isMounted) return;
                 setResolvedBg(url);
-                setGraphicMode(true); 
-                resolveUrl(ASSETS.HERO, "Hero").then(u => isMounted && setResolvedHero(u)).catch(() => {});
+                setGraphicMode(true);
                 resolveUrl(ASSETS.VIRUS, "Virus").then(u => isMounted && setResolvedVirus(u)).catch(() => {});
             })
             .catch(() => {
@@ -199,13 +198,11 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                         </div>
                     )}
 
-                    {resolvedHero && (
-                        <div className="absolute right-[-5%] lg:right-[5%] bottom-[-5%] h-[70%] lg:h-[90%] z-20 pointer-events-none flex items-end justify-end entry-hero">
-                             <img src={resolvedHero} referrerPolicy="no-referrer" alt="Vital Hero" className="h-full object-contain anim-vital"
-                                style={{ filter: isPlatinum ? 'drop-shadow(0 0 30px rgba(255, 215, 0, 0.4))' : 'drop-shadow(0 0 30px rgba(0, 255, 255, 0.3))' }}
-                             />
-                        </div>
-                    )}
+                    <div className="absolute right-[-5%] lg:right-[5%] bottom-[-5%] h-[70%] lg:h-[90%] z-20 pointer-events-none flex items-end justify-end entry-hero">
+                         <img src={VITAL_HERO} alt="Vital" className="h-full object-contain anim-vital"
+                            style={{ filter: isPlatinum ? 'drop-shadow(0 0 30px rgba(255, 215, 0, 0.4))' : 'drop-shadow(0 0 30px rgba(0, 255, 255, 0.3))' }}
+                         />
+                    </div>
 
                     <div className="absolute left-0 top-0 h-full w-full lg:w-[45%] z-30 flex flex-col justify-center p-4 lg:p-16 scale-90 lg:scale-100 origin-left entry-menu">
                         <MenuContent {...props} onStart={handleStartWithFullscreen} align="left" />
@@ -258,12 +255,12 @@ const MenuContent = (props: MainMenuProps & { align: 'left' | 'center' }) => {
             <div className={`space-y-1.5 lg:space-y-4 w-full ${isLeft ? 'max-w-md' : ''}`}>
                 <MenuButton onClick={onStart}>{t('START')}</MenuButton>
                 <div className="grid grid-cols-2 gap-2 lg:gap-4">
-                  <MenuButton variant="secondary" onClick={onControls}>{t('CONTROLS')}</MenuButton>
-                  <MenuButton variant="secondary" onClick={onManual}>{t('MANUAL')}</MenuButton>
+                  <MenuButton variant="secondary" onClick={onSettings}>{t('MENU_CONFIG')}</MenuButton>
+                  <MenuButton variant="secondary" onClick={onManual}>{t('MENU_EXTRAS')}</MenuButton>
                 </div>
                 <div className="grid grid-cols-2 gap-2 lg:gap-4">
-                  <MenuButton variant="secondary" onClick={onSettings}>{t('SETTINGS')}</MenuButton>
-                  <MenuButton variant="secondary" onClick={onAchievements}>{t('ACHIEVEMENTS')}</MenuButton>
+                  <MenuButton variant="secondary" onClick={onControls}>{t('MENU_INFO')}</MenuButton>
+                  <MenuButton variant="secondary" onClick={onAchievements}>{t('MENU_RANKING')}</MenuButton>
                 </div>
                 
                 <div className={`flex gap-2 lg:gap-2 mt-2 lg:mt-6 ${isLeft ? 'justify-start' : 'justify-center'}`}>
