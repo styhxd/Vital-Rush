@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Difficulty, Language } from '../types';
 import { TEXTS } from '../constants';
 import { audioManager } from '../services/audioManager';
@@ -7,11 +7,8 @@ import { IntroSequence } from './IntroSequence';
 
 // --- ASSETS CONFIGURATION ---
 const VITAL_HERO = new URL('../src/assets/vital.png', import.meta.url).href;
-
-const ASSETS = {
-    BG: "https://drive.google.com/file/d/1i4NAyU7cvCCdQP-P0PPFlYWiOxtzu2lG/view?usp=sharing",
-    VIRUS: "https://drive.google.com/file/d/187XZfpHZ1eTC50lflWK_wD6z20AFLUUt/view?usp=sharing"
-};
+const VIRUS = new URL('../src/assets/virus.png', import.meta.url).href;
+const BACKGROUND = new URL('../src/assets/background.jpg', import.meta.url).href;
 
 const MenuButton = ({ onClick, children, variant = 'primary', selected = false }: any) => {
     const base = "w-full py-2 lg:py-4 font-bold text-[10px] lg:text-xl tracking-widest uppercase clip-path-polygon transition-all hover:scale-105 shadow-[0_0_10px_rgba(0,0,0,0.4)] lg:shadow-[0_0_20px_rgba(0,0,0,0.4)] relative overflow-hidden group";
@@ -55,69 +52,6 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
     const { isVisible, language, isPlatinum } = props;
     
     const [showIntro, setShowIntro] = useState(true);
-    const [graphicMode, setGraphicMode] = useState(false);
-    
-    const [resolvedBg, setResolvedBg] = useState<string | null>(null);
-    const [resolvedVirus, setResolvedVirus] = useState<string | null>(null);
-
-    // --- ASSET LOADING LOGIC ---
-    useEffect(() => {
-        let isMounted = true;
-
-        const getDriveId = (url: string) => {
-            const matchFile = url.match(/\/d\/([a-zA-Z0-9_-]+)/);
-            if (matchFile) return matchFile[1];
-            const matchParam = url.match(/id=([a-zA-Z0-9_-]+)/);
-            if (matchParam) return matchParam[1];
-            return null;
-        };
-
-        const tryLoad = (url: string): Promise<string> => {
-            return new Promise((resolve, reject) => {
-                const img = new Image();
-                img.referrerPolicy = "no-referrer";
-                img.src = url;
-                img.onload = () => resolve(url);
-                img.onerror = () => reject(url);
-            });
-        };
-
-        const resolveUrl = async (rawUrl: string, assetName: string): Promise<string> => {
-            const id = getDriveId(rawUrl);
-            const candidates = [
-                rawUrl, 
-                id ? `https://lh3.googleusercontent.com/d/${id}` : null,
-                id ? `https://drive.google.com/uc?export=view&id=${id}` : null,
-                id ? `https://drive.google.com/thumbnail?id=${id}&sz=w1920` : null,
-                id ? `https://drive.usercontent.google.com/download?id=${id}&export=download` : null
-            ].filter(Boolean) as string[];
-
-            for (let i = 0; i < candidates.length; i++) {
-                try {
-                    const validUrl = await tryLoad(candidates[i]);
-                    return validUrl;
-                } catch (e) {
-                    continue;
-                }
-            }
-            throw new Error(`All strategies failed for ${assetName}`);
-        };
-
-        // Carrega assets em background independente do estado da Intro
-        resolveUrl(ASSETS.BG, "Background")
-            .then(url => {
-                if (!isMounted) return;
-                setResolvedBg(url);
-                setGraphicMode(true);
-                resolveUrl(ASSETS.VIRUS, "Virus").then(u => isMounted && setResolvedVirus(u)).catch(() => {});
-            })
-            .catch(() => {
-                if (!isMounted) return;
-                setGraphicMode(false);
-            });
-
-        return () => { isMounted = false; };
-    }, []);
 
     // FAILSAFE: Trigger Fullscreen on Start
     const handleStartWithFullscreen = () => {
@@ -148,17 +82,25 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     50% { transform: scale(1.02, 0.98) translateY(5px); }
                 }
                 @keyframes virus-float {
-                    0%, 100% { transform: translateY(0) rotate(0deg); }
-                    50% { transform: translateY(-20px) rotate(5deg); }
+                    0%, 100% { transform: translate3d(0, 0, 0) rotate(-4deg); }
+                    50% { transform: translate3d(18px, -54px, 0) rotate(8deg); }
+                }
+                @keyframes virus-float-wide {
+                    0%, 100% { transform: translate3d(0, 0, 0) rotate(5deg); }
+                    50% { transform: translate3d(-24px, -46px, 0) rotate(-7deg); }
+                }
+                @keyframes virus-orbit {
+                    from { transform: rotate(0deg) translateX(clamp(100px, 13vw, 190px)) rotate(0deg); }
+                    to { transform: rotate(360deg) translateX(clamp(100px, 13vw, 190px)) rotate(-360deg); }
                 }
                 @keyframes reveal-vein {
                     0% { opacity: 0; transform: scale(1.2); filter: brightness(0) sepia(1) hue-rotate(-50deg) saturate(5); }
                     40% { opacity: 1; filter: brightness(0.5) sepia(0.5) hue-rotate(-50deg) saturate(3); }
-                    100% { opacity: 1; transform: scale(1); filter: brightness(1) sepia(0) hue-rotate(0) saturate(1); }
+                    100% { opacity: 1; transform: scale(1); filter: none; }
                 }
                 @keyframes hero-arrival {
                     0% { opacity: 0; transform: translate(100px, 100px) scale(0.8); filter: blur(20px) grayscale(1); }
-                    100% { opacity: 1; transform: translate(0, 0) scale(1); filter: blur(0) grayscale(0); }
+                    100% { opacity: 1; transform: translate(0, 0) scale(1); filter: none; }
                 }
                 @keyframes virus-spawn {
                     0% { opacity: 0; transform: scale(0); }
@@ -167,39 +109,38 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                 }
                 @keyframes menu-slide-in {
                     0% { opacity: 0; transform: translateX(-50px); filter: blur(5px); }
-                    100% { opacity: 1; transform: translateX(0); filter: blur(0); }
+                    100% { opacity: 1; transform: translateX(0); filter: none; }
                 }
                 .anim-vital { animation: vital-breath 4s ease-in-out infinite; }
-                .anim-float-1 { animation: virus-float 5s ease-in-out infinite; }
-                .anim-float-2 { animation: virus-float 7s ease-in-out infinite; animation-delay: 1s; }
-                .anim-float-3 { animation: virus-float 6s ease-in-out infinite; animation-delay: 2s; }
+                .anim-float-1 { animation: virus-float 5.5s ease-in-out infinite; }
+                .anim-float-2 { animation: virus-float-wide 6.8s ease-in-out infinite; }
+                .anim-orbit { animation: virus-orbit 22s linear infinite; }
                 .entry-vein { animation: reveal-vein 2s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
                 .entry-hero { animation: hero-arrival 1.5s cubic-bezier(0.16, 1, 0.3, 1) forwards; animation-delay: 0.5s; opacity: 0; }
                 .entry-virus { animation: virus-spawn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; opacity: 0; }
                 .entry-menu { animation: menu-slide-in 1s cubic-bezier(0.22, 1, 0.36, 1) forwards; animation-delay: 0.5s; opacity: 0; }
             `}</style>
 
-            {graphicMode && resolvedBg ? (
-                <div className="absolute inset-0 w-full h-full">
-                    <div className="absolute inset-0 bg-cover bg-center z-0 entry-vein" style={{ backgroundImage: `url(${resolvedBg})` }} />
+            <div className="absolute inset-0 w-full h-full">
+                    <div className="absolute inset-0 bg-cover bg-center z-0 entry-vein" style={{ backgroundImage: `url(${BACKGROUND})` }} />
                     <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent z-10 animate-[fadeIn_2s_ease-out]"></div>
 
-                    {resolvedVirus && (
-                        <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
-                            <div className="absolute top-[20%] right-[30%] entry-virus" style={{ animationDelay: '1.2s' }}>
-                                <img src={resolvedVirus} referrerPolicy="no-referrer" alt="virus" className="w-24 lg:w-48 opacity-80 anim-float-1 drop-shadow-[0_0_15px_rgba(0,255,0,0.5)]" />
-                            </div>
-                            <div className="absolute bottom-[30%] right-[10%] entry-virus" style={{ animationDelay: '1.5s' }}>
-                                <img src={resolvedVirus} referrerPolicy="no-referrer" alt="virus" className="w-16 lg:w-32 opacity-60 anim-float-2 drop-shadow-[0_0_15px_rgba(0,255,0,0.5)] blur-[1px]" />
-                            </div>
-                            <div className="absolute top-[10%] right-[10%] entry-virus" style={{ animationDelay: '1.8s' }}>
-                                <img src={resolvedVirus} referrerPolicy="no-referrer" alt="virus" className="w-32 lg:w-64 opacity-40 anim-float-3 drop-shadow-[0_0_15px_rgba(0,255,0,0.5)] blur-[2px]" />
+                    <div className="absolute inset-0 z-[16] pointer-events-none overflow-hidden">
+                        <div className="absolute top-[6%] left-[28%] lg:left-[36%] entry-virus" style={{ animationDelay: '1.1s' }}>
+                            <img src={VIRUS} alt="" className="w-28 lg:w-52 opacity-90 anim-float-1 drop-shadow-[0_0_28px_rgba(0,255,0,0.55)]" />
+                        </div>
+                        <div className="absolute top-[34%] left-[42%] lg:left-[50%] entry-virus" style={{ animationDelay: '1.45s' }}>
+                            <img src={VIRUS} alt="" className="w-16 lg:w-36 opacity-75 anim-float-2 drop-shadow-[0_0_22px_rgba(0,255,0,0.45)]" />
+                        </div>
+                        <div className="absolute right-[20%] lg:right-[26%] top-[38%] w-0 h-0 entry-virus" style={{ animationDelay: '1.2s' }}>
+                            <div className="anim-orbit">
+                                <img src={VIRUS} alt="" className="absolute w-20 lg:w-40 max-w-none -translate-x-1/2 -translate-y-1/2 drop-shadow-[0_0_24px_rgba(0,255,0,0.5)]" />
                             </div>
                         </div>
-                    )}
+                    </div>
 
                     <div className="absolute right-[-5%] lg:right-[5%] bottom-[-5%] h-[70%] lg:h-[90%] z-20 pointer-events-none flex items-end justify-end entry-hero">
-                         <img src={VITAL_HERO} alt="Vital" className="h-full object-contain anim-vital"
+                         <img src={VITAL_HERO} alt="Vital" className="h-full w-auto max-w-none object-contain anim-vital"
                             style={{ filter: isPlatinum ? 'drop-shadow(0 0 30px rgba(255, 215, 0, 0.4))' : 'drop-shadow(0 0 30px rgba(0, 255, 255, 0.3))' }}
                          />
                     </div>
@@ -208,14 +149,6 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                         <MenuContent {...props} onStart={handleStartWithFullscreen} align="left" />
                     </div>
                 </div>
-            ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-                    <div className="relative text-center p-6 lg:p-8 max-w-md lg:max-w-md w-full scale-75 lg:scale-100">
-                        <MenuContent {...props} onStart={handleStartWithFullscreen} align="center" />
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

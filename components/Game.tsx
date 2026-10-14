@@ -12,6 +12,19 @@ import { SettingsMenu } from './SettingsMenu';
 import { LoadoutMenu } from './LoadoutMenu'; 
 import { MainMenu } from './MainMenu';
 
+const systemLanguage = (): Language => {
+  const tags = typeof navigator === 'undefined'
+    ? []
+    : (navigator.languages?.length ? Array.from(navigator.languages) : [navigator.language]);
+  for (const tag of tags) {
+    const base = (tag || '').toLowerCase().split('-')[0];
+    if (base === 'pt') return 'PT';
+    if (base === 'es') return 'ES';
+    if (base === 'en') return 'EN';
+  }
+  return 'EN';
+};
+
 // --- UI COMPONENTS (Versão Compacta - Agora Aumentada para Mobile) ---
 
 const StatBar = ({ value, max, colorClass, label, animate = false }: any) => (
@@ -171,7 +184,7 @@ export const Game: React.FC = () => {
   const [lastGameState, setLastGameState] = useState<GameState>(GameState.MENU);
   
   const [isPaused, setIsPaused] = useState(false);
-  const [language, setLanguage] = useState<Language>('EN');
+  const [language, setLanguage] = useState<Language>(systemLanguage);
   const [difficulty, setDifficulty] = useState<Difficulty>(Difficulty.NORMAL);
   
   const [stats, setStats] = useState<PlayerStats>(INITIAL_STATS);
