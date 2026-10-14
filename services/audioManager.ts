@@ -103,13 +103,17 @@ export class AudioManager {
       }
   }
 
+  private lastFilterFreq = -1;
+
   public setGameState(wave: number, healthRatio: number) {
       this.currentWave = wave;
       if (this.musicFilter && this.ctx) {
           let targetFreq = 22000;
           if (healthRatio < 0.3) {
-              targetFreq = 200 + (healthRatio / 0.3) * 600; 
+              targetFreq = 200 + (healthRatio / 0.3) * 600;
           }
+          if (Math.abs(targetFreq - this.lastFilterFreq) < 25) return;
+          this.lastFilterFreq = targetFreq;
           this.musicFilter.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.5);
       }
   }

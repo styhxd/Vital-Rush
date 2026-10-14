@@ -1,6 +1,7 @@
 import React from 'react';
 import { PlayerStats, Upgrade, Language } from '../types';
 import { TEXTS } from '../constants';
+import { motionClass, useScreenPresence } from './screenPresence';
 
 interface LoadoutMenuProps {
     isVisible: boolean;
@@ -18,13 +19,14 @@ const StatRow = ({label, value}: {label: string, value: string | number}) => (
 );
 
 export const LoadoutMenu: React.FC<LoadoutMenuProps> = ({ isVisible, stats, upgrades, language, onClose }) => {
-    if (!isVisible) return null;
+    const present = useScreenPresence(isVisible);
     const t = (key: string) => TEXTS[language][key] || key;
+    if (!present.alive) return null;
 
     const activeUpgrades = upgrades.filter(u => u.level > 0);
 
     return (
-        <div className="fixed inset-0 z-[120] bg-black/90 flex items-center justify-center screen-in">
+        <div className={`fixed inset-0 z-[120] bg-black/90 flex items-center justify-center ${motionClass(present.phase)}`}>
              {/* Background Grid Decorativo */}
              <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none"></div>
 

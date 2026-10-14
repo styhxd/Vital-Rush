@@ -4,6 +4,7 @@ import { Difficulty, Language } from '../types';
 import { TEXTS } from '../constants';
 import { audioManager } from '../services/audioManager';
 import { IntroSequence } from './IntroSequence';
+import { useScreenPresence } from './screenPresence';
 
 // --- ASSETS CONFIGURATION ---
 const VITAL_HERO = new URL('../src/assets/vital.png', import.meta.url).href;
@@ -52,6 +53,7 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
     const { isVisible, language, isPlatinum } = props;
     
     const [showIntro, setShowIntro] = useState(true);
+    const present = useScreenPresence(isVisible && !showIntro);
 
     useEffect(() => {
         if (showIntro || !isVisible) return;
@@ -94,37 +96,49 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
         return <IntroSequence onComplete={() => setShowIntro(false)} />;
     }
 
-    if (!isVisible) return null;
+    if (!present.alive) return null;
 
     return (
-        <div className="absolute inset-0 bg-black flex items-center justify-center z-50 overflow-hidden">
+        <div className={`absolute inset-0 bg-black flex items-center justify-center z-50 overflow-hidden ${present.phase === 'out' ? 'screen-out' : ''}`}>
             <style>{`
                 @keyframes vital-breath {
                     0%, 100% { transform: scale(1, 1) translateY(0); }
                     50% { transform: scale(1.02, 0.98) translateY(5px); }
                 }
                 @keyframes vital-arrive {
-                    from { opacity: 0; transform: translateY(8%); }
-                    to { opacity: 1; transform: translateY(0); }
+                    from { opacity: 0; transform: translate3d(34%, 10%, 0); }
+                    to { opacity: 1; transform: translate3d(0, 0, 0); }
                 }
                 @keyframes bg-arrive {
-                    from { opacity: 0; transform: scale(1.05); }
+                    from { opacity: 0; transform: scale(1.06); }
                     to { opacity: 1; transform: scale(1); }
                 }
                 @keyframes menu-arrive {
-                    from { opacity: 0; transform: translateX(-28px); }
-                    to { opacity: 1; transform: translateX(0); }
+                    from { opacity: 0; transform: translate3d(-96px, 18px, 0); }
+                    to { opacity: 1; transform: translate3d(0, 0, 0); }
                 }
-                @keyframes virus-arrive {
-                    from { opacity: 0; transform: scale(0.7); }
-                    to { opacity: 1; transform: scale(1); }
+                @keyframes virus-in-top {
+                    from { opacity: 0; transform: translate3d(-8vw, -48vh, 0) rotate(-22deg) scale(0.62); }
+                    to { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+                }
+                @keyframes virus-in-right {
+                    from { opacity: 0; transform: translate3d(42vw, -10vh, 0) rotate(20deg) scale(0.66); }
+                    to { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+                }
+                @keyframes virus-in-bottom {
+                    from { opacity: 0; transform: translate3d(10vw, 46vh, 0) rotate(-16deg) scale(0.7); }
+                    to { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+                }
+                @keyframes virus-in-left {
+                    from { opacity: 0; transform: translate3d(-46vw, 14vh, 0) rotate(18deg) scale(0.64); }
+                    to { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
                 }
                 @keyframes virus-route {
-                    0%, 16%  { left: 44%; top: 7%; }
-                    25%, 41% { left: 87%; top: 15%; }
-                    50%, 66% { left: 92%; top: 84%; }
-                    75%, 91% { left: 44%; top: 88%; }
-                    100%     { left: 44%; top: 7%; }
+                    0%, 16%  { transform: translate3d(44%, 7%, 0); }
+                    25%, 41% { transform: translate3d(87%, 15%, 0); }
+                    50%, 66% { transform: translate3d(92%, 84%, 0); }
+                    75%, 91% { transform: translate3d(44%, 88%, 0); }
+                    100%     { transform: translate3d(44%, 7%, 0); }
                 }
                 @keyframes virus-depth {
                     0%, 41% { z-index: 24; }
@@ -150,13 +164,15 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     50% { transform: translate(-50%, -50%) translate3d(-8px, -20px, 0) rotate(6deg); }
                 }
                 .anim-vital { animation: vital-breath 4s ease-in-out infinite; }
-                .vital-arrive { animation: vital-arrive 1.05s cubic-bezier(0.16, 1, 0.3, 1) both; }
-                .bg-arrive { animation: bg-arrive 1.1s cubic-bezier(0.16, 1, 0.3, 1) both; }
-                .menu-arrive { animation: menu-arrive 0.85s cubic-bezier(0.16, 1, 0.3, 1) 0.16s both; }
+                .vital-arrive { animation: vital-arrive 1.25s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both; }
+                .bg-arrive { animation: bg-arrive 1.2s cubic-bezier(0.16, 1, 0.3, 1) both; }
+                .menu-arrive { animation: menu-arrive 0.95s cubic-bezier(0.16, 1, 0.3, 1) 0.22s both; }
                 .virus-route {
                     position: absolute;
-                    width: 0;
-                    height: 0;
+                    left: 0;
+                    top: 0;
+                    width: 100%;
+                    height: 100%;
                     pointer-events: none;
                     animation-name: virus-route, virus-depth;
                     animation-duration: 52s, 52s;
@@ -164,7 +180,15 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     animation-iteration-count: infinite, infinite;
                     animation-delay: var(--route-delay), var(--route-delay);
                 }
-                .virus-arrive { animation: virus-arrive 0.9s cubic-bezier(0.16, 1, 0.3, 1) both; }
+                .virus-in-top, .virus-in-right, .virus-in-bottom, .virus-in-left {
+                    animation-duration: 1.08s;
+                    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+                    animation-fill-mode: both;
+                }
+                .virus-in-top { animation-name: virus-in-top; }
+                .virus-in-right { animation-name: virus-in-right; }
+                .virus-in-bottom { animation-name: virus-in-bottom; }
+                .virus-in-left { animation-name: virus-in-left; }
                 .virus-hover-a { animation: virus-hover-a 5.4s ease-in-out infinite; }
                 .virus-hover-b { animation: virus-hover-b 6.3s ease-in-out infinite; }
                 .virus-hover-c { animation: virus-hover-c 5.8s ease-in-out infinite; }
@@ -182,18 +206,18 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent z-10 bg-arrive"></div>
 
                     {([
-                        { size: 'clamp(104px, 24vh, 230px)', delay: '0s', hover: 'virus-hover-a', arrive: '0.2s' },
-                        { size: 'clamp(80px, 18vh, 175px)', delay: '-13s', hover: 'virus-hover-b', arrive: '0.34s' },
-                        { size: 'clamp(72px, 16vh, 155px)', delay: '-26s', hover: 'virus-hover-c', arrive: '0.48s' },
-                        { size: 'clamp(78px, 17vh, 165px)', delay: '-39s', hover: 'virus-hover-d', arrive: '0.4s' },
+                        { size: 'clamp(104px, 24vh, 230px)', delay: '0s', hover: 'virus-hover-a', arrive: 'virus-in-top', arriveDelay: '0.1s' },
+                        { size: 'clamp(80px, 18vh, 175px)', delay: '-13s', hover: 'virus-hover-b', arrive: 'virus-in-right', arriveDelay: '0.24s' },
+                        { size: 'clamp(72px, 16vh, 155px)', delay: '-26s', hover: 'virus-hover-c', arrive: 'virus-in-bottom', arriveDelay: '0.18s' },
+                        { size: 'clamp(78px, 17vh, 165px)', delay: '-39s', hover: 'virus-hover-d', arrive: 'virus-in-left', arriveDelay: '0.34s' },
                     ] as const).map((virus) => (
                         <div key={virus.delay} className="virus-route" style={{ ['--route-delay' as string]: virus.delay }}>
-                            <div className="virus-arrive" style={{ animationDelay: virus.arrive }}>
+                            <div className={virus.arrive} style={{ animationDelay: virus.arriveDelay }}>
                                 <img
                                     src={VIRUS}
                                     alt=""
                                     style={{ width: virus.size }}
-                                    className={`absolute max-w-none h-auto ${virus.hover} drop-shadow-[0_0_22px_rgba(0,255,0,0.5)]`}
+                                    className={`absolute left-0 top-0 max-w-none h-auto ${virus.hover} drop-shadow-[0_0_22px_rgba(0,255,0,0.5)]`}
                                 />
                             </div>
                         </div>

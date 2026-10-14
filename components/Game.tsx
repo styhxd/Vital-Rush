@@ -12,6 +12,7 @@ import { SettingsMenu } from './SettingsMenu';
 import { LoadoutMenu } from './LoadoutMenu'; 
 import { MainMenu } from './MainMenu';
 import { OutcomeChart, PatientChart } from './PatientChart';
+import { motionClass, ScreenPresence } from './screenPresence';
 
 const systemLanguage = (): Language => {
   const tags = typeof navigator === 'undefined'
@@ -467,7 +468,7 @@ export const Game: React.FC = () => {
         return;
     }
 
-    if ((gameState !== GameState.PLAYING && gameState !== GameState.WAVE_CLEARED) || isPaused) {
+    if (gameState !== GameState.PLAYING || isPaused) {
         lastTimeRef.current = time;
         animationFrameRef.current = requestAnimationFrame(loop);
         return;
@@ -477,7 +478,6 @@ export const Game: React.FC = () => {
     lastTimeRef.current = time;
 
     if (engineRef.current) {
-      if (gameState === GameState.PLAYING) {
           engineRef.current.update(
             dt, 
             stats, 
@@ -493,9 +493,8 @@ export const Game: React.FC = () => {
                 setHeartbreakAnim(true);
                 setTimeout(() => setHeartbreakAnim(false), 2500); 
             },
-            handleBossSpawn // New Callback passed to update
+            handleBossSpawn
           );
-      }
       
       engineRef.current.draw();
       
@@ -766,11 +765,23 @@ export const Game: React.FC = () => {
         .anim-break-right { animation: crack-right 1.5s ease-out forwards; animation-delay: 0.5s; }
         .anim-glitch { animation: glitch-text 0.5s steps(5) infinite; }
         .anim-pulse-red { animation: pulse-red 0.5s ease-in-out infinite; }
+        @keyframes heart-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.14); }
+        }
+        .heart-live {
+            color: #ff2d2d;
+            filter: drop-shadow(0 0 6px rgba(255, 40, 40, 0.9));
+            animation: heart-pulse 1.25s ease-in-out infinite;
+        }
+        .heart-gone { color: #4a1518; }
       `}</style>
 
       <div className="vignette"></div>
       <div className="scanlines"></div>
-      <div className="vein-overlay opacity-20" style={{filter: isPlatinum ? 'hue-rotate(240deg)' : 'none'}}></div>
+      <div className="vein-overlay opacity-20" style={isPlatinum ? { filter: 'hue-rotate(240deg)' } : undefined}>
+          <div className="vein-drift"></div>
+      </div>
 
       {heartbreakAnim && (
           <div className="absolute inset-0 flex items-center justify-center z-[150] pointer-events-none overflow-hidden">
@@ -859,17 +870,21 @@ export const Game: React.FC = () => {
                 {/* GLOBAL DASH INDICATOR (NEW) */}
                 <StatBar label="DASH" value={uiData.dashProgress * 100} max={100} colorClass="bg-white/90 shadow-[0_0_10px_white]" animate={uiData.dashReady} />
 
-                <div className="flex gap-1 lg:gap-1 mt-1 lg:mt-2">
-                    {Array.from({length: INITIAL_LIVES}).map((_, i) => (
-                        <div key={i} className={`w-2 h-2 lg:w-4 lg:h-4 rounded-full flex items-center justify-center transition-all duration-500
-                            ${i < uiData.lives 
-                                ? 'bg-red-500 shadow-[0_0_10px_red] border-white/20 border' 
-                                : 'bg-black/50 border border-red-900/50 shadow-none'}`}>
-                            {i < uiData.lives 
-                                ? <span className="text-[5px] lg:text-[8px]">♥</span> 
-                                : <span className="text-[5px] lg:text-[8px] text-red-900 font-bold">X</span>}
-                        </div>
-                    ))}
+                <div className="flex gap-1.5 lg:gap-2 mt-1 lg:mt-2">
+                    {Array.from({length: INITIAL_LIVES}).map((_, i) => {
+                        const alive = i < uiData.lives;
+                        return (
+                            <svg
+                                key={i}
+                                viewBox="0 0 24 22"
+                                aria-hidden
+                                className={`w-4 h-4 lg:w-7 lg:h-7 ${alive ? 'heart-live' : 'heart-gone'}`}
+                                style={alive ? { animationDelay: `${i * 0.18}s` } : undefined}
+                            >
+                                <path fill="currentColor" d="M12 20.5l-1.45-1.32C5.4 14.36 2 11.28 2 7.5 2 4.42 4.42 2 7.5 2c1.74 0 3.41.81 4.5 2.09C13.09 2.81 14.76 2 16.5 2 19.58 2 22 4.42 22 7.5c0 3.78-3.4 6.86-8.55 11.68L12 20.5z" />
+                            </svg>
+                        );
+                    })}
                 </div>
 
                 {uiData.adrenaline && (
@@ -950,7 +965,8 @@ export const Game: React.FC = () => {
         </div>
       )}
       
-      {gameState === GameState.WAVE_CLEARED && (
+      <ScreenPresence show={gameState === GameState.WAVE_CLEARED}>
+        {(phase) => (
         <OutcomeChart
             variant="cleared"
             patient={patient}
@@ -959,10 +975,12 @@ export const Game: React.FC = () => {
             wave={uiData.wave}
             biomass={uiData.biomass}
             score={uiData.score}
-            onPrimary={() => setGameState(GameState.BRIEFING)}
+            onPrimary={deployToWave}
             onSecondary={openShop}
+            motion={phase}
         />
-      )}
+        )}
+      </ScreenPresence>
 
       {/* COMPONENTE MAIN MENU - SUBSTITUIU O BLOCO ANTERIOR */}
       <MainMenu 
@@ -1010,8 +1028,9 @@ export const Game: React.FC = () => {
 
       {/* (RESTANTE DOS MENUS) */}
       
-      {gameState === GameState.ACHIEVEMENTS && (
-          <div className="absolute inset-0 bg-black flex items-center justify-center z-50 screen-in">
+      <ScreenPresence show={gameState === GameState.ACHIEVEMENTS}>
+        {(phase) => (
+          <div className={`absolute inset-0 bg-black flex items-center justify-center z-50 ${motionClass(phase)}`}>
               <div className={`w-full max-w-6xl h-full lg:h-[90%] border p-4 lg:p-8 relative flex flex-col ${isPlatinum ? 'border-amber-500/50 bg-purple-900/10' : 'border-white/10 bg-[#1a0a0a]'}`}>
                   <div className="flex justify-between items-center mb-4 lg:mb-4 border-b border-white/10 pb-2 flex-shrink-0">
                       <h2 className={`text-lg lg:text-4xl font-bold tracking-widest ${isPlatinum ? 'text-amber-400' : 'text-cyan-400'}`}>{t('ACHIEVEMENTS')}</h2>
@@ -1077,10 +1096,12 @@ export const Game: React.FC = () => {
                   </div>
               </div>
           </div>
-      )}
+        )}
+      </ScreenPresence>
 
-      {gameState === GameState.MANUAL && (
-        <div className="absolute inset-0 bg-black flex items-center justify-center z-50 screen-in">
+      <ScreenPresence show={gameState === GameState.MANUAL}>
+        {(phase) => (
+        <div className={`absolute inset-0 bg-black flex items-center justify-center z-50 ${motionClass(phase)}`}>
            <div className="w-full max-w-4xl p-6 lg:p-10 bg-[#1a0a0a] border border-white/10 relative h-[100vh] lg:h-[90vh] flex flex-col">
               <h2 className="text-lg lg:text-3xl text-white font-bold tracking-widest mb-4 lg:mb-4 border-b border-white/10 pb-2 flex justify-between">
                   <span>{t('MANUAL')}</span>
@@ -1125,11 +1146,12 @@ export const Game: React.FC = () => {
               </div>
            </div>
         </div>
-      )}
+        )}
+      </ScreenPresence>
 
-      {/* CONTROLS (Mantido compacto) */}
-      {gameState === GameState.CONTROLS && (
-        <div className="absolute inset-0 bg-black flex items-center justify-center z-[60] screen-in">
+      <ScreenPresence show={gameState === GameState.CONTROLS}>
+        {(phase) => (
+        <div className={`absolute inset-0 bg-black flex items-center justify-center z-[60] ${motionClass(phase)}`}>
            <div className="w-full max-w-3xl p-6 lg:p-8 bg-[#1a0a0a] border border-white/10 relative h-full lg:h-auto overflow-y-auto">
               <h2 className="text-xl lg:text-3xl text-white font-bold tracking-widest mb-4 lg:mb-4 border-b border-white/10 pb-2">{t('CONTROLS')}</h2>
               
@@ -1157,9 +1179,11 @@ export const Game: React.FC = () => {
               <MenuButton variant="secondary" onClick={goBackFromControls}>{t('BACK')}</MenuButton>
            </div>
         </div>
-      )}
+        )}
+      </ScreenPresence>
 
-      {gameState === GameState.BRIEFING && patient && (
+      <ScreenPresence show={gameState === GameState.BRIEFING && !!patient}>
+        {(phase) => patient ? (
          <PatientChart
             patient={patient}
             language={language}
@@ -1168,11 +1192,14 @@ export const Game: React.FC = () => {
             onPlay={deployToWave}
             onLab={openShop}
             onBack={() => setGameState(GameState.MENU)}
+            motion={phase}
          />
-      )}
+        ) : null}
+      </ScreenPresence>
 
-      {gameState === GameState.BIO_LAB && (
-        <div className="absolute inset-0 bg-black/95 flex items-center justify-center z-50 p-4 lg:p-4 screen-in">
+      <ScreenPresence show={gameState === GameState.BIO_LAB}>
+        {(phase) => (
+        <div className={`absolute inset-0 bg-black/95 flex items-center justify-center z-50 p-4 lg:p-4 ${motionClass(phase)}`}>
              <div className="w-full max-w-5xl h-full lg:h-[90%] flex flex-col relative">
                 <div className="flex justify-between items-center mb-4 lg:mb-6 border-b border-white/10 pb-4 lg:pb-4">
                     <h2 className="text-lg lg:text-4xl text-yellow-400 font-bold tracking-widest text-glow">{t('MUTATION')}</h2>
@@ -1219,11 +1246,13 @@ export const Game: React.FC = () => {
                 </button>
              </div>
         </div>
-      )}
+        )}
+      </ScreenPresence>
 
       {/* (LOADOUT, SETTINGS, CREDITS, PAUSED, GAME_OVER) mantidos */}
       
-      {gameState === GameState.GAME_OVER && (
+      <ScreenPresence show={gameState === GameState.GAME_OVER}>
+        {(phase) => (
         <OutcomeChart
             variant="lost"
             patient={patient}
@@ -1233,8 +1262,10 @@ export const Game: React.FC = () => {
             biomass={uiData.biomass}
             score={uiData.score}
             onPrimary={handleStartGame}
+            motion={phase}
         />
-      )}
+        )}
+      </ScreenPresence>
 
       {isMobile && !isPaused && gameState === GameState.PLAYING && <Joystick onMove={handleJoystickMove} />}
       

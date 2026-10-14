@@ -26,7 +26,11 @@ for (let i = 0; i < 360; i++) {
 const getSin = (idx: number) => SIN_TABLE[Math.floor(Math.abs(idx)) % 360];
 const getCos = (idx: number) => COS_TABLE[Math.floor(Math.abs(idx)) % 360];
 
-const distSq = (v1: Vector2, v2: Vector2) => Math.pow(v2.x - v1.x, 2) + Math.pow(v2.y - v1.y, 2);
+const distSq = (v1: Vector2, v2: Vector2) => {
+    const dx = v2.x - v1.x;
+    const dy = v2.y - v1.y;
+    return dx * dx + dy * dy;
+};
 
 const GRID_CELL_SIZE = 150;
 const GRID_COLS = Math.ceil(CANVAS_WIDTH / GRID_CELL_SIZE);
@@ -187,8 +191,12 @@ export class GameEngine {
   }
 
   public spawnText(pos: Vector2, text: string, color: string, fontSize: number = 20) {
-      if (this.isLowQuality && this.entities.filter(e => e.type === EntityType.TEXT_POPUP).length > 3) return;
-      if (this.entities.filter(e => e.type === EntityType.TEXT_POPUP).length > 8) return;
+      let popups = 0;
+      for (let i = 0; i < this.entities.length; i++) {
+          if (this.entities[i].type === EntityType.TEXT_POPUP) popups++;
+      }
+      if (popups > 8) return;
+      if (this.isLowQuality && popups > 3) return;
 
       this.entities.push({
           id: text, 
@@ -631,19 +639,28 @@ export class GameEngine {
       }
   }
 
-  private clearGrid() { this.grid.clear(); }
+  private collisionScratch: Entity[] = [];
+
+  private clearGrid() {
+      for (const cell of this.grid.values()) cell.length = 0;
+  }
   private addToGrid(e: Entity) {
       const col = Math.floor(e.pos.x / GRID_CELL_SIZE);
       const row = Math.floor(e.pos.y / GRID_CELL_SIZE);
       if (col < 0 || col >= GRID_COLS || row < 0 || row >= GRID_ROWS) return;
       const idx = row * GRID_COLS + col;
-      if (!this.grid.has(idx)) this.grid.set(idx, []);
-      this.grid.get(idx)!.push(e);
+      let cell = this.grid.get(idx);
+      if (!cell) {
+          cell = [];
+          this.grid.set(idx, cell);
+      }
+      cell.push(e);
   }
   private getPotentialCollisions(e: Entity): Entity[] {
       const col = Math.floor(e.pos.x / GRID_CELL_SIZE);
       const row = Math.floor(e.pos.y / GRID_CELL_SIZE);
-      const candidates: Entity[] = [];
+      const candidates = this.collisionScratch;
+      candidates.length = 0;
       for (let r = row - 1; r <= row + 1; r++) {
           for (let c = col - 1; c <= col + 1; c++) {
               if (c >= 0 && c < GRID_COLS && r >= 0 && r < GRID_ROWS) {
@@ -654,6 +671,13 @@ export class GameEngine {
           }
       }
       return candidates;
+  }
+  private compactInactive(list: Entity[]) {
+      let write = 0;
+      for (let i = 0; i < list.length; i++) {
+          if (list[i].active) list[write++] = list[i];
+      }
+      list.length = write;
   }
   private killAllEnemies() {
       this.entities.forEach(e => {
@@ -1057,10 +1081,7 @@ export class GameEngine {
     this.clearGrid();
     for (let i = this.entities.length - 1; i >= 0; i--) {
       const e = this.entities[i];
-      if (!e.active) {
-        this.entities.splice(i, 1);
-        continue;
-      }
+      if (!e.active) continue;
 
       if (e.hitFlash && e.hitFlash > 0) e.hitFlash--;
 
@@ -1305,13 +1326,13 @@ export class GameEngine {
       }
     }
 
-    for (let i = this.particles.length - 1; i >= 0; i--) {
+    let particleWrite = 0;
+    for (let i = 0; i < this.particles.length; i++) {
       const p = this.particles[i];
       if (p.id === 'mine_expl' || p.id === 'mine_expl_dash' || p.id === 'system_glitch') {
-          const maxLife = p.id === 'mine_expl' ? 25 : 20; 
-          const life = p.ttl || 0;
           p.ttl = (p.ttl || 0) - 1;
-          if (p.ttl <= 0) this.particles.splice(i, 1);
+          if ((p.ttl || 0) <= 0) continue;
+          this.particles[particleWrite++] = p;
           continue;
       }
       
@@ -1327,9 +1348,11 @@ export class GameEngine {
           p.vel.y *= 0.9;
           
           p.ttl = (p.ttl || 0) - 1;
-          if (p.ttl <= 0) this.particles.splice(i, 1);
+          if ((p.ttl || 0) <= 0) continue;
       }
+      this.particles[particleWrite++] = p;
     }
+    this.particles.length = particleWrite;
     
     const currentMaxParticles = this.isLowQuality ? 30 : 250;
     if (this.particles.length > currentMaxParticles) {
@@ -1348,6 +1371,7 @@ export class GameEngine {
     
     this.shakeIntensity *= 0.9;
     if (this.shakeIntensity < 0.5) this.shakeIntensity = 0;
+    this.compactInactive(this.entities);
   }
 
   private isOutOfBoundsExtended(pos: Vector2) {
@@ -1649,14 +1673,8 @@ export class GameEngine {
         if (!e.active) return;
         if (e.type === EntityType.ORBITAL) {
              if (!this.isLowQuality) {
-                 const grad = this.ctx.createRadialGradient(e.pos.x, e.pos.y, e.radius * 0.2, e.pos.x, e.pos.y, e.radius * 2.0);
-                 grad.addColorStop(0, hexToRgba(this.colors.ORBITAL, 0.6));
-                 grad.addColorStop(1, 'rgba(0,0,0,0)');
                  this.ctx.globalCompositeOperation = 'screen';
-                 this.ctx.fillStyle = grad;
-                 this.ctx.beginPath();
-                 this.ctx.arc(e.pos.x, e.pos.y, e.radius * 2.0, 0, Math.PI*2);
-                 this.ctx.fill();
+                 this.drawGlow(this.colors.ORBITAL, e.radius * 2, 0.6, null, 0.1, e.pos.x, e.pos.y);
              }
              this.ctx.globalCompositeOperation = 'source-over';
              this.ctx.strokeStyle = this.colors.ORBITAL;
@@ -1724,13 +1742,7 @@ export class GameEngine {
 
             if (!this.isLowQuality) {
                 this.ctx.globalCompositeOperation = 'screen';
-                const grad = this.ctx.createRadialGradient(0, r * 0.1, r * 0.2, 0, r * 0.1, r * 2.1);
-                grad.addColorStop(0, hexToRgba(this.colors.BIO_MINE, 0.5));
-                grad.addColorStop(1, 'rgba(0,0,0,0)');
-                this.ctx.fillStyle = grad;
-                this.ctx.beginPath();
-                this.ctx.arc(0, r * 0.1, r * 2, 0, Math.PI * 2);
-                this.ctx.fill();
+                this.drawGlow(this.colors.BIO_MINE, r * 2, 0.5, null, 0.1, 0, r * 0.1);
             }
 
             this.ctx.globalCompositeOperation = 'source-over';
@@ -1808,8 +1820,8 @@ export class GameEngine {
     this.entities.forEach(e => {
       if (!e.active) return;
       if (this.isEnemy(e.type) || e.type === EntityType.BOSS) {
-        this.ctx.save();
         this.ctx.translate(e.pos.x, e.pos.y);
+        let spin = 0;
         const glowColor = e.isElite || e.type === EntityType.BOSS 
             ? (e.type === EntityType.BOSS ? e.color : this.colors.ELITE_GLOW)
             : e.color;
@@ -1848,7 +1860,8 @@ export class GameEngine {
                  this.ctx.globalAlpha = 1.0;
             }
         } else if (e.type === EntityType.BACTERIA) {
-          this.ctx.rotate(this.time / 500);
+          spin = this.time / 500;
+          this.ctx.rotate(spin);
           this.ctx.roundRect(-e.radius, -e.radius/2, e.radius*2, e.radius, 10);
         } else if (e.type === EntityType.FUNGI) { 
            const r = e.radius;
@@ -1862,7 +1875,8 @@ export class GameEngine {
            this.ctx.closePath();
         } else if (e.type === EntityType.VIRUS) { 
             const r = e.radius;
-            this.ctx.rotate(this.time / 900); 
+            spin = this.time / 900;
+            this.ctx.rotate(spin); 
             this.ctx.fillStyle = (e.hitFlash && e.hitFlash > 0) ? '#ffffff' : '#00aa00';
             this.ctx.beginPath();
             this.ctx.arc(0, 0, r, 0, Math.PI*2);
@@ -1891,7 +1905,10 @@ export class GameEngine {
         }
         this.ctx.fill();
         this.ctx.stroke();
-        this.ctx.restore();
+        if (spin) this.ctx.rotate(-spin);
+        this.ctx.translate(-e.pos.x, -e.pos.y);
+        this.ctx.globalAlpha = 1;
+        this.ctx.globalCompositeOperation = 'source-over';
       }
     });
 

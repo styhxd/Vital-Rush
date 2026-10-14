@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { TEXTS } from '../constants';
 import { Language } from '../types';
 import { audioManager } from '../services/audioManager';
+import { motionClass, useScreenPresence } from './screenPresence';
 
 interface SettingsMenuProps {
     isVisible: boolean;
@@ -28,17 +29,11 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
     onToggleHighQuality,
     onClose 
 }) => {
-    // FAILSAFE 1: Verificação lógica de entrada
-    if (!isVisible) return null;
-
+    const present = useScreenPresence(isVisible);
     const t = (key: string) => TEXTS[language][key] || key;
-    
-    // State para o "Hold to Confirm" do reset
-    const [resetStage, setResetStage] = useState(0); 
-    // State para o CRT/Scanlines (lê do body para persistência visual durante a sessão)
+    const [resetStage, setResetStage] = useState(0);
     const [crtEnabled, setCrtEnabled] = useState(!document.body.classList.contains('force-clean-vision'));
 
-    // Efeito para injetar o CSS global que controla as scanlines sem precisar passar props pro Game.tsx
     useEffect(() => {
         const styleId = 'settings-override-style';
         let style = document.getElementById(styleId);
@@ -55,6 +50,8 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
             document.head.appendChild(style);
         }
     }, []);
+
+    if (!present.alive) return null;
 
     const toggleCrt = () => {
         const newState = !crtEnabled;
@@ -118,7 +115,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
 
     return (
         // FAILSAFE 2: Z-Index 110 (Acima do Pause que é 100) e Position Fixed
-        <div className="fixed inset-0 z-[110] bg-black/90 flex items-center justify-center screen-in">
+        <div className={`fixed inset-0 z-[110] bg-black/90 flex items-center justify-center ${motionClass(present.phase)}`}>
             {/* Background Grid Decorativo */}
             <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none"></div>
 

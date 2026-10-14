@@ -10,17 +10,18 @@ const inkOf = (isPlatinum: boolean) => ({
 });
 
 const ChartPaper = ({
-    title, stamp, stampColor, isPlatinum, children
+    title, stamp, stampColor, isPlatinum, motion = 'in', children
 }: {
     title: string;
     stamp: string;
     stampColor?: string;
     isPlatinum: boolean;
+    motion?: 'in' | 'out';
     children: React.ReactNode;
 }) => {
     const { ink, band } = inkOf(isPlatinum);
     return (
-        <div className="absolute inset-0 z-50 flex items-center justify-center p-3 lg:p-8 overflow-hidden screen-in">
+        <div className={`absolute inset-0 z-50 flex items-center justify-center p-3 lg:p-8 overflow-hidden ${motion === 'in' ? 'screen-in' : 'screen-out'}`}>
             <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${BACKGROUND})` }} />
             <div className="absolute inset-0 bg-black/60" />
 
@@ -112,16 +113,17 @@ interface PatientChartProps {
     onPlay: () => void;
     onLab: () => void;
     onBack: () => void;
+    motion?: 'in' | 'out';
 }
 
 export const PatientChart: React.FC<PatientChartProps> = ({
-    patient, language, difficulty, isPlatinum, onPlay, onLab, onBack
+    patient, language, difficulty, isPlatinum, onPlay, onLab, onBack, motion
 }) => {
     const t = (key: string) => TEXTS[language][key] || key;
     const { ink, band } = inkOf(isPlatinum);
 
     return (
-        <ChartPaper title={t('CHART_TITLE')} stamp={t('CHART_STAMP')} isPlatinum={isPlatinum}>
+        <ChartPaper title={t('CHART_TITLE')} stamp={t('CHART_STAMP')} isPlatinum={isPlatinum} motion={motion}>
             <PatientLine patient={patient} language={language} ink={ink} />
 
             <div className="mt-4 lg:mt-5 grid grid-cols-1 lg:grid-cols-3 gap-2 lg:gap-3">
@@ -168,10 +170,11 @@ interface OutcomeChartProps {
     score: number;
     onPrimary: () => void;
     onSecondary?: () => void;
+    motion?: 'in' | 'out';
 }
 
 export const OutcomeChart: React.FC<OutcomeChartProps> = ({
-    variant, patient, language, isPlatinum, wave, biomass, score, onPrimary, onSecondary
+    variant, patient, language, isPlatinum, wave, biomass, score, onPrimary, onSecondary, motion
 }) => {
     const t = (key: string) => TEXTS[language][key] || key;
     const { ink, band } = inkOf(isPlatinum);
@@ -184,6 +187,7 @@ export const OutcomeChart: React.FC<OutcomeChartProps> = ({
             stamp={cleared ? t('CHART_STAMP_OK') : t('CHART_STAMP_LOST')}
             stampColor={stampColor}
             isPlatinum={isPlatinum}
+            motion={motion}
         >
             {patient && <PatientLine patient={patient} language={language} ink={ink} />}
 
