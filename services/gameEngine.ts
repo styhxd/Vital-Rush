@@ -432,7 +432,7 @@ export class GameEngine {
       if (!isEnvironmental) {
           // SURPRESA 1: DANO ADAPTATIVO (Inimigo evolui no contato)
           if (sourceEntity && sourceEntity.active) {
-              sourceEntity.radius *= 1.1;
+              sourceEntity.radius = Math.min(240, sourceEntity.radius * 1.1);
               sourceEntity.damage *= 1.1;
               this.spawnText(sourceEntity.pos, "EVOLVED", sourceEntity.color, 15);
           }
@@ -702,7 +702,7 @@ export class GameEngine {
               this.entities.push({
                   id: `acid_${Date.now()}`, type: EntityType.ACID_POOL,
                   pos: { ...e.pos }, vel: { x: 0, y: 0 }, radius: 80,
-                  health: 1, maxHealth: 1, color: '#bf00ff', damage: 0, active: true, ttl: 6
+                  health: 1, maxHealth: 1, color: this.colors.ACID_POOL, damage: 0, active: true, ttl: 6
               });
               m.acidTimer = 2.0;
           }
@@ -1670,31 +1670,50 @@ export class GameEngine {
              this.ctx.fill();
         }
         else if (e.type === EntityType.ACID_POOL) {
-            this.ctx.fillStyle = this.colors.ACID_POOL;
-            this.ctx.globalAlpha = 0.3 + Math.sin(this.time/200)*0.1;
-            this.ctx.beginPath();
+            this.ctx.save();
+            this.ctx.translate(e.pos.x, e.pos.y);
             const r = e.radius;
-            const segments = 12;
-            for(let i=0; i<=segments; i++) {
-                const angle = (i / segments) * Math.PI * 2;
-                const wobble = Math.sin(this.time/150 + i) * 5;
-                const px = e.pos.x + Math.cos(angle) * (r + wobble);
-                const py = e.pos.y + Math.sin(angle) * (r + wobble);
-                if (i===0) this.ctx.moveTo(px, py);
-                else this.ctx.lineTo(px, py);
-            }
-            this.ctx.closePath();
+            const phase = this.time / 480;
+            const blob = (radius: number) => {
+                this.ctx.beginPath();
+                const n = 20;
+                for (let i = 0; i <= n; i++) {
+                    const a = (i / n) * Math.PI * 2;
+                    const wobble = Math.sin(a * 3 + phase) * radius * 0.14 + Math.cos(a * 5 - phase) * radius * 0.05;
+                    const px = Math.cos(a) * (radius + wobble);
+                    const py = Math.sin(a) * (radius * 0.78 + wobble);
+                    if (i === 0) this.ctx.moveTo(px, py);
+                    else this.ctx.lineTo(px, py);
+                }
+                this.ctx.closePath();
+            };
+            this.ctx.globalAlpha = 0.22;
+            this.ctx.fillStyle = '#6d8c18';
+            blob(r * 1.18);
             this.ctx.fill();
-            this.ctx.strokeStyle = '#ffff00';
-            this.ctx.lineWidth = 2;
-            this.ctx.globalAlpha = 0.6 + Math.sin(this.time/100)*0.4; 
+            this.ctx.globalAlpha = 0.92;
+            this.ctx.fillStyle = '#c6f542';
+            blob(r * 0.9);
+            this.ctx.fill();
+            this.ctx.lineWidth = Math.max(2.5, r * 0.045);
+            this.ctx.strokeStyle = '#243808';
             this.ctx.stroke();
-            this.ctx.globalAlpha = 0.8;
-            this.ctx.font = `${e.radius * 1.6}px var(--font-tech)`; 
-            this.ctx.textAlign = 'center';
-            this.ctx.textBaseline = 'middle';
-            this.ctx.fillText("💀", e.pos.x, e.pos.y);
-            this.ctx.globalAlpha = 1.0;
+            this.ctx.globalAlpha = 0.4;
+            this.ctx.fillStyle = '#f3ffb0';
+            this.ctx.beginPath();
+            this.ctx.ellipse(-r * 0.1, -r * 0.06, r * 0.34, r * 0.16, -0.5, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.globalAlpha = 0.85;
+            this.ctx.fillStyle = '#f7ffd2';
+            for (let i = 0; i < 5; i++) {
+                const bob = (this.time / 900 + i * 0.37) % 1;
+                const bx = Math.cos(i * 2.1) * r * 0.32;
+                const by = Math.sin(i * 1.6) * r * 0.22 - bob * r * 0.12;
+                this.ctx.beginPath();
+                this.ctx.arc(bx, by, Math.max(2, r * (0.03 + (i % 3) * 0.012)), 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+            this.ctx.restore();
         }
         else if (e.type === EntityType.BIO_MINE) {
             this.ctx.save();

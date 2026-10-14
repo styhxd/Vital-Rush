@@ -5,7 +5,7 @@ import { GameEngine } from '../services/gameEngine';
 import { audioManager } from '../services/audioManager';
 import { achievementManager } from '../services/achievementManager';
 import { GameState, PlayerStats, Upgrade, WaveConfig, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
-import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES_FIRST, PATIENT_NAMES_LAST, SYMPTOMS_KEYS, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES } from '../constants';
+import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES, SYMPTOMS_KEYS, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES } from '../constants';
 import { Joystick } from './Joystick';
 import { PauseMenu } from './PauseMenu';
 import { SettingsMenu } from './SettingsMenu';
@@ -392,8 +392,9 @@ export const Game: React.FC = () => {
   }, [gameState]);
 
   const generatePatient = () => {
-      const fName = PATIENT_NAMES_FIRST[Math.floor(Math.random() * PATIENT_NAMES_FIRST.length)];
-      const lName = PATIENT_NAMES_LAST[Math.floor(Math.random() * PATIENT_NAMES_LAST.length)];
+      const book = PATIENT_NAMES[language];
+      const fName = book.first[Math.floor(Math.random() * book.first.length)];
+      const lName = book.last[Math.floor(Math.random() * book.last.length)];
       const symptomKey = SYMPTOMS_KEYS[Math.floor(Math.random() * SYMPTOMS_KEYS.length)];
       const strains = Object.values(ViralStrain);
       const strain = strains[Math.floor(Math.random() * strains.length)];
@@ -1010,7 +1011,7 @@ export const Game: React.FC = () => {
       {/* (RESTANTE DOS MENUS) */}
       
       {gameState === GameState.ACHIEVEMENTS && (
-          <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-black flex items-center justify-center z-50 screen-in">
               <div className={`w-full max-w-6xl h-full lg:h-[90%] border p-4 lg:p-8 relative flex flex-col ${isPlatinum ? 'border-amber-500/50 bg-purple-900/10' : 'border-white/10 bg-[#1a0a0a]'}`}>
                   <div className="flex justify-between items-center mb-4 lg:mb-4 border-b border-white/10 pb-2 flex-shrink-0">
                       <h2 className={`text-lg lg:text-4xl font-bold tracking-widest ${isPlatinum ? 'text-amber-400' : 'text-cyan-400'}`}>{t('ACHIEVEMENTS')}</h2>
@@ -1079,7 +1080,7 @@ export const Game: React.FC = () => {
       )}
 
       {gameState === GameState.MANUAL && (
-        <div className="absolute inset-0 bg-black flex items-center justify-center z-50">
+        <div className="absolute inset-0 bg-black flex items-center justify-center z-50 screen-in">
            <div className="w-full max-w-4xl p-6 lg:p-10 bg-[#1a0a0a] border border-white/10 relative h-[100vh] lg:h-[90vh] flex flex-col">
               <h2 className="text-lg lg:text-3xl text-white font-bold tracking-widest mb-4 lg:mb-4 border-b border-white/10 pb-2 flex justify-between">
                   <span>{t('MANUAL')}</span>
@@ -1128,7 +1129,7 @@ export const Game: React.FC = () => {
 
       {/* CONTROLS (Mantido compacto) */}
       {gameState === GameState.CONTROLS && (
-        <div className="absolute inset-0 bg-black flex items-center justify-center z-[60]">
+        <div className="absolute inset-0 bg-black flex items-center justify-center z-[60] screen-in">
            <div className="w-full max-w-3xl p-6 lg:p-8 bg-[#1a0a0a] border border-white/10 relative h-full lg:h-auto overflow-y-auto">
               <h2 className="text-xl lg:text-3xl text-white font-bold tracking-widest mb-4 lg:mb-4 border-b border-white/10 pb-2">{t('CONTROLS')}</h2>
               
@@ -1171,7 +1172,7 @@ export const Game: React.FC = () => {
       )}
 
       {gameState === GameState.BIO_LAB && (
-        <div className="absolute inset-0 bg-black/95 flex items-center justify-center z-50 p-4 lg:p-4">
+        <div className="absolute inset-0 bg-black/95 flex items-center justify-center z-50 p-4 lg:p-4 screen-in">
              <div className="w-full max-w-5xl h-full lg:h-[90%] flex flex-col relative">
                 <div className="flex justify-between items-center mb-4 lg:mb-6 border-b border-white/10 pb-4 lg:pb-4">
                     <h2 className="text-lg lg:text-4xl text-yellow-400 font-bold tracking-widest text-glow">{t('MUTATION')}</h2>

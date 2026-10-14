@@ -36,7 +36,7 @@ export const COLORS_DEFAULT: ThemePalette = {
   COMBO: '#ffaa00',
   ORBITAL: '#0088ff',
   BIO_MINE: '#6ef3ff', // Ciano aliado — bomba útil, longe do dourado da moeda
-  ACID_POOL: '#bf00ff' 
+  ACID_POOL: '#c6f542' 
 };
 
 export const COLORS_PLATINUM: ThemePalette = {
@@ -58,7 +58,7 @@ export const COLORS_PLATINUM: ThemePalette = {
   COMBO: '#ffffff',
   ORBITAL: '#ffd700',
   BIO_MINE: '#d7fff6', // PLATINA: clara, ainda com pavio para não virar moeda
-  ACID_POOL: '#7c4dff'
+  ACID_POOL: '#d4ff6a'
 };
 
 export const CANVAS_WIDTH = 1920;
@@ -106,8 +106,20 @@ export const DIFFICULTY_MODIFIERS = {
   [Difficulty.APEX]: { hp: 6.0, dmg: 7.0, speed: 1.25, score: 3.0 } 
 };
 
-export const PATIENT_NAMES_FIRST = ["J.", "A.", "M.", "K.", "R.", "S.", "T.", "L.", "C.", "B."];
-export const PATIENT_NAMES_LAST = ["Doe", "Smith", "Neo", "Kovac", "Vane", "Ross", "Cole", "Drake", "Pike", "Ward"];
+export const PATIENT_NAMES: Record<Language, { first: string[]; last: string[] }> = {
+  EN: {
+    first: ["Peregrine", "Marigold", "Thaddeus", "Elowen", "Barnaby", "Ottilie", "Caspian", "Willa", "Harlan", "Cressida", "Algernon", "Juniper"],
+    last: ["Quillworth", "Harrow", "Penhaligon", "Ashcombe", "Voss", "Bellwether", "Nightingale", "Crowe", "Glassford", "Sallow", "Redmayne", "Pembroke"],
+  },
+  PT: {
+    first: ["Francisco", "Aurora", "Heitor", "Cândida", "Eustáquio", "Lígia", "Valdemar", "Iracema", "Anacleto", "Palmira", "Sebastião", "Zulmira"],
+    last: ["Saturno", "Alvarenga", "Pestana", "Quirino", "Lamego", "Bittencourt", "Serafim", "Dourado", "Castanheira", "Vilalobos", "Quintanilha", "Farneze"],
+  },
+  ES: {
+    first: ["Remedios", "Higinio", "Amparo", "Leocadio", "Nicanor", "Socorro", "Edelmira", "Faustino", "Milagros", "Práxedes", "Purificación", "Eustaquio"],
+    last: ["Alcantud", "Quirós", "Sepúlveda", "Cienfuegos", "Montemayor", "Salvatierra", "Herranz", "Villafañe", "Peñafiel", "Argumedo", "Bustamante", "Escalante"],
+  },
+};
 
 export const SYMPTOMS_KEYS = [
   "SYMPTOM_SEPTIC", "SYMPTOM_VIRAL", "SYMPTOM_NECROTIC", "SYMPTOM_CYTOKINE", 

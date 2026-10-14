@@ -21,7 +21,7 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({ isPaused, language, gameSt
     return (
         // FAILSAFE 2: Z-Index 100 absoluto. SettingsMenu terá 110, Loadout 120.
         <div 
-            className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm flex items-center justify-center animate-in fade-in duration-200"
+            className="absolute inset-0 z-[100] bg-black/90 flex items-center justify-center screen-in"
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
         >

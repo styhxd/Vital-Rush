@@ -20,7 +20,7 @@ const ChartPaper = ({
 }) => {
     const { ink, band } = inkOf(isPlatinum);
     return (
-        <div className="absolute inset-0 z-50 flex items-center justify-center p-3 lg:p-8 overflow-hidden">
+        <div className="absolute inset-0 z-50 flex items-center justify-center p-3 lg:p-8 overflow-hidden screen-in">
             <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${BACKGROUND})` }} />
             <div className="absolute inset-0 bg-black/60" />
 

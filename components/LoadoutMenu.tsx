@@ -24,7 +24,7 @@ export const LoadoutMenu: React.FC<LoadoutMenuProps> = ({ isVisible, stats, upgr
     const activeUpgrades = upgrades.filter(u => u.level > 0);
 
     return (
-        <div className="fixed inset-0 z-[120] bg-black/90 backdrop-blur-md flex items-center justify-center animate-in fade-in zoom-in duration-200">
+        <div className="fixed inset-0 z-[120] bg-black/90 flex items-center justify-center screen-in">
              {/* Background Grid Decorativo */}
              <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none"></div>
 

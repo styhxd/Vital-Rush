@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Difficulty, Language } from '../types';
 import { TEXTS } from '../constants';
 import { audioManager } from '../services/audioManager';
@@ -25,7 +25,7 @@ const MenuButton = ({ onClick, children, variant = 'primary', selected = false }
     }
     
     return (
-      <button onClick={onClick} className={`${base} ${colors}`} style={{clipPath: 'polygon(5% 0, 100% 0, 100% 70%, 95% 100%, 0 100%, 0 30%)'}}>
+      <button onClick={onClick} data-menu-hit={variant === 'secondary' ? '' : undefined} className={`${base} ${colors}`} style={{clipPath: 'polygon(5% 0, 100% 0, 100% 70%, 95% 100%, 0 100%, 0 30%)'}}>
         <span className="relative z-10">{children}</span>
         <div className="absolute inset-0 bg-white/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
       </button>
@@ -52,6 +52,28 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
     const { isVisible, language, isPlatinum } = props;
     
     const [showIntro, setShowIntro] = useState(true);
+
+    useEffect(() => {
+        if (showIntro || !isVisible) return;
+        let frame = 0;
+        let last = 0;
+        const tick = (now: number) => {
+            frame = requestAnimationFrame(tick);
+            if (now - last < 90) return;
+            last = now;
+            const viruses = document.querySelectorAll('.virus-route img');
+            const buttons = document.querySelectorAll('[data-menu-hit]');
+            const boxes: DOMRect[] = [];
+            viruses.forEach((el) => boxes.push(el.getBoundingClientRect()));
+            buttons.forEach((btn) => {
+                const b = btn.getBoundingClientRect();
+                const hit = boxes.some((v) => v.left < b.right - 6 && v.right > b.left + 6 && v.top < b.bottom - 6 && v.bottom > b.top + 6);
+                btn.classList.toggle('menu-hit', hit);
+            });
+        };
+        frame = requestAnimationFrame(tick);
+        return () => cancelAnimationFrame(frame);
+    }, [showIntro, isVisible]);
 
     // FAILSAFE: Trigger Fullscreen on Start
     const handleStartWithFullscreen = () => {
@@ -102,14 +124,14 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     25%, 41% { left: 87%; top: 15%; }
                     50%, 66% { left: 92%; top: 84%; }
                     75%, 91% { left: 44%; top: 88%; }
-                    100%     { left: 47%; top: 8%; }
+                    100%     { left: 44%; top: 7%; }
                 }
                 @keyframes virus-depth {
-                    0%, 43% { z-index: 24; }
-                    43.01%, 48% { z-index: 15; }
-                    48.01%, 68% { z-index: 24; }
-                    68.01%, 74% { z-index: 15; }
-                    74.01%, 100% { z-index: 24; }
+                    0%, 41% { z-index: 24; }
+                    41.01%, 50% { z-index: 15; }
+                    50.01%, 66% { z-index: 24; }
+                    66.01%, 75% { z-index: 15; }
+                    75.01%, 100% { z-index: 24; }
                 }
                 @keyframes virus-hover-a {
                     0%, 100% { transform: translate(-50%, -50%) rotate(-6deg); }
@@ -147,6 +169,12 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                 .virus-hover-b { animation: virus-hover-b 6.3s ease-in-out infinite; }
                 .virus-hover-c { animation: virus-hover-c 5.8s ease-in-out infinite; }
                 .virus-hover-d { animation: virus-hover-d 6.8s ease-in-out infinite; }
+                [data-menu-hit] { transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease; }
+                [data-menu-hit].menu-hit {
+                    background-color: rgba(12, 8, 10, 0.94) !important;
+                    border-color: rgba(255, 255, 255, 0.38) !important;
+                    color: #fff !important;
+                }
             `}</style>
 
             <div className="absolute inset-0 w-full h-full">
@@ -212,7 +240,7 @@ const MenuContent = (props: MainMenuProps & { align: 'left' | 'center' }) => {
                 <div className={`text-[10px] lg:text-xs text-gray-500 tracking-widest mb-0.5 lg:mb-2 ${isLeft ? 'text-left' : 'text-center'}`}>{t('DIFFICULTY')}</div>
                 <div className="grid grid-cols-4 gap-1.5 lg:gap-2">
                     {Object.values(Difficulty).map(d => (
-                        <button key={d} onClick={() => onDifficultyChange(d)} className={`text-[9px] lg:text-[10px] font-bold py-1 lg:py-2 border transition-all ${difficulty === d ? 'bg-red-600 text-black border-red-600' : 'bg-transparent text-gray-500 border-gray-800'}`}>
+                        <button key={d} data-menu-hit="" onClick={() => onDifficultyChange(d)} className={`text-[9px] lg:text-[10px] font-bold py-1 lg:py-2 border transition-all ${difficulty === d ? 'bg-red-600 text-black border-red-600' : 'bg-transparent text-gray-500 border-gray-800'}`}>
                             {t(`DIFF_${d}`)}
                         </button>
                     ))}
@@ -232,7 +260,7 @@ const MenuContent = (props: MainMenuProps & { align: 'left' | 'center' }) => {
                 
                 <div className={`flex gap-2 lg:gap-2 mt-2 lg:mt-6 ${isLeft ? 'justify-start' : 'justify-center'}`}>
                     {(['EN', 'PT', 'ES'] as Language[]).map(l => (
-                      <button key={l} onClick={() => onLanguageChange(l)} className={`text-[10px] lg:text-sm font-bold tracking-widest px-3 lg:px-3 py-1 lg:py-2 border-b-2 transition-all flex items-center gap-2 ${language === l ? 'text-white border-red-500 bg-red-900/20' : 'text-gray-600 border-transparent hover:text-gray-400'}`}>
+                      <button key={l} data-menu-hit="" onClick={() => onLanguageChange(l)} className={`text-[10px] lg:text-sm font-bold tracking-widest px-3 lg:px-3 py-1 lg:py-2 border-b-2 transition-all flex items-center gap-2 ${language === l ? 'text-white border-red-500 bg-red-900/20' : 'text-gray-600 border-transparent hover:text-gray-400'}`}>
                         {l}
                       </button>
                     ))}
