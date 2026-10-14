@@ -778,7 +778,7 @@ export const Game: React.FC = () => {
       <div className="vignette"></div>
       <div className="scanlines"></div>
       {gameState !== GameState.MENU && (
-      <div className="vein-overlay opacity-40" style={isPlatinum ? { filter: 'hue-rotate(240deg)' } : undefined}>
+      <div className="vein-overlay opacity-20" style={isPlatinum ? { filter: 'hue-rotate(240deg)' } : undefined}>
           <div className="vein-drift"></div>
           <div className="vein-drift-b"></div>
       </div>

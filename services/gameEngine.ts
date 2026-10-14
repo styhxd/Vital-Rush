@@ -1586,7 +1586,7 @@ export class GameEngine {
 
     if (!this.isLowQuality) {
         this.ctx.globalCompositeOperation = 'source-over';
-        this.ctx.globalAlpha = 0.55;
+        this.ctx.globalAlpha = 0.22;
         this.ctx.fillStyle = '#9a2428';
         for (let i = 0; i < this.particles.length; i++) {
             const p = this.particles[i];
