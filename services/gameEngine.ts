@@ -118,6 +118,10 @@ export class GameEngine {
   
   public invulnerabilityTimer: number = 0;
   private hitStopTimer: number = 0;
+  private acidContact: number = 0;
+  private acidCue: number = 0;
+  private acidDrip: number = 0;
+  private bgGap: number = 0.6;
   private systemGlitchActive: boolean = false; // SURPRESA 2: Disparo falha após levar dano
 
   private clearBufferTimer: number = 0; 
@@ -171,18 +175,18 @@ export class GameEngine {
 
   public spawnBackgroundCell(init: boolean = false) {
       if (this.isLowQuality) return;
-      if (Math.random() > 0.4) return; 
 
       const y = Math.random() * CANVAS_HEIGHT;
-      const x = init ? Math.random() * CANVAS_WIDTH : CANVAS_WIDTH + 50;
-      const size = Math.random() * 4 + 2; 
-      const speed = Math.random() * 2 + 1;
+      const x = init ? Math.random() * CANVAS_WIDTH : CANVAS_WIDTH + 40 + Math.random() * 280;
+      const big = Math.random() < 0.18;
+      const size = big ? 6 + Math.random() * 5 : 1.6 + Math.random() * 3.4;
+      const speed = 0.25 + Math.random() * 2.9;
       
       this.particles.push({
           id: 'bg',
           type: EntityType.PARTICLE,
           pos: { x, y },
-          vel: { x: -speed, y: 0 },
+          vel: { x: -speed, y: Math.random() * Math.PI * 2 },
           radius: size,
           health: 1, maxHealth: 1,
           color: this.colors.BLOOD_PARTICLE,
@@ -361,7 +365,7 @@ export class GameEngine {
           
           if (target.type === EntityType.BOSS) {
               this.sessionStats.bossesKilled++;
-              this.spawnText(target.pos, "BOSS DOWN", '#f00', 50);
+              this.spawnText(target.pos, this.t('MSG_BOSS_DOWN'), '#f00', 50);
               achievementManager.track('boss_1', 1);
               achievementManager.track('boss_10', 1);
               achievementManager.track('boss_50', 1);
@@ -381,7 +385,7 @@ export class GameEngine {
                   vel: { x: 0, y: 0 },
                   radius: 60,
                   health: 1, maxHealth: 1, color: this.colors.ACID_POOL, damage: 0, active: true, 
-                  ttl: 8 
+                  ttl: 8, value: 8
               });
           }
 
@@ -391,7 +395,7 @@ export class GameEngine {
           if (this.comboCount > this.sessionStats.maxCombo) this.sessionStats.maxCombo = this.comboCount;
           
           if (this.comboCount % 10 === 0) {
-              this.spawnText(this.player.pos, `${this.comboCount}X COMBO`, this.colors.COMBO, 30);
+              this.spawnText(this.player.pos, `${this.comboCount}x ${this.t('COMBO')}`, this.colors.COMBO, 30);
           }
 
           const comboMult = 1 + (this.comboCount * 0.1);
@@ -442,7 +446,7 @@ export class GameEngine {
           if (sourceEntity && sourceEntity.active) {
               sourceEntity.radius = Math.min(240, sourceEntity.radius * 1.1);
               sourceEntity.damage *= 1.1;
-              this.spawnText(sourceEntity.pos, "EVOLVED", sourceEntity.color, 15);
+              this.spawnText(sourceEntity.pos, this.t('MSG_GREW'), sourceEntity.color, 15);
           }
 
           // SURPRESA 2: CHOQUE DE SISTEMA
@@ -463,7 +467,7 @@ export class GameEngine {
           }
       }
 
-      audioManager.playHit();
+      if (!isEnvironmental || amount >= 2) audioManager.playHit();
 
       if (this.player.health <= 0) {
           this.handlePlayerDeath(onGameOver, onLifeLost, stats);
@@ -499,7 +503,7 @@ export class GameEngine {
               this.player.health = this.player.maxHealth;
               this.energy = 0; 
               this.invulnerabilityTimer = 3.0;
-              this.spawnText(this.player.pos, "CRITICAL FAILURE", '#ff0000', 50);
+              this.spawnText(this.player.pos, this.t('MSG_CRITICAL'), '#ff0000', 50);
               
               this.screenShake = {x: 40, y: 40}; 
               this.shakeIntensity = 40;
@@ -726,7 +730,7 @@ export class GameEngine {
               this.entities.push({
                   id: `acid_${Date.now()}`, type: EntityType.ACID_POOL,
                   pos: { ...e.pos }, vel: { x: 0, y: 0 }, radius: 80,
-                  health: 1, maxHealth: 1, color: this.colors.ACID_POOL, damage: 0, active: true, ttl: 6
+                  health: 1, maxHealth: 1, color: this.colors.ACID_POOL, damage: 0, active: true, ttl: 6, value: 6
               });
               m.acidTimer = 2.0;
           }
@@ -851,7 +855,7 @@ export class GameEngine {
                     e.active = false;
                     this.sessionStats.mineKills++;
                     achievementManager.track('mine_pop_20', 1);
-                    this.spawnText(e.pos, "OVERLOAD!", '#ffcc00', 45); // UPDATED COLOR
+                    this.spawnText(e.pos, this.t('MSG_BURST'), '#ffcc00', 45);
                     // VARIETY: SOUND CALL FOR MINE EXPLOSION (DASH)
                     audioManager.playMineExplosionDash();
                     audioManager.playSurge(); 
@@ -1064,9 +1068,38 @@ export class GameEngine {
       
       this.entities.forEach(e => {
           if (e.type === EntityType.ACID_POOL && e.active) {
-              if (distSq(this.player.pos, e.pos) < (e.radius + this.player.radius - 10)**2) {
-                  // environmental=true removes knockback/protection logic
+              const full = e.value && e.value > 0 ? e.value : 6;
+              const left = Math.max(0, e.ttl || 0);
+              const grown = 1 - Math.min(1, left / full);
+              const appear = grown < 0.18 ? grown / 0.18 : 1;
+              const hitR = e.radius * (0.28 + 0.72 * appear);
+              if (distSq(this.player.pos, e.pos) < (hitR + this.player.radius - 10)**2) {
                   this.damagePlayer(0.5 * tick, e.pos, onGameOver, onLifeLost, stats, true);
+                  this.acidContact = 0.45;
+                  this.acidDrip += 0.5 * tick;
+                  this.acidCue -= dtSeconds;
+                  if (this.acidCue <= 0) {
+                      this.acidCue = 0.42;
+                      const shown = Math.max(1, Math.round(this.acidDrip));
+                      this.acidDrip = 0;
+                      this.spawnText(
+                          { x: this.player.pos.x, y: this.player.pos.y - 16 },
+                          `${this.t('MSG_ACID')} -${shown}`,
+                          '#e8ff8a',
+                          22
+                      );
+                      audioManager.playHit();
+                      this.shakeIntensity = Math.max(this.shakeIntensity, 14);
+                      const sparks = this.isLowQuality ? 2 : 5;
+                      for (let k = 0; k < sparks; k++) {
+                          const ang = Math.random() * Math.PI * 2;
+                          this.particles.push({
+                              id: 'spark', type: EntityType.PARTICLE, pos: { ...this.player.pos },
+                              vel: { x: Math.cos(ang) * 2.2, y: -1.5 - Math.random() * 2.5 },
+                              radius: 2.5, health: 1, maxHealth: 1, color: '#d4ff6a', damage: 0, active: true, ttl: 16
+                          });
+                      }
+                  }
               }
           } else if (e.type === EntityType.ENEMY_PROJECTILE && e.active) {
               if (distSq(this.player.pos, e.pos) < (e.radius + this.player.radius)**2) {
@@ -1183,7 +1216,7 @@ export class GameEngine {
                    this.sessionStats.mineKills++;
                    achievementManager.track('mine_pop_20', 1);
                    this.shakeIntensity = 25;
-                   this.spawnText(other.pos, "SYSTEM OVERLOAD", '#ffcc00', 55); 
+                   this.spawnText(other.pos, this.t('MSG_BURST'), '#ffcc00', 55); 
                    // VARIETY: SOUND CALL FOR MINE EXPLOSION (SHOT)
                    audioManager.playMineExplosionShot();
                    audioManager.playSurge(); 
@@ -1338,8 +1371,14 @@ export class GameEngine {
       
       if (p.id === 'bg') {
           if (!this.isLowQuality) {
-              p.pos.x += (p.vel.x + this.bloodFlow.x * 2) * tick; 
-              if (p.pos.x < -50) p.pos.x = CANVAS_WIDTH + 50; 
+              const wander = Math.sin(this.time * 0.0011 + p.vel.y) * (0.22 + p.radius * 0.03);
+              p.pos.x += (p.vel.x + this.bloodFlow.x * 0.28) * tick;
+              p.pos.y += wander * tick;
+              if (p.pos.y < -40 || p.pos.y > CANVAS_HEIGHT + 40) p.pos.y = Math.random() * CANVAS_HEIGHT;
+              if (p.pos.x < -80) {
+                  p.pos.x = CANVAS_WIDTH + 60 + Math.random() * 640;
+                  p.pos.y = Math.random() * CANVAS_HEIGHT;
+              }
           }
       } else {
           p.pos.x += (p.vel.x + this.bloodFlow.x) * tick;
@@ -1367,7 +1406,20 @@ export class GameEngine {
         }
     }
     
-    if (!this.isLowQuality && this.particles.length < 30) this.spawnBackgroundCell();
+    if (!this.isLowQuality) {
+        this.bgGap -= dt / 1000;
+        const bgCount = this.particles.reduce((n, p) => n + (p.id === 'bg' ? 1 : 0), 0);
+        if (this.bgGap <= 0 && bgCount < 36) {
+            const cluster = 1 + Math.floor(Math.random() * 3);
+            for (let i = 0; i < cluster; i++) this.spawnBackgroundCell(false);
+            this.bgGap = 0.35 + Math.random() * 1.7;
+        }
+    }
+    if (this.acidContact > 0) this.acidContact -= dt / 1000;
+    else {
+        this.acidDrip = 0;
+        this.acidCue = 0;
+    }
     
     this.shakeIntensity *= 0.9;
     if (this.shakeIntensity < 0.5) this.shakeIntensity = 0;
@@ -1533,17 +1585,17 @@ export class GameEngine {
     }
 
     if (!this.isLowQuality) {
-        this.ctx.globalCompositeOperation = 'screen';
-        this.ctx.globalAlpha = 0.3;
-        this.ctx.fillStyle = this.colors.BLOOD_PARTICLE;
-        this.ctx.beginPath();
+        this.ctx.globalCompositeOperation = 'source-over';
+        this.ctx.globalAlpha = 0.55;
+        this.ctx.fillStyle = '#9a2428';
         for (let i = 0; i < this.particles.length; i++) {
             const p = this.particles[i];
             if (p.id !== 'bg') continue;
-            this.ctx.moveTo(p.pos.x + p.radius, p.pos.y);
-            this.ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI * 2);
+            const squash = 0.45 + ((p.vel.y % 1) + 1) % 1 * 0.35;
+            this.ctx.beginPath();
+            this.ctx.ellipse(p.pos.x, p.pos.y, p.radius * 1.45, Math.max(1.2, p.radius * squash), p.vel.y, 0, Math.PI * 2);
+            this.ctx.fill();
         }
-        this.ctx.fill();
     }
 
     this.particles.forEach(p => {
@@ -1690,7 +1742,14 @@ export class GameEngine {
         else if (e.type === EntityType.ACID_POOL) {
             this.ctx.save();
             this.ctx.translate(e.pos.x, e.pos.y);
-            const r = e.radius;
+            const full = e.value && e.value > 0 ? e.value : 6;
+            const left = Math.max(0, e.ttl || 0);
+            const life = Math.min(1, left / full);
+            const grown = 1 - life;
+            const appear = grown < 0.18 ? grown / 0.18 : 1;
+            const vanish = life < 0.22 ? life / 0.22 : 1;
+            const veil = appear * vanish;
+            const r = e.radius * (0.28 + 0.72 * appear);
             const phase = this.time / 480;
             const blob = (radius: number) => {
                 this.ctx.beginPath();
@@ -1705,23 +1764,23 @@ export class GameEngine {
                 }
                 this.ctx.closePath();
             };
-            this.ctx.globalAlpha = 0.22;
+            this.ctx.globalAlpha = 0.22 * veil;
             this.ctx.fillStyle = '#6d8c18';
             blob(r * 1.18);
             this.ctx.fill();
-            this.ctx.globalAlpha = 0.92;
+            this.ctx.globalAlpha = 0.92 * veil;
             this.ctx.fillStyle = '#c6f542';
             blob(r * 0.9);
             this.ctx.fill();
             this.ctx.lineWidth = Math.max(2.5, r * 0.045);
             this.ctx.strokeStyle = '#243808';
             this.ctx.stroke();
-            this.ctx.globalAlpha = 0.4;
+            this.ctx.globalAlpha = 0.4 * veil;
             this.ctx.fillStyle = '#f3ffb0';
             this.ctx.beginPath();
             this.ctx.ellipse(-r * 0.1, -r * 0.06, r * 0.34, r * 0.16, -0.5, 0, Math.PI * 2);
             this.ctx.fill();
-            this.ctx.globalAlpha = 0.85;
+            this.ctx.globalAlpha = 0.85 * veil;
             this.ctx.fillStyle = '#f7ffd2';
             for (let i = 0; i < 5; i++) {
                 const bob = (this.time / 900 + i * 0.37) % 1;
@@ -1929,7 +1988,10 @@ export class GameEngine {
       }
       this.ctx.globalCompositeOperation = 'source-over';
       this.ctx.globalAlpha = 1.0;
-      this.ctx.fillStyle = this.isDashing || this.invulnerabilityTimer > 0 ? this.colors.PLAYER_CORE : this.colors.PLAYER;
+      const burning = this.acidContact > 0;
+      this.ctx.fillStyle = burning
+          ? (Math.floor(this.time / 70) % 2 === 0 ? '#e8ff8a' : '#ffffff')
+          : (this.isDashing || this.invulnerabilityTimer > 0 ? this.colors.PLAYER_CORE : this.colors.PLAYER);
       if (this.invulnerabilityTimer > 0 && Math.floor(this.time / 100) % 2 === 0) {
           this.ctx.globalAlpha = 0.5;
       }
@@ -1951,6 +2013,20 @@ export class GameEngine {
       this.ctx.beginPath();
       this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius*0.4, 0, Math.PI*2);
       this.ctx.fill();
+      if (burning) {
+          this.ctx.globalAlpha = 0.9;
+          this.ctx.strokeStyle = '#d4ff6a';
+          this.ctx.lineWidth = 4;
+          this.ctx.beginPath();
+          this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius + 12 + Math.sin(this.time / 55) * 4, 0, Math.PI * 2);
+          this.ctx.stroke();
+          this.ctx.globalAlpha = 0.16 + Math.sin(this.time / 50) * 0.06;
+          this.ctx.fillStyle = '#c6f542';
+          this.ctx.fillRect(0, 0, CANVAS_WIDTH, 36);
+          this.ctx.fillRect(0, CANVAS_HEIGHT - 36, CANVAS_WIDTH, 36);
+          this.ctx.fillRect(0, 0, 36, CANVAS_HEIGHT);
+          this.ctx.fillRect(CANVAS_WIDTH - 36, 0, 36, CANVAS_HEIGHT);
+      }
       this.ctx.globalAlpha = 1.0;
     }
 

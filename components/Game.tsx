@@ -109,7 +109,7 @@ const IconTrophy = () => (
 );
 
 // --- TELA DE TUTORIAL (NOVA) ---
-const TutorialOverlay = ({ isMobile }: { isMobile: boolean }) => {
+const TutorialOverlay = ({ isMobile, t }: { isMobile: boolean; t: (key: string) => string }) => {
     return (
         <div className="absolute inset-0 z-40 pointer-events-none flex flex-col items-center justify-center anim-tutorial-fade">
             <style>{`
@@ -134,12 +134,10 @@ const TutorialOverlay = ({ isMobile }: { isMobile: boolean }) => {
                             <span className="text-xl lg:text-2xl font-bold font-mono text-cyan-400">WASD</span>
                         )}
                     </div>
-                    <span className="text-[10px] lg:text-xs tracking-[0.2em] text-cyan-300 font-bold">MOVE</span>
+                    <span className="text-[10px] lg:text-xs tracking-[0.2em] text-cyan-300 font-bold">{t('TUTORIAL_MOVE')}</span>
                 </div>
 
-                {/* DASH - O DESTAQUE */}
                 <div className="flex flex-col items-center gap-3 lg:gap-4 relative">
-                    <div className="absolute inset-0 bg-white/10 blur-xl rounded-full animate-pulse"></div>
                     <div className="w-16 h-16 lg:w-32 lg:h-32 rounded-full border-4 border-white flex items-center justify-center bg-white/10 shadow-[0_0_30px_white] animate-bounce">
                         {isMobile ? (
                             <span className="text-xl lg:text-2xl font-bold text-white">TAP</span>
@@ -148,8 +146,8 @@ const TutorialOverlay = ({ isMobile }: { isMobile: boolean }) => {
                         )}
                     </div>
                     <div className="flex flex-col items-center">
-                        <span className="text-base lg:text-2xl tracking-[0.3em] text-white font-black drop-shadow-[0_0_10px_white]">DASH</span>
-                        <span className="text-[9px] lg:text-xs text-yellow-300 uppercase tracking-widest bg-black/60 px-2 rounded mt-1">Invulnerability</span>
+                        <span className="text-base lg:text-2xl tracking-[0.3em] text-white font-black drop-shadow-[0_0_10px_white]">{t('DASH')}</span>
+                        <span className="text-[9px] lg:text-xs text-yellow-300 uppercase tracking-widest bg-black/60 px-2 rounded mt-1">{t('TUTORIAL_SAFE')}</span>
                     </div>
                 </div>
 
@@ -162,12 +160,12 @@ const TutorialOverlay = ({ isMobile }: { isMobile: boolean }) => {
                             <span className="text-lg lg:text-xl font-bold font-mono text-red-400">SPACE</span>
                         )}
                     </div>
-                    <span className="text-[10px] lg:text-xs tracking-[0.2em] text-red-300 font-bold">SURGE</span>
+                    <span className="text-[10px] lg:text-xs tracking-[0.2em] text-red-300 font-bold">{t('SURGE_READY')}</span>
                 </div>
             </div>
             
             <div className="mt-8 lg:mt-12 text-[10px] lg:text-sm text-white/50 font-mono animate-pulse tracking-widest">
-                SYSTEMS INITIALIZED... GOOD LUCK.
+                {t('TUTORIAL_LUCK')}
             </div>
         </div>
     );
@@ -779,8 +777,9 @@ export const Game: React.FC = () => {
 
       <div className="vignette"></div>
       <div className="scanlines"></div>
-      <div className="vein-overlay opacity-20" style={isPlatinum ? { filter: 'hue-rotate(240deg)' } : undefined}>
+      <div className="vein-overlay opacity-40" style={isPlatinum ? { filter: 'hue-rotate(240deg)' } : undefined}>
           <div className="vein-drift"></div>
+          <div className="vein-drift-b"></div>
       </div>
 
       {heartbreakAnim && (
@@ -797,7 +796,7 @@ export const Game: React.FC = () => {
                       </svg>
                   </div>
                   <div className="absolute inset-0 flex items-center justify-center">
-                      <h1 className="text-4xl md:text-6xl font-black text-red-500 tracking-[1em] anim-glitch opacity-80 mix-blend-overlay">CRITICAL</h1>
+                      <h1 className="text-4xl md:text-6xl font-black text-red-500 tracking-[0.4em] anim-glitch opacity-80 mix-blend-overlay">{t('MSG_CRITICAL')}</h1>
                   </div>
               </div>
               <div className="absolute inset-0 bg-red-900/20 mix-blend-overlay animate-pulse"></div>
@@ -806,19 +805,18 @@ export const Game: React.FC = () => {
 
       {/* TUTORIAL OVERLAY (FANTASMA) */}
       {showTutorial && gameState === GameState.PLAYING && (
-          <TutorialOverlay isMobile={isMobile} />
+          <TutorialOverlay isMobile={isMobile} t={t} />
       )}
 
       {/* BOSS WARNING OVERLAY */}
       {showBossIntro && (
           <div className="absolute inset-0 z-[60] pointer-events-none flex flex-col items-center justify-center anim-pulse-red">
-              <div className="w-full bg-red-600/20 backdrop-blur-sm border-y-8 border-red-600 py-6 md:py-20 flex flex-col items-center justify-center relative overflow-hidden">
-                  <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-30 mix-blend-overlay"></div>
+              <div className="w-full bg-red-600/25 border-y-8 border-red-600 py-6 md:py-20 flex flex-col items-center justify-center relative overflow-hidden">
                   <h1 className="text-3xl lg:text-9xl font-black text-red-500 tracking-[0.2em] anim-glitch drop-shadow-[0_0_20px_red] text-center">
-                      WARNING
+                      {t('BOSS_BANNER')}
                   </h1>
                   <h2 className="text-sm lg:text-4xl text-white font-mono tracking-widest mt-2 lg:mt-4 blink text-center">
-                      BIOLOGICAL THREAT DETECTED
+                      {t('BOSS_SUB')}
                   </h2>
                   <div className="w-[200%] h-2 bg-red-500 absolute top-0 animate-[flow_2s_linear_infinite]"></div>
                   <div className="w-[200%] h-2 bg-red-500 absolute bottom-0 animate-[flow_2s_linear_infinite_reverse]"></div>
@@ -830,7 +828,7 @@ export const Game: React.FC = () => {
       {bossEntity && !showBossIntro && (
           <div className="absolute top-14 lg:top-36 left-1/2 -translate-x-1/2 z-30 w-[60%] lg:w-[50%] flex flex-col items-center pointer-events-none anim-tutorial-fade" style={{animationDuration: '0.5s'}}>
               <div className="flex justify-between w-full text-red-500 font-bold font-mono text-[8px] lg:text-xs mb-1 tracking-[0.3em]">
-                  <span className="anim-glitch">ANOMALY // BOSS</span>
+                  <span className="anim-glitch">{t('BOSS_TAG')}</span>
                   <span>{Math.ceil(bossEntity.hp)}/{bossEntity.max}</span>
               </div>
               <div className="w-full h-2 lg:h-6 bg-black/80 border-2 border-red-900 relative skew-x-[-20deg] overflow-hidden">
@@ -853,7 +851,7 @@ export const Game: React.FC = () => {
                       : 'bg-black/90 border-cyan-500 shadow-[0_0_20px_rgba(0,255,255,0.3)]'}`}>
                   <div className="text-2xl lg:text-4xl animate-bounce">{activeAchievement.icon}</div>
                   <div>
-                      <div className={`text-[10px] lg:text-xs font-bold tracking-widest mb-1 ${isPlatinum ? 'text-amber-400' : 'text-cyan-400'}`}>{t('ACHIEVEMENTS')} UNLOCKED</div>
+                      <div className={`text-[10px] lg:text-xs font-bold tracking-widest mb-1 ${isPlatinum ? 'text-amber-400' : 'text-cyan-400'}`}>{t('UNLOCKED')}</div>
                       <div className="text-sm lg:text-lg font-bold text-white">{t(activeAchievement.titleKey)}</div>
                       <div className="text-[10px] lg:text-xs text-gray-400">{t(activeAchievement.descKey)}</div>
                   </div>
@@ -868,7 +866,7 @@ export const Game: React.FC = () => {
                 <StatBar label={t('INTEGRITY')} value={uiData.health} max={uiData.maxHealth} colorClass={uiData.adrenaline ? "bg-red-600 animate-pulse" : (isPlatinum ? "bg-gradient-to-r from-purple-500 to-amber-400" : "bg-gradient-to-r from-red-600 to-red-400")} />
                 <StatBar label={t('SURGE_READY')} value={uiData.energy} max={uiData.maxEnergy} colorClass={isPlatinum ? "bg-gradient-to-r from-amber-400 to-white" : "bg-gradient-to-r from-cyan-600 to-cyan-400"} animate={true}/>
                 {/* GLOBAL DASH INDICATOR (NEW) */}
-                <StatBar label="DASH" value={uiData.dashProgress * 100} max={100} colorClass="bg-white/90 shadow-[0_0_10px_white]" animate={uiData.dashReady} />
+                <StatBar label={t('DASH')} value={uiData.dashProgress * 100} max={100} colorClass="bg-white/90 shadow-[0_0_10px_white]" animate={uiData.dashReady} />
 
                 <div className="flex gap-1.5 lg:gap-2 mt-1 lg:mt-2">
                     {Array.from({length: INITIAL_LIVES}).map((_, i) => {
@@ -940,7 +938,7 @@ export const Game: React.FC = () => {
                                 : 'border-white/10 bg-black/40 opacity-50'}`}
                      >
                          <div className={`absolute inset-0 bg-white/30 rounded-full transition-all duration-500 ${uiData.dashReady ? 'scale-0' : 'scale-100'}`} style={{clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0% 100%)'}}></div>
-                         <span className="font-bold text-[10px] lg:text-xs">DASH</span>
+                         <span className="font-bold text-[10px] lg:text-xs">{t('DASH')}</span>
                      </button>
 
                      <button 
@@ -957,7 +955,7 @@ export const Game: React.FC = () => {
                                 : 'border-white/10 bg-black/40 grayscale opacity-50'}`}
                      >
                          <div className={`absolute inset-0 rounded-full border border-dashed border-white/20 ${uiData.energy >= uiData.maxEnergy ? 'animate-spin-slow' : ''}`}></div>
-                         <span className={`font-bold text-[10px] lg:text-sm tracking-widest ${uiData.energy >= uiData.maxEnergy ? (isPlatinum ? 'text-amber-200' : 'text-cyan-200') : 'text-white/30'}`}>SURGE</span>
+                         <span className={`font-bold text-[10px] lg:text-sm tracking-widest ${uiData.energy >= uiData.maxEnergy ? (isPlatinum ? 'text-amber-200' : 'text-cyan-200') : 'text-white/30'}`}>{t('SURGE_READY')}</span>
                      </button>
                  </div>
              </div>
@@ -1023,6 +1021,7 @@ export const Game: React.FC = () => {
           stats={stats}
           upgrades={upgrades}
           language={language}
+          isPlatinum={isPlatinum}
           onClose={closeLoadout}
       />
 
@@ -1074,7 +1073,7 @@ export const Game: React.FC = () => {
                                                   
                                                   <div className="flex justify-between text-[8px] lg:text-xs tracking-widest font-mono">
                                                       <span className={progress.unlocked ? 'text-green-400 font-bold' : 'text-gray-600'}>
-                                                          {progress.unlocked ? 'UNLOCKED' : t('ACH_LOCKED')}
+                                                          {progress.unlocked ? t('UNLOCKED') : t('ACH_LOCKED')}
                                                       </span>
                                                       {ach.isCumulative && (
                                                           <span className="text-gray-500">
@@ -1273,9 +1272,10 @@ export const Game: React.FC = () => {
       <PauseMenu 
           isPaused={isPaused} 
           language={language}
-          gameState={gameState} // NEW: Passing game state
+          isPlatinum={isPlatinum}
+          gameState={gameState}
           onResume={togglePause} 
-          onSettings={openSettings} // New Handler
+          onSettings={openSettings}
           onQuit={() => {
               togglePause(); // Unpause logic
               setGameState(GameState.MENU);

@@ -104,12 +104,6 @@
         opacity: 0.3;
       }
 
-      @keyframes pulse {
-        0% { opacity: 0.08; transform: scale(1); }
-        50% { opacity: 0.15; transform: scale(1.02); } 
-        100% { opacity: 0.08; transform: scale(1); }
-      }
-
       @keyframes flow {
         from { background-position: 0 0; }
         to { background-position: -200px 0; } 
@@ -120,32 +114,50 @@
         top: -10%; left: -10%; right: -10%; bottom: -10%;
         width: 120%; height: 120%;
         overflow: hidden;
-        animation: pulse 4s ease-in-out infinite;
         pointer-events: none;
         z-index: 5;
       }
 
-      .vein-drift {
+      .vein-drift,
+      .vein-drift-b {
         position: absolute;
         top: 0;
         left: 0;
-        width: calc(100% + 220px);
-        height: 100%;
-        background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 2.24 5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 2.24 5 5 2.24 5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 2.24 5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23ff0000' fill-opacity='0.15' fill-rule='evenodd'/%3E%3C/svg%3E");
-        animation: vein-drift 3s linear infinite;
+        height: 140%;
+        background-repeat: repeat;
         will-change: transform;
       }
 
-      @keyframes vein-drift {
-        from { transform: translate3d(0, 0, 0); }
-        to { transform: translate3d(-200px, 0, 0); }
+      .vein-drift {
+        width: calc(100% + 720px);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='720' height='380' viewBox='0 0 720 380'%3E%3Cellipse cx='54' cy='48' rx='22' ry='13' fill='%23c4373b' fill-opacity='0.8' transform='rotate(-16 54 48)'/%3E%3Cellipse cx='168' cy='22' rx='7' ry='4' fill='%238c1c22' fill-opacity='0.7' transform='rotate(24 168 22)'/%3E%3Cellipse cx='246' cy='96' rx='28' ry='15' fill='%23a8282e' fill-opacity='0.75' transform='rotate(8 246 96)'/%3E%3Cellipse cx='92' cy='168' rx='11' ry='7' fill='%23e04a46' fill-opacity='0.55' transform='rotate(-40 92 168)'/%3E%3Cellipse cx='330' cy='40' rx='16' ry='9' fill='%23701518' fill-opacity='0.8' transform='rotate(31 330 40)'/%3E%3Cellipse cx='410' cy='150' rx='34' ry='18' fill='%23b43136' fill-opacity='0.7' transform='rotate(-9 410 150)'/%3E%3Cellipse cx='520' cy='28' rx='6' ry='4' fill='%23c4373b' fill-opacity='0.6' transform='rotate(12 520 28)'/%3E%3Cellipse cx='588' cy='118' rx='19' ry='11' fill='%238c1c22' fill-opacity='0.85' transform='rotate(-28 588 118)'/%3E%3Cellipse cx='670' cy='62' rx='13' ry='8' fill='%23e04a46' fill-opacity='0.5' transform='rotate(18 670 62)'/%3E%3Cellipse cx='40' cy='280' rx='26' ry='14' fill='%23a8282e' fill-opacity='0.65' transform='rotate(6 40 280)'/%3E%3Cellipse cx='190' cy='250' rx='9' ry='5' fill='%23701518' fill-opacity='0.75' transform='rotate(-22 190 250)'/%3E%3Cellipse cx='300' cy='310' rx='21' ry='12' fill='%23c4373b' fill-opacity='0.7' transform='rotate(14 300 310)'/%3E%3Cellipse cx='470' cy='270' rx='8' ry='14' fill='%238c1c22' fill-opacity='0.6' transform='rotate(-50 470 270)'/%3E%3Cellipse cx='610' cy='300' rx='30' ry='16' fill='%23b43136' fill-opacity='0.72' transform='rotate(-4 610 300)'/%3E%3Cellipse cx='140' cy='340' rx='5' ry='3' fill='%23e04a46' fill-opacity='0.8' transform='rotate(40 140 340)'/%3E%3C/svg%3E");
+        background-size: 720px 380px;
+        animation: vein-a 28s linear infinite;
       }
 
-      .perf-mode-low .vein-overlay {
+      .vein-drift-b {
+        width: calc(100% + 540px);
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='540' height='460' viewBox='0 0 540 460'%3E%3Cellipse cx='70' cy='90' rx='15' ry='9' fill='%23941f26' fill-opacity='0.7' transform='rotate(22 70 90)'/%3E%3Cellipse cx='210' cy='40' rx='36' ry='19' fill='%23d24a42' fill-opacity='0.45' transform='rotate(-11 210 40)'/%3E%3Cellipse cx='360' cy='130' rx='8' ry='5' fill='%236e1418' fill-opacity='0.85' transform='rotate(48 360 130)'/%3E%3Cellipse cx='480' cy='70' rx='18' ry='11' fill='%23b43136' fill-opacity='0.65' transform='rotate(-30 480 70)'/%3E%3Cellipse cx='30' cy='240' rx='10' ry='6' fill='%23e04a46' fill-opacity='0.5' transform='rotate(8 30 240)'/%3E%3Cellipse cx='160' cy='200' rx='24' ry='13' fill='%238c1c22' fill-opacity='0.7' transform='rotate(-18 160 200)'/%3E%3Cellipse cx='310' cy='280' rx='42' ry='20' fill='%23a8282e' fill-opacity='0.5' transform='rotate(5 310 280)'/%3E%3Cellipse cx='450' cy='220' rx='7' ry='12' fill='%23701518' fill-opacity='0.75' transform='rotate(60 450 220)'/%3E%3Cellipse cx='90' cy='380' rx='20' ry='12' fill='%23c4373b' fill-opacity='0.6' transform='rotate(-8 90 380)'/%3E%3Cellipse cx='250' cy='410' rx='11' ry='7' fill='%23941f26' fill-opacity='0.8' transform='rotate(33 250 410)'/%3E%3Cellipse cx='420' cy='360' rx='28' ry='15' fill='%23d24a42' fill-opacity='0.4' transform='rotate(-14 420 360)'/%3E%3Cellipse cx='510' cy='430' rx='6' ry='4' fill='%236e1418' fill-opacity='0.7' transform='rotate(15 510 430)'/%3E%3C/svg%3E");
+        background-size: 540px 460px;
+        animation: vein-b 19s linear infinite;
+        opacity: 0.9;
+      }
+
+      @keyframes vein-a {
+        from { transform: translate3d(0, 0, 0); }
+        to { transform: translate3d(-720px, 0, 0); }
+      }
+
+      @keyframes vein-b {
+        from { transform: translate3d(-80px, 0, 0); }
+        to { transform: translate3d(-620px, 0, 0); }
+      }
+
+      .perf-mode-low .vein-overlay,
+      .perf-mode-low .vein-drift,
+      .perf-mode-low .vein-drift-b {
           animation: none !important;
-          opacity: 0.15 !important;
           filter: none !important;
-          transform: none !important;
       }
       
       .text-glow {

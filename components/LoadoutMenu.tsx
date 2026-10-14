@@ -8,92 +8,114 @@ interface LoadoutMenuProps {
     stats: PlayerStats;
     upgrades: Upgrade[];
     language: Language;
+    isPlatinum?: boolean;
     onClose: () => void;
 }
 
-const StatRow = ({label, value}: {label: string, value: string | number}) => (
-    <div className="flex justify-between border-b border-white/5 pb-0.5">
-        <span className="text-gray-500">{label}</span>
-        <span className="text-cyan-200">{value}</span>
-    </div>
-);
+const rarityKey: Record<Upgrade['rarity'], string> = {
+    COMMON: 'RARITY_COMMON',
+    RARE: 'RARITY_RARE',
+    EPIC: 'RARITY_EPIC',
+    LEGENDARY: 'RARITY_LEGENDARY',
+};
 
-export const LoadoutMenu: React.FC<LoadoutMenuProps> = ({ isVisible, stats, upgrades, language, onClose }) => {
+export const LoadoutMenu: React.FC<LoadoutMenuProps> = ({ isVisible, stats, upgrades, language, isPlatinum, onClose }) => {
     const present = useScreenPresence(isVisible);
     const t = (key: string) => TEXTS[language][key] || key;
     if (!present.alive) return null;
 
-    const activeUpgrades = upgrades.filter(u => u.level > 0);
+    const ink = isPlatinum ? '#7c4a12' : '#7f1d1d';
+    const band = isPlatinum ? '#b45309' : '#b91c1c';
+    const bought = upgrades.filter(u => u.level > 0);
+
+    const rows: { label: string; value: string }[] = [
+        { label: t('STAT_DAMAGE'), value: stats.damage.toFixed(1) },
+        { label: t('STAT_FIRE'), value: (1000 / stats.fireRate).toFixed(1) },
+        { label: t('STAT_SPEED'), value: stats.speed.toFixed(1) },
+        { label: t('STAT_HP'), value: String(stats.maxHealth) },
+        { label: t('STAT_CRIT'), value: `${Math.round(stats.critChance * 100)}%` },
+        { label: t('STAT_CRIT_MULT'), value: `${stats.critMultiplier.toFixed(1)}x` },
+        { label: t('STAT_SHOTS'), value: String(stats.bulletCount) },
+        { label: t('STAT_MAGNET'), value: String(Math.round(stats.magnetRadius)) },
+        { label: t('STAT_THORNS'), value: stats.thorns.toFixed(1) },
+        { label: t('STAT_ORBITALS'), value: String(stats.orbitals) },
+        { label: t('STAT_ENERGY'), value: String(stats.maxEnergy) },
+    ];
 
     return (
-        <div className={`fixed inset-0 z-[120] bg-black/90 flex items-center justify-center ${motionClass(present.phase)}`}>
-             {/* Background Grid Decorativo */}
-             <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none"></div>
-
-             <div className="w-full max-w-4xl h-[90vh] border-y-2 border-cyan-500 bg-[#050b14] flex flex-col p-4 lg:p-10 relative shadow-[0_0_50px_rgba(0,255,255,0.1)]">
-                {/* Header */}
-                <div className="flex justify-between items-center mb-4 lg:mb-8 border-b border-cyan-800 pb-2 lg:pb-4">
-                    <h2 className="text-2xl lg:text-3xl font-bold text-cyan-400 tracking-[0.3em]">{t('LOADOUT')}</h2>
-                    <div className="text-[10px] lg:text-[10px] text-gray-500 font-mono tracking-widest text-right">
-                        <div>GENOME SEQUENCE</div>
-                        <div>ID: 734-APEX</div>
-                    </div>
+        <div className={`fixed inset-0 z-[120] flex items-center justify-center p-3 lg:p-8 ${motionClass(present.phase)}`}>
+            <div className="absolute inset-0 bg-black/55" />
+            <article
+                className="relative w-full max-w-4xl max-h-full overflow-y-auto shadow-[0_24px_70px_rgba(0,0,0,0.55)]"
+                style={{ background: 'linear-gradient(180deg, #f8f1e3 0%, #f3e6d0 100%)', color: '#2b1614' }}
+            >
+                <div className="absolute left-0 top-0 bottom-0 w-8 lg:w-11" style={{ background: band }}>
+                    <div className="absolute left-1/2 top-[12%] -translate-x-1/2 w-3 h-3 lg:w-4 lg:h-4 rounded-full bg-[#f8f1e3]" />
+                    <div className="absolute left-1/2 top-[20%] -translate-x-1/2 w-3 h-3 lg:w-4 lg:h-4 rounded-full bg-[#f8f1e3]" />
                 </div>
 
-                <div className="flex-1 overflow-y-auto custom-scroll grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-8 min-h-0">
-                    {/* STATS COLUMN */}
-                    <div className="bg-white/5 p-3 lg:p-4 border border-white/5">
-                        <h3 className="text-white font-mono text-[10px] lg:text-sm tracking-widest mb-2 lg:mb-4 border-l-2 border-cyan-500 pl-2">VIRAL METRICS</h3>
-                        <div className="space-y-2 lg:space-y-3 font-mono text-[10px] lg:text-sm text-gray-300">
-                            <StatRow label="DAMAGE" value={stats.damage.toFixed(1)} />
-                            <StatRow label="FIRE RATE" value={(1000/stats.fireRate).toFixed(1) + '/s'} />
-                            <StatRow label="SPEED" value={stats.speed.toFixed(1)} />
-                            <StatRow label="MAX HP" value={stats.maxHealth} />
-                            <StatRow label="CRIT CHANCE" value={(stats.critChance * 100).toFixed(0) + '%'} />
-                            <StatRow label="CRIT MULT" value={stats.critMultiplier.toFixed(1) + 'x'} />
-                            <StatRow label="PROJECTILES" value={stats.bulletCount} />
-                            <StatRow label="MAGNET" value={stats.magnetRadius.toFixed(0)} />
-                            <StatRow label="THORNS" value={stats.thorns.toFixed(1)} />
-                            <StatRow label="ORBITALS" value={stats.orbitals} />
-                            <StatRow label="MAX ENERGY" value={stats.maxEnergy} />
+                <div className="pl-12 lg:pl-16 pr-4 lg:pr-8 py-4 lg:py-6">
+                    <div className="flex items-end justify-between gap-4 border-b pb-3" style={{ borderColor: `${ink}33` }}>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <span className="relative w-4 h-4 lg:w-5 lg:h-5 shrink-0" aria-hidden>
+                                    <span className="absolute left-1/2 top-0 bottom-0 w-[3px] -translate-x-1/2" style={{ background: band }} />
+                                    <span className="absolute top-1/2 left-0 right-0 h-[3px] -translate-y-1/2" style={{ background: band }} />
+                                </span>
+                                <span className="text-[10px] lg:text-xs tracking-[0.35em] font-bold" style={{ color: ink }}>VITAL RUSH</span>
+                            </div>
+                            <h2 className="mt-1 text-3xl lg:text-5xl leading-none" style={{ fontFamily: 'Georgia, "Palatino Linotype", serif' }}>
+                                {t('LOADOUT')}
+                            </h2>
                         </div>
                     </div>
+                    <p className="mt-3 text-sm" style={{ color: '#5c403c' }}>{t('LOADOUT_HINT')}</p>
 
-                    {/* UPGRADES COLUMN */}
-                    <div>
-                        <h3 className="text-white font-mono text-[10px] lg:text-sm tracking-widest mb-2 lg:mb-4 border-l-2 border-yellow-500 pl-2">ACTIVE MUTATIONS</h3>
-                        <div className="space-y-2 lg:space-y-2 max-h-[30vh] lg:max-h-[50vh] overflow-y-auto custom-scroll pr-2">
-                            {activeUpgrades.length === 0 ? (
-                                <div className="text-gray-600 italic text-[10px] lg:text-xs p-3 lg:p-4 border border-dashed border-gray-800 text-center">
-                                    {t('NO_MUTATIONS')}
-                                </div>
-                            ) : (
-                                activeUpgrades.map(u => (
-                                    <div key={u.id} className="flex justify-between items-center bg-white/5 p-2.5 lg:p-3 border-l-2 border-yellow-500/50 hover:bg-white/10 transition-colors">
-                                        <div>
-                                            <div className="text-cyan-300 font-bold text-[10px] lg:text-xs tracking-wide">{t(u.nameKey)}</div>
-                                            <div className="text-[10px] lg:text-[10px] text-gray-500">{t(u.descKey)}</div>
-                                        </div>
-                                        <div className="flex flex-col items-end">
-                                            <span className="text-[8px] lg:text-[8px] text-gray-600">{u.rarity}</span>
-                                            <span className="text-yellow-500 font-mono font-bold text-[10px] lg:text-xs">LVL {u.level}</span>
-                                        </div>
+                    <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <section>
+                            <h3 className="text-[11px] tracking-[0.28em] font-bold" style={{ color: ink }}>{t('LOADOUT_NOW')}</h3>
+                            <div className="mt-2">
+                                {rows.map(row => (
+                                    <div key={row.label} className="flex items-baseline justify-between gap-4 border-t py-2" style={{ borderColor: `${ink}22` }}>
+                                        <span className="text-sm" style={{ color: '#5c403c' }}>{row.label}</span>
+                                        <span className="text-base font-semibold tabular-nums">{row.value}</span>
                                     </div>
-                                ))
-                            )}
-                        </div>
-                    </div>
-                </div>
+                                ))}
+                            </div>
+                        </section>
 
-                <div className="mt-4 lg:mt-6 pt-2 lg:pt-4 border-t border-cyan-900/30">
-                     <button 
+                        <section>
+                            <h3 className="text-[11px] tracking-[0.28em] font-bold" style={{ color: ink }}>{t('LOADOUT_BOUGHT')}</h3>
+                            {bought.length === 0 ? (
+                                <p className="mt-3 text-sm leading-relaxed" style={{ color: '#5c403c' }}>{t('LOADOUT_EMPTY')}</p>
+                            ) : (
+                                <ul className="mt-2 space-y-2">
+                                    {bought.map(u => (
+                                        <li key={u.id} className="border-t pt-2" style={{ borderColor: `${ink}22` }}>
+                                            <div className="flex items-baseline justify-between gap-3">
+                                                <span className="font-semibold text-sm lg:text-base">{t(u.nameKey)}</span>
+                                                <span className="text-xs font-bold shrink-0" style={{ color: ink }}>
+                                                    {t('STAT_LEVEL')} {u.level}
+                                                </span>
+                                            </div>
+                                            <div className="text-xs mt-0.5" style={{ color: '#5c403c' }}>{t(u.descKey)}</div>
+                                            <div className="text-[10px] tracking-[0.18em] uppercase mt-1 opacity-60">{t(rarityKey[u.rarity])}</div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </section>
+                    </div>
+
+                    <button
                         onClick={onClose}
-                        className="w-full py-3 lg:py-4 bg-cyan-600 hover:bg-cyan-500 text-black font-bold tracking-[0.2em] text-xs lg:text-base transition-all shadow-[0_0_20px_rgba(0,255,255,0.2)]"
+                        className="mt-6 w-full py-4 font-bold tracking-[0.28em] text-sm uppercase text-black"
+                        style={{ background: band, boxShadow: `0 6px 0 ${ink}` }}
                     >
                         {t('BACK')}
                     </button>
                 </div>
-             </div>
+            </article>
         </div>
     );
-}
+};
