@@ -102,8 +102,10 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
         <div className={`absolute inset-0 bg-black flex items-center justify-center z-50 overflow-hidden ${present.phase === 'out' ? 'screen-out' : ''}`}>
             <style>{`
                 @keyframes vital-breath {
-                    0%, 100% { transform: scale(1) translateY(0); }
-                    50% { transform: scale(1.012) translateY(2px); }
+                    0%, 100% { transform: scaleX(1) scaleY(1); }
+                    28% { transform: scaleX(0.982) scaleY(1.04); }
+                    52% { transform: scaleX(1) scaleY(1); }
+                    78% { transform: scaleX(1.035) scaleY(0.986); }
                 }
                 @keyframes vital-arrive {
                     from { opacity: 0; transform: translate3d(34%, 10%, 0); }
@@ -163,7 +165,7 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     0%, 100% { transform: translate(-50%, -50%) rotate(-8deg); }
                     50% { transform: translate(-50%, -50%) translate3d(-8px, -20px, 0) rotate(6deg); }
                 }
-                .anim-vital { animation: vital-breath 8s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+                .anim-vital { animation: vital-breath 6.5s linear infinite; transform-origin: center bottom; will-change: transform; }
                 .vital-arrive { animation: vital-arrive 1.25s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both; }
                 .bg-arrive { animation: bg-arrive 1.2s cubic-bezier(0.16, 1, 0.3, 1) both; }
                 .menu-arrive { animation: menu-arrive 0.95s cubic-bezier(0.16, 1, 0.3, 1) 0.22s both; }
@@ -224,9 +226,11 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     ))}
 
                     <div className="absolute right-[-5%] lg:right-[5%] bottom-[-5%] h-[70%] lg:h-[90%] z-20 pointer-events-none flex items-end justify-end vital-arrive">
-                         <img src={VITAL_HERO} alt="Vital" className="h-full w-auto max-w-none object-contain anim-vital"
+                         <div className="h-full anim-vital">
+                         <img src={VITAL_HERO} alt="Vital" className="h-full w-auto max-w-none object-contain"
                             style={{ filter: isPlatinum ? 'drop-shadow(0 0 30px rgba(255, 215, 0, 0.4))' : 'drop-shadow(0 0 30px rgba(0, 255, 255, 0.3))' }}
                          />
+                         </div>
                     </div>
 
                     <div className="absolute left-0 top-0 h-full w-full lg:w-[45%] z-30 flex flex-col justify-center p-4 lg:p-16 scale-90 lg:scale-100 origin-left">
