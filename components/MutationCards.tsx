@@ -146,7 +146,7 @@ const MutationCard: React.FC<CardProps> = ({
 
             <div className="lab-rarity">{t(RARITY_KEY[upgrade.rarity])}</div>
             <div className="lab-level">
-                <small>{t('STAT_LEVEL')}</small>
+                <span>{t('STAT_LEVEL')}</span>
                 <strong>{upgrade.level}/{upgrade.maxLevel}</strong>
             </div>
             <div
@@ -627,7 +627,7 @@ export const mutationCardStyles = `
     font-family: 'Teko', sans-serif;
     font-size: 4.5cqw;
     letter-spacing: 0.06em;
-    line-height: 0.8;
+    line-height: 1;
     text-transform: uppercase;
     clip-path: polygon(0 10%, 100% 0, 86% 100%, 0 90%);
     text-shadow: 0 1px 0 rgba(0,0,0,0.4);
@@ -636,40 +636,44 @@ export const mutationCardStyles = `
 .lab-level {
     position: absolute;
     z-index: 4;
-    right: 2.6%;
-    top: 3.6%;
-    width: 24.6%;
-    height: 15.2%;
+    right: 1.8%;
+    top: 3.2%;
+    width: 26.8%;
+    height: 16.2%;
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     align-items: center;
     justify-content: center;
-    gap: 0.02em;
+    gap: 0.28em;
     color: #f7f2e8;
     font-family: 'Teko', sans-serif;
-    line-height: 0.78;
+    line-height: 1;
+    white-space: nowrap;
     text-shadow: 0 1px 0 rgba(0,0,0,0.85);
 }
 .lab-level::before {
     content: '';
     position: absolute;
-    inset: 16% 10% 14%;
-    background: radial-gradient(circle at 50% 78%, var(--accent), transparent 72%);
-    opacity: calc(var(--rank) * 0.62);
+    inset: 18% 8% 16%;
+    background: radial-gradient(circle at 50% 60%, var(--accent), transparent 72%);
+    opacity: calc(var(--rank) * 0.55);
     pointer-events: none;
 }
-.lab-level small {
-    position: relative;
-    font-size: 2.45cqw;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    opacity: 0.78;
-}
+.lab-level span,
 .lab-level strong {
     position: relative;
-    font-size: 5.5cqw;
+    transform: translateY(0.06em);
+}
+.lab-level span {
+    font-size: 3.05cqw;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    opacity: 0.9;
+}
+.lab-level strong {
+    font-size: 4.35cqw;
     font-weight: 600;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.02em;
     color: #fff8ea;
 }
 .lab-copy {
@@ -688,9 +692,10 @@ export const mutationCardStyles = `
     color: #f8f4ec;
     font-family: 'Teko', sans-serif;
     font-weight: 600;
-    font-size: 6.5cqw;
-    letter-spacing: 0.03em;
-    line-height: 0.82;
+    font-size: 6.15cqw;
+    letter-spacing: 0.02em;
+    line-height: 1.05;
+    padding-top: 0.06em;
     text-transform: uppercase;
     text-shadow: 0 2px 0 rgba(0,0,0,0.65);
     display: -webkit-box;
@@ -748,21 +753,21 @@ export const mutationCardStyles = `
 .lab-evolve {
     position: absolute;
     z-index: 3;
-    left: 24%;
-    top: 72.5%;
-    width: 52%;
-    height: 17%;
+    left: 26.5%;
+    top: 74.6%;
+    width: 47%;
+    height: 16.2%;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #f7f1e4;
-    font-family: 'Teko', sans-serif;
-    font-weight: 600;
-    letter-spacing: 0.06em;
-    font-size: 5.3cqw;
-    line-height: 0.8;
+    font-family: 'Chakra Petch', sans-serif;
+    font-weight: 700;
+    letter-spacing: 0.045em;
+    font-size: 3.35cqw;
+    line-height: 1;
     text-transform: uppercase;
-    text-shadow: -1px -1px 0 #1a1008, 1px -1px 0 #1a1008, -1px 1px 0 #1a1008, 1px 1px 0 #1a1008;
+    text-shadow: 0 1px 0 #1a1008;
     white-space: nowrap;
 }
 .lab-evolve.is-maxed { color: #ffe08a; }

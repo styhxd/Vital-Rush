@@ -15,6 +15,8 @@ interface SettingsMenuProps {
     onLanguageChange: (lang: Language) => void;
     onSystemPurge: () => void;
     onToggleHighQuality: () => void; // NEW PROP
+    cheatInput: string;
+    onCheatInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
     onClose: () => void;
 }
 
@@ -27,6 +29,8 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
     onLanguageChange,
     onSystemPurge,
     onToggleHighQuality,
+    cheatInput,
+    onCheatInput,
     onClose 
 }) => {
     const present = useScreenPresence(isVisible);
@@ -200,6 +204,20 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                                 </button>
                             ))}
                         </div>
+                    </div>
+
+                    <div className="mb-4 lg:mb-6">
+                        <h3 className="text-[10px] lg:text-xs font-mono text-gray-500 mb-2 lg:mb-3 border-l-2 border-cyan-500 pl-2">{t('PH_ACCESS_CODE')}</h3>
+                        <input
+                            type="text"
+                            value={cheatInput}
+                            onChange={onCheatInput}
+                            autoComplete="off"
+                            autoCorrect="off"
+                            spellCheck={false}
+                            placeholder={t('PH_ACCESS_CODE')}
+                            className="w-full bg-black/50 border border-cyan-900/50 px-3 py-3 font-mono text-[11px] lg:text-xs tracking-[0.22em] text-cyan-100 uppercase placeholder:text-cyan-900 focus:outline-none focus:border-cyan-400"
+                        />
                     </div>
 
                     {/* Surpresa 2: SYSTEM PURGE (Data Reset) */}

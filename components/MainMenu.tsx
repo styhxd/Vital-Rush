@@ -38,7 +38,6 @@ interface MainMenuProps {
     language: Language;
     difficulty: Difficulty;
     isPlatinum: boolean;
-    cheatInput: string;
     onStart: () => void;
     onControls: () => void;
     onManual: () => void;
@@ -46,7 +45,6 @@ interface MainMenuProps {
     onAchievements: () => void;
     onLanguageChange: (lang: Language) => void;
     onDifficultyChange: (diff: Difficulty) => void;
-    onCheatInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 export const MainMenu: React.FC<MainMenuProps> = (props) => {
@@ -257,9 +255,9 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
 
 const MenuContent = (props: MainMenuProps & { align: 'left' | 'center' }) => {
     const { 
-        language, difficulty, isPlatinum, cheatInput, align,
+        language, difficulty, isPlatinum, align,
         onStart, onControls, onManual, onSettings, onAchievements, 
-        onLanguageChange, onDifficultyChange, onCheatInput 
+        onLanguageChange, onDifficultyChange 
     } = props;
     
     const t = (key: string) => TEXTS[language][key] || key;
@@ -305,10 +303,6 @@ const MenuContent = (props: MainMenuProps & { align: 'left' | 'center' }) => {
                       </button>
                     ))}
                 </div>
-            </div>
-            
-            <div className={`mt-2 lg:mt-8 w-full ${isLeft ? 'max-w-md' : ''}`}>
-                <input type="text" value={cheatInput} onChange={onCheatInput} placeholder={t('PH_ACCESS_CODE')} className={`bg-transparent border-b border-gray-800 text-[10px] lg:text-xs text-gray-500 focus:outline-none focus:border-red-500 w-full font-mono tracking-widest uppercase ${isLeft ? 'text-left' : 'text-center'}`} />
             </div>
         </div>
     );

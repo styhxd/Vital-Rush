@@ -1085,7 +1085,6 @@ export const Game: React.FC = () => {
           language={language}
           difficulty={difficulty}
           isPlatinum={isPlatinum}
-          cheatInput={cheatInput}
           onStart={() => { handleStartGame(); audioManager.startMenuMusic(); }}
           onControls={() => openControls(true)}
           onManual={() => setGameState(GameState.MANUAL)}
@@ -1093,7 +1092,6 @@ export const Game: React.FC = () => {
           onAchievements={openAchievements}
           onLanguageChange={setLanguage}
           onDifficultyChange={setDifficulty}
-          onCheatInput={handleCheatInput}
       />
 
       {/* REPLACED: New Settings Menu Component Rendering */}
@@ -1105,6 +1103,8 @@ export const Game: React.FC = () => {
           onUpdateAudio={updateAudio}
           onLanguageChange={setLanguage}
           onSystemPurge={handleSystemPurge} // WIRING UP THE SOFT RESET
+          cheatInput={cheatInput}
+          onCheatInput={handleCheatInput}
           onToggleHighQuality={() => { // Função de toggle
               const newVal = !forceHighQuality;
               setForceHighQuality(newVal);
