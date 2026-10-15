@@ -432,27 +432,31 @@ export const mutationCardStyles = `
     color: #f6f1e6;
     font-family: 'Teko', sans-serif;
     font-size: clamp(22px, 2.4vw, 34px);
-    letter-spacing: 0.12em;
-    line-height: 0.9;
+    letter-spacing: 0.08em;
+    line-height: 1;
+    transform: translateY(0.21em);
     text-shadow: 0 2px 0 rgba(0,0,0,0.55);
 }
 .lab-readout {
     display: flex;
-    align-items: baseline;
-    gap: 0.65rem;
+    align-items: center;
+    gap: 0.55rem;
 }
 .lab-readout span {
     color: #f4f1ea;
     font-weight: 700;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.12em;
     font-size: clamp(10px, 1.15vw, 14px);
+    line-height: 1;
+    transform: translateY(0.11em);
 }
 .lab-readout strong {
     color: #ffd84a;
     font-family: 'Teko', sans-serif;
     font-size: clamp(28px, 3vw, 42px);
     font-weight: 600;
-    line-height: 0.8;
+    line-height: 1;
+    transform: translateY(0.085em);
     text-shadow: 0 0 14px rgba(255, 196, 40, 0.7);
 }
 .lab-readout strong.is-tick { animation: lab-biomass 0.28s ease; }
@@ -592,19 +596,19 @@ export const mutationCardStyles = `
 }
 .lab-wash { inset: 0; mix-blend-mode: soft-light; opacity: 0.95; }
 .lab-art-glow {
-    right: 6%;
-    top: 30%;
-    width: 20%;
-    height: 28%;
+    right: 4%;
+    top: 26%;
+    width: 26%;
+    height: 38%;
     background: radial-gradient(circle, var(--accent), transparent 68%);
     opacity: calc(0.16 + var(--rank) * 0.5);
     filter: blur(8px);
 }
 .lab-art {
-    right: 3.4%;
-    top: 21.5%;
-    width: 25%;
-    height: 42%;
+    right: 1.6%;
+    top: 21.6%;
+    width: 31.2%;
+    height: 49%;
     object-fit: contain;
     object-position: center bottom;
     transform-origin: 72% 88%;
@@ -681,7 +685,7 @@ export const mutationCardStyles = `
     z-index: 2;
     left: 4.2%;
     top: 18.5%;
-    width: 63%;
+    width: 61%;
     height: 48%;
     display: flex;
     flex-direction: column;
@@ -753,21 +757,20 @@ export const mutationCardStyles = `
 .lab-evolve {
     position: absolute;
     z-index: 3;
-    left: 26.5%;
-    top: 74.6%;
-    width: 47%;
-    height: 16.2%;
+    left: 27%;
+    top: 73.1%;
+    width: 46%;
+    height: 20.2%;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #f7f1e4;
     font-family: 'Chakra Petch', sans-serif;
     font-weight: 700;
-    letter-spacing: 0.045em;
-    font-size: 3.35cqw;
+    letter-spacing: 0.04em;
+    font-size: 3.25cqw;
     line-height: 1;
     text-transform: uppercase;
-    text-shadow: 0 1px 0 #1a1008;
     white-space: nowrap;
 }
 .lab-evolve.is-maxed { color: #ffe08a; }
@@ -836,7 +839,7 @@ export const mutationCardStyles = `
     cursor: not-allowed;
     filter: saturate(0.7) brightness(0.9) drop-shadow(0 7px 0 rgba(0,0,0,0.4));
 }
-.lab-card.is-poor .lab-evolve { opacity: 0.55; }
+.lab-card.is-poor .lab-evolve { opacity: 1; color: #cfc6b6; }
 .lab-card.is-max {
     filter: saturate(1.15) drop-shadow(0 0 12px rgba(255, 208, 90, 0.4)) drop-shadow(0 7px 0 rgba(0,0,0,0.4));
 }

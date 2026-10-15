@@ -14,6 +14,7 @@ import { MainMenu } from './MainMenu';
 import { OutcomeChart, PatientChart } from './PatientChart';
 import { motionClass, ScreenPresence } from './screenPresence';
 import { BioLab, SerumOffer, mutationCardStyles, rollSerumOffers, serumWindowMs } from './MutationCards';
+import { Dossier } from './Dossier';
 
 const systemLanguage = (): Language => {
   const tags = typeof navigator === 'undefined'
@@ -55,34 +56,20 @@ const IconButton = ({ onClick, icon }: any) => (
   </button>
 );
 
-const MenuButton = ({ onClick, children, variant = 'primary', selected = false }: any) => {
-  // AUMENTADO: py-2 e text-xs no mobile
-  const base = "w-full py-2.5 lg:py-4 font-bold text-xs lg:text-xl tracking-widest uppercase clip-path-polygon transition-all hover:scale-105 shadow-[0_0_10px_rgba(0,0,0,0.4)] lg:shadow-[0_0_20px_rgba(0,0,0,0.4)] relative overflow-hidden group";
-  let colors = "";
-  
-  if (variant === 'primary') {
-      colors = "bg-red-600 hover:bg-red-500 text-black shadow-[0_0_10px_rgba(255,0,0,0.4)]";
-  } else if (variant === 'secondary') {
-      colors = selected 
-        ? "bg-white text-black border border-white shadow-[0_0_10px_white]"
-        : "bg-white/10 hover:bg-white/20 text-white border border-white/10";
-  } else if (variant === 'success') {
-      colors = "bg-green-600 hover:bg-green-500 text-black shadow-[0_0_10px_rgba(0,255,0,0.4)]";
-  }
-  
-  return (
-    <button onClick={onClick} className={`${base} ${colors}`} style={{clipPath: 'polygon(5% 0, 100% 0, 100% 70%, 95% 100%, 0 100%, 0 30%)'}}>
-      <span className="relative z-10">{children}</span>
-      <div className="absolute inset-0 bg-white/10 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500"></div>
-    </button>
-  );
+const readableInk = (hex: string) => {
+    const n = parseInt(hex.replace('#', ''), 16);
+    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    if (lum > 0.55) return hex;
+    const lift = (c: number) => Math.round(c + (255 - c) * 0.62);
+    return `rgb(${lift(r)}, ${lift(g)}, ${lift(b)})`;
 };
 
 const DatabaseCard = ({ title, desc, color }: any) => (
-    <div className="bg-white/5 border border-white/10 p-2 lg:p-4 relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-1 h-full" style={{backgroundColor: color}}></div>
-        <h3 className="text-xs lg:text-lg font-bold mb-0.5" style={{color: color}}>{title}</h3>
-        <p className="text-[9px] lg:text-xs text-gray-400 leading-tight">{desc}</p>
+    <div className="dossier-card relative overflow-hidden pl-3">
+        <div className="absolute top-3 bottom-3 left-0 w-1 rounded-full" style={{ backgroundColor: color }}></div>
+        <h3 style={{ color: readableInk(color) }}>{title}</h3>
+        <p>{desc}</p>
     </div>
 );
 
@@ -1128,35 +1115,28 @@ export const Game: React.FC = () => {
       
       <ScreenPresence show={gameState === GameState.ACHIEVEMENTS}>
         {(phase) => (
-          <div className={`absolute inset-0 bg-black flex items-center justify-center z-50 ${motionClass(phase)}`}>
-              <div className={`w-full max-w-6xl h-full lg:h-[90%] border p-4 lg:p-8 relative flex flex-col ${isPlatinum ? 'border-amber-500/50 bg-purple-900/10' : 'border-white/10 bg-[#1a0a0a]'}`}>
-                  <div className="flex justify-between items-center mb-4 lg:mb-4 border-b border-white/10 pb-2 flex-shrink-0">
-                      <h2 className={`text-lg lg:text-4xl font-bold tracking-widest ${isPlatinum ? 'text-amber-400' : 'text-cyan-400'}`}>{t('ACHIEVEMENTS')}</h2>
-                      <div className="flex items-center gap-2">
-                          <IconTrophy />
-                          <span className="text-sm lg:text-xl font-mono">
-                              {Object.values(achievementManager.getProgress()).filter(p => p.unlocked).length} / {ACHIEVEMENTS_LIST.length}
-                          </span>
-                      </div>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto pr-2 custom-scroll min-h-0">
-                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4 pb-4">
+          <div className={`absolute inset-0 z-50 ${motionClass(phase)}`}>
+            <Dossier
+              title={t('ACHIEVEMENTS')}
+              meta={`${Object.values(achievementManager.getProgress()).filter(p => p.unlocked).length} / ${ACHIEVEMENTS_LIST.length}`}
+              onBack={() => setGameState(GameState.MENU)}
+              backLabel={t('BACK')}
+            >
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 pb-2">
                           {ACHIEVEMENTS_LIST.map((ach) => {
                               const progress = achievementManager.getProgress()[ach.id] || { unlocked: false, currentValue: 0 };
                               const isLocked = !progress.unlocked;
                               if (ach.secret && isLocked) {
                                   return (
-                                      <div key={ach.id} className="bg-black/60 border border-white/5 p-4 lg:p-6 flex items-center justify-center opacity-50 min-h-[50px] lg:min-h-[120px]">
-                                          <span className="text-[10px] lg:text-xs tracking-widest text-gray-600 font-mono">??? ENCRYPTED DATA ???</span>
+                                      <div key={ach.id} className="dossier-card flex items-center justify-center opacity-45 min-h-[72px]">
+                                          <span className="text-[11px] tracking-[0.22em] text-[#e2b060]/70">??? ENCRYPTED DATA ???</span>
                                       </div>
                                   )
                               }
 
                               return (
-                                  <div key={ach.id} className={`p-3 lg:p-6 border relative overflow-hidden transition-all group flex flex-col min-h-[60px] lg:min-h-[140px]
-                                      ${isLocked ? 'border-white/10 bg-black/80 grayscale opacity-70' : 
-                                        (ach.id === 'all_achievements' ? 'border-amber-500 bg-amber-900/30 shadow-[0_0_20px_rgba(255,215,0,0.2)]' : 'border-cyan-500/30 bg-cyan-900/20')}`}>
+                                  <div key={ach.id} className={`dossier-card relative overflow-hidden flex flex-col min-h-[88px]
+                                      ${isLocked ? 'opacity-55' : ''}`}>
                                       <div className="flex items-center lg:items-start gap-3 lg:gap-4 z-10 relative h-full">
                                           <div className="text-2xl lg:text-4xl filter drop-shadow-md">{ach.icon}</div>
                                           <div className="flex-1 flex flex-col h-full justify-center">
@@ -1166,7 +1146,7 @@ export const Game: React.FC = () => {
                                               <div className="mt-auto w-full">
                                                   {ach.isCumulative && !progress.unlocked && (
                                                       <div className="w-full h-1 bg-black rounded overflow-hidden mb-1 border border-white/5">
-                                                          <div className="h-full bg-cyan-600" style={{width: `${Math.min(100, (progress.currentValue / ach.targetValue)*100)}%`}}></div>
+                                                          <div className="h-full bg-[#e2a01f]" style={{width: `${Math.min(100, (progress.currentValue / ach.targetValue)*100)}%`}}></div>
                                                       </div>
                                                   )}
                                                   
@@ -1187,29 +1167,19 @@ export const Game: React.FC = () => {
                               )
                           })}
                       </div>
-                  </div>
-
-                  <div className="mt-4 lg:mt-6 pt-4 lg:pt-4 border-t border-white/10 flex-shrink-0">
-                      <MenuButton variant="secondary" onClick={() => setGameState(GameState.MENU)}>{t('BACK')}</MenuButton>
-                  </div>
-              </div>
+            </Dossier>
           </div>
         )}
       </ScreenPresence>
 
       <ScreenPresence show={gameState === GameState.MANUAL}>
         {(phase) => (
-        <div className={`absolute inset-0 bg-black flex items-center justify-center z-50 ${motionClass(phase)}`}>
-           <div className="w-full max-w-4xl p-6 lg:p-10 bg-[#1a0a0a] border border-white/10 relative h-[100vh] lg:h-[90vh] flex flex-col">
-              <h2 className="text-lg lg:text-3xl text-white font-bold tracking-widest mb-4 lg:mb-4 border-b border-white/10 pb-2 flex justify-between">
-                  <span>{t('MANUAL')}</span>
-                  <span className="text-cyan-500 text-[10px] lg:text-sm font-mono tracking-normal opacity-50">DB-V2.4</span>
-              </h2>
-              
-              <div className="flex-1 overflow-y-auto custom-scroll pr-2 lg:pr-4 space-y-4 lg:space-y-8">
+        <div className={`absolute inset-0 z-50 ${motionClass(phase)}`}>
+           <Dossier title={t('MANUAL')} meta="DB-V2.4" onBack={() => setGameState(GameState.MENU)} backLabel={t('BACK')}>
+              <div className="space-y-5">
                   <section>
-                      <h4 className="text-cyan-400 font-bold tracking-[0.2em] mb-2 lg:mb-2 text-[10px] lg:text-sm border-l-2 border-cyan-500 pl-3">{t('MANUAL_HOSTILES')}</h4>
-                      <div className="grid grid-cols-2 gap-2 lg:gap-2">
+                      <h4 className="dossier-kicker">{t('MANUAL_HOSTILES')}</h4>
+                      <div className="grid grid-cols-2 gap-2">
                           <DatabaseCard title="BACTERIA" desc={t('MANUAL_BAC_DESC')} color={COLORS_DEFAULT.BACTERIA} />
                           <DatabaseCard title="VIRUS" desc={t('MANUAL_VIR_DESC')} color={COLORS_DEFAULT.VIRUS} />
                           <DatabaseCard title="PARASITE" desc={t('MANUAL_PAR_DESC')} color={COLORS_DEFAULT.PARASITE} />
@@ -1220,7 +1190,7 @@ export const Game: React.FC = () => {
                   </section>
 
                   <section>
-                      <h4 className="text-white font-bold tracking-[0.2em] mb-2 lg:mb-2 text-[10px] lg:text-sm border-l-2 border-white pl-3">{t('MANUAL_MECHANICS')}</h4>
+                      <h4 className="dossier-kicker">{t('MANUAL_MECHANICS')}</h4>
                       <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-2">
                            <DatabaseCard title={t('MANUAL_MECH_DASH_TITLE')} desc={t('MANUAL_MECH_DASH_DESC')} color="#fff" />
                            <DatabaseCard title={t('MANUAL_MECH_SURGE_TITLE')} desc={t('MANUAL_MECH_SURGE_DESC')} color={COLORS_DEFAULT.PLAYER_CORE} />
@@ -1229,7 +1199,7 @@ export const Game: React.FC = () => {
                   </section>
 
                   <section>
-                      <h4 className="text-yellow-400 font-bold tracking-[0.2em] mb-2 lg:mb-2 text-[10px] lg:text-sm border-l-2 border-yellow-500 pl-3">{t('MANUAL_STRAINS')}</h4>
+                      <h4 className="dossier-kicker">{t('MANUAL_STRAINS')}</h4>
                       <div className="grid grid-cols-2 gap-2 lg:gap-2">
                            <DatabaseCard title={t('STRAIN_STANDARD')} desc={t('STRAIN_STD_DESC')} color="#fff" />
                            <DatabaseCard title={t('STRAIN_SWARM')} desc={t('STRAIN_SWM_DESC')} color="#ff00ff" />
@@ -1238,44 +1208,33 @@ export const Game: React.FC = () => {
                       </div>
                   </section>
               </div>
-
-              <div className="mt-4 lg:mt-6 pt-2 border-t border-white/10">
-                  <MenuButton variant="secondary" onClick={() => setGameState(GameState.MENU)}>{t('BACK')}</MenuButton>
-              </div>
-           </div>
+           </Dossier>
         </div>
         )}
       </ScreenPresence>
 
       <ScreenPresence show={gameState === GameState.CONTROLS}>
         {(phase) => (
-        <div className={`absolute inset-0 bg-black flex items-center justify-center z-[60] ${motionClass(phase)}`}>
-           <div className="w-full max-w-3xl p-6 lg:p-8 bg-[#1a0a0a] border border-white/10 relative h-full lg:h-auto overflow-y-auto">
-              <h2 className="text-xl lg:text-3xl text-white font-bold tracking-widest mb-4 lg:mb-4 border-b border-white/10 pb-2">{t('CONTROLS')}</h2>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 lg:gap-4 mb-4 lg:mb-4">
-                  <div className="p-4 lg:p-4 border border-white/5 bg-white/5 rounded">
-                      <div className="text-cyan-400 font-bold mb-1 tracking-widest text-xs lg:text-sm">{t('CTRL_MOVE')}</div>
-                      <div className="text-[10px] lg:text-xs text-gray-400">{t('CTRL_MOVE_DESC')}</div>
+        <div className={`absolute inset-0 z-[60] ${motionClass(phase)}`}>
+           <Dossier title={t('CONTROLS')} onBack={goBackFromControls} backLabel={t('BACK')}>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  <div className="dossier-card">
+                      <h3>{t('CTRL_MOVE')}</h3>
+                      <p>{t('CTRL_MOVE_DESC')}</p>
                   </div>
-
-                  <div className="p-4 lg:p-4 border border-white/5 bg-white/5 rounded">
-                      <div className="text-cyan-400 font-bold mb-1 tracking-widest text-xs lg:text-sm">{t('CTRL_DASH')}</div>
-                      <div className="text-[10px] lg:text-xs text-gray-400">{t('CTRL_DASH_DESC')}</div>
+                  <div className="dossier-card">
+                      <h3>{t('CTRL_DASH')}</h3>
+                      <p>{t('CTRL_DASH_DESC')}</p>
                   </div>
-
-                  <div className="p-4 lg:p-4 border border-white/5 bg-white/5 rounded">
-                      <div className="text-cyan-400 font-bold mb-1 tracking-widest text-xs lg:text-sm">{t('CTRL_SURGE')}</div>
-                      <div className="text-[10px] lg:text-xs text-gray-400">{t('CTRL_SURGE_DESC')}</div>
+                  <div className="dossier-card">
+                      <h3>{t('CTRL_SURGE')}</h3>
+                      <p>{t('CTRL_SURGE_DESC')}</p>
                   </div>
-
-                   <div className="p-4 lg:p-4 border border-white/5 bg-white/5 rounded flex items-center justify-center">
-                      <div className="text-[10px] lg:text-xs text-yellow-500 font-mono text-center">{t('CTRL_NOTE')}</div>
+                  <div className="dossier-card flex items-center justify-center">
+                      <p className="text-center text-[#ffd84a]">{t('CTRL_NOTE')}</p>
                   </div>
               </div>
-
-              <MenuButton variant="secondary" onClick={goBackFromControls}>{t('BACK')}</MenuButton>
-           </div>
+           </Dossier>
         </div>
         )}
       </ScreenPresence>

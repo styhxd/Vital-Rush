@@ -1,10 +1,11 @@
-
+﻿
 
 import React, { useState, useEffect } from 'react';
 import { TEXTS } from '../constants';
 import { Language } from '../types';
 import { audioManager } from '../services/audioManager';
 import { motionClass, useScreenPresence } from './screenPresence';
+import { Dossier } from './Dossier';
 
 interface SettingsMenuProps {
     isVisible: boolean;
@@ -62,10 +63,10 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
         setCrtEnabled(newState);
         if (!newState) {
             document.body.classList.add('force-clean-vision');
-            audioManager.playShoot(); // Feedback sonoro
+            audioManager.playShoot();
         } else {
             document.body.classList.remove('force-clean-vision');
-            audioManager.playPowerUp(); // Feedback sonoro
+            audioManager.playPowerUp();
         }
     };
 
@@ -73,141 +74,94 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
         if (resetStage === 0) {
             setResetStage(1);
             audioManager.playHit();
-            setTimeout(() => setResetStage(0), 3000); // Reseta o botão se não confirmar
+            setTimeout(() => setResetStage(0), 3000);
         } else {
-            // EXECUTE ORDER 66 - SOFT RESET
             audioManager.playExplosion();
-            onSystemPurge(); // Chama a função do pai para resetar o estado React
+            onSystemPurge();
             setResetStage(0);
         }
     };
 
-    // Componente interno para o Slider Holográfico
-    const HoloSlider = ({ label, value, onChange }: { label: string, value: number, onChange: (val: number) => void }) => {
-        const percentage = Math.round(value * 100);
-        return (
-            <div className="mb-4 lg:mb-6">
-                <div className="flex justify-between text-[10px] lg:text-xs font-mono text-cyan-400 mb-1 lg:mb-1 tracking-widest">
-                    <span>{label}</span>
-                    <span>{percentage}%</span>
-                </div>
-                <div className="relative h-6 lg:h-6 w-full bg-black/50 border border-cyan-900/50 skew-x-[-10deg] flex items-center px-1 cursor-pointer group">
-                    <input 
-                        type="range" 
-                        min="0" max="1" step="0.1" 
-                        value={value} 
-                        onChange={(e) => onChange(parseFloat(e.target.value))}
-                        className="absolute inset-0 w-full h-full opacity-0 z-20 cursor-pointer"
-                    />
-                    {/* Visualização de Barras Segmentadas */}
-                    <div className="flex gap-1 lg:gap-1 w-full h-3 lg:h-3 z-10 pointer-events-none">
-                        {Array.from({ length: 20 }).map((_, i) => {
-                            const active = (i / 20) < value;
-                            return (
-                                <div 
-                                    key={i} 
-                                    className={`flex-1 transition-all duration-300 ${active ? 'bg-cyan-500 shadow-[0_0_5px_cyan]' : 'bg-cyan-900/20'} 
-                                    ${active && (i / 20) > 0.8 ? 'bg-red-500 shadow-[0_0_5px_red]' : ''}`}
-                                ></div>
-                            );
-                        })}
-                    </div>
+    const Meter = ({ label, value, onChange }: { label: string, value: number, onChange: (val: number) => void }) => (
+        <label className="block mb-3">
+            <div className="flex items-center justify-between mb-1 text-[11px] tracking-[0.14em] text-[#f4f1ea]">
+                <span>{label}</span>
+                <strong className="font-['Teko'] text-[22px] font-semibold leading-none text-[#ffd84a]">{Math.round(value * 100)}</strong>
+            </div>
+            <div className="relative h-7 bg-black/45 border border-[#e2b060]/35 rounded-md px-1.5 flex items-center">
+                <input
+                    type="range"
+                    min="0" max="1" step="0.1"
+                    value={value}
+                    onChange={(e) => onChange(parseFloat(e.target.value))}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                />
+                <div className="flex gap-1 w-full h-3 pointer-events-none">
+                    {Array.from({ length: 10 }).map((_, i) => (
+                        <div key={i} className={`flex-1 rounded-[2px] ${i / 10 < value ? 'bg-[#e2a01f]' : 'bg-white/10'}`} />
+                    ))}
                 </div>
             </div>
-        );
-    };
+        </label>
+    );
+
+    const Switch = ({ on, onClick }: { on: boolean; onClick: () => void }) => (
+        <button
+            type="button"
+            onClick={onClick}
+            className={`w-14 h-7 rounded-full relative shrink-0 border ${on ? 'bg-[#e2a01f] border-[#ffe08a]' : 'bg-black/50 border-white/15'}`}
+            aria-pressed={on}
+        >
+            <span className={`absolute top-1 h-5 w-5 rounded-full bg-[#1a1008] transition-all ${on ? 'left-[calc(100%-1.45rem)]' : 'left-1'}`} />
+        </button>
+    );
 
     return (
-        // FAILSAFE 2: Z-Index 110 (Acima do Pause que é 100) e Position Fixed
-        <div className={`fixed inset-0 z-[110] bg-black/90 flex items-center justify-center ${motionClass(present.phase)}`}>
-            {/* Background Grid Decorativo */}
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(0,255,255,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(0,255,255,0.03)_1px,transparent_1px)] bg-[size:20px_20px] pointer-events-none"></div>
-
-            <div className="w-full max-w-md lg:max-w-lg p-1 border-y-2 border-cyan-500 bg-[#050b14] relative shadow-[0_0_100px_rgba(0,255,255,0.1)]">
-                <div className="p-6 lg:p-10 relative overflow-hidden flex flex-col max-h-[90vh] overflow-y-auto custom-scroll">
-                    
-                    {/* Header */}
-                    <h2 className="text-2xl lg:text-3xl font-bold text-center text-cyan-400 tracking-[0.3em] mb-4 lg:mb-8 border-b border-cyan-800 pb-4 lg:pb-4">
-                        {t('SETTINGS')}
-                        <span className="block text-[10px] lg:text-[10px] text-gray-500 font-mono mt-1 lg:mt-1 tracking-normal">SYS.CONFIG.V4.6</span>
-                    </h2>
-
-                    {/* Audio Section */}
-                    <div className="mb-4 lg:mb-8">
-                        <h3 className="text-[10px] lg:text-xs font-mono text-gray-500 mb-2 lg:mb-4 border-l-2 border-cyan-500 pl-2">{t('AUDIO_PROTOCOLS')}</h3>
-                        <HoloSlider 
-                            label={t('MASTER_OUTPUT')}
-                            value={audioSettings.master} 
-                            onChange={(v) => onUpdateAudio('master', v)} 
-                        />
-                        <HoloSlider 
-                            label={t('MUSIC_STREAM')}
-                            value={audioSettings.music} 
-                            onChange={(v) => onUpdateAudio('music', v)} 
-                        />
-                        <HoloSlider 
-                            label={t('SFX_FEEDBACK')}
-                            value={audioSettings.sfx} 
-                            onChange={(v) => onUpdateAudio('sfx', v)} 
-                        />
-                    </div>
-
-                    {/* Visual Section (SURPRESA 1: Retro Optics & High Quality) */}
-                    <div className="mb-4 lg:mb-8">
-                        <h3 className="text-[10px] lg:text-xs font-mono text-gray-500 mb-2 lg:mb-4 border-l-2 border-cyan-500 pl-2">{t('VISUAL_OPTICS')}</h3>
-                        
-                        {/* CRT TOGGLE */}
-                        <div className="flex items-center justify-between bg-white/5 p-4 lg:p-4 border border-white/10 mb-3">
-                            <div className="flex flex-col">
-                                <span className="text-xs lg:text-sm font-bold text-white tracking-widest">{t('RETRO_FILTER')}</span>
-                                <span className="text-[8px] lg:text-[10px] text-gray-400">{t('CRT_DESC')}</span>
-                            </div>
-                            <button 
-                                onClick={toggleCrt}
-                                className={`w-14 h-6 lg:w-16 lg:h-8 rounded-full relative transition-all duration-300 ${crtEnabled ? 'bg-cyan-900/80 border border-cyan-500' : 'bg-gray-800 border border-gray-600'}`}
-                            >
-                                <div className={`absolute top-0.5 bottom-0.5 w-6 lg:w-6 bg-white rounded-full transition-all duration-300 shadow-[0_0_10px_white] ${crtEnabled ? 'left-7 lg:left-8 bg-cyan-400' : 'left-0.5 bg-gray-500'}`}></div>
-                            </button>
+        <div className={`fixed inset-0 z-[110] ${motionClass(present.phase)}`}>
+            <Dossier title={t('SETTINGS')} onBack={onClose} backLabel={t('BACK')}>
+                <div className="dossier-split">
+                    <section>
+                    <h3 className="dossier-kicker">{t('AUDIO_PROTOCOLS')}</h3>
+                    <Meter label={t('MASTER_OUTPUT')} value={audioSettings.master} onChange={(v) => onUpdateAudio('master', v)} />
+                    <Meter label={t('MUSIC_STREAM')} value={audioSettings.music} onChange={(v) => onUpdateAudio('music', v)} />
+                    <Meter label={t('SFX_FEEDBACK')} value={audioSettings.sfx} onChange={(v) => onUpdateAudio('sfx', v)} />
+                    </section>
+                    <section>
+                    <h3 className="dossier-kicker">{t('VISUAL_OPTICS')}</h3>
+                    <div className="dossier-card mb-2 flex items-center justify-between gap-4">
+                        <div>
+                            <div className="font-['Teko'] text-[22px] leading-none tracking-wide">{t('RETRO_FILTER')}</div>
+                            <p>{t('CRT_DESC')}</p>
                         </div>
-
-                        {/* HIGH QUALITY TOGGLE */}
-                        <div className="flex flex-col bg-white/5 p-4 lg:p-4 border border-white/10">
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="flex flex-col">
-                                    <span className="text-xs lg:text-sm font-bold text-white tracking-widest">{t('HIGH_QUALITY')}</span>
-                                </div>
-                                <button 
-                                    onClick={onToggleHighQuality}
-                                    className={`w-14 h-6 lg:w-16 lg:h-8 rounded-full relative transition-all duration-300 ${forceHighQuality ? 'bg-red-900/80 border border-red-500' : 'bg-gray-800 border border-gray-600'}`}
-                                >
-                                    <div className={`absolute top-0.5 bottom-0.5 w-6 lg:w-6 bg-white rounded-full transition-all duration-300 shadow-[0_0_10px_white] ${forceHighQuality ? 'left-7 lg:left-8 bg-red-500' : 'left-0.5 bg-gray-500'}`}></div>
-                                </button>
-                            </div>
-                             <span className="text-[8px] lg:text-[10px] text-red-400">{t('HQ_WARNING')}</span>
-                        </div>
+                        <Switch on={crtEnabled} onClick={toggleCrt} />
                     </div>
-
-                    {/* Language Section */}
-                    <div className="mb-4 lg:mb-8">
-                        <h3 className="text-[10px] lg:text-xs font-mono text-gray-500 mb-2 lg:mb-4 border-l-2 border-cyan-500 pl-2">{t('LANG')}</h3>
-                        <div className="flex gap-2">
+                    <div className="dossier-card mb-2">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="font-['Teko'] text-[22px] leading-none tracking-wide">{t('HIGH_QUALITY')}</div>
+                            <Switch on={forceHighQuality} onClick={onToggleHighQuality} />
+                        </div>
+                        <p className="mt-2 text-[#e7b0a4]">{t('HQ_WARNING')}</p>
+                    </div>
+                    </section>
+                </div>
+                <div className="dossier-foot">
+                    <div>
+                        <h3 className="dossier-kicker">{t('LANG')}</h3>
+                        <div className="grid grid-cols-3 gap-2">
                             {(['EN', 'PT', 'ES'] as Language[]).map(l => (
-                                <button 
+                                <button
                                     key={l}
+                                    type="button"
                                     onClick={() => onLanguageChange(l)}
-                                    className={`flex-1 py-3 lg:py-3 font-bold text-[10px] lg:text-xs tracking-widest border transition-all duration-300 flex items-center justify-center gap-2
-                                    ${language === l 
-                                        ? 'bg-cyan-600 text-black border-cyan-400 shadow-[0_0_15px_rgba(0,255,255,0.4)]' 
-                                        : 'bg-black/40 text-cyan-700 border-cyan-900/50 hover:bg-cyan-900/20'}`}
+                                    className={`px-4 py-2 font-['Teko'] text-[22px] leading-none tracking-[0.14em] rounded-md border ${language === l ? 'bg-[#e2a01f] text-[#1a1008] border-[#ffe08a]' : 'bg-black/35 text-[#f6f1e6] border-[#e2b060]/30'}`}
                                 >
                                     {l}
                                 </button>
                             ))}
                         </div>
                     </div>
-
-                    <div className="mb-4 lg:mb-6">
-                        <h3 className="text-[10px] lg:text-xs font-mono text-gray-500 mb-2 lg:mb-3 border-l-2 border-cyan-500 pl-2">{t('PH_ACCESS_CODE')}</h3>
+                    <div>
+                        <h3 className="dossier-kicker">{t('PH_ACCESS_CODE')}</h3>
                         <input
                             type="text"
                             value={cheatInput}
@@ -216,37 +170,18 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                             autoCorrect="off"
                             spellCheck={false}
                             placeholder={t('PH_ACCESS_CODE')}
-                            className="w-full bg-black/50 border border-cyan-900/50 px-3 py-3 font-mono text-[11px] lg:text-xs tracking-[0.22em] text-cyan-100 uppercase placeholder:text-cyan-900 focus:outline-none focus:border-cyan-400"
+                            className="w-full bg-black/45 border border-[#e2b060]/35 rounded-md px-3 py-2.5 font-mono text-xs tracking-[0.18em] text-[#f6f1e6] uppercase placeholder:text-[#e2b060]/40 focus:outline-none focus:border-[#ffe08a]"
                         />
                     </div>
-
-                    {/* Surpresa 2: SYSTEM PURGE (Data Reset) */}
-                    <div className="mb-4 lg:mb-6 border-t border-red-900/30 pt-4 lg:pt-6">
-                        <button 
-                            onClick={handleReset}
-                            className={`w-full py-3 lg:py-4 border font-mono text-[10px] lg:text-xs tracking-[0.2em] transition-all relative overflow-hidden group
-                                ${resetStage === 1 
-                                    ? 'bg-red-600 text-black border-red-500 animate-pulse' 
-                                    : 'bg-red-950/20 text-red-500 border-red-900/50 hover:bg-red-900/40'}`}
-                        >
-                            <span className="relative z-10 flex items-center justify-center gap-2">
-                                {resetStage === 1 ? t('CONFIRM_PURGE') : t('SYSTEM_PURGE')}
-                            </span>
-                            {/* Barra de progresso visual para o reset */}
-                            <div className={`absolute bottom-0 left-0 h-1 bg-red-500 transition-all duration-[3000ms] ease-linear ${resetStage === 1 ? 'w-full' : 'w-0'}`}></div>
-                        </button>
-                    </div>
-
-                    {/* Footer Actions */}
-                    <button 
-                        onClick={onClose}
-                        className="w-full py-3 lg:py-4 bg-cyan-600 hover:bg-cyan-500 text-black font-bold tracking-[0.2em] text-xs lg:text-base transition-all shadow-[0_0_20px_rgba(0,255,255,0.3)] hover:scale-[1.02]"
+                    <button
+                        type="button"
+                        onClick={handleReset}
+                        className={`px-4 py-2.5 rounded-md border font-['Teko'] text-[22px] leading-none tracking-[0.12em] ${resetStage === 1 ? 'bg-[#b91c1c] text-white border-[#fecaca]' : 'bg-transparent text-[#f0b4a8] border-[#b91c1c]/60'}`}
                     >
-                        {t('BACK')}
+                        {resetStage === 1 ? t('CONFIRM_PURGE') : t('SYSTEM_PURGE')}
                     </button>
-
                 </div>
-            </div>
+            </Dossier>
         </div>
     );
 };
