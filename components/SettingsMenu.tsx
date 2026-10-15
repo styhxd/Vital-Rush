@@ -83,10 +83,10 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
     };
 
     const Meter = ({ label, value, onChange }: { label: string, value: number, onChange: (val: number) => void }) => (
-        <label className="block mb-3">
-            <div className="flex items-center justify-between mb-1 text-[11px] tracking-[0.14em] text-[#f4f1ea]">
+        <label className="block mb-2">
+            <div className="flex items-center justify-between mb-1 text-[10px] tracking-[0.14em] text-[#f4f1ea]">
                 <span>{label}</span>
-                <strong className="font-['Teko'] text-[22px] font-semibold leading-none text-[#ffd84a]">{Math.round(value * 100)}</strong>
+                <strong className="font-['Teko'] text-[15px] font-semibold leading-none text-[#ffd84a]">{Math.round(value * 100)}</strong>
             </div>
             <div className="relative h-7 bg-black/45 border border-[#e2b060]/35 rounded-md px-1.5 flex items-center">
                 <input
@@ -130,14 +130,14 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                     <h3 className="dossier-kicker">{t('VISUAL_OPTICS')}</h3>
                     <div className="dossier-card mb-2 flex items-center justify-between gap-4">
                         <div>
-                            <div className="font-['Teko'] text-[22px] leading-none tracking-wide">{t('RETRO_FILTER')}</div>
+                            <div className="font-['Teko'] text-[16px] leading-none tracking-wide">{t('RETRO_FILTER')}</div>
                             <p>{t('CRT_DESC')}</p>
                         </div>
                         <Switch on={crtEnabled} onClick={toggleCrt} />
                     </div>
                     <div className="dossier-card mb-2">
                         <div className="flex items-center justify-between gap-4">
-                            <div className="font-['Teko'] text-[22px] leading-none tracking-wide">{t('HIGH_QUALITY')}</div>
+                            <div className="font-['Teko'] text-[16px] leading-none tracking-wide">{t('HIGH_QUALITY')}</div>
                             <Switch on={forceHighQuality} onClick={onToggleHighQuality} />
                         </div>
                         <p className="mt-2 text-[#e7b0a4]">{t('HQ_WARNING')}</p>
@@ -153,7 +153,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                                     key={l}
                                     type="button"
                                     onClick={() => onLanguageChange(l)}
-                                    className={`px-4 py-2 font-['Teko'] text-[22px] leading-none tracking-[0.14em] rounded-md border ${language === l ? 'bg-[#e2a01f] text-[#1a1008] border-[#ffe08a]' : 'bg-black/35 text-[#f6f1e6] border-[#e2b060]/30'}`}
+                                    className={`px-3 py-1.5 font-['Teko'] text-[16px] leading-none tracking-[0.14em] rounded-md border ${language === l ? 'bg-[#e2a01f] text-[#1a1008] border-[#ffe08a]' : 'bg-black/35 text-[#f6f1e6] border-[#e2b060]/30'}`}
                                 >
                                     {l}
                                 </button>
@@ -176,7 +176,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                     <button
                         type="button"
                         onClick={handleReset}
-                        className={`px-4 py-2.5 rounded-md border font-['Teko'] text-[22px] leading-none tracking-[0.12em] ${resetStage === 1 ? 'bg-[#b91c1c] text-white border-[#fecaca]' : 'bg-transparent text-[#f0b4a8] border-[#b91c1c]/60'}`}
+                        className={`px-3 py-2 rounded-md border font-['Teko'] text-[15px] leading-none tracking-[0.1em] ${resetStage === 1 ? 'bg-[#b91c1c] text-white border-[#fecaca]' : 'bg-transparent text-[#f0b4a8] border-[#b91c1c]/60'}`}
                     >
                         {resetStage === 1 ? t('CONFIRM_PURGE') : t('SYSTEM_PURGE')}
                     </button>

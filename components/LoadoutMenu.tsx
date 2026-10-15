@@ -43,10 +43,10 @@ export const LoadoutMenu: React.FC<LoadoutMenuProps> = ({ isVisible, stats, upgr
     ];
 
     return (
-        <div className={`fixed inset-0 z-[120] flex items-center justify-center p-3 lg:p-8 ${motionClass(present.phase)}`}>
+        <div className={`fixed inset-0 z-[120] flex items-center justify-center p-4 lg:p-10 ${motionClass(present.phase)}`}>
             <div className="absolute inset-0 bg-black/55" />
             <article
-                className="relative w-full max-w-4xl max-h-full overflow-y-auto shadow-[0_24px_70px_rgba(0,0,0,0.55)]"
+                className="relative w-full max-w-3xl max-h-full overflow-y-auto shadow-[0_18px_50px_rgba(0,0,0,0.55)]"
                 style={{ background: 'linear-gradient(180deg, #f8f1e3 0%, #f3e6d0 100%)', color: '#2b1614' }}
             >
                 <div className="absolute left-0 top-0 bottom-0 w-8 lg:w-11" style={{ background: band }}>
@@ -54,7 +54,7 @@ export const LoadoutMenu: React.FC<LoadoutMenuProps> = ({ isVisible, stats, upgr
                     <div className="absolute left-1/2 top-[20%] -translate-x-1/2 w-3 h-3 lg:w-4 lg:h-4 rounded-full bg-[#f8f1e3]" />
                 </div>
 
-                <div className="pl-12 lg:pl-16 pr-4 lg:pr-8 py-4 lg:py-6">
+                <div className="pl-10 lg:pl-16 pr-3 lg:pr-8 py-3 lg:py-6">
                     <div className="flex items-end justify-between gap-4 border-b pb-3" style={{ borderColor: `${ink}33` }}>
                         <div>
                             <div className="flex items-center gap-2">
@@ -64,21 +64,21 @@ export const LoadoutMenu: React.FC<LoadoutMenuProps> = ({ isVisible, stats, upgr
                                 </span>
                                 <span className="text-[10px] lg:text-xs tracking-[0.35em] font-bold" style={{ color: ink }}>VITAL RUSH</span>
                             </div>
-                            <h2 className="mt-1 text-3xl lg:text-5xl leading-none" style={{ fontFamily: 'Georgia, "Palatino Linotype", serif' }}>
+                            <h2 className="mt-1 text-2xl lg:text-4xl leading-none" style={{ fontFamily: 'Georgia, "Palatino Linotype", serif' }}>
                                 {t('LOADOUT')}
                             </h2>
                         </div>
                     </div>
-                    <p className="mt-3 text-sm" style={{ color: '#5c403c' }}>{t('LOADOUT_HINT')}</p>
+                    <p className="mt-2 text-xs lg:text-sm" style={{ color: '#5c403c' }}>{t('LOADOUT_HINT')}</p>
 
-                    <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="mt-3 lg:mt-5 grid grid-cols-2 gap-4 lg:gap-6">
                         <section>
                             <h3 className="text-[11px] tracking-[0.28em] font-bold" style={{ color: ink }}>{t('LOADOUT_NOW')}</h3>
                             <div className="mt-2">
                                 {rows.map(row => (
-                                    <div key={row.label} className="flex items-baseline justify-between gap-4 border-t py-2" style={{ borderColor: `${ink}22` }}>
-                                        <span className="text-sm" style={{ color: '#5c403c' }}>{row.label}</span>
-                                        <span className="text-base font-semibold tabular-nums">{row.value}</span>
+                                    <div key={row.label} className="flex items-baseline justify-between gap-3 border-t py-1 lg:py-2" style={{ borderColor: `${ink}22` }}>
+                                        <span className="text-xs lg:text-sm" style={{ color: '#5c403c' }}>{row.label}</span>
+                                        <span className="text-sm lg:text-base font-semibold tabular-nums">{row.value}</span>
                                     </div>
                                 ))}
                             </div>
@@ -109,7 +109,7 @@ export const LoadoutMenu: React.FC<LoadoutMenuProps> = ({ isVisible, stats, upgr
 
                     <button
                         onClick={onClose}
-                        className="mt-6 w-full py-4 font-bold tracking-[0.28em] text-sm uppercase text-black"
+                        className="mt-3 lg:mt-6 w-full py-2.5 lg:py-4 font-bold tracking-[0.22em] text-xs lg:text-sm uppercase text-black"
                         style={{ background: band, boxShadow: `0 6px 0 ${ink}` }}
                     >
                         {t('BACK')}

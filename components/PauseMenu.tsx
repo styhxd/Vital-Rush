@@ -46,15 +46,15 @@ export const PauseMenu: React.FC<PauseMenuProps> = ({ isPaused, language, isPlat
                         </span>
                         <span className="text-[10px] tracking-[0.35em] font-bold" style={{ color: ink }}>VITAL RUSH</span>
                     </div>
-                    <h2 className="mt-1 text-4xl leading-none" style={{ fontFamily: 'Georgia, "Palatino Linotype", serif' }}>
+                    <h2 className="mt-1 text-3xl leading-none" style={{ fontFamily: 'Georgia, "Palatino Linotype", serif' }}>
                         {t('PAUSED')}
                     </h2>
                     <p className="mt-3 text-sm leading-snug" style={{ color: '#5c403c' }}>{t('PAUSE_HINT')}</p>
 
-                    <div className="mt-6 flex flex-col gap-2">
+                    <div className="mt-4 flex flex-col gap-2">
                         <button
                             onClick={(e) => { e.stopPropagation(); onResume(); }}
-                            className="w-full py-4 font-bold tracking-[0.28em] text-sm uppercase text-black"
+                            className="w-full py-3 font-bold tracking-[0.22em] text-xs uppercase text-black"
                             style={{ background: band, boxShadow: `0 6px 0 ${ink}` }}
                         >
                             {t('RESUME')}

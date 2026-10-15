@@ -33,6 +33,123 @@ const MenuButton = ({ onClick, children, variant = 'primary', selected = false }
     );
 };
 
+type VirusSlot = { x: number; y: number };
+
+const FALLBACK_SLOTS: VirusSlot[] = [
+    { x: 58, y: 14 },
+    { x: 90, y: 11 },
+    { x: 56, y: 78 },
+    { x: 95, y: 60 },
+];
+
+// Pockets around Vital: above the left gun, the top-right corner, the dark
+// gap left of his hip, and the open flank beside his right arm. Measured from
+// his sprite so the same composition holds on a phone and on a wide screen.
+const layoutBox = (el: HTMLElement, stage: HTMLElement) => {
+    let x = 0;
+    let y = 0;
+    let node: HTMLElement | null = el;
+    while (node && node !== stage) {
+        x += node.offsetLeft;
+        y += node.offsetTop;
+        node = node.offsetParent as HTMLElement | null;
+    }
+    return { left: x, top: y, width: el.offsetWidth, height: el.offsetHeight, right: x + el.offsetWidth };
+};
+
+const measureVirusSlots = (): VirusSlot[] | null => {
+    const stage = document.querySelector('.menu-stage') as HTMLElement | null;
+    const vital = document.querySelector('.vital-anchor') as HTMLElement | null;
+    if (!stage || !vital) return null;
+    const s = {
+        left: 0,
+        top: 0,
+        width: stage.clientWidth,
+        height: stage.clientHeight,
+        right: stage.clientWidth,
+        bottom: stage.clientHeight,
+    };
+    const v = layoutBox(vital, stage);
+    if (s.width < 10 || v.width < 10) return null;
+
+    const menuRight = [...document.querySelectorAll<HTMLElement>('[data-menu-hit]')]
+        .reduce((max, el) => Math.max(max, layoutBox(el, stage).right), 0);
+    const pct = (x: number, y: number): VirusSlot => ({
+        x: ((x - s.left) / s.width) * 100,
+        y: ((y - s.top) / s.height) * 100,
+    });
+    const radii = [0.09, 0.07, 0.06, 0.065].map((part) => s.height * part);
+    const clearOfMenu = (x: number, radius: number) => Math.max(x, menuRight + radius + 10);
+    const onScreen = (slot: VirusSlot, radius: number): VirusSlot => ({
+        x: Math.min(98, Math.max((radius / s.width) * 100 + 1, slot.x)),
+        y: Math.min(96, Math.max((radius / s.height) * 100 + 1, slot.y)),
+    });
+
+    const gap = v.left - menuRight;
+    const sky = pct(
+        clearOfMenu(menuRight + Math.max(gap * 0.72, radii[0]), radii[0]),
+        Math.max(s.top + radii[0] * 0.45, v.top - radii[0] * 0.45)
+    );
+    const corner = pct(
+        Math.min(s.right - radii[1] - 8, v.right - v.width * 0.18),
+        Math.max(s.top + radii[1] * 0.4, v.top - s.height * 0.05)
+    );
+    const hip = pct(
+        clearOfMenu((menuRight + v.left) / 2, radii[2]),
+        v.top + v.height * 0.7
+    );
+    const flank = pct(
+        Math.min(s.right - radii[3] - 6, v.left + v.width * 0.93),
+        v.top + v.height * 0.48
+    );
+
+    return [sky, corner, hip, flank].map((slot, index) => onScreen(slot, radii[index]));
+};
+
+const useVirusSlots = (active: boolean) => {
+    const [slots, setSlots] = useState<VirusSlot[]>(FALLBACK_SLOTS);
+    const [placed, setPlaced] = useState(false);
+    const [order, setOrder] = useState([0, 1, 2, 3]);
+
+    useEffect(() => {
+        if (!active) return;
+        let frame = 0;
+        const measure = () => {
+            const next = measureVirusSlots();
+            if (next) {
+                setSlots(next);
+                setPlaced(true);
+            }
+        };
+        frame = requestAnimationFrame(() => requestAnimationFrame(measure));
+        window.addEventListener('resize', measure);
+        return () => {
+            cancelAnimationFrame(frame);
+            window.removeEventListener('resize', measure);
+        };
+    }, [active]);
+
+    useEffect(() => {
+        if (!active) return;
+        let timer = 0;
+        const hop = () => {
+            setOrder((prev) => {
+                const next = [...prev];
+                const a = Math.floor(Math.random() * next.length);
+                let b = Math.floor(Math.random() * (next.length - 1));
+                if (b >= a) b += 1;
+                [next[a], next[b]] = [next[b], next[a]];
+                return next;
+            });
+            timer = window.setTimeout(hop, 20000 + Math.random() * 16000);
+        };
+        timer = window.setTimeout(hop, 22000 + Math.random() * 8000);
+        return () => window.clearTimeout(timer);
+    }, [active]);
+
+    return { slots: order.map((index) => slots[index]), placed };
+};
+
 interface MainMenuProps {
     isVisible: boolean;
     language: Language;
@@ -52,6 +169,7 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
     
     const [showIntro, setShowIntro] = useState(true);
     const present = useScreenPresence(isVisible && !showIntro);
+    const viruses = useVirusSlots(!showIntro);
 
     useEffect(() => {
         if (showIntro || !isVisible) return;
@@ -117,58 +235,29 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     from { opacity: 0; transform: translate3d(-96px, 18px, 0); }
                     to { opacity: 1; transform: translate3d(0, 0, 0); }
                 }
-                @keyframes virus-in-top {
-                    from { opacity: 0; transform: translate3d(-8vw, -48vh, 0) rotate(-22deg) scale(0.62); }
-                    to { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+                @keyframes virus-arrive {
+                    from { opacity: 0; transform: scale(0.7); }
+                    to { opacity: 1; transform: scale(1); }
                 }
-                @keyframes virus-in-right {
-                    from { opacity: 0; transform: translate3d(42vw, -10vh, 0) rotate(20deg) scale(0.66); }
-                    to { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+                @keyframes virus-idle-a {
+                    0%, 68% { transform: translate(-50%, -50%) rotate(-3deg); }
+                    84% { transform: translate(-50%, -50%) translate3d(5px, -7px, 0) rotate(2deg); }
+                    100% { transform: translate(-50%, -50%) rotate(-3deg); }
                 }
-                @keyframes virus-in-bottom {
-                    from { opacity: 0; transform: translate3d(10vw, 46vh, 0) rotate(-16deg) scale(0.7); }
-                    to { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+                @keyframes virus-idle-b {
+                    0%, 74% { transform: translate(-50%, -50%) rotate(4deg); }
+                    88% { transform: translate(-50%, -50%) translate3d(-6px, 5px, 0) rotate(-1deg); }
+                    100% { transform: translate(-50%, -50%) rotate(4deg); }
                 }
-                @keyframes virus-in-left {
-                    from { opacity: 0; transform: translate3d(-46vw, 14vh, 0) rotate(18deg) scale(0.64); }
-                    to { opacity: 1; transform: translate3d(0, 0, 0) rotate(0deg) scale(1); }
+                @keyframes virus-idle-c {
+                    0%, 62% { transform: translate(-50%, -50%) rotate(1deg); }
+                    80% { transform: translate(-50%, -50%) translate3d(4px, 8px, 0) rotate(-3deg); }
+                    100% { transform: translate(-50%, -50%) rotate(1deg); }
                 }
-                @keyframes virus-route {
-                    0%, 16%  { transform: translate3d(44%, 7%, 0); }
-                    25%, 41% { transform: translate3d(87%, 15%, 0); }
-                    50%, 66% { transform: translate3d(92%, 84%, 0); }
-                    75%, 91% { transform: translate3d(44%, 88%, 0); }
-                    100%     { transform: translate3d(44%, 7%, 0); }
-                }
-                @keyframes virus-route-land {
-                    0%, 16%  { transform: translate3d(74%, 20%, 0); }
-                    25%, 41% { transform: translate3d(88%, 28%, 0); }
-                    50%, 66% { transform: translate3d(90%, 62%, 0); }
-                    75%, 91% { transform: translate3d(72%, 68%, 0); }
-                    100%     { transform: translate3d(74%, 20%, 0); }
-                }
-                @keyframes virus-depth {
-                    0%, 41% { z-index: 24; }
-                    41.01%, 50% { z-index: 15; }
-                    50.01%, 66% { z-index: 24; }
-                    66.01%, 75% { z-index: 15; }
-                    75.01%, 100% { z-index: 24; }
-                }
-                @keyframes virus-hover-a {
-                    0%, 100% { transform: translate(-50%, -50%) rotate(-6deg); }
-                    50% { transform: translate(-50%, -50%) translate3d(10px, -18px, 0) rotate(8deg); }
-                }
-                @keyframes virus-hover-b {
-                    0%, 100% { transform: translate(-50%, -50%) rotate(7deg); }
-                    50% { transform: translate(-50%, -50%) translate3d(-14px, -16px, 0) rotate(-5deg); }
-                }
-                @keyframes virus-hover-c {
-                    0%, 100% { transform: translate(-50%, -50%) rotate(4deg); }
-                    50% { transform: translate(-50%, -50%) translate3d(12px, -14px, 0) rotate(-8deg); }
-                }
-                @keyframes virus-hover-d {
-                    0%, 100% { transform: translate(-50%, -50%) rotate(-8deg); }
-                    50% { transform: translate(-50%, -50%) translate3d(-8px, -20px, 0) rotate(6deg); }
+                @keyframes virus-idle-d {
+                    0%, 78% { transform: translate(-50%, -50%) rotate(-2deg); }
+                    90% { transform: translate(-50%, -50%) translate3d(-4px, -6px, 0) rotate(3deg); }
+                    100% { transform: translate(-50%, -50%) rotate(-2deg); }
                 }
                 .anim-vital { animation: vital-breath 6.5s linear infinite; transform-origin: center bottom; will-change: transform; }
                 .vital-arrive { animation: vital-arrive 1.25s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both; }
@@ -178,64 +267,56 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     position: absolute;
                     left: 0;
                     top: 0;
+                    z-index: 16;
                     width: 100%;
                     height: 100%;
                     pointer-events: none;
-                    animation-name: virus-route, virus-depth;
-                    animation-duration: 52s, 52s;
-                    animation-timing-function: cubic-bezier(0.45, 0.02, 0.55, 0.98), step-end;
-                    animation-iteration-count: infinite, infinite;
-                    animation-delay: var(--route-delay), var(--route-delay);
                 }
-                .virus-in-top, .virus-in-right, .virus-in-bottom, .virus-in-left {
-                    animation-duration: 1.08s;
-                    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
-                    animation-fill-mode: both;
+                .virus-route.is-settled {
+                    transition: transform 7.5s cubic-bezier(0.45, 0.02, 0.2, 1);
                 }
-                .virus-in-top { animation-name: virus-in-top; }
-                .virus-in-right { animation-name: virus-in-right; }
-                .virus-in-bottom { animation-name: virus-in-bottom; }
-                .virus-in-left { animation-name: virus-in-left; }
-                .virus-hover-a { animation: virus-hover-a 5.4s ease-in-out infinite; }
-                .virus-hover-b { animation: virus-hover-b 6.3s ease-in-out infinite; }
-                .virus-hover-c { animation: virus-hover-c 5.8s ease-in-out infinite; }
-                .virus-hover-d { animation: virus-hover-d 6.8s ease-in-out infinite; }
+                .virus-arrive {
+                    animation: virus-arrive 1.15s cubic-bezier(0.16, 1, 0.3, 1) both;
+                }
+                .virus-idle-a { animation: virus-idle-a 11s ease-in-out infinite; }
+                .virus-idle-b { animation: virus-idle-b 13.5s ease-in-out infinite; }
+                .virus-idle-c { animation: virus-idle-c 9.5s ease-in-out infinite; }
+                .virus-idle-d { animation: virus-idle-d 15s ease-in-out infinite; }
                 [data-menu-hit] { transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease; }
                 [data-menu-hit].menu-hit {
                     background-color: rgba(12, 8, 10, 0.94) !important;
                     border-color: rgba(255, 255, 255, 0.38) !important;
                     color: #fff !important;
                 }
-                @media (max-width: 1023px) and (orientation: landscape) {
-                    .virus-route {
-                        animation-name: virus-route-land, virus-depth;
-                    }
-                }
             `}</style>
 
-            <div className="absolute inset-0 w-full h-full">
+            <div className="menu-stage absolute inset-0 w-full h-full">
                     <div className="absolute inset-0 bg-cover bg-center z-0 bg-arrive" style={{ backgroundImage: `url(${BACKGROUND})` }} />
                     <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent z-10 bg-arrive"></div>
 
                     {([
-                        { size: 'clamp(64px, 22vh, 230px)', delay: '0s', hover: 'virus-hover-a', arrive: 'virus-in-top', arriveDelay: '0.1s' },
-                        { size: 'clamp(52px, 16vh, 175px)', delay: '-13s', hover: 'virus-hover-b', arrive: 'virus-in-right', arriveDelay: '0.24s' },
-                        { size: 'clamp(46px, 14vh, 155px)', delay: '-26s', hover: 'virus-hover-c', arrive: 'virus-in-bottom', arriveDelay: '0.18s' },
-                        { size: 'clamp(50px, 15vh, 165px)', delay: '-39s', hover: 'virus-hover-d', arrive: 'virus-in-left', arriveDelay: '0.34s' },
-                    ] as const).map((virus) => (
-                        <div key={virus.delay} className="virus-route" style={{ ['--route-delay' as string]: virus.delay }}>
-                            <div className={virus.arrive} style={{ animationDelay: virus.arriveDelay }}>
+                        { size: 'clamp(58px, 18vh, 210px)', idle: 'virus-idle-a', arriveDelay: '0.12s' },
+                        { size: 'clamp(46px, 14vh, 160px)', idle: 'virus-idle-b', arriveDelay: '0.28s' },
+                        { size: 'clamp(42px, 12vh, 142px)', idle: 'virus-idle-c', arriveDelay: '0.2s' },
+                        { size: 'clamp(44px, 13vh, 150px)', idle: 'virus-idle-d', arriveDelay: '0.36s' },
+                    ] as const).map((virus, index) => (
+                        <div
+                            key={virus.idle}
+                            className={`virus-route${viruses.placed ? ' is-settled' : ''}`}
+                            style={{ transform: `translate3d(${viruses.slots[index].x}%, ${viruses.slots[index].y}%, 0)` }}
+                        >
+                            <div className="virus-arrive" style={{ animationDelay: virus.arriveDelay }}>
                                 <img
                                     src={VIRUS}
                                     alt=""
                                     style={{ width: virus.size }}
-                                    className={`absolute left-0 top-0 max-w-none h-auto ${virus.hover} drop-shadow-[0_0_22px_rgba(0,255,0,0.5)]`}
+                                    className={`absolute left-0 top-0 max-w-none h-auto ${virus.idle} drop-shadow-[0_0_22px_rgba(0,255,0,0.5)]`}
                                 />
                             </div>
                         </div>
                     ))}
 
-                    <div className="absolute right-[2%] lg:right-[5%] bottom-0 lg:bottom-[-5%] h-[76%] lg:h-[90%] z-20 pointer-events-none flex items-end justify-end vital-arrive">
+                    <div className="vital-anchor absolute right-[2%] lg:right-[5%] bottom-0 lg:bottom-[-5%] h-[76%] lg:h-[90%] z-20 pointer-events-none flex items-end justify-end vital-arrive">
                          <div className="h-full anim-vital">
                          <img src={VITAL_HERO} alt="Vital" className="h-full w-auto max-w-none object-contain"
                             style={{ filter: isPlatinum ? 'drop-shadow(0 0 30px rgba(255, 215, 0, 0.4))' : 'drop-shadow(0 0 30px rgba(0, 255, 255, 0.3))' }}

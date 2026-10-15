@@ -1128,14 +1128,14 @@ export const Game: React.FC = () => {
                               const isLocked = !progress.unlocked;
                               if (ach.secret && isLocked) {
                                   return (
-                                      <div key={ach.id} className="dossier-card flex items-center justify-center opacity-45 min-h-[72px]">
+                                      <div key={ach.id} className="dossier-card flex items-center justify-center opacity-45 min-h-[52px] lg:min-h-[72px]">
                                           <span className="text-[11px] tracking-[0.22em] text-[#e2b060]/70">??? ENCRYPTED DATA ???</span>
                                       </div>
                                   )
                               }
 
                               return (
-                                  <div key={ach.id} className={`dossier-card relative overflow-hidden flex flex-col min-h-[88px]
+                                  <div key={ach.id} className={`dossier-card relative overflow-hidden flex flex-col min-h-[64px] lg:min-h-[88px]
                                       ${isLocked ? 'opacity-55' : ''}`}>
                                       <div className="flex items-center lg:items-start gap-3 lg:gap-4 z-10 relative h-full">
                                           <div className="text-2xl lg:text-4xl filter drop-shadow-md">{ach.icon}</div>
