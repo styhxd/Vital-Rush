@@ -142,6 +142,13 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     75%, 91% { transform: translate3d(44%, 88%, 0); }
                     100%     { transform: translate3d(44%, 7%, 0); }
                 }
+                @keyframes virus-route-land {
+                    0%, 16%  { transform: translate3d(74%, 20%, 0); }
+                    25%, 41% { transform: translate3d(88%, 28%, 0); }
+                    50%, 66% { transform: translate3d(90%, 62%, 0); }
+                    75%, 91% { transform: translate3d(72%, 68%, 0); }
+                    100%     { transform: translate3d(74%, 20%, 0); }
+                }
                 @keyframes virus-depth {
                     0%, 41% { z-index: 24; }
                     41.01%, 50% { z-index: 15; }
@@ -201,6 +208,11 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     border-color: rgba(255, 255, 255, 0.38) !important;
                     color: #fff !important;
                 }
+                @media (max-width: 1023px) and (orientation: landscape) {
+                    .virus-route {
+                        animation-name: virus-route-land, virus-depth;
+                    }
+                }
             `}</style>
 
             <div className="absolute inset-0 w-full h-full">
@@ -208,10 +220,10 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent z-10 bg-arrive"></div>
 
                     {([
-                        { size: 'clamp(104px, 24vh, 230px)', delay: '0s', hover: 'virus-hover-a', arrive: 'virus-in-top', arriveDelay: '0.1s' },
-                        { size: 'clamp(80px, 18vh, 175px)', delay: '-13s', hover: 'virus-hover-b', arrive: 'virus-in-right', arriveDelay: '0.24s' },
-                        { size: 'clamp(72px, 16vh, 155px)', delay: '-26s', hover: 'virus-hover-c', arrive: 'virus-in-bottom', arriveDelay: '0.18s' },
-                        { size: 'clamp(78px, 17vh, 165px)', delay: '-39s', hover: 'virus-hover-d', arrive: 'virus-in-left', arriveDelay: '0.34s' },
+                        { size: 'clamp(64px, 22vh, 230px)', delay: '0s', hover: 'virus-hover-a', arrive: 'virus-in-top', arriveDelay: '0.1s' },
+                        { size: 'clamp(52px, 16vh, 175px)', delay: '-13s', hover: 'virus-hover-b', arrive: 'virus-in-right', arriveDelay: '0.24s' },
+                        { size: 'clamp(46px, 14vh, 155px)', delay: '-26s', hover: 'virus-hover-c', arrive: 'virus-in-bottom', arriveDelay: '0.18s' },
+                        { size: 'clamp(50px, 15vh, 165px)', delay: '-39s', hover: 'virus-hover-d', arrive: 'virus-in-left', arriveDelay: '0.34s' },
                     ] as const).map((virus) => (
                         <div key={virus.delay} className="virus-route" style={{ ['--route-delay' as string]: virus.delay }}>
                             <div className={virus.arrive} style={{ animationDelay: virus.arriveDelay }}>
@@ -225,7 +237,7 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                         </div>
                     ))}
 
-                    <div className="absolute right-[-5%] lg:right-[5%] bottom-[-5%] h-[70%] lg:h-[90%] z-20 pointer-events-none flex items-end justify-end vital-arrive">
+                    <div className="absolute right-[2%] lg:right-[5%] bottom-0 lg:bottom-[-5%] h-[76%] lg:h-[90%] z-20 pointer-events-none flex items-end justify-end vital-arrive">
                          <div className="h-full anim-vital">
                          <img src={VITAL_HERO} alt="Vital" className="h-full w-auto max-w-none object-contain"
                             style={{ filter: isPlatinum ? 'drop-shadow(0 0 30px rgba(255, 215, 0, 0.4))' : 'drop-shadow(0 0 30px rgba(0, 255, 255, 0.3))' }}

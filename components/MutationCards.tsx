@@ -1,19 +1,21 @@
-import React, { useEffect, useState } from 'react';
-import { Upgrade, Language } from '../types';
+import React, { useEffect, useRef, useState } from 'react';
+import { Upgrade, Language, Difficulty } from '../types';
 
-const CARD_ART: Record<string, string> = {
-    mitosis: new URL('../src/assets/cards/01-mitosis.png', import.meta.url).href,
-    enzyme: new URL('../src/assets/cards/02-enzyme.png', import.meta.url).href,
-    membrane: new URL('../src/assets/cards/03-membrane.png', import.meta.url).href,
-    multishot: new URL('../src/assets/cards/04-multishot.png', import.meta.url).href,
-    orbitals: new URL('../src/assets/cards/05-orbitals.png', import.meta.url).href,
-    crit: new URL('../src/assets/cards/06-crit.png', import.meta.url).href,
-    dash_dmg: new URL('../src/assets/cards/07-dash.png', import.meta.url).href,
-    thorns: new URL('../src/assets/cards/08-thorns.png', import.meta.url).href,
-    lifesteal: new URL('../src/assets/cards/09-lifesteal.png', import.meta.url).href,
-    magnet: new URL('../src/assets/cards/10-magnet.png', import.meta.url).href,
-    energy_core: new URL('../src/assets/cards/11-energy.png', import.meta.url).href,
-    giga_blast: new URL('../src/assets/cards/12-giga.png', import.meta.url).href,
+const CARD_BG = new URL('../src/assets/cards/card-bg.webp', import.meta.url).href;
+
+const ART: Record<string, { src: string; tint: string; wash: string }> = {
+    mitosis: { src: new URL('../src/assets/cards/01-mitosis.webp', import.meta.url).href, tint: '#ff9a2a', wash: '86% 28%' },
+    enzyme: { src: new URL('../src/assets/cards/02-enzyme.webp', import.meta.url).href, tint: '#ff3a22', wash: '80% 24%' },
+    membrane: { src: new URL('../src/assets/cards/03-membrane.webp', import.meta.url).href, tint: '#ff3358', wash: '82% 36%' },
+    multishot: { src: new URL('../src/assets/cards/04-multishot.webp', import.meta.url).href, tint: '#ff7a18', wash: '78% 40%' },
+    orbitals: { src: new URL('../src/assets/cards/05-orbitals.webp', import.meta.url).href, tint: '#ff2d2d', wash: '84% 32%' },
+    crit: { src: new URL('../src/assets/cards/06-crit.webp', import.meta.url).href, tint: '#2ad4e6', wash: '82% 30%' },
+    dash_dmg: { src: new URL('../src/assets/cards/07-dash.webp', import.meta.url).href, tint: '#3ecfff', wash: '88% 38%' },
+    thorns: { src: new URL('../src/assets/cards/08-thorns.webp', import.meta.url).href, tint: '#ff6a3c', wash: '80% 34%' },
+    lifesteal: { src: new URL('../src/assets/cards/09-lifesteal.webp', import.meta.url).href, tint: '#ff5d78', wash: '74% 42%' },
+    magnet: { src: new URL('../src/assets/cards/10-magnet.webp', import.meta.url).href, tint: '#c44ad4', wash: '86% 30%' },
+    energy_core: { src: new URL('../src/assets/cards/11-energy.webp', import.meta.url).href, tint: '#ff9a12', wash: '82% 36%' },
+    giga_blast: { src: new URL('../src/assets/cards/12-giga.webp', import.meta.url).href, tint: '#4eb6ea', wash: '76% 44%' },
 };
 
 const RARITY_KEY: Record<Upgrade['rarity'], string> = {
@@ -24,20 +26,20 @@ const RARITY_KEY: Record<Upgrade['rarity'], string> = {
 };
 
 const RARITY_INK: Record<Upgrade['rarity'], string> = {
-    COMMON: '#8d8374',
+    COMMON: '#6f675c',
     RARE: '#c4472a',
-    EPIC: '#8d3ec4',
+    EPIC: '#7c3ec4',
     LEGENDARY: '#e2a01f',
 };
 
-const RANK_HUE: Record<Upgrade['rarity'], number> = {
-    COMMON: 48,
-    RARE: -16,
-    EPIC: 26,
-    LEGENDARY: 10,
-};
+export const SERUM_WINDOW_MS = 8000;
 
-export const SERUM_WINDOW_MS = 6800;
+export function serumWindowMs(difficulty: Difficulty): number {
+    if (difficulty === Difficulty.EASY) return 12000;
+    if (difficulty === Difficulty.HARD) return 6000;
+    if (difficulty === Difficulty.APEX) return 4200;
+    return SERUM_WINDOW_MS;
+}
 
 export function rollSerumOffers(upgrades: Upgrade[]): string[] {
     const pool = upgrades.filter(u => u.level < u.maxLevel);
@@ -78,17 +80,18 @@ type CardProps = {
     hotkey?: string;
     forced?: boolean;
     pulse: Pulse;
+    guard?: () => boolean;
     onPress: () => void;
 };
 
 const MutationCard: React.FC<CardProps> = ({
-    upgrade, language, t, mode, canAfford, cost, hotkey, forced, pulse, onPress
+    upgrade, t, mode, canAfford, cost, hotkey, forced, pulse, guard, onPress
 }) => {
     const maxed = upgrade.level >= upgrade.maxLevel;
     const alive = mode === 'offer' || (!maxed && canAfford);
     const rank = upgrade.maxLevel > 0 ? upgrade.level / upgrade.maxLevel : 0;
     const ink = RARITY_INK[upgrade.rarity];
-    const art = CARD_ART[upgrade.id];
+    const art = ART[upgrade.id] ?? ART.mitosis;
     const pulsing = pulse?.id === upgrade.id ? pulse : null;
     const [motion, setMotion] = useState('none');
 
@@ -101,78 +104,81 @@ const MutationCard: React.FC<CardProps> = ({
         return () => cancelAnimationFrame(frame);
     }, [pulsing?.token]);
 
-    const tint = rank > 0
-        ? `saturate(${1 + rank * 0.55}) hue-rotate(${rank * RANK_HUE[upgrade.rarity]}deg) brightness(${1 + rank * 0.06})`
-        : undefined;
-
     const label = maxed
         ? t('MAXED')
         : mode === 'offer'
             ? t('SERUM_TAKE')
             : `${t('LAB_EVOLVE')} [${cost}]`;
 
+    const wash = upgrade.rarity === 'RARE'
+        ? `linear-gradient(90deg, rgba(196,71,42,0.34), transparent 26%), radial-gradient(circle at ${art.wash}, ${art.tint}b0, transparent 36%)`
+        : `radial-gradient(circle at ${art.wash}, ${art.tint}c4, transparent 34%)`;
+
     return (
+        <div className="lab-slot">
         <div
             role="button"
             tabIndex={alive || mode === 'shop' ? 0 : -1}
             aria-disabled={!alive && mode === 'shop'}
-            onClick={onPress}
+            aria-label={`${t(upgrade.nameKey)}. ${label}`}
+            onClick={() => {
+                if (guard && !guard()) return;
+                onPress();
+            }}
             onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
                     onPress();
                 }
             }}
-            className={`lab-card ${alive ? 'is-hot' : ''} ${!alive && !maxed ? 'is-poor' : ''} ${maxed ? 'is-max' : ''} ${forced ? 'is-forced' : ''}`}
+            className={`lab-card is-${upgrade.rarity.toLowerCase()} ${mode === 'offer' ? 'is-offer' : ''} ${alive ? 'is-hot' : ''} ${!alive && !maxed ? 'is-poor' : ''} ${maxed ? 'is-max' : ''} ${forced ? 'is-forced' : ''}`}
             style={{
-                ['--glow' as string]: ink,
+                ['--ink' as string]: ink,
+                ['--accent' as string]: art.tint,
+                ['--rank' as string]: rank,
                 animation: motion,
-                cursor: maxed ? 'default' : alive ? 'pointer' : 'not-allowed',
             }}
         >
-            <img src={art} alt="" draggable={false} style={{ filter: tint }} />
+            <img className="lab-shell" src={CARD_BG} alt="" draggable={false} />
+            <span className="lab-wash" style={{ background: wash }} />
+            <span className="lab-art-glow" />
+            <img className="lab-art" src={art.src} alt="" draggable={false} />
 
-            {language !== 'PT' && (
-                <>
-                    <div className="lab-rarity" style={{ background: ink }}>{t(RARITY_KEY[upgrade.rarity])}</div>
-                    <div className="lab-plate">
-                        <img src={art} alt="" />
-                    </div>
-                    <div className="lab-copy">
-                        <div className="lab-name">{t(upgrade.nameKey)}</div>
-                        <div className="lab-desc">{t(upgrade.descKey)}</div>
-                    </div>
-                </>
-            )}
-
+            <div className="lab-rarity">{t(RARITY_KEY[upgrade.rarity])}</div>
+            <div className="lab-level">
+                <small>{t('STAT_LEVEL')}</small>
+                <strong>{upgrade.level}/{upgrade.maxLevel}</strong>
+            </div>
             <div
-                className="lab-level"
-                style={{
-                    borderColor: rank > 0 ? ink : '#6a5840',
-                    boxShadow: rank > 0 ? `0 0 ${6 + rank * 10}px ${ink}` : undefined,
-                    color: maxed ? '#ffe08a' : '#f3ecdf',
-                }}
+                className={`lab-meter ${rank <= 0 ? 'is-empty' : ''} ${pulsing?.kind === 'ok' ? 'is-fresh' : ''}`}
+                style={{ ['--steps' as string]: Math.max(1, upgrade.maxLevel) }}
+                aria-hidden
             >
-                {t('STAT_LEVEL')} {upgrade.level}/{upgrade.maxLevel}
+                <b />
+            </div>
+
+            <div className="lab-copy">
+                <div className="lab-name">{t(upgrade.nameKey)}</div>
+                <div className="lab-desc">{t(upgrade.descKey)}</div>
             </div>
 
             <div className={`lab-evolve ${maxed ? 'is-maxed' : ''}`}>{label}</div>
-
             {hotkey && <div className="lab-key">{hotkey}</div>}
 
-            {rank > 0 && (
-                <div
-                    className="lab-rim"
-                    style={{ boxShadow: `inset 0 0 0 ${1 + rank * 3}px ${ink}`, opacity: 0.35 + rank * 0.65 }}
-                />
-            )}
+            <span className="lab-sheen" />
+            {upgrade.rarity === 'EPIC' && <span className="lab-scan" />}
+            {upgrade.rarity === 'LEGENDARY' && <span className="lab-glint" />}
+            <span className="lab-rim" />
 
             {pulsing?.kind === 'ok' && (
                 <>
-                    <div className="lab-flash" />
-                    {mode === 'shop' && <div className="lab-float">-{pulsing.cost}</div>}
+                    <span className="lab-flash" />
+                    <span className="lab-burst" />
+                    {mode === 'shop' && <span className="lab-float">-{pulsing.cost}</span>}
                 </>
             )}
+            {pulsing?.kind === 'no' && <span className="lab-deny-flash" />}
+        </div>
         </div>
     );
 };
@@ -189,11 +195,56 @@ type LabProps = {
 
 export const BioLab: React.FC<LabProps> = ({ upgrades, biomass, language, t, pulse, onBuy, onClose }) => {
     const [tick, setTick] = useState(false);
+    const [showHint, setShowHint] = useState(false);
+    const scrollerRef = useRef<HTMLDivElement>(null);
+    const dragRef = useRef({ down: false, y: 0, top: 0, moved: false });
+
     useEffect(() => {
         setTick(true);
         const timer = window.setTimeout(() => setTick(false), 280);
         return () => window.clearTimeout(timer);
     }, [biomass]);
+
+    useEffect(() => {
+        const el = scrollerRef.current;
+        if (!el) return;
+        const sync = () => {
+            const more = el.scrollHeight - el.clientHeight - el.scrollTop > 8;
+            setShowHint(more && el.scrollTop < 24);
+        };
+        sync();
+        const obs = new ResizeObserver(sync);
+        obs.observe(el);
+        el.addEventListener('scroll', sync, { passive: true });
+        return () => {
+            obs.disconnect();
+            el.removeEventListener('scroll', sync);
+        };
+    }, [upgrades.length]);
+
+    useEffect(() => {
+        const move = (event: PointerEvent) => {
+            const drag = dragRef.current;
+            const el = scrollerRef.current;
+            if (!drag.down || !el || event.pointerType !== 'mouse') return;
+            const dy = event.clientY - drag.y;
+            if (Math.abs(dy) > 8) {
+                drag.moved = true;
+                el.classList.add('is-grabbing');
+            }
+            if (drag.moved) el.scrollTop = drag.top - dy;
+        };
+        const up = () => {
+            dragRef.current.down = false;
+            scrollerRef.current?.classList.remove('is-grabbing');
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+        return () => {
+            window.removeEventListener('pointermove', move);
+            window.removeEventListener('pointerup', up);
+        };
+    }, []);
 
     return (
         <div className="lab-screen">
@@ -201,28 +252,56 @@ export const BioLab: React.FC<LabProps> = ({ upgrades, biomass, language, t, pul
                 <div className="vein-drift" />
                 <div className="vein-drift-b" />
             </div>
-            <div className="lab-head">
-                <span>{t('LAB_BIOMASS')}:</span>
-                <strong className={tick ? 'is-tick' : ''}>{biomass}</strong>
+            <header className="lab-head">
+                <div className="lab-brand">
+                    <svg viewBox="0 0 32 32" aria-hidden>
+                        <path d="M16 3 l6 3.2 v7.2 l-6 3.2 -6-3.2 V6.2z" fill="none" stroke="#e2a01f" strokeWidth="1.6" />
+                        <path d="M16 9.2 v6.2 M13.2 12.3 h5.6" stroke="#fff6d8" strokeWidth="1.6" strokeLinecap="square" />
+                    </svg>
+                    <span>{t('MUTATION')}</span>
+                </div>
+                <div className="lab-readout">
+                    <span>{t('LAB_BIOMASS')}</span>
+                    <strong className={tick ? 'is-tick' : ''}>{biomass}</strong>
+                </div>
+            </header>
+            <div className={`lab-tray ${showHint ? 'has-more' : ''}`}>
+                <div
+                    className="lab-grid"
+                    ref={scrollerRef}
+                    onPointerDown={(event) => {
+                        if (event.pointerType !== 'mouse' || event.button !== 0) return;
+                        dragRef.current = {
+                            down: true,
+                            y: event.clientY,
+                            top: event.currentTarget.scrollTop,
+                            moved: false,
+                        };
+                    }}
+                >
+                    {upgrades.map((upgrade) => {
+                        const cost = upgradeCost(upgrade);
+                        const canAfford = biomass >= cost;
+                        return (
+                            <MutationCard
+                                key={upgrade.id}
+                                upgrade={upgrade}
+                                language={language}
+                                t={t}
+                                mode="shop"
+                                canAfford={canAfford}
+                                cost={cost}
+                                pulse={pulse}
+                                guard={() => !dragRef.current.moved}
+                                onPress={() => onBuy(upgrade.id)}
+                            />
+                        );
+                    })}
+                </div>
             </div>
-            <div className="lab-grid custom-scroll">
-                {upgrades.map((upgrade) => {
-                    const cost = upgradeCost(upgrade);
-                    const canAfford = biomass >= cost;
-                    return (
-                        <MutationCard
-                            key={upgrade.id}
-                            upgrade={upgrade}
-                            language={language}
-                            t={t}
-                            mode="shop"
-                            canAfford={canAfford}
-                            cost={cost}
-                            pulse={pulse}
-                            onPress={() => onBuy(upgrade.id)}
-                        />
-                    );
-                })}
+            <div className={`lab-more ${showHint ? '' : 'is-hidden'}`}>
+                <i />
+                <em>{t('LAB_SCROLL')}</em>
             </div>
             <button type="button" className="lab-back" onClick={onClose}>{t('LAB_BACK')}</button>
         </div>
@@ -237,15 +316,16 @@ type OfferProps = {
     now: number;
     endsAt: number;
     collapseId: string | null;
+    windowMs?: number;
     onPick: (id: string) => void;
 };
 
 export const SerumOffer: React.FC<OfferProps> = ({
-    ids, upgrades, language, t, now, endsAt, collapseId, onPick
+    ids, upgrades, language, t, now, endsAt, collapseId, windowMs = SERUM_WINDOW_MS, onPick
 }) => {
     const left = Math.max(0, endsAt - now);
-    const ratio = Math.max(0, Math.min(1, left / SERUM_WINDOW_MS));
-    const urgent = left < 2200;
+    const ratio = Math.max(0, Math.min(1, left / windowMs));
+    const urgent = left < Math.min(2200, windowMs * 0.34);
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
@@ -262,15 +342,16 @@ export const SerumOffer: React.FC<OfferProps> = ({
                 <div className="serum-mark" aria-hidden>
                     <svg viewBox="0 0 64 64">
                         <defs>
-                            <linearGradient id="serumBurst" x1="0" y1="0" x2="1" y2="1">
-                                <stop offset="0" stopColor="#7af7ff" />
-                                <stop offset="0.5" stopColor="#ffffff" />
-                                <stop offset="1" stopColor="#ff4ad4" />
+                            <linearGradient id="serumFill" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0" stopColor="#d8fffb" />
+                                <stop offset="0.45" stopColor="#3ad8ff" />
+                                <stop offset="1" stopColor="#ff3ad0" />
                             </linearGradient>
                         </defs>
-                        <polygon points="32,2 38,22 60,16 44,32 60,48 38,42 32,62 26,42 4,48 20,32 4,16 26,22" fill="url(#serumBurst)" stroke="#1a0614" strokeWidth="2" />
-                        <circle cx="32" cy="32" r="13" fill="#ff4ad4" stroke="#fff" strokeWidth="3" />
-                        <path d="M32 23 v18 M23 32 h18" stroke="#fff" strokeWidth="4" strokeLinecap="square" />
+                        <rect x="24" y="6" width="16" height="8" rx="2" fill="#d5e2ee" stroke="#102028" strokeWidth="2" />
+                        <rect x="16" y="14" width="32" height="42" rx="12" fill="#2a1248" stroke="#f7fbff" strokeWidth="3" />
+                        <rect x="20" y="22" width="24" height="28" rx="8" fill="url(#serumFill)" />
+                        <path d="M33 27 l6 8 h-4 l5 10 -11-12 h4 z" fill="#fff" stroke="#1a0614" strokeWidth="1.2" />
                     </svg>
                     <em>{t('SERUM_TAG')}</em>
                 </div>
@@ -308,6 +389,7 @@ export const SerumOffer: React.FC<OfferProps> = ({
 };
 
 export const mutationCardStyles = `
+.lab-screen, .serum-screen { font-family: 'Chakra Petch', sans-serif; }
 .lab-screen {
     position: absolute;
     inset: 0;
@@ -315,7 +397,7 @@ export const mutationCardStyles = `
     display: flex;
     flex-direction: column;
     background:
-        radial-gradient(ellipse at 50% 42%, rgba(120, 24, 36, 0.42), rgba(18, 5, 8, 0.94) 68%),
+        radial-gradient(ellipse at 50% 38%, rgba(132, 28, 40, 0.46), rgba(16, 4, 8, 0.94) 70%),
         #120408;
     overflow: hidden;
 }
@@ -327,228 +409,462 @@ export const mutationCardStyles = `
 }
 .lab-head {
     position: relative;
-    z-index: 1;
+    z-index: 2;
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin: 0.55rem 2.4% 0.35rem;
+    padding: 0.35rem 0.9rem 0.35rem 0.7rem;
+    border: 1px solid rgba(226, 176, 96, 0.32);
+    border-radius: 10px;
+    background: linear-gradient(180deg, rgba(42, 24, 18, 0.72), rgba(12, 4, 6, 0.55));
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35), 0 6px 0 rgba(0,0,0,0.25);
+}
+.lab-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-width: 0;
+}
+.lab-brand svg { width: 28px; height: 28px; flex: none; }
+.lab-brand span {
+    color: #f6f1e6;
+    font-family: 'Teko', sans-serif;
+    font-size: clamp(22px, 2.4vw, 34px);
+    letter-spacing: 0.12em;
+    line-height: 0.9;
+    text-shadow: 0 2px 0 rgba(0,0,0,0.55);
+}
+.lab-readout {
+    display: flex;
     align-items: baseline;
-    gap: 0.7rem;
-    padding: 0.85rem 4% 0.35rem;
+    gap: 0.65rem;
 }
-.lab-head span {
+.lab-readout span {
     color: #f4f1ea;
-    font-weight: 800;
-    letter-spacing: 0.16em;
-    font-size: clamp(11px, 1.5vw, 16px);
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    font-size: clamp(10px, 1.15vw, 14px);
 }
-.lab-head strong {
+.lab-readout strong {
     color: #ffd84a;
-    font-family: var(--font-mono);
-    font-size: clamp(22px, 2.6vw, 36px);
-    line-height: 1;
+    font-family: 'Teko', sans-serif;
+    font-size: clamp(28px, 3vw, 42px);
+    font-weight: 600;
+    line-height: 0.8;
     text-shadow: 0 0 14px rgba(255, 196, 40, 0.7);
 }
-.lab-head strong.is-tick { animation: lab-biomass 0.28s ease; }
-.lab-grid {
+.lab-readout strong.is-tick { animation: lab-biomass 0.28s ease; }
+.lab-tray {
     position: relative;
     z-index: 1;
     flex: 1;
     min-height: 0;
+    container-type: inline-size;
+    margin: 0.15rem 2.2% 0.15rem;
+    border: 1px solid rgba(226, 176, 96, 0.34);
+    border-radius: 16px;
+    background:
+        linear-gradient(180deg, rgba(255, 214, 140, 0.05), transparent 18%),
+        rgba(0, 0, 0, 0.22);
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.45), inset 0 0 48px rgba(0,0,0,0.28);
+}
+.lab-tray::before {
+    content: '';
+    position: absolute;
+    inset: 7px;
+    border: 1px solid rgba(226, 176, 96, 0.14);
+    border-radius: 11px;
+    pointer-events: none;
+    z-index: 2;
+}
+.lab-tray.has-more::after {
+    content: '';
+    position: absolute;
+    left: 10px;
+    right: 18px;
+    bottom: 8px;
+    height: 22px;
+    border-radius: 0 0 12px 12px;
+    background: linear-gradient(transparent, rgba(10, 3, 6, 0.55));
+    pointer-events: none;
+    z-index: 2;
+}
+.lab-grid {
+    position: relative;
+    z-index: 1;
+    height: 100%;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: clamp(8px, 1.1vw, 16px);
-    padding: 0.4rem 3.2% 0.6rem;
+    gap: clamp(8px, 1.15vw, 18px);
+    padding: 0.7rem 0.9rem 0.85rem;
     overflow-y: auto;
     align-content: start;
+    justify-items: stretch;
+    cursor: grab;
+    scrollbar-width: thin;
+    scrollbar-color: #e2a01f rgba(255,255,255,0.06);
 }
+.lab-grid::-webkit-scrollbar { width: 10px; }
+.lab-grid::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 8px; }
+.lab-grid::-webkit-scrollbar-thumb {
+    background: repeating-linear-gradient(-52deg, #24180d 0 4px, #e2a01f 4px 8px);
+    border-radius: 8px;
+}
+.lab-grid.is-grabbing,
+.lab-grid.is-grabbing .lab-card { cursor: grabbing; }
+.lab-more {
+    position: relative;
+    z-index: 2;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin: 0.2rem auto 0;
+    padding: 0.16rem 0.75rem 0.12rem;
+    background: rgba(12, 6, 4, 0.88);
+    border: 1px solid rgba(226, 176, 96, 0.6);
+    border-radius: 999px;
+    color: #ffe08a;
+    letter-spacing: 0.16em;
+    font-weight: 700;
+    font-size: 11px;
+    pointer-events: none;
+    box-shadow: 0 3px 0 rgba(0,0,0,0.35);
+    animation: lab-hint 1.35s ease-in-out infinite;
+}
+.lab-more i {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #ffe08a;
+}
+.lab-more.is-hidden { display: none; }
 .lab-back {
     position: relative;
     z-index: 1;
-    margin: 0.15rem auto 0.7rem;
-    background: transparent;
-    border: 0;
+    margin: 0.35rem auto 0.7rem;
+    padding: 0.28rem 1.5rem 0.18rem;
+    background: linear-gradient(#3a3228, #1a140e);
+    border: 1px solid rgba(226, 176, 96, 0.5);
+    border-radius: 6px;
     color: #f7f4ee;
-    letter-spacing: 0.28em;
-    font-weight: 800;
-    font-size: clamp(13px, 1.5vw, 18px);
+    letter-spacing: 0.22em;
+    font-family: 'Teko', sans-serif;
+    font-size: clamp(18px, 1.8vw, 26px);
+    line-height: 1;
     cursor: pointer;
-    text-shadow: 0 2px 0 rgba(0,0,0,0.65);
+    box-shadow: 0 4px 0 #0a0604;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, color 0.12s ease;
 }
-.lab-back:hover { color: #ffe08a; }
-.lab-card {
+.lab-back:hover { color: #ffe08a; transform: translateY(-2px); }
+.lab-back:active { transform: translateY(2px); box-shadow: 0 1px 0 #0a0604; }
+.lab-slot {
     position: relative;
+    width: 100%;
+    aspect-ratio: 1100 / 496;
+}
+.lab-card {
+    position: absolute;
+    inset: 0;
     container-type: inline-size;
     width: 100%;
-    aspect-ratio: 408 / 184;
+    height: 100%;
+    overflow: hidden;
     border-radius: 8px;
     outline: none;
-    transform: translateZ(0);
-    filter: drop-shadow(0 7px 0 rgba(0,0,0,0.38));
-    transition: transform 0.16s ease, filter 0.16s ease;
     user-select: none;
+    transform: translateZ(0);
+    filter: drop-shadow(0 7px 0 rgba(0,0,0,0.4));
+    transition: transform 0.16s cubic-bezier(.2,.7,.2,1), filter 0.16s ease;
 }
-.lab-card img {
-    width: 100%;
-    height: 100%;
+.lab-shell, .lab-art {
+    position: absolute;
     display: block;
-    object-fit: fill;
     pointer-events: none;
-    border-radius: 8px;
 }
-.lab-card.is-hot:hover,
-.lab-card.is-hot:focus-visible {
-    transform: translateY(-6px) scale(1.028);
-    filter: drop-shadow(0 12px 0 rgba(0,0,0,0.34)) drop-shadow(0 0 16px var(--glow));
-}
-.lab-card.is-hot:active { transform: translateY(1px) scale(0.985); }
-.lab-card.is-poor:hover,
-.lab-card.is-poor:focus-visible,
-.lab-card.is-max:hover { transform: none; }
-.lab-card.is-max { filter: saturate(1.15) drop-shadow(0 0 10px rgba(255, 208, 74, 0.35)) drop-shadow(0 7px 0 rgba(0,0,0,0.38)); }
-.lab-card.is-forced {
-    transform: translateY(-8px) scale(1.04);
-    filter: drop-shadow(0 0 18px #ff4ad4) drop-shadow(0 12px 0 rgba(0,0,0,0.34));
-}
-.lab-level {
+.lab-shell { inset: 0; width: 100%; height: 100%; object-fit: fill; }
+.lab-wash, .lab-art-glow, .lab-sheen, .lab-scan, .lab-glint, .lab-rim, .lab-flash, .lab-burst, .lab-deny-flash {
     position: absolute;
-    right: 3.2%;
-    top: 6.2%;
-    width: 23%;
-    height: 14.5%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(#2a2318, #14110c);
-    border: 1px solid #6a5840;
-    border-radius: 3px;
-    font-weight: 800;
-    letter-spacing: 0.02em;
-    font-size: 3.15cqw;
-    line-height: 1;
-    text-transform: none;
     pointer-events: none;
 }
-.lab-evolve {
-    position: absolute;
-    left: 22%;
-    top: 65%;
-    width: 56%;
-    height: 23%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: repeating-linear-gradient(-52deg, #24180d 0 7px, #e2a01f 7px 13px);
-    color: #f7f1e4;
-    font-weight: 900;
-    letter-spacing: 0.04em;
-    font-size: 4.5cqw;
-    line-height: 1;
-    text-transform: uppercase;
-    text-shadow: -1px -1px 0 #1a1008, 1px -1px 0 #1a1008, -1px 1px 0 #1a1008, 1px 1px 0 #1a1008;
-    pointer-events: none;
-    white-space: nowrap;
+.lab-wash { inset: 0; mix-blend-mode: soft-light; opacity: 0.95; }
+.lab-art-glow {
+    right: 6%;
+    top: 30%;
+    width: 20%;
+    height: 28%;
+    background: radial-gradient(circle, var(--accent), transparent 68%);
+    opacity: calc(0.16 + var(--rank) * 0.5);
+    filter: blur(8px);
 }
-.lab-evolve.is-maxed {
-    background: repeating-linear-gradient(-52deg, #14301c 0 7px, #d6b25a 7px 13px);
-    color: #fff6d0;
+.lab-art {
+    right: 3.4%;
+    top: 21.5%;
+    width: 25%;
+    height: 42%;
+    object-fit: contain;
+    object-position: center bottom;
+    transform-origin: 72% 88%;
+    filter: drop-shadow(0 6px 0 rgba(0,0,0,0.28));
+    transition: transform 0.18s ease;
+    z-index: 1;
 }
 .lab-rarity {
     position: absolute;
-    z-index: 4;
-    left: 1.2%;
-    top: 3.2%;
-    width: 31%;
-    height: 17%;
-    padding: 0 1.1em 0 0.55em;
+    z-index: 3;
+    left: 0.8%;
+    top: 2.6%;
+    width: 23%;
+    height: 13%;
     display: flex;
     align-items: center;
+    padding: 0 0.8em 0.05em 0.55em;
+    background: var(--ink);
     color: #fff;
-    font-weight: 900;
-    font-size: 2.7cqw;
+    font-family: 'Teko', sans-serif;
+    font-size: 4.5cqw;
     letter-spacing: 0.06em;
+    line-height: 0.8;
     text-transform: uppercase;
-    clip-path: polygon(0 0, 100% 0, 88% 100%, 0 100%);
-    text-shadow: 0 1px 0 rgba(0,0,0,0.45);
-    pointer-events: none;
+    clip-path: polygon(0 10%, 100% 0, 86% 100%, 0 90%);
+    text-shadow: 0 1px 0 rgba(0,0,0,0.4);
 }
-.lab-plate {
+.lab-card.is-legendary .lab-rarity { color: #2a1608; text-shadow: none; }
+.lab-level {
     position: absolute;
-    z-index: 1;
-    left: 3%;
-    top: 18.5%;
-    width: 74%;
-    height: 46%;
-    overflow: hidden;
-    pointer-events: none;
-    background:
-        radial-gradient(circle at 18% 30%, rgba(92, 78, 46, 0.55), transparent 55%),
-        linear-gradient(165deg, #4c4332 0%, #322a1c 55%, #3c3426 100%);
-    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.28);
+    z-index: 4;
+    right: 2.6%;
+    top: 3.6%;
+    width: 24.6%;
+    height: 15.2%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.02em;
+    color: #f7f2e8;
+    font-family: 'Teko', sans-serif;
+    line-height: 0.78;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.85);
 }
-.lab-plate img, .lab-plate::after { display: none; }
+.lab-level::before {
+    content: '';
+    position: absolute;
+    inset: 16% 10% 14%;
+    background: radial-gradient(circle at 50% 78%, var(--accent), transparent 72%);
+    opacity: calc(var(--rank) * 0.62);
+    pointer-events: none;
+}
+.lab-level small {
+    position: relative;
+    font-size: 2.45cqw;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    opacity: 0.78;
+}
+.lab-level strong {
+    position: relative;
+    font-size: 5.5cqw;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: #fff8ea;
+}
 .lab-copy {
     position: absolute;
     z-index: 2;
-    left: 5%;
-    top: 21%;
+    left: 4.2%;
+    top: 18.5%;
     width: 63%;
-    height: 41%;
+    height: 48%;
     display: flex;
     flex-direction: column;
     justify-content: center;
-    gap: 0.15em;
-    pointer-events: none;
-    text-shadow: 0 1px 0 rgba(0,0,0,0.75);
+    gap: 0.08em;
 }
 .lab-name {
-    color: #f7f4ee;
-    font-weight: 900;
-    font-size: 4.7cqw;
+    color: #f8f4ec;
+    font-family: 'Teko', sans-serif;
+    font-weight: 600;
+    font-size: 6.5cqw;
     letter-spacing: 0.03em;
-    line-height: 1.05;
+    line-height: 0.82;
     text-transform: uppercase;
+    text-shadow: 0 2px 0 rgba(0,0,0,0.65);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 .lab-desc {
-    color: #f0e2c4;
+    color: #f3e6c8;
     font-weight: 600;
-    font-size: 3.15cqw;
-    line-height: 1.15;
+    font-size: 2.7cqw;
+    line-height: 1.16;
+    text-shadow: 0 1px 0 rgba(0,0,0,0.75);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
-.lab-key {
+.lab-meter {
     position: absolute;
-    left: 2%;
-    bottom: 8%;
-    width: 1.7em;
-    height: 1.7em;
-    border-radius: 999px;
-    background: #12040c;
-    color: #fff;
-    border: 2px solid #ff4ad4;
+    z-index: 4;
+    left: 43.4%;
+    top: 3.7%;
+    width: 17.2%;
+    height: 4.8%;
+    overflow: hidden;
+    border-radius: 1px;
+    background: rgba(6, 4, 2, 0.42);
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 214, 140, 0.42),
+        inset 0 1px 2px rgba(0, 0, 0, 0.65);
+}
+.lab-meter b {
+    position: absolute;
+    top: 1px;
+    bottom: 1px;
+    left: 1px;
+    width: calc((100% - 2px) * var(--rank));
+    background: linear-gradient(180deg, #fff6d2 0%, var(--accent) 62%, rgba(0,0,0,0.28) 100%);
+    transition: width 0.35s ease;
+}
+.lab-meter::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(90deg,
+        transparent 0,
+        transparent calc(100% / var(--steps) - 1px),
+        rgba(8, 5, 2, 0.85) calc(100% / var(--steps) - 1px),
+        rgba(8, 5, 2, 0.85) calc(100% / var(--steps)));
+    pointer-events: none;
+}
+.lab-meter.is-empty b { opacity: 0; }
+.lab-meter.is-fresh b { filter: brightness(1.4); }
+.lab-evolve {
+    position: absolute;
+    z-index: 3;
+    left: 24%;
+    top: 72.5%;
+    width: 52%;
+    height: 17%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 900;
-    font-size: 3.4cqw;
-    pointer-events: none;
+    color: #f7f1e4;
+    font-family: 'Teko', sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    font-size: 5.3cqw;
+    line-height: 0.8;
+    text-transform: uppercase;
+    text-shadow: -1px -1px 0 #1a1008, 1px -1px 0 #1a1008, -1px 1px 0 #1a1008, 1px 1px 0 #1a1008;
+    white-space: nowrap;
 }
-.lab-rim, .lab-flash {
+.lab-evolve.is-maxed { color: #ffe08a; }
+.lab-key {
     position: absolute;
+    z-index: 5;
+    left: 6.4%;
+    bottom: 9.5%;
+    width: 7%;
+    aspect-ratio: 1;
+    border-radius: 999px;
+    background: #14080c;
+    color: #fff;
+    border: 2px solid var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Teko', sans-serif;
+    font-size: 4.4cqw;
+    line-height: 1;
+    box-shadow: 0 0 10px var(--accent);
+}
+.lab-sheen {
+    inset: 0;
+    background: linear-gradient(105deg, transparent 36%, rgba(255,255,255,0.28) 50%, transparent 64%);
+    transform: translateX(-130%);
+    mix-blend-mode: screen;
+}
+.lab-card.is-hot:hover .lab-sheen { animation: lab-sheen 0.7s ease; }
+.lab-scan {
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 22%;
+    background: linear-gradient(180deg, transparent, rgba(190, 120, 255, 0.22), transparent);
+    mix-blend-mode: screen;
+    animation: lab-scan 3.4s linear infinite;
+}
+.lab-glint {
+    inset: -20% -40%;
+    background: linear-gradient(100deg, transparent 40%, rgba(255, 220, 120, 0.28) 50%, transparent 60%);
+    mix-blend-mode: screen;
+    animation: lab-sheen 3.6s ease-in-out infinite;
+}
+.lab-rim {
     inset: 0;
     border-radius: 8px;
-    pointer-events: none;
+    box-shadow: inset 0 0 0 calc(1px + var(--rank) * 5px) var(--ink);
+    opacity: calc(0.08 + var(--rank) * 0.92);
 }
-.lab-flash {
-    background: radial-gradient(circle at 50% 70%, rgba(255, 225, 120, 0.55), transparent 62%);
-    mix-blend-mode: screen;
+.lab-card.is-hot { cursor: pointer; }
+.lab-card.is-hot:hover,
+.lab-card.is-hot:focus-visible {
+    transform: translateY(-4px) scale(1.015);
+    filter: drop-shadow(0 10px 0 rgba(0,0,0,0.32)) drop-shadow(0 0 14px var(--ink));
+}
+.lab-card.is-hot:hover .lab-art,
+.lab-card.is-hot:focus-visible .lab-art { transform: scale(1.05) rotate(-3deg); }
+.lab-card.is-hot:active {
+    transform: translateY(2px) scale(0.985);
+    filter: drop-shadow(0 2px 0 rgba(0,0,0,0.5));
+    transition-duration: 0.05s;
+}
+.lab-card.is-hot:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.lab-card.is-poor {
+    cursor: not-allowed;
+    filter: saturate(0.7) brightness(0.9) drop-shadow(0 7px 0 rgba(0,0,0,0.4));
+}
+.lab-card.is-poor .lab-evolve { opacity: 0.55; }
+.lab-card.is-max {
+    filter: saturate(1.15) drop-shadow(0 0 12px rgba(255, 208, 90, 0.4)) drop-shadow(0 7px 0 rgba(0,0,0,0.4));
+}
+.lab-card.is-offer .lab-evolve { animation: lab-invite 1.15s ease-in-out infinite; }
+.lab-card.is-forced {
+    transform: translateY(-8px) scale(1.04);
+    filter: drop-shadow(0 0 16px #ff4ad4) drop-shadow(0 12px 0 rgba(0,0,0,0.34));
+}
+.lab-card.is-legendary .lab-name { text-shadow: 0 2px 0 rgba(0,0,0,0.65), 0 0 10px rgba(255, 196, 70, 0.55); }
+.lab-flash, .lab-deny-flash {
+    inset: 0;
     animation: lab-flash 0.5s ease forwards;
+}
+.lab-flash { background: radial-gradient(circle at 50% 62%, rgba(255, 225, 140, 0.55), transparent 62%); mix-blend-mode: screen; }
+.lab-deny-flash { background: rgba(255, 36, 48, 0.2); }
+.lab-burst {
+    left: 22%;
+    top: 68%;
+    width: 56%;
+    height: 24%;
+    border-radius: 6px;
+    box-shadow: inset 0 0 14px var(--accent), 0 0 12px var(--accent);
+    animation: lab-burst 0.45s ease forwards;
 }
 .lab-float {
     position: absolute;
+    z-index: 6;
     left: 50%;
-    bottom: 28%;
-    transform: translateX(-50%);
+    bottom: 30%;
     color: #ffe14a;
-    font-weight: 900;
-    font-size: 6cqw;
+    font-family: 'Teko', sans-serif;
+    font-size: 8cqw;
+    line-height: 1;
     text-shadow: 0 2px 0 #1a1008, 0 0 12px #ffbf1a;
     pointer-events: none;
     animation: lab-float 0.7s ease forwards;
@@ -562,37 +878,41 @@ export const mutationCardStyles = `
     justify-content: center;
     gap: 1.2rem;
     padding: 2vh 4vw 3vh;
-    background:
-        radial-gradient(ellipse at 50% 40%, rgba(80, 0, 40, 0.28), rgba(4, 0, 8, 0.82) 70%);
+    background: radial-gradient(ellipse at 50% 40%, rgba(80, 0, 40, 0.28), rgba(4, 0, 8, 0.82) 70%);
     backdrop-filter: blur(2px);
 }
 .serum-head { text-align: center; color: #fff; }
 .serum-mark {
     display: inline-flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.45rem;
     margin-bottom: 0.2rem;
 }
-.serum-mark svg { width: 54px; height: 54px; filter: drop-shadow(0 0 10px #ff4ad4); }
+.serum-mark svg { width: 42px; height: 42px; filter: drop-shadow(0 0 8px rgba(58, 216, 255, 0.8)); }
 .serum-mark em {
     font-style: normal;
-    font-weight: 900;
-    letter-spacing: 0.18em;
+    font-family: 'Teko', sans-serif;
+    font-size: 22px;
+    letter-spacing: 0.14em;
+    line-height: 1;
     color: #fff;
     background: #12040c;
-    border: 2px solid #ff4ad4;
-    padding: 0.2rem 0.55rem;
+    border: 2px solid #7af7ff;
+    padding: 0.15rem 0.5rem 0.05rem;
 }
 .serum-head h2 {
     margin: 0.15rem 0 0;
-    font-size: clamp(22px, 3vw, 42px);
-    letter-spacing: 0.16em;
-    text-shadow: 0 0 18px rgba(255, 74, 212, 0.65);
+    font-family: 'Teko', sans-serif;
+    font-weight: 600;
+    font-size: clamp(26px, 3.2vw, 46px);
+    letter-spacing: 0.12em;
+    line-height: 0.9;
+    text-shadow: 0 0 18px rgba(255, 74, 212, 0.55);
 }
 .serum-head p {
-    margin: 0.25rem 0 0.55rem;
+    margin: 0.2rem 0 0.55rem;
     color: #f0d6ea;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     font-size: clamp(12px, 1.4vw, 16px);
 }
 .serum-timer {
@@ -606,15 +926,17 @@ export const mutationCardStyles = `
 .serum-timer i {
     display: block;
     height: 100%;
-    background: linear-gradient(90deg, #ff4ad4, #ffe14a);
+    background: linear-gradient(90deg, #3ad8ff, #ff4ad4);
 }
 .serum-timer.is-urgent i { background: #ff2d3a; }
 .serum-head b {
     display: inline-block;
     margin-top: 0.35rem;
-    font-family: var(--font-mono);
+    font-family: 'Teko', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 600;
     color: #ffe14a;
-    font-size: 1.1rem;
+    line-height: 1;
 }
 .serum-head b.is-urgent { color: #ff5a66; }
 .serum-row {
@@ -638,17 +960,64 @@ export const mutationCardStyles = `
     60% { transform: translateX(-4px); }
     80% { transform: translateX(4px); }
 }
-@keyframes lab-flash { from { opacity: 0.8; } to { opacity: 0; } }
+@keyframes lab-flash { from { opacity: 0.85; } to { opacity: 0; } }
 @keyframes lab-float {
     from { opacity: 1; transform: translate(-50%, 0); }
     to { opacity: 0; transform: translate(-50%, -28px); }
+}
+@keyframes lab-burst {
+    from { opacity: 0.9; transform: scale(0.86); }
+    to { opacity: 0; transform: scale(1.08); }
+}
+@keyframes lab-pip {
+    0% { transform: scaleY(0.25); }
+    55% { transform: scaleY(1.45); }
+    100% { transform: scaleY(1); }
 }
 @keyframes lab-biomass {
     from { transform: scale(1.18); color: #fff; }
     to { transform: scale(1); }
 }
+@keyframes lab-sheen {
+    from { transform: translateX(-130%); }
+    to { transform: translateX(130%); }
+}
+@keyframes lab-scan {
+    from { transform: translateY(-140%); }
+    to { transform: translateY(460%); }
+}
+@keyframes lab-invite {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.06); }
+}
+@keyframes lab-hint {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(3px); }
+}
 @keyframes serum-in {
     from { opacity: 0; transform: translateY(28px) scale(0.94); }
     to { opacity: 1; transform: none; }
+}
+@container (max-width: 980px) {
+    .lab-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@container (max-width: 560px) {
+    .lab-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-height: 520px) {
+    .lab-head { margin: 0.28rem 2% 0.15rem; padding: 0.18rem 0.65rem; }
+    .lab-brand svg { width: 22px; height: 22px; }
+    .lab-brand span { font-size: 20px; }
+    .lab-readout strong { font-size: 26px; }
+    .lab-back { margin: 0.15rem auto 0.3rem; font-size: 18px; }
+    .lab-card.is-hot:hover,
+    .lab-card.is-hot:focus-visible { transform: translateY(-3px) scale(1.012); }
+    .serum-screen { gap: 0.4rem; padding: 1vh 3vw 1.2vh; }
+    .serum-head h2 { font-size: 22px; }
+    .serum-head p { margin: 0.05rem 0 0.25rem; font-size: 11px; }
+    .serum-mark svg { width: 30px; height: 30px; }
+}
+@media (prefers-reduced-motion: reduce) {
+    .lab-scan, .lab-glint, .lab-more, .lab-card.is-offer .lab-evolve { animation: none; }
 }
 `;

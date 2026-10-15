@@ -1485,7 +1485,7 @@ export class GameEngine {
           type: EntityType.SERUM,
           pos: { x: CANVAS_WIDTH + 70, y },
           vel: { x: 0, y: 0 },
-          radius: 42,
+          radius: 36,
           health: 1,
           maxHealth: 1,
           color: '#ff4ad4',
@@ -1502,16 +1502,16 @@ export class GameEngine {
       e.pos.x -= 3.55 * tick;
       e.pos.y = anchor + Math.sin(this.time / 240 + (e.orbitOffset || 0)) * amp;
 
-      if (!this.isLowQuality && Math.random() < 0.7) {
+      if (!this.isLowQuality && Math.random() < 0.28) {
           this.particles.push({
               id: 'spark',
               type: EntityType.PARTICLE,
-              pos: { x: e.pos.x + 18, y: e.pos.y },
-              vel: { x: 1.5 + Math.random() * 2, y: (Math.random() - 0.5) * 2 },
-              radius: 2 + Math.random() * 2,
+              pos: { x: e.pos.x + 14, y: e.pos.y + (Math.random() - 0.4) * 10 },
+              vel: { x: 0.8 + Math.random() * 1.4, y: (Math.random() - 0.5) * 1.2 },
+              radius: 1.4 + Math.random() * 1.6,
               health: 1, maxHealth: 1,
-              color: Math.random() < 0.5 ? '#ff4ad4' : '#7af7ff',
-              damage: 0, active: true, ttl: 14
+              color: Math.random() < 0.55 ? '#7af7ff' : '#ffe14a',
+              damage: 0, active: true, ttl: 16
           });
       }
 
@@ -1528,77 +1528,146 @@ export class GameEngine {
   }
 
   private drawSerum(e: Entity) {
-      const pulse = 0.86 + 0.14 * Math.sin(this.time / 90);
-      const R = e.radius * pulse;
+      const pulse = 0.97 + 0.03 * Math.sin(this.time / 160);
+      const s = 21 * pulse;
       const x = e.pos.x;
       const y = e.pos.y;
+      const ring = s * 1.48;
 
       this.ctx.save();
       this.ctx.translate(x, y);
-      this.ctx.globalCompositeOperation = 'screen';
-      this.drawGlow('#ff3df2', R * 3.3, 0.7, 0.22, 0.02);
-      this.drawGlow('#3df6ff', R * 2.15, 0.85, null, 0.08);
-      this.ctx.globalCompositeOperation = 'source-over';
+
+      if (!this.isLowQuality) {
+          this.ctx.globalCompositeOperation = 'screen';
+          this.drawGlow('#7af7ff', s * 2.15, 0.45, null, 0.16);
+          this.drawGlow('#ff4ad4', s * 1.35, 0.28, null, 0.3);
+          this.ctx.globalCompositeOperation = 'source-over';
+      }
 
       this.ctx.save();
-      this.ctx.rotate(this.time / 680);
-      this.ctx.beginPath();
-      const spikes = 12;
-      for (let i = 0; i < spikes; i++) {
-          const a = (i / spikes) * Math.PI * 2;
-          const rad = i % 2 === 0 ? R * 1.72 : R * 0.92;
-          const px = Math.cos(a) * rad;
-          const py = Math.sin(a) * rad;
-          if (i === 0) this.ctx.moveTo(px, py);
-          else this.ctx.lineTo(px, py);
+      this.ctx.rotate(this.time / 1400);
+      this.ctx.strokeStyle = 'rgba(244, 251, 255, 0.92)';
+      this.ctx.lineWidth = 2.4;
+      this.ctx.lineCap = 'round';
+      for (let i = 0; i < 6; i++) {
+          const a0 = (i / 6) * Math.PI * 2 + 0.28;
+          this.ctx.beginPath();
+          this.ctx.arc(0, 0, ring, a0, a0 + 0.52);
+          this.ctx.stroke();
       }
-      this.ctx.closePath();
-      const burst = this.ctx.createLinearGradient(-R, -R, R, R);
-      burst.addColorStop(0, '#7af7ff');
-      burst.addColorStop(0.5, '#ffffff');
-      burst.addColorStop(1, '#ff4ad4');
-      this.ctx.fillStyle = burst;
+      this.ctx.restore();
+
+      if (!this.isLowQuality) {
+          const a = this.time / 320;
+          this.ctx.fillStyle = '#ffe14a';
+          this.ctx.beginPath();
+          this.ctx.arc(Math.cos(a) * ring, Math.sin(a) * ring, 2.6, 0, Math.PI * 2);
+          this.ctx.fill();
+      }
+
+      const bob = Math.sin(this.time / 170) * 2.4;
+      this.ctx.save();
+      this.ctx.translate(0, -ring - 8 + bob);
+      this.ctx.fillStyle = '#fffaf2';
       this.ctx.strokeStyle = '#1a0614';
-      this.ctx.lineWidth = 4;
+      this.ctx.lineWidth = 2;
+      this.ctx.lineJoin = 'round';
+      this.ctx.beginPath();
+      this.ctx.moveTo(0, -6);
+      this.ctx.lineTo(6.5, 2);
+      this.ctx.lineTo(2.4, 2);
+      this.ctx.lineTo(2.4, 7);
+      this.ctx.lineTo(-2.4, 7);
+      this.ctx.lineTo(-2.4, 2);
+      this.ctx.lineTo(-6.5, 2);
+      this.ctx.closePath();
       this.ctx.fill();
       this.ctx.stroke();
       this.ctx.restore();
 
+      const vw = s * 0.72;
+      const vh = s * 1.28;
+      const top = -vh * 0.42;
+      const rad = vw * 0.38;
+
       this.ctx.beginPath();
-      this.ctx.arc(0, 0, R * 0.72, 0, Math.PI * 2);
-      const grad = this.ctx.createRadialGradient(-R * 0.2, -R * 0.28, R * 0.08, 0, 0, R * 0.72);
-      grad.addColorStop(0, '#fff7fd');
-      grad.addColorStop(0.42, '#ff4ad4');
-      grad.addColorStop(1, '#5b16e0');
-      this.ctx.fillStyle = grad;
+      this.ctx.roundRect(-vw * 0.46, top - s * 0.34, vw * 0.92, s * 0.36, 3);
+      const cap = this.ctx.createLinearGradient(0, top - s * 0.34, 0, top);
+      cap.addColorStop(0, '#f7fbff');
+      cap.addColorStop(1, '#8ea4b8');
+      this.ctx.fillStyle = cap;
+      this.ctx.strokeStyle = '#102028';
+      this.ctx.lineWidth = 2.5;
       this.ctx.fill();
-      this.ctx.lineWidth = 5;
-      this.ctx.strokeStyle = '#ffffff';
       this.ctx.stroke();
 
+      this.ctx.beginPath();
+      this.ctx.roundRect(-vw, top, vw * 2, vh, rad);
+      const glass = this.ctx.createLinearGradient(-vw, 0, vw, 0);
+      glass.addColorStop(0, '#1c0c30');
+      glass.addColorStop(0.5, '#3a1868');
+      glass.addColorStop(1, '#140818');
+      this.ctx.fillStyle = glass;
+      this.ctx.strokeStyle = '#f4fbff';
+      this.ctx.lineWidth = 2.8;
+      this.ctx.fill();
+      this.ctx.stroke();
+
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.roundRect(-vw + 3.5, top + 3.5, vw * 2 - 7, vh - 7, rad * 0.62);
+      this.ctx.clip();
+      const liquid = this.ctx.createLinearGradient(0, top, 0, top + vh);
+      liquid.addColorStop(0, '#d8fffb');
+      liquid.addColorStop(0.42, '#3ad8ff');
+      liquid.addColorStop(1, '#ff3ad0');
+      this.ctx.fillStyle = liquid;
+      this.ctx.fillRect(-vw, top + vh * 0.16, vw * 2, vh);
+      const by = top + vh * (0.58 + 0.1 * Math.sin(this.time / 220));
+      this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      this.ctx.beginPath();
+      this.ctx.arc(-vw * 0.28, by, 2.3, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.restore();
+
+      this.ctx.beginPath();
+      const lx = 0.5;
+      const ly = top + vh * 0.55;
+      this.ctx.moveTo(lx - 1, ly - 8);
+      this.ctx.lineTo(lx + 6, ly - 1);
+      this.ctx.lineTo(lx + 1.2, ly - 1);
+      this.ctx.lineTo(lx + 5, ly + 8);
+      this.ctx.lineTo(lx - 5, ly + 1.2);
+      this.ctx.lineTo(lx - 0.4, ly + 1.2);
+      this.ctx.closePath();
       this.ctx.fillStyle = '#ffffff';
-      const arm = R * 0.42;
-      const thick = R * 0.15;
-      this.ctx.fillRect(-thick, -arm, thick * 2, arm * 2);
-      this.ctx.fillRect(-arm, -thick, arm * 2, thick * 2);
+      this.ctx.strokeStyle = '#1a0614';
+      this.ctx.lineWidth = 1.7;
+      this.ctx.fill();
+      this.ctx.stroke();
+
+      this.ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      this.ctx.beginPath();
+      this.ctx.roundRect(-vw + 5, top + 6, vw * 0.26, vh * 0.48, 3);
+      this.ctx.fill();
       this.ctx.restore();
 
       const tag = this.t('SERUM_TAG');
       this.ctx.save();
-      this.ctx.font = '900 28px sans-serif';
+      this.ctx.font = '700 18px "Chakra Petch", sans-serif';
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'middle';
-      const plateW = this.ctx.measureText(tag).width + 36;
-      const ly = y - e.radius * 2.45;
-      this.ctx.fillStyle = 'rgba(12, 0, 18, 0.88)';
-      this.ctx.strokeStyle = '#ff4ad4';
-      this.ctx.lineWidth = 3;
+      const plateW = this.ctx.measureText(tag).width + 18;
+      const lyLabel = y + s * 1.72;
+      this.ctx.fillStyle = 'rgba(8, 2, 14, 0.9)';
+      this.ctx.strokeStyle = '#7af7ff';
+      this.ctx.lineWidth = 1.8;
       this.ctx.beginPath();
-      this.ctx.rect(x - plateW / 2, ly - 20, plateW, 40);
+      this.ctx.roundRect(x - plateW / 2, lyLabel - 11, plateW, 22, 11);
       this.ctx.fill();
       this.ctx.stroke();
-      this.ctx.fillStyle = '#ffffff';
-      this.ctx.fillText(tag, x, ly);
+      this.ctx.fillStyle = '#f4fbff';
+      this.ctx.fillText(tag, x, lyLabel + 0.5);
       this.ctx.restore();
   }
 

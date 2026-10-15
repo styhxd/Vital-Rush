@@ -13,7 +13,7 @@ import { LoadoutMenu } from './LoadoutMenu';
 import { MainMenu } from './MainMenu';
 import { OutcomeChart, PatientChart } from './PatientChart';
 import { motionClass, ScreenPresence } from './screenPresence';
-import { BioLab, SerumOffer, mutationCardStyles, rollSerumOffers, SERUM_WINDOW_MS } from './MutationCards';
+import { BioLab, SerumOffer, mutationCardStyles, rollSerumOffers, serumWindowMs } from './MutationCards';
 
 const systemLanguage = (): Language => {
   const tags = typeof navigator === 'undefined'
@@ -511,7 +511,7 @@ export const Game: React.FC = () => {
               serumResolvedRef.current = false;
               serumLockRef.current = true;
               setSerumCollapse(null);
-              setSerum({ ids, endsAt: performance.now() + SERUM_WINDOW_MS });
+              setSerum({ ids, endsAt: performance.now() + serumWindowMs(difficulty) });
               setSerumNow(performance.now());
           }
       }
@@ -558,7 +558,7 @@ export const Game: React.FC = () => {
     }
     
     animationFrameRef.current = requestAnimationFrame(loop);
-  }, [gameState, stats, isPaused, isLowPerfMode, handleBossSpawn]);
+  }, [gameState, stats, isPaused, isLowPerfMode, handleBossSpawn, difficulty]);
 
   useEffect(() => {
     lastTimeRef.current = performance.now();
@@ -1338,6 +1338,7 @@ export const Game: React.FC = () => {
           now={serumNow}
           endsAt={serum.endsAt}
           collapseId={serumCollapse}
+          windowMs={serumWindowMs(difficulty)}
           onPick={pickSerum}
         />
       )}
