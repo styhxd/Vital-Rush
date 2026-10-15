@@ -96,68 +96,142 @@ const IconTrophy = () => (
     </svg>
 );
 
-// --- TELA DE TUTORIAL (NOVA) ---
+const TUTORIAL_MS = 5400;
+
+// Each control is readable in the middle, then slides into the slot it occupies.
 const TutorialOverlay = ({ isMobile, t }: { isMobile: boolean; t: (key: string) => string }) => {
+    const place = isMobile ? 'teach-mobile' : 'teach-desk';
     return (
-        <div className="absolute inset-0 z-40 pointer-events-none flex flex-col items-center justify-center anim-tutorial-fade">
+        <div className="absolute inset-0 z-40 pointer-events-none">
             <style>{`
-                @keyframes tutorial-seq {
-                    0% { opacity: 0; transform: scale(0.9); }
-                    10% { opacity: 1; transform: scale(1); }
-                    85% { opacity: 1; transform: scale(1); }
-                    100% { opacity: 0; transform: scale(1.1); pointer-events: none; }
+                .teach {
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    transform-origin: center center;
+                    animation: teach-flight 5.2s cubic-bezier(0.16, 1, 0.3, 1) both;
                 }
-                .anim-tutorial-fade {
-                    animation: tutorial-seq 4.0s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+                .teach-token {
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    border-radius: 999px;
+                    font-weight: 800;
+                }
+                .teach-move .teach-token { width: 72px; height: 72px; }
+                .teach-dash .teach-token { width: 56px; height: 56px; }
+                .teach-surge .teach-token { width: 64px; height: 64px; }
+                .teach-caption {
+                    position: absolute;
+                    left: 50%;
+                    top: calc(100% + 8px);
+                    transform: translateX(-50%);
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 2px;
+                    white-space: nowrap;
+                    animation: teach-caption 5.2s linear forwards;
+                }
+                .teach-caption strong {
+                    font-weight: 800;
+                    letter-spacing: 0.22em;
+                    font-size: 13px;
+                }
+                .teach-caption em {
+                    font-style: normal;
+                    font-size: 10px;
+                    letter-spacing: 0.14em;
+                    text-transform: uppercase;
+                    color: #fde68a;
+                    background: rgba(0, 0, 0, 0.55);
+                    border-radius: 999px;
+                    padding: 1px 6px;
+                }
+                .teach-luck {
+                    position: absolute;
+                    left: 50%;
+                    bottom: 16%;
+                    transform: translateX(-50%);
+                    font-family: ui-monospace, monospace;
+                    font-size: 12px;
+                    letter-spacing: 0.22em;
+                    color: rgba(255, 255, 255, 0.62);
+                    animation: teach-luck 5.2s linear forwards;
+                }
+                .teach-move { --cx: calc(50vw - 128px); --cy: 44vh; animation-delay: 0s; }
+                .teach-dash { --cx: 50vw; --cy: 40vh; animation-delay: 0.06s; }
+                .teach-surge { --cx: calc(50vw + 128px); --cy: 44vh; animation-delay: 0.12s; }
+                .teach-mobile.teach-move { --x: 78px; --y: calc(100vh - 78px); }
+                .teach-mobile.teach-dash { --x: calc(100vw - 132px); --y: calc(100vh - 52px); }
+                .teach-mobile.teach-surge { --x: calc(100vw - 56px); --y: calc(100vh - 56px); }
+                .teach-desk.teach-move { --x: calc(50vw - 240px); --y: 62vh; }
+                .teach-desk.teach-dash { --x: 50vw; --y: 66vh; }
+                .teach-desk.teach-surge { --x: calc(50vw + 240px); --y: 62vh; }
+                @media (min-width: 1024px) {
+                    .teach-move .teach-token { width: 96px; height: 96px; }
+                    .teach-dash .teach-token { width: 64px; height: 64px; }
+                    .teach-surge .teach-token { width: 96px; height: 96px; }
+                    .teach-caption strong { font-size: 18px; }
+                    .teach-mobile.teach-dash { --x: calc(100vw - 168px); --y: calc(100vh - 56px); }
+                    .teach-mobile.teach-surge { --x: calc(100vw - 72px); --y: calc(100vh - 72px); }
+                    .teach-mobile.teach-move { --x: 96px; --y: calc(100vh - 96px); }
+                }
+                @keyframes teach-flight {
+                    0% { opacity: 0; transform: translate(calc(var(--cx) - 50%), calc(var(--cy) - 50%)) scale(0.78); }
+                    12% { opacity: 1; transform: translate(calc(var(--cx) - 50%), calc(var(--cy) - 50%)) scale(1.42); }
+                    40% { opacity: 1; transform: translate(calc(var(--cx) - 50%), calc(var(--cy) - 50%)) scale(1.42); }
+                    68% { opacity: 1; transform: translate(calc(var(--x) - 50%), calc(var(--y) - 50%)) scale(1); }
+                    86% { opacity: 1; transform: translate(calc(var(--x) - 50%), calc(var(--y) - 50%)) scale(1); }
+                    100% { opacity: 0; transform: translate(calc(var(--x) - 50%), calc(var(--y) - 50%)) scale(1); }
+                }
+                @keyframes teach-caption {
+                    0%, 38% { opacity: 1; }
+                    56%, 100% { opacity: 0; }
+                }
+                @keyframes teach-luck {
+                    0%, 10% { opacity: 0; }
+                    20%, 36% { opacity: 1; }
+                    50%, 100% { opacity: 0; }
                 }
             `}</style>
-            
-            <div className="flex gap-6 lg:gap-24 items-center scale-75 lg:scale-100 origin-center">
-                {/* Movement */}
-                <div className="flex flex-col items-center gap-2 lg:gap-2 opacity-80">
-                    <div className="w-12 h-12 lg:w-24 lg:h-24 rounded-full border-2 border-cyan-500 flex items-center justify-center bg-cyan-900/20">
-                        {isMobile ? (
-                            <div className="w-6 h-6 rounded-full bg-cyan-400/50 shadow-[0_0_15px_cyan]"></div>
-                        ) : (
-                            <span className="text-xl lg:text-2xl font-bold font-mono text-cyan-400">WASD</span>
-                        )}
-                    </div>
-                    <span className="text-[10px] lg:text-xs tracking-[0.2em] text-cyan-300 font-bold">{t('TUTORIAL_MOVE')}</span>
-                </div>
 
-                <div className="flex flex-col items-center gap-3 lg:gap-4 relative">
-                    <div className="w-16 h-16 lg:w-32 lg:h-32 rounded-full border-4 border-white flex items-center justify-center bg-white/10 shadow-[0_0_30px_white] animate-bounce">
-                        {isMobile ? (
-                            <span className="text-xl lg:text-2xl font-bold text-white">TAP</span>
-                        ) : (
-                            <span className="text-xl lg:text-2xl font-bold font-mono text-white">SHIFT</span>
-                        )}
-                    </div>
-                    <div className="flex flex-col items-center">
-                        <span className="text-base lg:text-2xl tracking-[0.3em] text-white font-black drop-shadow-[0_0_10px_white]">{t('DASH')}</span>
-                        <span className="text-[9px] lg:text-xs text-yellow-300 uppercase tracking-widest bg-black/60 px-2 rounded mt-1">{t('TUTORIAL_SAFE')}</span>
-                    </div>
+            <div className={`teach teach-move ${place}`}>
+                <div className="teach-token border-2 border-cyan-400/80 bg-cyan-950/50 shadow-[0_0_24px_rgba(34,211,238,0.35)]">
+                    {isMobile ? (
+                        <span className="w-7 h-7 rounded-full bg-cyan-300/80 shadow-[0_0_12px_rgba(34,211,238,0.8)]" />
+                    ) : (
+                        <span className="font-mono text-sm text-cyan-200">WASD</span>
+                    )}
                 </div>
-
-                {/* Ultimate */}
-                <div className="flex flex-col items-center gap-2 lg:gap-2 opacity-80">
-                    <div className="w-12 h-12 lg:w-24 lg:h-24 rounded-full border-2 border-red-500 border-dashed flex items-center justify-center bg-red-900/20">
-                         {isMobile ? (
-                            <div className="w-8 h-8 border-2 border-red-500 rounded-full"></div>
-                        ) : (
-                            <span className="text-lg lg:text-xl font-bold font-mono text-red-400">SPACE</span>
-                        )}
-                    </div>
-                    <span className="text-[10px] lg:text-xs tracking-[0.2em] text-red-300 font-bold">{t('SURGE_READY')}</span>
+                <div className="teach-caption text-cyan-200">
+                    <strong>{t('TUTORIAL_MOVE')}</strong>
                 </div>
             </div>
-            
-            <div className="mt-8 lg:mt-12 text-[10px] lg:text-sm text-white/50 font-mono animate-pulse tracking-widest">
-                {t('TUTORIAL_LUCK')}
+
+            <div className={`teach teach-dash ${place}`}>
+                <div className="teach-token border-2 border-white bg-white/15 text-[10px] tracking-widest text-white shadow-[0_0_24px_rgba(255,255,255,0.35)]">
+                    {isMobile ? t('DASH') : 'SHIFT'}
+                </div>
+                <div className="teach-caption text-white">
+                    <strong>{t('DASH')}</strong>
+                    <em>{t('TUTORIAL_SAFE')}</em>
+                </div>
             </div>
+
+            <div className={`teach teach-surge ${place}`}>
+                <div className="teach-token border-2 border-cyan-300 bg-cyan-900/40 text-[9px] tracking-widest text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.28)]">
+                    {isMobile ? t('SURGE_READY') : 'SPACE'}
+                </div>
+                <div className="teach-caption text-cyan-100">
+                    <strong>{t('SURGE_READY')}</strong>
+                </div>
+            </div>
+
+            <div className="teach-luck">{t('TUTORIAL_LUCK')}</div>
         </div>
     );
-}
+};
 
 // --- MAIN COMPONENT ---
 
@@ -351,7 +425,7 @@ export const Game: React.FC = () => {
           const nextWaveIdx = engineRef.current.currentWaveIndex === -1 ? 0 : engineRef.current.currentWaveIndex + 1;
           
           // Sincroniza o atraso do spawn dos monstros com a duração do tutorial
-          const TUTORIAL_DURATION = 4000; // 4 segundos (reduzido para ser mais rápido)
+          const TUTORIAL_DURATION = TUTORIAL_MS;
           
           if (nextWaveIdx === 0) {
               // Passa o delay para a engine (em segundos)
@@ -1009,7 +1083,10 @@ export const Game: React.FC = () => {
 
            {isMobile && !isPaused && (
              <div className="absolute inset-0 z-10 pointer-events-none">
-                 <div className="absolute bottom-6 right-6 pointer-events-auto flex gap-4 items-end">
+                 <div
+                    className="absolute bottom-6 right-6 flex gap-4 items-end"
+                    style={{ opacity: showTutorial ? 0 : 1, pointerEvents: showTutorial ? 'none' : 'auto', transition: 'opacity 280ms ease' }}
+                 >
                      <button 
                         onTouchStart={(e) => {
                             e.preventDefault();
@@ -1302,7 +1379,7 @@ export const Game: React.FC = () => {
         />
       )}
 
-      {isMobile && !isPaused && !serum && gameState === GameState.PLAYING && <Joystick onMove={handleJoystickMove} />}
+      {isMobile && !isPaused && !serum && !showTutorial && gameState === GameState.PLAYING && <Joystick onMove={handleJoystickMove} />}
       
       {/* NEW PAUSE MENU IMPLEMENTATION */}
       <PauseMenu 

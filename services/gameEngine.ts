@@ -1485,7 +1485,7 @@ export class GameEngine {
           type: EntityType.SERUM,
           pos: { x: CANVAS_WIDTH + 70, y },
           vel: { x: 0, y: 0 },
-          radius: 36,
+          radius: 48,
           health: 1,
           maxHealth: 1,
           color: '#ff4ad4',
@@ -1528,146 +1528,93 @@ export class GameEngine {
   }
 
   private drawSerum(e: Entity) {
-      const pulse = 0.97 + 0.03 * Math.sin(this.time / 160);
-      const s = 21 * pulse;
       const x = e.pos.x;
       const y = e.pos.y;
-      const ring = s * 1.48;
+      const spin = this.time / 420;
+      const height = 108;
+      const amp = 26;
+      const turns = 1.55;
+      const steps = this.isLowQuality ? 18 : 36;
+      const sample = (phase: number, i: number) => {
+          const t = i / steps;
+          const ang = spin + phase + t * Math.PI * 2 * turns;
+          return { x: Math.sin(ang) * amp, y: (t - 0.5) * height, z: Math.cos(ang) };
+      };
 
       this.ctx.save();
-      this.ctx.translate(x, y);
+      this.ctx.translate(x, y - 10);
+      this.ctx.lineCap = 'round';
+      this.ctx.lineJoin = 'round';
 
       if (!this.isLowQuality) {
           this.ctx.globalCompositeOperation = 'screen';
-          this.drawGlow('#7af7ff', s * 2.15, 0.45, null, 0.16);
-          this.drawGlow('#ff4ad4', s * 1.35, 0.28, null, 0.3);
+          this.drawGlow('#ffd36a', 54, 0.5, 0.14, 0.1);
           this.ctx.globalCompositeOperation = 'source-over';
       }
 
-      this.ctx.save();
-      this.ctx.rotate(this.time / 1400);
-      this.ctx.strokeStyle = 'rgba(244, 251, 255, 0.92)';
-      this.ctx.lineWidth = 2.4;
-      this.ctx.lineCap = 'round';
-      for (let i = 0; i < 6; i++) {
-          const a0 = (i / 6) * Math.PI * 2 + 0.28;
+      const strand = (phase: number, front: boolean, color: string, dim: string) => {
+          for (let i = 0; i < steps; i++) {
+              const p = sample(phase, i);
+              const n = sample(phase, i + 1);
+              const z = (p.z + n.z) * 0.5;
+              if ((z > 0) !== front) continue;
+              this.ctx.strokeStyle = front ? color : dim;
+              this.ctx.lineWidth = front ? 5.4 + z * 2.6 : 2.7;
+              this.ctx.beginPath();
+              this.ctx.moveTo(p.x, p.y);
+              this.ctx.lineTo(n.x, n.y);
+              this.ctx.stroke();
+          }
+      };
+
+      strand(0, false, '#ffe7a3', 'rgba(196, 140, 42, 0.42)');
+      strand(Math.PI, false, '#d7fbff', 'rgba(64, 148, 168, 0.38)');
+
+      for (let i = 3; i < steps - 2; i += 4) {
+          const p = sample(0, i);
+          const q = sample(Math.PI, i);
+          const z = (p.z + q.z) * 0.5;
+          if (Math.hypot(q.x - p.x, q.y - p.y) < 10) continue;
+          this.ctx.strokeStyle = z > 0.12 ? 'rgba(255, 250, 236, 0.96)' : 'rgba(186, 146, 68, 0.32)';
+          this.ctx.lineWidth = z > 0.12 ? 3.2 : 1.7;
           this.ctx.beginPath();
-          this.ctx.arc(0, 0, ring, a0, a0 + 0.52);
+          this.ctx.moveTo(p.x, p.y);
+          this.ctx.lineTo(q.x, q.y);
           this.ctx.stroke();
       }
-      this.ctx.restore();
+
+      strand(0, true, '#ffe7a3', 'rgba(196, 140, 42, 0.42)');
+      strand(Math.PI, true, '#d7fbff', 'rgba(64, 148, 168, 0.38)');
 
       if (!this.isLowQuality) {
-          const a = this.time / 320;
-          this.ctx.fillStyle = '#ffe14a';
-          this.ctx.beginPath();
-          this.ctx.arc(Math.cos(a) * ring, Math.sin(a) * ring, 2.6, 0, Math.PI * 2);
-          this.ctx.fill();
+          for (let i = 1; i < steps; i += 2) {
+              const p = sample(0, i);
+              if (p.z < 0.7) continue;
+              this.ctx.fillStyle = '#fffaf0';
+              this.ctx.beginPath();
+              this.ctx.arc(p.x, p.y, 2.2 + p.z * 1.4, 0, Math.PI * 2);
+              this.ctx.fill();
+          }
       }
 
-      const bob = Math.sin(this.time / 170) * 2.4;
-      this.ctx.save();
-      this.ctx.translate(0, -ring - 8 + bob);
-      this.ctx.fillStyle = '#fffaf2';
-      this.ctx.strokeStyle = '#1a0614';
-      this.ctx.lineWidth = 2;
-      this.ctx.lineJoin = 'round';
-      this.ctx.beginPath();
-      this.ctx.moveTo(0, -6);
-      this.ctx.lineTo(6.5, 2);
-      this.ctx.lineTo(2.4, 2);
-      this.ctx.lineTo(2.4, 7);
-      this.ctx.lineTo(-2.4, 7);
-      this.ctx.lineTo(-2.4, 2);
-      this.ctx.lineTo(-6.5, 2);
-      this.ctx.closePath();
-      this.ctx.fill();
-      this.ctx.stroke();
-      this.ctx.restore();
-
-      const vw = s * 0.72;
-      const vh = s * 1.28;
-      const top = -vh * 0.42;
-      const rad = vw * 0.38;
-
-      this.ctx.beginPath();
-      this.ctx.roundRect(-vw * 0.46, top - s * 0.34, vw * 0.92, s * 0.36, 3);
-      const cap = this.ctx.createLinearGradient(0, top - s * 0.34, 0, top);
-      cap.addColorStop(0, '#f7fbff');
-      cap.addColorStop(1, '#8ea4b8');
-      this.ctx.fillStyle = cap;
-      this.ctx.strokeStyle = '#102028';
-      this.ctx.lineWidth = 2.5;
-      this.ctx.fill();
-      this.ctx.stroke();
-
-      this.ctx.beginPath();
-      this.ctx.roundRect(-vw, top, vw * 2, vh, rad);
-      const glass = this.ctx.createLinearGradient(-vw, 0, vw, 0);
-      glass.addColorStop(0, '#1c0c30');
-      glass.addColorStop(0.5, '#3a1868');
-      glass.addColorStop(1, '#140818');
-      this.ctx.fillStyle = glass;
-      this.ctx.strokeStyle = '#f4fbff';
-      this.ctx.lineWidth = 2.8;
-      this.ctx.fill();
-      this.ctx.stroke();
-
-      this.ctx.save();
-      this.ctx.beginPath();
-      this.ctx.roundRect(-vw + 3.5, top + 3.5, vw * 2 - 7, vh - 7, rad * 0.62);
-      this.ctx.clip();
-      const liquid = this.ctx.createLinearGradient(0, top, 0, top + vh);
-      liquid.addColorStop(0, '#d8fffb');
-      liquid.addColorStop(0.42, '#3ad8ff');
-      liquid.addColorStop(1, '#ff3ad0');
-      this.ctx.fillStyle = liquid;
-      this.ctx.fillRect(-vw, top + vh * 0.16, vw * 2, vh);
-      const by = top + vh * (0.58 + 0.1 * Math.sin(this.time / 220));
-      this.ctx.fillStyle = 'rgba(255,255,255,0.8)';
-      this.ctx.beginPath();
-      this.ctx.arc(-vw * 0.28, by, 2.3, 0, Math.PI * 2);
-      this.ctx.fill();
-      this.ctx.restore();
-
-      this.ctx.beginPath();
-      const lx = 0.5;
-      const ly = top + vh * 0.55;
-      this.ctx.moveTo(lx - 1, ly - 8);
-      this.ctx.lineTo(lx + 6, ly - 1);
-      this.ctx.lineTo(lx + 1.2, ly - 1);
-      this.ctx.lineTo(lx + 5, ly + 8);
-      this.ctx.lineTo(lx - 5, ly + 1.2);
-      this.ctx.lineTo(lx - 0.4, ly + 1.2);
-      this.ctx.closePath();
-      this.ctx.fillStyle = '#ffffff';
-      this.ctx.strokeStyle = '#1a0614';
-      this.ctx.lineWidth = 1.7;
-      this.ctx.fill();
-      this.ctx.stroke();
-
-      this.ctx.fillStyle = 'rgba(255,255,255,0.3)';
-      this.ctx.beginPath();
-      this.ctx.roundRect(-vw + 5, top + 6, vw * 0.26, vh * 0.48, 3);
-      this.ctx.fill();
       this.ctx.restore();
 
       const tag = this.t('SERUM_TAG');
       this.ctx.save();
-      this.ctx.font = '700 18px "Chakra Petch", sans-serif';
+      this.ctx.font = '700 22px "Chakra Petch", sans-serif';
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'middle';
-      const plateW = this.ctx.measureText(tag).width + 18;
-      const lyLabel = y + s * 1.72;
-      this.ctx.fillStyle = 'rgba(8, 2, 14, 0.9)';
-      this.ctx.strokeStyle = '#7af7ff';
-      this.ctx.lineWidth = 1.8;
+      const plateW = this.ctx.measureText(tag).width + 22;
+      const lyLabel = y + 58;
+      this.ctx.fillStyle = 'rgba(22, 12, 4, 0.9)';
+      this.ctx.strokeStyle = 'rgba(255, 214, 120, 0.95)';
+      this.ctx.lineWidth = 1.6;
       this.ctx.beginPath();
-      this.ctx.roundRect(x - plateW / 2, lyLabel - 11, plateW, 22, 11);
+      this.ctx.roundRect(x - plateW / 2, lyLabel - 13, plateW, 26, 13);
       this.ctx.fill();
       this.ctx.stroke();
-      this.ctx.fillStyle = '#f4fbff';
-      this.ctx.fillText(tag, x, lyLabel + 0.5);
+      this.ctx.fillStyle = '#ffe7a8';
+      this.ctx.fillText(tag, x, lyLabel + 1);
       this.ctx.restore();
   }
 
