@@ -948,13 +948,19 @@ export const mutationCardStyles = `
 }
 .serum-head b.is-urgent { color: #ff5a66; }
 .serum-row {
-    display: grid;
-    grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
     gap: clamp(10px, 1.6vw, 22px);
-    width: min(1100px, 100%);
+    width: 100%;
     margin: 0 auto;
 }
-.serum-slot { animation: serum-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both; }
+.serum-slot {
+    flex: 1 1 0;
+    min-width: 0;
+    max-width: 340px;
+    animation: serum-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
 @keyframes lab-pop {
     0% { transform: scale(1); }
     28% { transform: scale(0.94); }

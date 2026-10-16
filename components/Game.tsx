@@ -1,7 +1,7 @@
 
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { GameEngine } from '../services/gameEngine';
+import { GameEngine, comboDamageMultiplier, COMBO_RAMP_KILLS } from '../services/gameEngine';
 import { audioManager } from '../services/audioManager';
 import { achievementManager } from '../services/achievementManager';
 import { GameState, PlayerStats, Upgrade, WaveConfig, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
@@ -1063,6 +1063,11 @@ export const Game: React.FC = () => {
                          {uiData.combo}x
                      </div>
                      <div className="text-[9px] lg:text-xs font-bold text-yellow-600 tracking-[0.5em] text-center">{t('COMBO')}</div>
+                     {uiData.combo > 1 && (
+                         <div className={`mt-0.5 text-center text-[9px] lg:text-[11px] font-bold tracking-[0.16em] ${uiData.combo > COMBO_RAMP_KILLS ? 'text-rose-300' : 'text-amber-200/90'}`}>
+                             {uiData.combo > COMBO_RAMP_KILLS ? t('COMBO_ADAPTED') : t('COMBO_POWER')} {comboDamageMultiplier(uiData.combo).toFixed(1)}x
+                         </div>
+                     )}
                  </div>
              </div>
 

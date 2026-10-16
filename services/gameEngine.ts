@@ -32,6 +32,31 @@ const distSq = (v1: Vector2, v2: Vector2) => {
     return dx * dx + dy * dy;
 };
 
+// Os primeiros abates rendem o mesmo de antes (+10% de dano por kill).
+// Depois a cepa acostuma: o bônus ainda sobe, mas encosta perto de 6.3x
+// em vez de crescer para sempre. Um combo de 3000 não pode valer 300x.
+export const COMBO_RAMP_KILLS = 40;
+const COMBO_TAIL = 1.35;
+const COMBO_TAIL_SPAN = 140;
+
+export function comboDamageMultiplier(combo: number): number {
+    const chain = Math.max(0, combo);
+    const ramp = Math.min(chain, COMBO_RAMP_KILLS) * 0.1;
+    const beyond = chain - COMBO_RAMP_KILLS;
+    if (beyond <= 0) return 1 + ramp;
+    return 1 + ramp + COMBO_TAIL * (1 - Math.exp(-beyond / COMBO_TAIL_SPAN));
+}
+
+export function comboScoreMultiplier(combo: number): number {
+    const chain = Math.max(0, combo);
+    if (chain <= 0) return 1;
+    return 1 + Math.sqrt(chain) * 0.5;
+}
+
+function wavesPastTheWall(waveIndex: number): number {
+    return Math.max(0, waveIndex - 9);
+}
+
 const GRID_CELL_SIZE = 150;
 const GRID_COLS = Math.ceil(CANVAS_WIDTH / GRID_CELL_SIZE);
 const GRID_ROWS = Math.ceil(CANVAS_HEIGHT / GRID_CELL_SIZE);
@@ -86,6 +111,7 @@ export class GameEngine {
   public comboCount: number = 0;
   public comboTimer: number = 0;
   private readonly COMBO_DURATION = 2.5;
+  private strainAdapted: boolean = false;
   
   public dashCooldownTimer: number = 0;
   public isDashing: boolean = false;
@@ -157,7 +183,7 @@ export class GameEngine {
     this.lastInputTime = Date.now();
     this.forceHighQuality = true;
     
-    for(let i=0; i<30; i++) this.spawnBackgroundCell(true);
+    for(let i=0; i<84; i++) this.spawnBackgroundCell(true);
   }
 
   public setLanguage(lang: Language) { this.language = lang; }
@@ -189,9 +215,9 @@ export class GameEngine {
       if (this.isLowQuality) return;
 
       const y = Math.random() * CANVAS_HEIGHT;
-      const x = init ? Math.random() * CANVAS_WIDTH : CANVAS_WIDTH + 40 + Math.random() * 280;
-      const big = Math.random() < 0.18;
-      const size = big ? 6 + Math.random() * 5 : 1.6 + Math.random() * 3.4;
+      const x = init ? Math.random() * CANVAS_WIDTH : CANVAS_WIDTH + 12 + Math.random() * 80;
+      const big = Math.random() < 0.16;
+      const size = big ? 8 + Math.random() * 6 : 3.2 + Math.random() * 4.2;
       const speed = 0.25 + Math.random() * 2.9;
       
       this.particles.push({
@@ -261,7 +287,11 @@ export class GameEngine {
       dmg *= this.difficultyMods.dmg;
       val *= this.difficultyMods.score;
       
-      const isElite = Math.random() < 0.12; 
+      // Até a onda 10 nada muda: o filtro continua sendo passar dela.
+      // Da 11 em diante a infecção acompanha quem já upou vida e dano,
+      // e um pouco mais de elite deixa ácido no chão pra quem fica parado no DNA.
+      const pastTheWall = wavesPastTheWall(this.currentWaveIndex);
+      const isElite = Math.random() < (0.12 + Math.min(0.10, pastTheWall * 0.012));
       if (isElite) {
           hp *= 3.5;
           dmg *= 2;
@@ -270,10 +300,7 @@ export class GameEngine {
           speed *= 0.85;
       }
 
-      // SCALING AJUSTADO PELO ARQUITETO
-      // HP Escala: 12% por wave
-      // Dano Escala: 15% por wave (Aumento de letalidade progressiva)
-      hp *= (1 + this.currentWaveIndex * 0.12);
+      hp *= (1 + this.currentWaveIndex * 0.12) * Math.pow(1.12, pastTheWall);
       dmg *= (1 + this.currentWaveIndex * 0.15);
 
       this.entities.push({
@@ -296,8 +323,8 @@ export class GameEngine {
   
   public spawnBoss(config: WaveConfig) {
       const mutation = BossArchitect.mutate();
-      // SCALING AJUSTADO: Bosses agora escalam 25% por wave ao invés de 50%
-      let hp = 1500 * this.difficultyMods.hp * (1 + this.currentWaveIndex * 0.25);
+      const pastTheWall = wavesPastTheWall(this.currentWaveIndex);
+      let hp = 1500 * this.difficultyMods.hp * (1 + this.currentWaveIndex * 0.25) * Math.pow(1.09, pastTheWall);
       if (mutation.traits.includes(BossTrait.JUGGERNAUT)) hp *= 2.5;
 
       const dmg = 50 * this.difficultyMods.dmg * (1 + this.currentWaveIndex * 0.1);
@@ -405,8 +432,13 @@ export class GameEngine {
               this.spawnText(this.player.pos, `${this.comboCount}x ${this.t('COMBO')}`, this.colors.COMBO, 30);
           }
 
-          const comboMult = 1 + (this.comboCount * 0.1);
-          const scoreGain = Math.floor((target.value || 10) * comboMult);
+          if (!this.strainAdapted && this.comboCount > COMBO_RAMP_KILLS) {
+              this.strainAdapted = true;
+              this.spawnText(this.player.pos, this.t('MSG_STRAIN_ADAPTED'), '#ff8aa8', 26);
+          }
+
+          const comboPower = comboDamageMultiplier(this.comboCount);
+          const scoreGain = Math.floor((target.value || 10) * comboScoreMultiplier(this.comboCount));
           this.score += scoreGain;
           if (this.score >= 50000) achievementManager.track('score_50k', 50000);
           
@@ -430,7 +462,7 @@ export class GameEngine {
               color: this.colors.DNA,
               damage: 0, active: true,
               drag: 0.05,
-              value: Math.max(1, Math.ceil((target.value || 10) * Math.min(3, comboMult) * dnaYield)),
+              value: Math.max(1, Math.ceil((target.value || 10) * Math.min(3, comboPower) * dnaYield)),
               isElite: target.isElite
           });
           
@@ -1305,8 +1337,8 @@ export class GameEngine {
                  if (distSq(e.pos, other.pos) < rSum * rSum) {
                    if (e.type === EntityType.ANTIBODY) e.active = false;
                    
-                   const comboMult = 1 + (this.comboCount * 0.1); 
-                   this.damageEnemy(other, e.damage * (e.type === EntityType.ORBITAL ? 1 : comboMult), e.type === EntityType.ANTIBODY, stats);
+                   const comboPower = comboDamageMultiplier(this.comboCount);
+                   this.damageEnemy(other, e.damage * (e.type === EntityType.ORBITAL ? 1 : comboPower), e.type === EntityType.ANTIBODY, stats);
                    
                    if (e.type === EntityType.ANTIBODY) {
                        audioManager.playHit();
@@ -1374,16 +1406,15 @@ export class GameEngine {
           
           if (dist < stats.magnetRadius || this.surgeActive || isVacuuming) {
             const speed = isVacuuming ? 80 : (this.surgeActive ? 50 : 28);
-            
-            if (dist > 1) {
-                e.pos.x += (dx / dist) * speed * tick;
-                e.pos.y += (dy / dist) * speed * tick;
-            } else {
-                e.pos.x = this.player.pos.x;
-                e.pos.y = this.player.pos.y;
+            // Sem o teto, o vácuo do fim da onda passa do corpo e a moeda
+            // fica orbitando colada no personagem até ele se mexer.
+            const step = Math.min(dist, speed * tick);
+            if (dist > 0.001) {
+                e.pos.x += (dx / dist) * step;
+                e.pos.y += (dy / dist) * step;
             }
-            
-            if (dist < this.player.radius + e.radius) {
+
+            if (dist - step < this.player.radius + e.radius) {
               e.active = false;
               const energyGain = e.isElite ? 20 : 5;
               this.energy = Math.min(this.energy + energyGain, stats.maxEnergy);
@@ -1416,7 +1447,7 @@ export class GameEngine {
               p.pos.y += wander * tick;
               if (p.pos.y < -40 || p.pos.y > CANVAS_HEIGHT + 40) p.pos.y = Math.random() * CANVAS_HEIGHT;
               if (p.pos.x < -80) {
-                  p.pos.x = CANVAS_WIDTH + 60 + Math.random() * 640;
+                  p.pos.x = CANVAS_WIDTH + 12 + Math.random() * 80;
                   p.pos.y = Math.random() * CANVAS_HEIGHT;
               }
           }
@@ -1449,7 +1480,7 @@ export class GameEngine {
     if (!this.isLowQuality) {
         this.bgGap -= dt / 1000;
         const bgCount = this.particles.reduce((n, p) => n + (p.id === 'bg' ? 1 : 0), 0);
-        if (this.bgGap <= 0 && bgCount < 36) {
+        if (this.bgGap <= 0 && bgCount < 84) {
             const cluster = 1 + Math.floor(Math.random() * 3);
             for (let i = 0; i < cluster; i++) this.spawnBackgroundCell(false);
             this.bgGap = 0.35 + Math.random() * 1.7;
@@ -1770,15 +1801,16 @@ export class GameEngine {
 
     if (!this.isLowQuality) {
         this.ctx.globalCompositeOperation = 'source-over';
-        this.ctx.globalAlpha = 0.22;
-        this.ctx.fillStyle = '#9a2428';
+        this.ctx.globalAlpha = 0.12;
+        this.ctx.fillStyle = '#d25a5e';
         for (let i = 0; i < this.particles.length; i++) {
             const p = this.particles[i];
             if (p.id !== 'bg') continue;
             this.ctx.beginPath();
-            this.ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI * 2);
+            this.ctx.ellipse(p.pos.x, p.pos.y, p.radius * 1.45, p.radius * 0.62, p.vel.y, 0, Math.PI * 2);
             this.ctx.fill();
         }
+        this.ctx.globalAlpha = 1;
     }
 
     this.particles.forEach(p => {
