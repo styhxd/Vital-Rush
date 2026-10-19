@@ -165,6 +165,7 @@ interface Trace {
     x0: number;
     age: number;
     span: number;
+    shape: number;
     hit: Set<string>;
     playerHit: boolean;
 }
@@ -229,6 +230,7 @@ export class OrganDirector {
     private ecgClock = 7;
     private traces: Trace[] = [];
     private heartBeat = 0;
+    private beatN = 0;
 
     private lungClock = 5.5;
     private gustN = 0;
@@ -291,6 +293,7 @@ export class OrganDirector {
         this.glycogenClock = 10;
         this.ecgClock = 8 + quiet * 0.7;
         this.heartBeat = 0;
+        this.beatN = 0;
         this.lungClock = 7 + quiet * 0.55;
         this.gustN = 0;
         this.oxygenClock = 9;
@@ -319,10 +322,7 @@ export class OrganDirector {
         if (this.rinseT > 0) this.rinseT -= dt;
         if (this.oxygenT > 0) this.oxygenT -= dt;
         if (this.dopamineT > 0) this.dopamineT -= dt;
-        if (this.systoleT > 0) {
-            this.systoleT -= dt;
-            this.speedMul = 1.38;
-        }
+        if (this.systoleT > 0) this.systoleT -= dt;
         if (this.glycogenT > 0 && hooks.player.active) {
             this.glycogenT -= dt;
             hooks.heal(hooks.player.maxHealth * 0.055 * dt);
@@ -378,7 +378,7 @@ export class OrganDirector {
 
     drawBackdrop(ctx: CanvasRenderingContext2D, time: number, low: boolean) {
         if (this.id === 'heart' && this.pulse > 0.02) {
-            ctx.fillStyle = `rgba(120, 8, 18, ${0.22 * this.pulse})`;
+            ctx.fillStyle = `rgba(120, 8, 18, ${0.07 * this.pulse})`;
             ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         }
         if (low) return;
@@ -388,6 +388,7 @@ export class OrganDirector {
         ctx.lineWidth = 2;
         if (this.id === 'molar') this.drawEnamel(ctx, time);
         else if (this.id === 'liver') this.drawLobules(ctx);
+        else if (this.id === 'heart') this.drawVessel(ctx, time);
         else if (this.id === 'lung') this.drawAlveoli(ctx, time);
         else if (this.id === 'brain') this.drawNeural(ctx, time);
         ctx.restore();
@@ -570,8 +571,7 @@ export class OrganDirector {
                 const touch = this.streamTouch(s, e.pos);
                 if (!touch.hit) continue;
                 if (e.id.startsWith('plaque_')) {
-                    e.radius = Math.max(0, e.radius - 80 * dt);
-                    if (e.radius < 16) e.active = false;
+                    this.rinsePlaque(e, s, dt);
                 } else if (this.isFoe(e.type)) {
                     e.vel.x *= 0.86;
                     e.vel.y *= 0.86;
@@ -668,8 +668,16 @@ export class OrganDirector {
         const period = Math.max(0.58, 0.9 - this.local * 0.045 - this.pastWall * 0.02);
         this.heartBeat += dt;
         const phase = (this.heartBeat % period) / period;
-        this.pulse = Math.exp(-phase * 16);
-        if (phase < 0.12 && this.systoleT <= 0) this.systoleT = 0.16;
+        this.pulse = Math.exp(-phase * 14);
+        if (phase < 0.08 && this.systoleT <= 0) {
+            this.beatN++;
+            this.systoleT = 0.16;
+        }
+        if (this.systoleT > 0) {
+            const kick = Math.min(1, this.systoleT / 0.1);
+            this.wind.x -= 1.4 * kick;
+            this.speedMul = Math.max(this.speedMul, 1 + 0.1 * kick);
+        }
 
         this.traces = this.traces.filter(tr => {
             tr.age += dt;
@@ -682,12 +690,15 @@ export class OrganDirector {
         if (this.ecgClock <= 0) {
             this.ecgClock = Math.max(10, (19 - this.local * 0.9) / pace);
             const y = 170 + Math.random() * (CANVAS_HEIGHT - 340);
-            this.traces.push({ y, x0: CANVAS_WIDTH + 20, age: -1.25, span: CANVAS_WIDTH * 0.72, hit: new Set(), playerHit: false });
+            const shape = this.beatN % 4;
+            const spans = [0.56, 0.74, 0.64, 0.84];
+            this.traces.push({ y, x0: CANVAS_WIDTH + 20, age: -1.25, span: CANVAS_WIDTH * spans[shape], shape, hit: new Set(), playerHit: false });
             audioManager.playHit();
             hooks.shake(8);
             if (this.local >= 3) {
                 const y2 = Math.max(140, Math.min(CANVAS_HEIGHT - 140, y + (Math.random() < 0.5 ? -240 : 240)));
-                this.traces.push({ y: y2, x0: CANVAS_WIDTH + 20, age: -1.9, span: CANVAS_WIDTH * 0.72, hit: new Set(), playerHit: false });
+                const shape2 = (shape + 2) % 4;
+                this.traces.push({ y: y2, x0: CANVAS_WIDTH + 20, age: -1.9, span: CANVAS_WIDTH * spans[shape2], shape: shape2, hit: new Set(), playerHit: false });
             }
         }
     }
@@ -1005,6 +1016,7 @@ export class OrganDirector {
         for (const e of hooks.entities) {
             if (!e.active || e.type !== EntityType.ACID_POOL) continue;
             if (!e.id.startsWith('plaque_') && !e.id.startsWith('bile_')) continue;
+            if (e.lobes && e.lobes.length > 1) continue;
             const full = e.value && e.value > 0 ? e.value : 8;
             const left = Math.max(0, e.ttl || 0);
             const age = Math.max(0, full - left);
@@ -1019,6 +1031,7 @@ export class OrganDirector {
                 if (e.radius > cap) e.radius = cap;
             }
         }
+        this.weldPools(hooks);
     }
 
     private collectPickups(hooks: OrganHooks) {
@@ -1102,22 +1115,211 @@ export class OrganDirector {
         if (!hooks) return false;
         for (const e of hooks.entities) {
             if (!e.active || !e.id.startsWith(prefix)) continue;
-            const r = e.radius * 0.75 + hooks.player.radius * 0.4;
-            const dx = pos.x - e.pos.x;
-            const dy = pos.y - e.pos.y;
-            if (dx * dx + dy * dy < r * r) return true;
+            if (this.covers(e, pos, hooks.player.radius * 0.4, 0.75)) return true;
         }
         return false;
     }
 
     private insideAny(pos: Vector2, pad: number, pools: Entity[]): boolean {
         for (const p of pools) {
-            const r = p.radius * 0.72 + pad;
-            const dx = pos.x - p.pos.x;
-            const dy = pos.y - p.pos.y;
-            if (dx * dx + dy * dy < r * r) return true;
+            if (this.covers(p, pos, pad, 0.72)) return true;
         }
         return false;
+    }
+
+    private covers(e: Entity, pos: Vector2, pad: number, radiusMul: number): boolean {
+        const fade = this.puddleFade(e);
+        if (e.lobes && e.lobes.length > 1) {
+            for (const l of e.lobes) {
+                const rx = l.rx * fade + pad;
+                const ry = l.ry * fade + pad;
+                if (rx <= 1 || ry <= 1) continue;
+                const dx = pos.x - (e.pos.x + l.x);
+                const dy = pos.y - (e.pos.y + l.y);
+                if ((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) < 1) return true;
+            }
+            return false;
+        }
+        const r = e.radius * radiusMul * fade + pad;
+        const dx = pos.x - e.pos.x;
+        const dy = pos.y - e.pos.y;
+        return dx * dx + dy * dy < r * r;
+    }
+
+    private puddleFade(e: Entity): number {
+        if (!e.lobes || e.lobes.length < 2) return 1;
+        const left = Math.max(0, e.ttl || 0);
+        return left < 1.15 ? Math.max(0.12, left / 1.15) : 1;
+    }
+
+    private rinsePlaque(e: Entity, s: SalivaRibbon, dt: number) {
+        if (e.lobes && e.lobes.length > 1) {
+            for (const l of e.lobes) {
+                if (!this.streamTouch(s, { x: e.pos.x + l.x, y: e.pos.y + l.y }).hit) continue;
+                l.rx = Math.max(0, l.rx - 50 * dt);
+                l.ry = Math.max(0, l.ry - 38 * dt);
+            }
+            e.lobes = e.lobes.filter(l => l.rx >= 12 && l.ry >= 9);
+            if (e.lobes.length === 0) e.active = false;
+            else if (e.lobes.length === 1) this.collapseRound(e);
+            return;
+        }
+        if (!this.streamTouch(s, e.pos).hit) return;
+        e.radius = Math.max(0, e.radius - 80 * dt);
+        if (e.radius < 16) e.active = false;
+    }
+
+    private weldPools(hooks: OrganHooks) {
+        const list = hooks.entities.filter(e => e.active && e.type === EntityType.ACID_POOL);
+        for (let i = 0; i < list.length; i++) {
+            const a = list[i];
+            if (!a.active || !this.poolSettled(a)) continue;
+            for (let j = i + 1; j < list.length; j++) {
+                const b = list[j];
+                if (!b.active || !this.poolSettled(b)) continue;
+                if (this.poolFamily(a.id) !== this.poolFamily(b.id)) continue;
+                if (!this.puddlesTouch(a, b)) continue;
+                this.absorbPool(a, b);
+                b.active = false;
+            }
+        }
+    }
+
+    private poolFamily(id: string): string {
+        if (id.startsWith('plaque_')) return 'plaque';
+        if (id.startsWith('bile_')) return 'bile';
+        return 'acid';
+    }
+
+    private poolSettled(e: Entity): boolean {
+        if (e.lobes && e.lobes.length > 1) return true;
+        if (e.id.startsWith('plaque_') || e.id.startsWith('bile_')) {
+            const rest = e.angle && e.angle > 0 ? e.angle : e.radius;
+            return e.radius >= rest * 0.9;
+        }
+        const full = e.value && e.value > 0 ? e.value : 6;
+        const left = Math.max(0, e.ttl || 0);
+        return 1 - Math.min(1, left / full) >= 0.2;
+    }
+
+    private blobParts(e: Entity): { x: number; y: number; rx: number; ry: number }[] {
+        if (e.lobes && e.lobes.length > 1) {
+            const fade = this.puddleFade(e);
+            return e.lobes.map(l => ({ x: e.pos.x + l.x, y: e.pos.y + l.y, rx: l.rx * fade, ry: l.ry * fade }));
+        }
+        const v = this.visualRadii(e);
+        return [{ x: e.pos.x, y: e.pos.y, rx: v.rx, ry: v.ry }];
+    }
+
+    private visualRadii(e: Entity): { rx: number; ry: number } {
+        const r = e.radius;
+        if (e.id.startsWith('plaque_')) return { rx: r * 0.62, ry: r * 0.48 };
+        if (e.id.startsWith('bile_')) {
+            const full = e.value && e.value > 0 ? e.value : 8;
+            const age = Math.max(0, full - Math.max(0, e.ttl || 0));
+            const settle = Math.min(1, age / 1.25);
+            return { rx: r * 1.02, ry: r * (0.92 - 0.34 * settle) };
+        }
+        const drawn = (e.angle && e.angle > 0 ? e.angle : r) * 0.9;
+        return { rx: drawn, ry: drawn * 0.78 };
+    }
+
+    private puddlesTouch(a: Entity, b: Entity): boolean {
+        const as = this.blobParts(a);
+        const bs = this.blobParts(b);
+        for (const p of as) {
+            for (const q of bs) {
+                const rx = p.rx + q.rx;
+                const ry = p.ry + q.ry;
+                if (rx <= 1 || ry <= 1) continue;
+                const dx = p.x - q.x;
+                const dy = p.y - q.y;
+                if ((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) < 1) return true;
+            }
+        }
+        return false;
+    }
+
+    private absorbPool(a: Entity, b: Entity) {
+        if (!a.lobes || a.lobes.length === 0) a.lobes = this.localLobes(a);
+        const incoming = this.localLobes(b);
+        for (const lobe of incoming) {
+            this.pushLobe(a, {
+                x: (b.pos.x + lobe.x) - a.pos.x,
+                y: (b.pos.y + lobe.y) - a.pos.y,
+                rx: lobe.rx,
+                ry: lobe.ry,
+            });
+        }
+        this.collapseRound(a);
+    }
+
+    private localLobes(e: Entity): { x: number; y: number; rx: number; ry: number }[] {
+        if (e.lobes && e.lobes.length > 1) return e.lobes.map(l => ({ ...l }));
+        const v = this.visualRadii(e);
+        return [{ x: 0, y: 0, rx: v.rx, ry: v.ry }];
+    }
+
+    private pushLobe(e: Entity, lobe: { x: number; y: number; rx: number; ry: number }) {
+        const lobes = e.lobes || (e.lobes = []);
+        let nearest = 0;
+        let nearestD = Infinity;
+        for (let i = 0; i < lobes.length; i++) {
+            const m = lobes[i];
+            const dx = lobe.x - m.x;
+            const dy = lobe.y - m.y;
+            const d = dx * dx + dy * dy;
+            if (d < nearestD) {
+                nearestD = d;
+                nearest = i;
+            }
+            const reach = 0.42 * Math.min(lobe.rx, m.rx);
+            if (d < reach * reach) {
+                this.foldLobe(m, lobe);
+                return;
+            }
+        }
+        if (lobes.length < 5) {
+            lobes.push(lobe);
+            return;
+        }
+        this.foldLobe(lobes[nearest], lobe);
+    }
+
+    private foldLobe(
+        m: { x: number; y: number; rx: number; ry: number },
+        lobe: { x: number; y: number; rx: number; ry: number },
+    ) {
+        const a1 = Math.max(1, lobe.rx * lobe.ry);
+        const a2 = Math.max(1, m.rx * m.ry);
+        const aspect = m.rx > 1 ? m.ry / m.rx : 0.78;
+        const rx = Math.min(280, Math.sqrt((a1 + a2) / aspect));
+        const w = a1 + a2;
+        m.x = (m.x * a2 + lobe.x * a1) / w;
+        m.y = (m.y * a2 + lobe.y * a1) / w;
+        m.rx = rx;
+        m.ry = rx * aspect;
+    }
+
+    private collapseRound(e: Entity) {
+        if (!e.lobes || e.lobes.length !== 1) return;
+        const l = e.lobes[0];
+        e.pos.x += l.x;
+        e.pos.y += l.y;
+        if (e.id.startsWith('plaque_')) {
+            const r = l.rx / 0.62;
+            e.radius = r;
+            e.angle = r;
+        } else if (e.id.startsWith('bile_')) {
+            const r = l.rx / 1.02;
+            e.radius = r;
+            e.angle = r;
+        } else {
+            const r = l.rx / 0.9;
+            e.radius = r;
+            e.angle = r;
+        }
+        e.lobes = undefined;
     }
 
     private isFoe(t: EntityType): boolean {
@@ -1145,7 +1347,7 @@ export class OrganDirector {
         const n = 56;
         for (let i = 0; i <= n; i++) {
             const u = i / n;
-            pts.push({ x: trace.x0 + u * trace.span, y: trace.y - pqrst(u) });
+            pts.push({ x: trace.x0 + u * trace.span, y: trace.y - pqrst(u, trace.shape) });
         }
         return pts;
     }
@@ -1523,21 +1725,150 @@ export class OrganDirector {
 
     private drawTrace(ctx: CanvasRenderingContext2D, trace: Trace, low: boolean) {
         const warned = trace.age < 0;
-        const lead = warned ? 1 : Math.max(0, 1 - trace.age / 0.28);
         ctx.save();
-        ctx.fillStyle = `rgba(255, 214, 220, ${0.16 + lead * 0.22})`;
-        ctx.fillRect(0, trace.y - 78, CANVAS_WIDTH, 156);
-        if (!warned) {
-            const pts = low ? this.tracePoints(trace).filter((_, i) => i % 2 === 0) : this.tracePoints(trace);
+        ctx.fillStyle = warned ? 'rgba(255, 64, 84, 0.1)' : 'rgba(255, 48, 68, 0.06)';
+        ctx.fillRect(0, trace.y - 86, CANVAS_WIDTH, 172);
+        ctx.strokeStyle = 'rgba(255, 186, 196, 0.09)';
+        ctx.lineWidth = 1;
+        for (const dy of [-56, -28, 28, 56]) {
             ctx.beginPath();
-            pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-            ctx.strokeStyle = 'rgba(255, 80, 96, 0.35)';
-            ctx.lineWidth = 22;
+            ctx.moveTo(24, trace.y + dy);
+            ctx.lineTo(CANVAS_WIDTH - 24, trace.y + dy);
+            ctx.stroke();
+        }
+        ctx.strokeStyle = 'rgba(255, 210, 216, 0.28)';
+        ctx.beginPath();
+        ctx.moveTo(40, trace.y);
+        ctx.lineTo(CANVAS_WIDTH - 40, trace.y);
+        ctx.stroke();
+
+        const stroke = (pts: Vector2[], width: number, color: string) => {
+            if (pts.length < 2) return;
+            ctx.beginPath();
+            ctx.moveTo(pts[0].x, pts[0].y);
+            for (let i = 1; i < pts.length - 1; i++) {
+                const mx = (pts[i].x + pts[i + 1].x) / 2;
+                const my = (pts[i].y + pts[i + 1].y) / 2;
+                ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
+            }
+            const last = pts[pts.length - 1];
+            ctx.lineTo(last.x, last.y);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = width;
             ctx.lineJoin = 'round';
             ctx.lineCap = 'round';
             ctx.stroke();
-            ctx.strokeStyle = '#fff6f7';
-            ctx.lineWidth = 4;
+        };
+
+        if (warned) {
+            const preview: Vector2[] = [];
+            const span = 460;
+            const x0 = CANVAS_WIDTH * 0.5 - span * 0.5;
+            const n = low ? 28 : 48;
+            for (let i = 0; i <= n; i++) {
+                const u = i / n;
+                preview.push({ x: x0 + u * span, y: trace.y - pqrst(u, trace.shape) * 0.92 });
+            }
+            stroke(preview, 11, 'rgba(255, 70, 96, 0.22)');
+            stroke(preview, 2.2, 'rgba(255, 228, 232, 0.78)');
+        } else {
+            const pts = low ? this.tracePoints(trace).filter((_, i) => i % 2 === 0) : this.tracePoints(trace);
+            const glow = ['rgba(255, 36, 64, 0.28)', 'rgba(255, 96, 64, 0.26)', 'rgba(255, 30, 80, 0.34)', 'rgba(255, 170, 150, 0.24)'][trace.shape] || 'rgba(255, 36, 64, 0.28)';
+            const ink = ['#fff6f7', '#ffe4d8', '#ffffff', '#ffd0d4'][trace.shape] || '#fff6f7';
+            const width = [2.6, 3.3, 1.7, 2.3][trace.shape] || 2.6;
+            stroke(pts, 14, glow);
+            stroke(pts, width, ink);
+            let peak = pts[0];
+            let pen = pts[0];
+            for (const p of pts) {
+                if (p.y < peak.y) peak = p;
+                if (p.x > pen.x && p.x < CANVAS_WIDTH - 8) pen = p;
+            }
+            if (peak) {
+                ctx.strokeStyle = 'rgba(255, 220, 226, 0.55)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(peak.x - 16, peak.y);
+                ctx.lineTo(peak.x + 16, peak.y);
+                ctx.moveTo(peak.x, peak.y - 16);
+                ctx.lineTo(peak.x, peak.y + 16);
+                ctx.stroke();
+                ctx.fillStyle = 'rgba(255, 80, 104, 0.45)';
+                ctx.beginPath();
+                ctx.arc(peak.x, peak.y, 13, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(peak.x, peak.y, 3.2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            if (pen) {
+                ctx.fillStyle = 'rgba(255, 246, 247, 0.9)';
+                ctx.beginPath();
+                ctx.arc(pen.x, pen.y, 4.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        ctx.restore();
+    }
+
+    private drawVessel(ctx: CanvasRenderingContext2D, time: number) {
+        ctx.save();
+        ctx.globalAlpha = 1;
+        const walls: Array<[number, number, number, number]> = [
+            [CANVAS_WIDTH * 0.5, -30, 1100, 250],
+            [CANVAS_WIDTH * 0.5, CANVAS_HEIGHT + 40, 1140, 270],
+            [-50, CANVAS_HEIGHT * 0.5, 280, 520],
+            [CANVAS_WIDTH + 60, CANVAS_HEIGHT * 0.45, 300, 540],
+        ];
+        for (const [x, y, rx, ry] of walls) {
+            const wall = ctx.createRadialGradient(x, y, rx * 0.15, x, y, rx);
+            wall.addColorStop(0, 'rgba(150, 28, 42, 0.42)');
+            wall.addColorStop(0.55, 'rgba(90, 14, 26, 0.22)');
+            wall.addColorStop(1, 'rgba(72, 12, 22, 0)');
+            ctx.fillStyle = wall;
+            ctx.beginPath();
+            ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        this.drawValve(ctx, time);
+        for (let i = 0; i < 6; i++) {
+            const drift = ((time / 110 + i * 340) % (CANVAS_WIDTH + 240)) - 120;
+            const x = CANVAS_WIDTH - drift;
+            const y = 160 + (i * 150) % (CANVAS_HEIGHT - 260) + Math.sin(time / 1400 + i) * 8;
+            const fat = i % 3 === 0 ? 32 : 24;
+            ctx.fillStyle = 'rgba(196, 42, 58, 0.28)';
+            ctx.beginPath();
+            ctx.ellipse(x, y, fat, fat * 0.55, -0.35, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = 'rgba(255, 190, 196, 0.22)';
+            ctx.beginPath();
+            ctx.ellipse(x - 8, y - 4, fat * 0.28, fat * 0.14, -0.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    private drawValve(ctx: CanvasRenderingContext2D, time: number) {
+        const sway = Math.sin(time / 1800) * 1.5;
+        ctx.save();
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 5; i++) {
+            const x = 260 + i * 310;
+            const lift = sway + Math.sin(i * 1.7) * 6;
+            ctx.fillStyle = 'rgba(92, 16, 28, 0.45)';
+            ctx.strokeStyle = 'rgba(255, 196, 196, 0.28)';
+            ctx.beginPath();
+            ctx.moveTo(x - 58, 8);
+            ctx.quadraticCurveTo(x - 10, 54 + lift, x + 18, 18);
+            ctx.quadraticCurveTo(x + 40, 46 + lift, x + 70, 6);
+            ctx.quadraticCurveTo(x + 8, 22, x - 58, 8);
+            ctx.fill();
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(x - 46, CANVAS_HEIGHT - 8);
+            ctx.quadraticCurveTo(x, CANVAS_HEIGHT - 62 - lift, x + 62, CANVAS_HEIGHT - 10);
             ctx.stroke();
         }
         ctx.restore();
@@ -1740,15 +2071,24 @@ export class OrganDirector {
     }
 }
 
-function pqrst(t: number): number {
+function pqrst(t: number, shape: number): number {
     const g = (center: number, amp: number, width: number) =>
         amp * Math.exp(-((t - center) * (t - center)) / (2 * width * width));
+    if (shape === 1) {
+        return g(0.2, 12, 0.04) + g(0.42, -20, 0.02) + g(0.52, 62, 0.018) + g(0.64, -18, 0.02) + g(0.82, 30, 0.045);
+    }
+    if (shape === 2) {
+        return g(0.28, -10, 0.012) + g(0.33, 78, 0.0045) + g(0.37, -40, 0.008) + g(0.52, 14, 0.02);
+    }
+    if (shape === 3) {
+        return g(0.14, 18, 0.028) + g(0.32, 34, 0.012) + g(0.4, -16, 0.01) + g(0.55, 16, 0.02) + g(0.7, 26, 0.032);
+    }
     return (
-        g(0.16, 26, 0.038) +
-        g(0.40, -20, 0.012) +
-        g(0.455, 148, 0.013) +
-        g(0.52, -46, 0.015) +
-        g(0.74, 40, 0.048)
+        g(0.18, 16, 0.026) +
+        g(0.33, -14, 0.011) +
+        g(0.39, 74, 0.007) +
+        g(0.455, -30, 0.011) +
+        g(0.66, 24, 0.036)
     );
 }
 

@@ -16,6 +16,7 @@ import { OutcomeChart, PatientChart } from './PatientChart';
 import { motionClass, ScreenPresence } from './screenPresence';
 import { BioLab, SerumOffer, mutationCardStyles, rollSerumOffers, serumWindowMs } from './MutationCards';
 import { Dossier } from './Dossier';
+import { FieldGuide } from './FieldGuide';
 
 const systemLanguage = (): Language => {
   const tags = typeof navigator === 'undefined'
@@ -36,7 +37,7 @@ const StatBar = ({ value, max, colorClass, label, animate = false }: any) => (
   <div className="flex flex-col w-full">
     <div className="flex justify-between items-end mb-0.5 px-0.5">
         <span className="text-[9px] lg:text-xs font-bold tracking-widest text-white/70">{label}</span>
-        <span className="text-[9px] lg:text-xs font-mono text-white/70">{Math.floor(value)}/{max}</span>
+        <span className="text-[9px] lg:text-xs font-mono text-white/70">{Math.round(value)}/{Math.round(max)}</span>
     </div>
     <div className="h-1.5 lg:h-3 w-full bg-black/50 border border-white/10 rounded-sm skew-x-[-10deg] overflow-hidden backdrop-blur-sm relative">
       <div 
@@ -496,39 +497,59 @@ export const Game: React.FC = () => {
           alert("SYSTEM OVERRIDE: APEX PRIVILEGES GRANTED");
       }
       // NEW CHEAT: BORA FICAR FORTE (RUN WITH ALL UPGRADES)
-      else if (val === 'boraficarforte') {
-          // 1. Calculate stats as if all upgrades were bought to max
+      else if (val === 'boraficarforte' || /^forte(\d{2})$/.test(val.trim().toLowerCase().replace(/\s+/g, ''))) {
+          const forte = val.trim().toLowerCase().replace(/\s+/g, '').match(/^forte(\d{2})$/);
+          let waveNum = forte ? parseInt(forte[1], 10) : 0;
+          if (!forte) {
+              const ask = language === 'PT'
+                  ? `Qual onda? (1 a ${WAVES.length})`
+                  : language === 'ES'
+                      ? `¿Qué onda? (1 a ${WAVES.length})`
+                      : `Which wave? (1 to ${WAVES.length})`;
+              const answer = window.prompt(ask, '1');
+              setCheatInput("");
+              if (answer === null) return;
+              waveNum = parseInt(answer.trim(), 10);
+          }
+          if (!Number.isFinite(waveNum) || waveNum < 1 || waveNum > WAVES.length) return;
           let godStats = { ...INITIAL_STATS };
           const maxedUpgrades = UPGRADES.map(u => {
               const def = UPGRADES.find(d => d.id === u.id);
               if (def) {
-                  for(let i=0; i < u.maxLevel; i++) {
-                      godStats = def.apply(godStats);
-                  }
+                  for (let i = 0; i < u.maxLevel; i++) godStats = def.apply(godStats);
               }
               return { ...u, level: u.maxLevel };
           });
+          godStats = {
+              ...godStats,
+              maxHealth: Math.round(godStats.maxHealth),
+              maxEnergy: Math.round(godStats.maxEnergy),
+              damage: Math.round(godStats.damage),
+              speed: Math.round(godStats.speed),
+              fireRate: Math.round(godStats.fireRate),
+              bulletSpeed: Math.round(godStats.bulletSpeed),
+              magnetRadius: Math.round(godStats.magnetRadius),
+              thorns: Math.round(godStats.thorns),
+          };
 
-          // 2. Initialize Game immediately
           audioManager.init();
           const newPatient = generatePatient();
           setPatient(newPatient);
 
           if (canvasRef.current) {
+              const jump = waveNum - 1;
               engineRef.current = new GameEngine(canvasRef.current, godStats, newPatient, difficulty, colors);
               engineRef.current.setLanguage(language);
-              engineRef.current.forceHighQuality = forceHighQuality; // Apply existing setting
-              
+              engineRef.current.forceHighQuality = forceHighQuality;
               setStats(godStats);
               setUpgrades(maxedUpgrades);
-              setUiData({ 
-                health: godStats.maxHealth, maxHealth: godStats.maxHealth, score: 0, biomass: 0, 
-                wave: 1, waveTime: 0, waveDuration: 1, energy: godStats.maxEnergy, maxEnergy: godStats.maxEnergy, 
+              engineRef.current.startWave(jump);
+              setUiData({
+                health: godStats.maxHealth, maxHealth: godStats.maxHealth, score: 0, biomass: 0,
+                wave: waveNum, waveTime: 0, waveDuration: WAVES[jump].duration, energy: godStats.maxEnergy, maxEnergy: godStats.maxEnergy,
                 combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES,
-                organId: 'molar'
+                organId: engineRef.current.organ.id
               });
-              
-              engineRef.current.startWave(0); // Wave 1 start
               setGameState(GameState.PLAYING);
               setIsPaused(false);
               audioManager.startGameMusic();
@@ -559,15 +580,15 @@ export const Game: React.FC = () => {
           eng.setLanguage(language);
           eng.startWave(jump);
           setUiData({
-              health: Math.floor(eng.player.health),
-              maxHealth: eng.player.maxHealth,
-              score: eng.score,
-              biomass: eng.biomass,
+              health: Math.round(eng.player.health),
+              maxHealth: Math.round(eng.player.maxHealth),
+              score: Math.round(eng.score),
+              biomass: Math.round(eng.biomass),
               wave: jump + 1,
               waveTime: 0,
               waveDuration: config.duration,
-              energy: eng.energy,
-              maxEnergy: fromRun ? stats.maxEnergy : INITIAL_STATS.maxEnergy,
+              energy: Math.round(eng.energy),
+              maxEnergy: Math.round(fromRun ? stats.maxEnergy : INITIAL_STATS.maxEnergy),
               combo: eng.comboCount,
               dashReady: eng.dashCooldownTimer <= 0,
               dashProgress: 1,
@@ -660,15 +681,15 @@ export const Game: React.FC = () => {
           }
           
           setUiData({
-            health: Math.floor(eng.player.health),
-            maxHealth: eng.player.maxHealth,
-            score: eng.score,
-            biomass: eng.biomass,
+            health: Math.round(eng.player.health),
+            maxHealth: Math.round(eng.player.maxHealth),
+            score: Math.round(eng.score),
+            biomass: Math.round(eng.biomass),
             wave: eng.currentWaveIndex + 1,
             waveTime: eng.waveTimer,
             waveDuration: currentWaveConfig.duration,
-            energy: eng.energy,
-            maxEnergy: stats.maxEnergy,
+            energy: Math.round(eng.energy),
+            maxEnergy: Math.round(stats.maxEnergy),
             combo: eng.comboCount,
             dashReady: eng.dashCooldownTimer <= 0,
             dashProgress: eng.getDashProgress(stats),
@@ -774,10 +795,10 @@ export const Game: React.FC = () => {
           setUpgrades(nextUpgrades);
           setUiData(prev => ({
               ...prev,
-              biomass: eng.biomass,
-              health: Math.floor(eng.player.health),
-              maxHealth: eng.player.maxHealth,
-              maxEnergy: newStats.maxEnergy,
+              biomass: Math.round(eng.biomass),
+              health: Math.round(eng.player.health),
+              maxHealth: Math.round(eng.player.maxHealth),
+              maxEnergy: Math.round(newStats.maxEnergy),
           }));
 
           if (nextLevel >= upgState.maxLevel && upgradeId === 'mitosis') {
@@ -1112,7 +1133,7 @@ export const Game: React.FC = () => {
           <div className="absolute top-14 lg:top-36 left-1/2 -translate-x-1/2 z-30 w-[60%] lg:w-[50%] flex flex-col items-center pointer-events-none anim-tutorial-fade" style={{animationDuration: '0.5s'}}>
               <div className="flex justify-between w-full text-red-500 font-bold font-mono text-[8px] lg:text-xs mb-1 tracking-[0.3em]">
                   <span className="anim-glitch">{t('BOSS_TAG')}</span>
-                  <span>{Math.ceil(bossEntity.hp)}/{bossEntity.max}</span>
+                  <span>{Math.round(bossEntity.hp)}/{Math.round(bossEntity.max)}</span>
               </div>
               <div className="w-full h-2 lg:h-6 bg-black/80 border-2 border-red-900 relative skew-x-[-20deg] overflow-hidden">
                   <div 
@@ -1205,7 +1226,7 @@ export const Game: React.FC = () => {
                     <div className="text-[9px] lg:text-xs text-white/50 tracking-widest">{t('SCORE')}</div>
                     <div className="text-base lg:text-3xl font-bold font-mono text-white tracking-tighter cyan-glow">{uiData.score.toString().padStart(6, '0')}</div>
                     <div className="text-[9px] lg:text-xs text-yellow-500 tracking-widest mt-0.5 lg:mt-1">{t('BIOMASS_AVAIL')}</div>
-                    <div className="text-base lg:text-xl font-bold font-mono text-yellow-400 tracking-tighter">{uiData.biomass}</div>
+                    <div className="text-base lg:text-xl font-bold font-mono text-yellow-400 tracking-tighter">{Math.round(uiData.biomass)}</div>
                  </div>
              </div>
            </div>
@@ -1404,40 +1425,12 @@ export const Game: React.FC = () => {
       <ScreenPresence show={gameState === GameState.MANUAL}>
         {(phase) => (
         <div className={`absolute inset-0 z-50 ${motionClass(phase)}`}>
-           <Dossier title={t('MANUAL')} meta="DB-V2.4" onBack={() => setGameState(GameState.MENU)} backLabel={t('BACK')}>
-              <div className="space-y-5">
-                  <section>
-                      <h4 className="dossier-kicker">{t('MANUAL_HOSTILES')}</h4>
-                      <div className="grid grid-cols-2 gap-2">
-                          <DatabaseCard title="BACTERIA" desc={t('MANUAL_BAC_DESC')} color={COLORS_DEFAULT.BACTERIA} />
-                          <DatabaseCard title="VIRUS" desc={t('MANUAL_VIR_DESC')} color={COLORS_DEFAULT.VIRUS} />
-                          <DatabaseCard title="PARASITE" desc={t('MANUAL_PAR_DESC')} color={COLORS_DEFAULT.PARASITE} />
-                          {/* ADDED FUNGI CARD */}
-                          <DatabaseCard title="FUNGI" desc={t('MANUAL_FUNGI_DESC')} color={COLORS_DEFAULT.FUNGI} />
-                          <DatabaseCard title="BOSS" desc={t('MANUAL_BOSS_DESC')} color={COLORS_DEFAULT.BOSS} />
-                      </div>
-                  </section>
-
-                  <section>
-                      <h4 className="dossier-kicker">{t('MANUAL_MECHANICS')}</h4>
-                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 lg:gap-2">
-                           <DatabaseCard title={t('MANUAL_MECH_DASH_TITLE')} desc={t('MANUAL_MECH_DASH_DESC')} color="#fff" />
-                           <DatabaseCard title={t('MANUAL_MECH_SURGE_TITLE')} desc={t('MANUAL_MECH_SURGE_DESC')} color={COLORS_DEFAULT.PLAYER_CORE} />
-                           <DatabaseCard title={t('MANUAL_MECH_COMBO_TITLE')} desc={t('MANUAL_MECH_COMBO_DESC')} color={COLORS_DEFAULT.COMBO} />
-                      </div>
-                  </section>
-
-                  <section>
-                      <h4 className="dossier-kicker">{t('MANUAL_STRAINS')}</h4>
-                      <div className="grid grid-cols-2 gap-2 lg:gap-2">
-                           <DatabaseCard title={t('STRAIN_STANDARD')} desc={t('STRAIN_STD_DESC')} color="#fff" />
-                           <DatabaseCard title={t('STRAIN_SWARM')} desc={t('STRAIN_SWM_DESC')} color="#ff00ff" />
-                           <DatabaseCard title={t('STRAIN_TITAN')} desc={t('STRAIN_TTN_DESC')} color="#ffaa00" />
-                           <DatabaseCard title={t('STRAIN_VOLATILE')} desc={t('STRAIN_VOL_DESC')} color="#ff4444" />
-                      </div>
-                  </section>
-              </div>
-           </Dossier>
+           <FieldGuide
+              language={language}
+              title={t('MANUAL')}
+              backLabel={t('BACK')}
+              onBack={() => setGameState(GameState.MENU)}
+           />
         </div>
         )}
       </ScreenPresence>

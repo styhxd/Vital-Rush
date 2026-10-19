@@ -28,6 +28,7 @@ export const dossierStyles = `
     flex: 0 1 auto;
     overflow: hidden;
 }
+.dossier-panel.is-wide { width: min(1080px, 100%); }
 .dossier-veins { position: absolute; inset: -8%; opacity: 0.45; pointer-events: none; }
 .dossier-head {
     position: relative;
@@ -161,15 +162,16 @@ export const Dossier: React.FC<{
     meta?: React.ReactNode;
     onBack: () => void;
     backLabel: string;
+    wide?: boolean;
     children: React.ReactNode;
-}> = ({ title, meta, onBack, backLabel, children }) => (
+}> = ({ title, meta, onBack, backLabel, wide, children }) => (
     <div className="dossier">
         <style>{dossierStyles}</style>
         <div className="dossier-veins" aria-hidden>
             <div className="vein-drift" />
             <div className="vein-drift-b" />
         </div>
-        <div className="dossier-panel">
+        <div className={`dossier-panel${wide ? ' is-wide' : ''}`}>
             <header className="dossier-head">
                 <strong>{title}</strong>
                 {meta ? <em>{meta}</em> : null}

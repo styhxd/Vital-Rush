@@ -132,6 +132,7 @@ export interface Entity {
   orbitOffset?: number; // Para orbitais girarem bonitinho
   shootTimer?: number; // Para inimigos que atiram
   mutation?: BossMutation; // NEW: Procedural Boss Data
+  lobes?: { x: number; y: number; rx: number; ry: number }[];
 }
 
 // Os números que definem se você é um deus ou um inseto.

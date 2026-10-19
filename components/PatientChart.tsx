@@ -225,7 +225,7 @@ export const OutcomeChart: React.FC<OutcomeChartProps> = ({
                 {cleared ? (
                     <>
                         <Field label={t('WAVE')} value={String(wave)} ink={ink} />
-                        <Field label={t('BIOMASS_AVAIL')} value={String(biomass)} ink={ink} accent={band} />
+                        <Field label={t('BIOMASS_AVAIL')} value={String(Math.round(biomass))} ink={ink} accent={band} />
                     </>
                 ) : (
                     <>

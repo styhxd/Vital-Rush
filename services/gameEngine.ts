@@ -1205,10 +1205,26 @@ export class GameEngine {
           if (e.type === EntityType.ACID_POOL && e.active && !e.id.startsWith('plaque_') && !e.id.startsWith('bile_')) {
               const full = e.value && e.value > 0 ? e.value : 6;
               const left = Math.max(0, e.ttl || 0);
-              const grown = 1 - Math.min(1, left / full);
-              const appear = grown < 0.18 ? grown / 0.18 : 1;
-              const hitR = e.radius * (0.28 + 0.72 * appear);
-              if (distSq(this.player.pos, e.pos) < (hitR + this.player.radius - 10)**2) {
+              const life = Math.min(1, left / full);
+              const grown = 1 - life;
+              const settled = !!(e.angle && e.angle > 0);
+              const appear = settled ? 1 : (grown < 0.18 ? grown / 0.18 : 1);
+              const pad = this.player.radius - 10;
+              let hit = false;
+              if (e.lobes && e.lobes.length > 1) {
+                  for (const l of e.lobes) {
+                      const rx = l.rx + pad;
+                      const ry = l.ry + pad;
+                      if (rx <= 1 || ry <= 1) continue;
+                      const dx = this.player.pos.x - e.pos.x - l.x;
+                      const dy = this.player.pos.y - e.pos.y - l.y;
+                      if ((dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) < 1) { hit = true; break; }
+                  }
+              } else {
+                  const hitR = settled ? e.angle! : e.radius * (0.28 + 0.72 * appear);
+                  hit = distSq(this.player.pos, e.pos) < (hitR + pad) ** 2;
+              }
+              if (hit) {
                   this.damagePlayer(0.5 * tick, e.pos, onGameOver, onLifeLost, stats, true);
                   this.acidContact = 0.45;
                   this.acidDrip += 0.5 * tick;
@@ -1837,7 +1853,95 @@ export class GameEngine {
       this.bgFill = `rgb(${this.bgR | 0},${this.bgG | 0},${this.bgB | 0})`;
   }
 
+  private drawPuddleUnion(e: Entity, kind: 'plaque' | 'bile' | 'acid', alpha: number, scale: number) {
+      const lobes = e.lobes;
+      if (!lobes || lobes.length < 2 || alpha <= 0.01) return;
+      const ctx = this.ctx;
+      const phase = this.time / 700;
+      let cx = 0;
+      let cy = 0;
+      for (const l of lobes) {
+          cx += l.x;
+          cy += l.y;
+      }
+      cx = e.pos.x + cx / lobes.length;
+      cy = e.pos.y + cy / lobes.length;
+      let reach = 48;
+      for (const l of lobes) {
+          const d = Math.hypot(e.pos.x + l.x - cx, e.pos.y + l.y - cy) + Math.max(l.rx, l.ry) * scale;
+          if (d > reach) reach = d;
+      }
+      const path = () => {
+          ctx.beginPath();
+          for (const l of lobes) {
+              const ox = e.pos.x + l.x;
+              const oy = e.pos.y + l.y;
+              const n = 16;
+              for (let i = 0; i <= n; i++) {
+                  const a = (i / n) * Math.PI * 2;
+                  const wob = 1 + 0.03 * Math.sin(a * 3 + phase + l.x * 0.01);
+                  const px = ox + Math.cos(a) * l.rx * scale * wob;
+                  const py = oy + Math.sin(a) * l.ry * scale * wob;
+                  if (i === 0) ctx.moveTo(px, py);
+                  else ctx.lineTo(px, py);
+              }
+              ctx.closePath();
+          }
+      };
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = kind === 'acid' ? 3 : 2.4;
+      ctx.strokeStyle = kind === 'plaque' ? 'rgba(74, 58, 28, 0.85)' : kind === 'bile' ? 'rgba(36, 42, 10, 0.55)' : '#243808';
+      path();
+      ctx.stroke();
+      const g = ctx.createRadialGradient(cx - reach * 0.12, cy - reach * 0.1, reach * 0.08, cx, cy, reach);
+      if (kind === 'plaque') {
+          g.addColorStop(0, '#e4d09a');
+          g.addColorStop(0.55, '#c2a45c');
+          g.addColorStop(1, '#8d7340');
+      } else if (kind === 'bile') {
+          g.addColorStop(0, 'rgba(255, 250, 186, 0.98)');
+          g.addColorStop(0.22, 'rgba(206, 210, 72, 0.96)');
+          g.addColorStop(0.7, 'rgba(148, 158, 36, 0.94)');
+          g.addColorStop(1, 'rgba(70, 78, 18, 0.92)');
+      } else {
+          g.addColorStop(0, '#f4ffb4');
+          g.addColorStop(0.28, '#d6f56e');
+          g.addColorStop(0.72, '#c6f542');
+          g.addColorStop(1, '#7ea318');
+      }
+      ctx.fillStyle = g;
+      path();
+      ctx.fill();
+      ctx.globalAlpha = alpha * (kind === 'plaque' ? 0.55 : 0.8);
+      ctx.fillStyle = kind === 'plaque' ? 'rgba(74, 58, 28, 0.7)' : 'rgba(255, 252, 220, 0.85)';
+      ctx.beginPath();
+      ctx.ellipse(cx - reach * 0.1, cy - reach * 0.08, Math.max(5, reach * 0.055), Math.max(2, reach * 0.022), -0.45, 0, Math.PI * 2);
+      ctx.fill();
+      const spots = Math.min(4, lobes.length + 1);
+      for (let i = 0; i < spots; i++) {
+          const l = lobes[i % lobes.length];
+          const bx = e.pos.x + l.x + Math.cos(i * 2.2) * l.rx * scale * 0.22;
+          const by = e.pos.y + l.y + Math.sin(i * 1.7) * l.ry * scale * 0.18;
+          ctx.beginPath();
+          ctx.arc(bx, by, kind === 'plaque' ? 3 : Math.max(2, l.rx * scale * 0.055), 0, Math.PI * 2);
+          ctx.fill();
+      }
+      ctx.restore();
+  }
+
   private drawOrganPool(e: Entity) {
+      if (e.lobes && e.lobes.length > 1) {
+          const full = e.value && e.value > 0 ? e.value : 6;
+          const left = Math.max(0, e.ttl || 0);
+          const age = Math.max(0, full - left);
+          const fade = left < 1.15 ? left / 1.15 : 1;
+          const veil = Math.min(1, age / 0.35) * fade;
+          const kind = e.id.startsWith('plaque_') ? 'plaque' : 'bile';
+          this.drawPuddleUnion(e, kind, veil, fade);
+          return;
+      }
       const plaque = e.id.startsWith('plaque_');
       const full = e.value && e.value > 0 ? e.value : 6;
       const left = Math.max(0, e.ttl || 0);
@@ -2303,6 +2407,12 @@ export class GameEngine {
         else if (e.type === EntityType.ACID_POOL) {
             if (e.id.startsWith('plaque_') || e.id.startsWith('bile_')) {
                 this.drawOrganPool(e);
+            } else if (e.lobes && e.lobes.length > 1) {
+                const full = e.value && e.value > 0 ? e.value : 6;
+                const left = Math.max(0, e.ttl || 0);
+                const life = Math.min(1, left / full);
+                const vanish = life < 0.22 ? life / 0.22 : 1;
+                this.drawPuddleUnion(e, 'acid', 0.92 * vanish, 1);
             } else {
             this.ctx.save();
             this.ctx.translate(e.pos.x, e.pos.y);
@@ -2310,10 +2420,11 @@ export class GameEngine {
             const left = Math.max(0, e.ttl || 0);
             const life = Math.min(1, left / full);
             const grown = 1 - life;
-            const appear = grown < 0.18 ? grown / 0.18 : 1;
+            const settled = !!(e.angle && e.angle > 0);
+            const appear = settled ? 1 : (grown < 0.18 ? grown / 0.18 : 1);
             const vanish = life < 0.22 ? life / 0.22 : 1;
-            const veil = appear * vanish;
-            const r = e.radius * (0.28 + 0.72 * appear);
+            const veil = (settled ? 1 : appear) * vanish;
+            const r = settled ? e.angle! : e.radius * (0.28 + 0.72 * appear);
             const phase = this.time / 480;
             const blob = (radius: number) => {
                 this.ctx.beginPath();

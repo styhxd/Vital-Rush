@@ -262,7 +262,7 @@ export const BioLab: React.FC<LabProps> = ({ upgrades, biomass, language, t, pul
                 </div>
                 <div className="lab-readout">
                     <span>{t('LAB_BIOMASS')}</span>
-                    <strong className={tick ? 'is-tick' : ''}>{biomass}</strong>
+                    <strong className={tick ? 'is-tick' : ''}>{Math.round(biomass)}</strong>
                 </div>
             </header>
             <div className={`lab-tray ${showHint ? 'has-more' : ''}`}>

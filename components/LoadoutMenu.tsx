@@ -29,17 +29,17 @@ export const LoadoutMenu: React.FC<LoadoutMenuProps> = ({ isVisible, stats, upgr
     const bought = upgrades.filter(u => u.level > 0);
 
     const rows: { label: string; value: string }[] = [
-        { label: t('STAT_DAMAGE'), value: stats.damage.toFixed(1) },
-        { label: t('STAT_FIRE'), value: (1000 / stats.fireRate).toFixed(1) },
-        { label: t('STAT_SPEED'), value: stats.speed.toFixed(1) },
-        { label: t('STAT_HP'), value: String(stats.maxHealth) },
+        { label: t('STAT_DAMAGE'), value: String(Math.round(stats.damage)) },
+        { label: t('STAT_FIRE'), value: String(Math.round(1000 / stats.fireRate)) },
+        { label: t('STAT_SPEED'), value: String(Math.round(stats.speed)) },
+        { label: t('STAT_HP'), value: String(Math.round(stats.maxHealth)) },
         { label: t('STAT_CRIT'), value: `${Math.round(stats.critChance * 100)}%` },
-        { label: t('STAT_CRIT_MULT'), value: `${stats.critMultiplier.toFixed(1)}x` },
-        { label: t('STAT_SHOTS'), value: String(stats.bulletCount) },
+        { label: t('STAT_CRIT_MULT'), value: `${Math.round(stats.critMultiplier)}x` },
+        { label: t('STAT_SHOTS'), value: String(Math.round(stats.bulletCount)) },
         { label: t('STAT_MAGNET'), value: String(Math.round(stats.magnetRadius)) },
-        { label: t('STAT_THORNS'), value: stats.thorns.toFixed(1) },
-        { label: t('STAT_ORBITALS'), value: String(stats.orbitals) },
-        { label: t('STAT_ENERGY'), value: String(stats.maxEnergy) },
+        { label: t('STAT_THORNS'), value: String(Math.round(stats.thorns)) },
+        { label: t('STAT_ORBITALS'), value: String(Math.round(stats.orbitals)) },
+        { label: t('STAT_ENERGY'), value: String(Math.round(stats.maxEnergy)) },
     ];
 
     return (
