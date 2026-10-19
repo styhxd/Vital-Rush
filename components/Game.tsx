@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine, comboDamageMultiplier, COMBO_RAMP_KILLS } from '../services/gameEngine';
-import { ORGAN_CHEATS, organAccent, organNameKey, organVeinStyle, type OrganId } from '../services/organDirector';
+import { organAccent, organNameKey, organVeinStyle, type OrganId } from '../services/organDirector';
 import { audioManager } from '../services/audioManager';
 import { achievementManager } from '../services/achievementManager';
 import { GameState, PlayerStats, Upgrade, WaveConfig, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
@@ -279,6 +279,7 @@ export const Game: React.FC = () => {
   const [isPlatinum, setIsPlatinum] = useState(false);
   const [colors, setColors] = useState<ThemePalette>(COLORS_DEFAULT);
   const [cheatInput, setCheatInput] = useState("");
+  const [waveDeck, setWaveDeck] = useState(false);
   const [heartbreakAnim, setHeartbreakAnim] = useState(false);
   const [outcomeBeat, setOutcomeBeat] = useState<null | 'win' | 'lose'>(null);
   const outcomeTimer = useRef<number | null>(null); 
@@ -486,6 +487,52 @@ export const Game: React.FC = () => {
       };
   }
 
+  const launchGodRun = (waveNum: number) => {
+      if (waveNum < 1 || waveNum > WAVES.length || !canvasRef.current) return;
+      let godStats = { ...INITIAL_STATS };
+      const maxedUpgrades = UPGRADES.map(u => {
+          const def = UPGRADES.find(d => d.id === u.id);
+          if (def) {
+              for (let i = 0; i < u.maxLevel; i++) godStats = def.apply(godStats);
+          }
+          return { ...u, level: u.maxLevel };
+      });
+      godStats = {
+          ...godStats,
+          maxHealth: Math.round(godStats.maxHealth),
+          maxEnergy: Math.round(godStats.maxEnergy),
+          damage: Math.round(godStats.damage),
+          speed: Math.round(godStats.speed),
+          fireRate: Math.round(godStats.fireRate),
+          bulletSpeed: Math.round(godStats.bulletSpeed),
+          magnetRadius: Math.round(godStats.magnetRadius),
+          thorns: Math.round(godStats.thorns),
+      };
+
+      audioManager.init();
+      const newPatient = generatePatient();
+      setPatient(newPatient);
+      const jump = waveNum - 1;
+      engineRef.current = new GameEngine(canvasRef.current, godStats, newPatient, difficulty, colors);
+      engineRef.current.setLanguage(language);
+      engineRef.current.forceHighQuality = forceHighQuality;
+      setStats(godStats);
+      setUpgrades(maxedUpgrades);
+      engineRef.current.startWave(jump);
+      setUiData({
+          health: godStats.maxHealth, maxHealth: godStats.maxHealth, score: 0, biomass: 0,
+          wave: waveNum, waveTime: 0, waveDuration: WAVES[jump].duration, energy: godStats.maxEnergy, maxEnergy: godStats.maxEnergy,
+          combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES,
+          organId: engineRef.current.organ.id
+      });
+      setWaveDeck(false);
+      setGameState(GameState.PLAYING);
+      setIsPaused(false);
+      audioManager.startGameMusic();
+      audioManager.playPowerUp();
+      setCheatInput("");
+  };
+
   const handleCheatInput = (e: React.ChangeEvent<HTMLInputElement>) => {
       const val = e.target.value;
       setCheatInput(val);
@@ -495,114 +542,13 @@ export const Game: React.FC = () => {
           audioManager.playPowerUp();
           setCheatInput("");
           alert("SYSTEM OVERRIDE: APEX PRIVILEGES GRANTED");
+          return;
       }
-      // NEW CHEAT: BORA FICAR FORTE (RUN WITH ALL UPGRADES)
-      else if (val === 'boraficarforte' || /^forte(\d{2})$/.test(val.trim().toLowerCase().replace(/\s+/g, ''))) {
-          const forte = val.trim().toLowerCase().replace(/\s+/g, '').match(/^forte(\d{2})$/);
-          let waveNum = forte ? parseInt(forte[1], 10) : 0;
-          if (!forte) {
-              const ask = language === 'PT'
-                  ? `Qual onda? (1 a ${WAVES.length})`
-                  : language === 'ES'
-                      ? `¿Qué onda? (1 a ${WAVES.length})`
-                      : `Which wave? (1 to ${WAVES.length})`;
-              const answer = window.prompt(ask, '1');
-              setCheatInput("");
-              if (answer === null) return;
-              waveNum = parseInt(answer.trim(), 10);
-          }
-          if (!Number.isFinite(waveNum) || waveNum < 1 || waveNum > WAVES.length) return;
-          let godStats = { ...INITIAL_STATS };
-          const maxedUpgrades = UPGRADES.map(u => {
-              const def = UPGRADES.find(d => d.id === u.id);
-              if (def) {
-                  for (let i = 0; i < u.maxLevel; i++) godStats = def.apply(godStats);
-              }
-              return { ...u, level: u.maxLevel };
-          });
-          godStats = {
-              ...godStats,
-              maxHealth: Math.round(godStats.maxHealth),
-              maxEnergy: Math.round(godStats.maxEnergy),
-              damage: Math.round(godStats.damage),
-              speed: Math.round(godStats.speed),
-              fireRate: Math.round(godStats.fireRate),
-              bulletSpeed: Math.round(godStats.bulletSpeed),
-              magnetRadius: Math.round(godStats.magnetRadius),
-              thorns: Math.round(godStats.thorns),
-          };
-
-          audioManager.init();
-          const newPatient = generatePatient();
-          setPatient(newPatient);
-
-          if (canvasRef.current) {
-              const jump = waveNum - 1;
-              engineRef.current = new GameEngine(canvasRef.current, godStats, newPatient, difficulty, colors);
-              engineRef.current.setLanguage(language);
-              engineRef.current.forceHighQuality = forceHighQuality;
-              setStats(godStats);
-              setUpgrades(maxedUpgrades);
-              engineRef.current.startWave(jump);
-              setUiData({
-                health: godStats.maxHealth, maxHealth: godStats.maxHealth, score: 0, biomass: 0,
-                wave: waveNum, waveTime: 0, waveDuration: WAVES[jump].duration, energy: godStats.maxEnergy, maxEnergy: godStats.maxEnergy,
-                combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES,
-                organId: engineRef.current.organ.id
-              });
-              setGameState(GameState.PLAYING);
-              setIsPaused(false);
-              audioManager.startGameMusic();
-              audioManager.playPowerUp();
-              setCheatInput("");
-          }
-      }
-      else {
-          const code = val.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-          const jump = ORGAN_CHEATS[code];
-          if (jump === undefined || !canvasRef.current) return;
-          const config = WAVES[Math.min(jump, WAVES.length - 1)];
-          serumLockRef.current = false;
-          setSerum(null);
-          setSerumCollapse(null);
-          const fromRun = lastGameState === GameState.PLAYING && !!engineRef.current;
-          if (!fromRun) {
-              audioManager.init();
-              const newPatient = generatePatient();
-              setPatient(newPatient);
-              engineRef.current = new GameEngine(canvasRef.current, INITIAL_STATS, newPatient, difficulty, colors);
-              engineRef.current.forceHighQuality = forceHighQuality;
-              setStats(INITIAL_STATS);
-              setUpgrades(UPGRADES.map(u => ({ ...u })));
-          }
-          const eng = engineRef.current;
-          if (!eng) return;
-          eng.setLanguage(language);
-          eng.startWave(jump);
-          setUiData({
-              health: Math.round(eng.player.health),
-              maxHealth: Math.round(eng.player.maxHealth),
-              score: Math.round(eng.score),
-              biomass: Math.round(eng.biomass),
-              wave: jump + 1,
-              waveTime: 0,
-              waveDuration: config.duration,
-              energy: Math.round(eng.energy),
-              maxEnergy: Math.round(fromRun ? stats.maxEnergy : INITIAL_STATS.maxEnergy),
-              combo: eng.comboCount,
-              dashReady: eng.dashCooldownTimer <= 0,
-              dashProgress: 1,
-              adrenaline: eng.adrenalineActive,
-              lives: eng.lives,
-              organId: eng.organ.id,
-          });
-          lastTimeRef.current = performance.now();
-          setGameState(GameState.PLAYING);
-          setIsPaused(false);
-          setIsLowPerfMode(false);
-          audioManager.startGameMusic();
-          audioManager.playPowerUp();
+      const code = val.trim().toLowerCase().replace(/\s+/g, '');
+      if (code === 'boraficarforte') {
           setCheatInput("");
+          setWaveDeck(true);
+          audioManager.playPowerUp();
       }
   }
 
@@ -936,6 +882,7 @@ export const Game: React.FC = () => {
   };
 
   const closeSettings = () => {
+      setWaveDeck(false);
       if (lastGameState === GameState.MENU) {
           setGameState(GameState.MENU);
       } else {
@@ -1342,6 +1289,9 @@ export const Game: React.FC = () => {
           onSystemPurge={handleSystemPurge} // WIRING UP THE SOFT RESET
           cheatInput={cheatInput}
           onCheatInput={handleCheatInput}
+          waveDeck={waveDeck}
+          onPickWave={launchGodRun}
+          onCancelDeck={() => setWaveDeck(false)}
           onToggleHighQuality={() => { // Função de toggle
               const newVal = !forceHighQuality;
               setForceHighQuality(newVal);
