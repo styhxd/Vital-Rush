@@ -12,6 +12,7 @@
     "@capacitor/android": "^6.0.0",
     "@capacitor/app": "^6.0.0",
     "@capacitor/core": "^6.0.0",
+    "@capacitor/haptics": "^6.0.3",
     "@capacitor/ios": "^6.0.0",
     "@capacitor/screen-orientation": "^6.0.0",
     "@capacitor/status-bar": "^6.0.0",
@@ -28,5 +29,8 @@
     "tailwindcss": "^3.4.3",
     "typescript": "^5.2.2",
     "vite": "^5.2.0"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true
   }
 }

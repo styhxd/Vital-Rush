@@ -34,7 +34,8 @@ export enum EntityType {
   BOSS,           // O cara que vai te matar
   ORBITAL,        // Seus amigos robôs
   BIO_MINE,       // Cabum
-  ACID_POOL       // O chão é lava (ácido)
+  ACID_POOL,      // O chão é lava (ácido)
+  ORGAN_PICKUP    // Flúor, glicogênio, oxigênio, dopamina
 }
 
 // A Máquina de Estados Finita (ou quase isso) do jogo.

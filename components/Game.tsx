@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine, comboDamageMultiplier, COMBO_RAMP_KILLS } from '../services/gameEngine';
+import { ORGAN_CHEATS, organAccent, organNameKey, organVeinStyle, type OrganId } from '../services/organDirector';
 import { audioManager } from '../services/audioManager';
 import { achievementManager } from '../services/achievementManager';
 import { GameState, PlayerStats, Upgrade, WaveConfig, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
@@ -261,7 +262,8 @@ export const Game: React.FC = () => {
   const [uiData, setUiData] = useState({ 
     health: 100, maxHealth: 100, score: 0, biomass: 0, 
     wave: 0, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100,
-    combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES
+    combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES,
+    organId: 'molar' as OrganId
   });
   
   const [isMobile, setIsMobile] = useState(false);
@@ -276,7 +278,9 @@ export const Game: React.FC = () => {
   const [isPlatinum, setIsPlatinum] = useState(false);
   const [colors, setColors] = useState<ThemePalette>(COLORS_DEFAULT);
   const [cheatInput, setCheatInput] = useState("");
-  const [heartbreakAnim, setHeartbreakAnim] = useState(false); 
+  const [heartbreakAnim, setHeartbreakAnim] = useState(false);
+  const [outcomeBeat, setOutcomeBeat] = useState<null | 'win' | 'lose'>(null);
+  const outcomeTimer = useRef<number | null>(null); 
   
   // State para controlar o tutorial e eventos de Boss
   const [showTutorial, setShowTutorial] = useState(false);
@@ -346,7 +350,8 @@ export const Game: React.FC = () => {
       setUiData({ 
         health: 100, maxHealth: 100, score: 0, biomass: 0, 
         wave: 0, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100,
-        combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES
+        combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES,
+        organId: 'molar'
       });
       setDifficulty(Difficulty.NORMAL);
       setPatient(null);
@@ -519,7 +524,8 @@ export const Game: React.FC = () => {
               setUiData({ 
                 health: godStats.maxHealth, maxHealth: godStats.maxHealth, score: 0, biomass: 0, 
                 wave: 1, waveTime: 0, waveDuration: 1, energy: godStats.maxEnergy, maxEnergy: godStats.maxEnergy, 
-                combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES
+                combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES,
+                organId: 'molar'
               });
               
               engineRef.current.startWave(0); // Wave 1 start
@@ -529,6 +535,53 @@ export const Game: React.FC = () => {
               audioManager.playPowerUp();
               setCheatInput("");
           }
+      }
+      else {
+          const code = val.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+          const jump = ORGAN_CHEATS[code];
+          if (jump === undefined || !canvasRef.current) return;
+          const config = WAVES[Math.min(jump, WAVES.length - 1)];
+          serumLockRef.current = false;
+          setSerum(null);
+          setSerumCollapse(null);
+          const fromRun = lastGameState === GameState.PLAYING && !!engineRef.current;
+          if (!fromRun) {
+              audioManager.init();
+              const newPatient = generatePatient();
+              setPatient(newPatient);
+              engineRef.current = new GameEngine(canvasRef.current, INITIAL_STATS, newPatient, difficulty, colors);
+              engineRef.current.forceHighQuality = forceHighQuality;
+              setStats(INITIAL_STATS);
+              setUpgrades(UPGRADES.map(u => ({ ...u })));
+          }
+          const eng = engineRef.current;
+          if (!eng) return;
+          eng.setLanguage(language);
+          eng.startWave(jump);
+          setUiData({
+              health: Math.floor(eng.player.health),
+              maxHealth: eng.player.maxHealth,
+              score: eng.score,
+              biomass: eng.biomass,
+              wave: jump + 1,
+              waveTime: 0,
+              waveDuration: config.duration,
+              energy: eng.energy,
+              maxEnergy: fromRun ? stats.maxEnergy : INITIAL_STATS.maxEnergy,
+              combo: eng.comboCount,
+              dashReady: eng.dashCooldownTimer <= 0,
+              dashProgress: 1,
+              adrenaline: eng.adrenalineActive,
+              lives: eng.lives,
+              organId: eng.organ.id,
+          });
+          lastTimeRef.current = performance.now();
+          setGameState(GameState.PLAYING);
+          setIsPaused(false);
+          setIsLowPerfMode(false);
+          audioManager.startGameMusic();
+          audioManager.playPowerUp();
+          setCheatInput("");
       }
   }
 
@@ -554,11 +607,18 @@ export const Game: React.FC = () => {
             stats, 
             () => {
                 setGameState(GameState.WAVE_CLEARED);
-                audioManager.stopMusic(); 
+                audioManager.stopMusic();
+                audioManager.playPowerUp();
+                setOutcomeBeat('win');
+                if (outcomeTimer.current) window.clearTimeout(outcomeTimer.current);
+                outcomeTimer.current = window.setTimeout(() => setOutcomeBeat(null), 1700);
             },
             () => {
                 setGameState(GameState.GAME_OVER);
                 audioManager.stopMusic();
+                setOutcomeBeat('lose');
+                if (outcomeTimer.current) window.clearTimeout(outcomeTimer.current);
+                outcomeTimer.current = window.setTimeout(() => setOutcomeBeat(null), 1100);
             },
             () => {
                 setHeartbreakAnim(true);
@@ -604,16 +664,17 @@ export const Game: React.FC = () => {
             maxHealth: eng.player.maxHealth,
             score: eng.score,
             biomass: eng.biomass,
-            wave: currentWaveConfig.waveNumber,
+            wave: eng.currentWaveIndex + 1,
             waveTime: eng.waveTimer,
             waveDuration: currentWaveConfig.duration,
             energy: eng.energy,
             maxEnergy: stats.maxEnergy,
             combo: eng.comboCount,
             dashReady: eng.dashCooldownTimer <= 0,
-            dashProgress: eng.getDashProgress(stats), // GET PROGRESS
+            dashProgress: eng.getDashProgress(stats),
             adrenaline: eng.adrenalineActive,
-            lives: eng.lives
+            lives: eng.lives,
+            organId: eng.organ.id
           });
       }
     }
@@ -661,7 +722,8 @@ export const Game: React.FC = () => {
          setUpgrades(UPGRADES.map(u => ({...u}))); 
          setUiData({ 
            health: 100, maxHealth: 100, score: 0, biomass: 0, 
-           wave: 1, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100, combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES
+           wave: 1, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100, combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES,
+           organId: 'molar'
          });
          
          setGameState(GameState.BRIEFING);
@@ -930,13 +992,74 @@ export const Game: React.FC = () => {
             animation: heart-pulse 1.25s ease-in-out infinite;
         }
         .heart-gone { color: #4a1518; }
+        .outcome-beat {
+            position: absolute;
+            inset: 0;
+            z-index: 90;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+            overflow: hidden;
+        }
+        .outcome-win { background: radial-gradient(circle at center, rgba(255, 226, 150, 0.42), rgba(0, 0, 0, 0.18) 46%, rgba(0, 0, 0, 0.62)); }
+        .outcome-lose { background: radial-gradient(circle at center, rgba(160, 0, 20, 0.28), rgba(0, 0, 0, 0.78)); }
+        .outcome-flash { position: absolute; inset: 0; background: #fff; animation: outcome-flash 0.5s ease-out forwards; }
+        .outcome-lose .outcome-flash { background: #ff2438; }
+        .outcome-ring {
+            position: absolute;
+            width: 240px;
+            height: 240px;
+            border-radius: 999px;
+            border: 3px solid rgba(255, 226, 150, 0.9);
+            animation: outcome-ring 0.9s ease-out forwards;
+        }
+        .outcome-lose .outcome-ring { border-color: rgba(255, 90, 90, 0.9); }
+        .outcome-copy { position: relative; text-align: center; }
+        .outcome-kicker {
+            font-family: "Chakra Petch", sans-serif;
+            font-weight: 900;
+            font-size: clamp(40px, 7vw, 104px);
+            letter-spacing: 0.14em;
+            color: #fffaf0;
+            text-shadow: 0 0 28px rgba(255, 210, 120, 0.95);
+            animation: outcome-pop 0.55s cubic-bezier(.2, 1.45, .35, 1) both;
+        }
+        .outcome-lose .outcome-kicker { color: #ffd0d0; text-shadow: 0 0 28px rgba(255, 40, 50, 0.85); }
+        .outcome-wave {
+            margin-top: 8px;
+            font-family: "Chakra Petch", sans-serif;
+            font-weight: 700;
+            letter-spacing: 0.42em;
+            font-size: clamp(16px, 2vw, 28px);
+            color: #ffe7a8;
+        }
+        .outcome-sub {
+            margin-top: 10px;
+            font-family: "Chakra Petch", sans-serif;
+            letter-spacing: 0.46em;
+            font-size: clamp(12px, 1.4vw, 18px);
+            color: rgba(255, 250, 240, 0.82);
+        }
+        .outcome-spark {
+            position: absolute;
+            top: 46%;
+            width: 9px;
+            height: 9px;
+            border-radius: 999px;
+            animation: outcome-spark 1.15s ease-out forwards;
+        }
+        @keyframes outcome-flash { 0% { opacity: 0.8; } 100% { opacity: 0; } }
+        @keyframes outcome-ring { 0% { transform: scale(0.15); opacity: 1; } 100% { transform: scale(2.8); opacity: 0; } }
+        @keyframes outcome-pop { 0% { transform: scale(0.35); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes outcome-spark { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-220px) scale(0.3); opacity: 0; } }
         ${mutationCardStyles}
       `}</style>
 
       <div className="vignette"></div>
       <div className="scanlines"></div>
       {gameState !== GameState.MENU && (
-      <div className="vein-overlay opacity-20" style={isPlatinum ? { filter: 'hue-rotate(240deg)' } : undefined}>
+      <div className="vein-overlay" style={organVeinStyle(uiData.organId, isPlatinum)}>
           <div className="vein-drift"></div>
           <div className="vein-drift-b"></div>
       </div>
@@ -1046,8 +1169,8 @@ export const Game: React.FC = () => {
                 </div>
 
                 {uiData.adrenaline && (
-                    <div className="text-red-500 font-bold tracking-widest text-[8px] lg:text-xs animate-pulse text-glow border border-red-500/50 bg-red-900/20 px-1 py-0.5 lg:px-2 lg:py-1 mt-1 lg:mt-2">
-                        ⚠ {t('ADRENALINE')} ⚠
+                    <div className="mt-1 lg:mt-2 text-[9px] lg:text-xs font-semibold tracking-[0.16em] text-rose-200/90">
+                        {t('ADRENALINE')}
                     </div>
                 )}
              </div>
@@ -1056,7 +1179,8 @@ export const Game: React.FC = () => {
                  <div className="bg-black/50 border border-white/10 px-3 py-1 lg:px-3 lg:py-1 rounded-full backdrop-blur-md mb-1">
                      <span className={`font-bold tracking-widest text-sm lg:text-2xl text-glow ${isPlatinum ? 'text-amber-400' : 'text-red-400'}`}>{t('WAVE')} {uiData.wave}</span>
                  </div>
-                 <div className="text-[11px] lg:text-xs text-white/50 tracking-widest">{(uiData.waveDuration - uiData.waveTime).toFixed(0)}s</div>
+                 <div className="text-[10px] lg:text-sm font-bold tracking-[0.28em]" style={{ color: organAccent(uiData.organId) }}>{t(organNameKey(uiData.organId))}</div>
+                 <div className="text-[11px] lg:text-xs text-white/50 tracking-widest">{Math.max(0, uiData.waveDuration - uiData.waveTime).toFixed(0)}s</div>
                  
                  <div className={`mt-2 lg:mt-4 transition-all duration-200 ${uiData.combo > 1 ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}>
                      <div className="text-3xl lg:text-4xl font-black italic text-yellow-400 text-glow" style={{textShadow: '0 0 20px orange'}}>
@@ -1131,7 +1255,30 @@ export const Game: React.FC = () => {
         </div>
       )}
       
-      <ScreenPresence show={gameState === GameState.WAVE_CLEARED}>
+      {outcomeBeat && (
+        <div className={`outcome-beat ${outcomeBeat === 'win' ? 'outcome-win' : 'outcome-lose'}`}>
+          <div className="outcome-flash" />
+          <div className="outcome-ring" />
+          {outcomeBeat === 'win' && Array.from({ length: 18 }).map((_, i) => (
+            <span
+              key={i}
+              className="outcome-spark"
+              style={{
+                left: `${6 + ((i * 53) % 88)}%`,
+                animationDelay: `${(i % 6) * 0.05}s`,
+                background: i % 2 === 0 ? organAccent(uiData.organId) : '#ffe7a8',
+              }}
+            />
+          ))}
+          <div className="outcome-copy">
+            <div className="outcome-kicker">{outcomeBeat === 'win' ? t('WAVE_WIN') : t('GAME_OVER')}</div>
+            <div className="outcome-wave">{t('WAVE')} {uiData.wave}</div>
+            {outcomeBeat === 'win' && <div className="outcome-sub">{t('WAVE_WIN_SUB')}</div>}
+          </div>
+        </div>
+      )}
+
+      <ScreenPresence show={gameState === GameState.WAVE_CLEARED && outcomeBeat !== 'win'}>
         {(phase) => (
         <OutcomeChart
             variant="cleared"
@@ -1354,7 +1501,7 @@ export const Game: React.FC = () => {
 
       {/* (LOADOUT, SETTINGS, CREDITS, PAUSED, GAME_OVER) mantidos */}
       
-      <ScreenPresence show={gameState === GameState.GAME_OVER}>
+      <ScreenPresence show={gameState === GameState.GAME_OVER && outcomeBeat !== 'lose'}>
         {(phase) => (
         <OutcomeChart
             variant="lost"

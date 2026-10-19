@@ -12,10 +12,12 @@
  */
 
 import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette, Language } from '../types';
-import { COLORS_DEFAULT, CANVAS_WIDTH, CANVAS_HEIGHT, WAVES, DIFFICULTY_MODIFIERS, INITIAL_LIVES, ADRENALINE_MAX_DURATION, TEXTS } from '../constants';
+import { COLORS_DEFAULT, COLORS_PLATINUM, CANVAS_WIDTH, CANVAS_HEIGHT, WAVES, DIFFICULTY_MODIFIERS, INITIAL_LIVES, ADRENALINE_MAX_DURATION, TEXTS } from '../constants';
 import { audioManager } from './audioManager';
+import { buzz } from './haptics';
 import { achievementManager } from './achievementManager';
 import { BossArchitect, BossTrait } from './bossArchitect';
+import { OrganDirector, cellBudget, cellColor, cellRises, organBg, rollCellStyle } from './organDirector';
 
 const SIN_TABLE = new Float32Array(360);
 const COS_TABLE = new Float32Array(360);
@@ -53,8 +55,18 @@ export function comboScoreMultiplier(combo: number): number {
     return 1 + Math.sqrt(chain) * 0.5;
 }
 
+// A parede infinita só abre depois da onda 30 (índice 29), já dentro do cérebro.
+const CAMPAIGN_LAST_INDEX = 29;
+
 function wavesPastTheWall(waveIndex: number): number {
-    return Math.max(0, waveIndex - 9);
+    return Math.max(0, waveIndex - CAMPAIGN_LAST_INDEX);
+}
+
+// 0 na onda 1, 1 na onda 30. O expoente deixa o começo perto do ritmo antigo
+// e faz a onda 30 encostar no poder que a onda 20 tinha antes.
+function campaignPressure(waveIndex: number): number {
+    const t = Math.min(Math.max(waveIndex, 0), CAMPAIGN_LAST_INDEX) / CAMPAIGN_LAST_INDEX;
+    return Math.pow(t, 1.35);
 }
 
 const GRID_CELL_SIZE = 150;
@@ -128,7 +140,12 @@ export class GameEngine {
   public waveStartDelay: number = 0;
 
   public inputVector: Vector2 = { x: 0, y: 0 };
-  private bloodFlow: Vector2 = { x: -3.5, y: 0 }; 
+  private bloodFlow: Vector2 = { x: -0.35, y: 0 };
+  public readonly organ = new OrganDirector();
+  private bgR = 28;
+  private bgG = 20;
+  private bgB = 12;
+  private bgFill = '#1c140c'; 
   private lastShotTime: number = 0;
   private spawnTimer: number = 0;
   private regenTimer: number = 0;
@@ -178,12 +195,17 @@ export class GameEngine {
     this.currentDifficulty = difficulty;
     this.difficultyMods = DIFFICULTY_MODIFIERS[difficulty];
     this.colors = theme;
+    const platinum = theme.BG === COLORS_PLATINUM.BG;
+    this.bgFill = organBg('molar', platinum);
+    this.bgR = parseInt(this.bgFill.slice(1, 3), 16);
+    this.bgG = parseInt(this.bgFill.slice(3, 5), 16);
+    this.bgB = parseInt(this.bgFill.slice(5, 7), 16);
     
     this.player = this.createPlayer(initialStats);
     this.lastInputTime = Date.now();
     this.forceHighQuality = true;
     
-    for(let i=0; i<84; i++) this.spawnBackgroundCell(true);
+    for (let i = 0; i < cellBudget(this.organ.id); i++) this.spawnBackgroundCell(true);
   }
 
   public setLanguage(lang: Language) { this.language = lang; }
@@ -214,12 +236,15 @@ export class GameEngine {
   public spawnBackgroundCell(init: boolean = false) {
       if (this.isLowQuality) return;
 
+      const style = rollCellStyle(this.organ.id);
       const y = Math.random() * CANVAS_HEIGHT;
       const x = init ? Math.random() * CANVAS_WIDTH : CANVAS_WIDTH + 12 + Math.random() * 80;
-      const big = Math.random() < 0.16;
-      const size = big ? 8 + Math.random() * 6 : 3.2 + Math.random() * 4.2;
-      const speed = 0.25 + Math.random() * 2.9;
-      
+      const big = Math.random() < (style === 7 ? 0.4 : 0.16);
+      const size = style === 8 ? 1.6 + Math.random() * 1.8
+          : style === 1 ? 2 + Math.random() * 2.2
+          : big ? 8 + Math.random() * 6 : 3.2 + Math.random() * 4.2;
+      const speed = (this.organ.id === 'heart' ? 1.4 : this.organ.id === 'brain' ? 0.35 : 0.7) + Math.random() * (this.organ.id === 'heart' ? 2.4 : 1.4);
+
       this.particles.push({
           id: 'bg',
           type: EntityType.PARTICLE,
@@ -227,8 +252,9 @@ export class GameEngine {
           vel: { x: -speed, y: Math.random() * Math.PI * 2 },
           radius: size,
           health: 1, maxHealth: 1,
-          color: this.colors.BLOOD_PARTICLE,
-          damage: 0, active: true, ttl: 999999
+          color: cellColor(style, this.organ.id),
+          damage: 0, active: true, ttl: 999999,
+          value: style
       });
   }
 
@@ -287,11 +313,10 @@ export class GameEngine {
       dmg *= this.difficultyMods.dmg;
       val *= this.difficultyMods.score;
       
-      // Até a onda 10 nada muda: o filtro continua sendo passar dela.
-      // Da 11 em diante a infecção acompanha quem já upou vida e dano,
-      // e um pouco mais de elite deixa ácido no chão pra quem fica parado no DNA.
+      // A rampa vai até a onda 30. O expoente da parede só entra depois do cérebro.
       const pastTheWall = wavesPastTheWall(this.currentWaveIndex);
-      const isElite = Math.random() < (0.12 + Math.min(0.10, pastTheWall * 0.012));
+      const pressure = campaignPressure(this.currentWaveIndex);
+      const isElite = Math.random() < (0.10 + Math.min(0.08, this.currentWaveIndex * 0.0028) + Math.min(0.10, pastTheWall * 0.012));
       if (isElite) {
           hp *= 3.5;
           dmg *= 2;
@@ -300,8 +325,8 @@ export class GameEngine {
           speed *= 0.85;
       }
 
-      hp *= (1 + this.currentWaveIndex * 0.12) * Math.pow(1.12, pastTheWall);
-      dmg *= (1 + this.currentWaveIndex * 0.15);
+      hp *= (1 + pressure * 9.19) * Math.pow(1.12, pastTheWall);
+      dmg *= (1 + pressure * 2.85) * Math.pow(1.08, pastTheWall);
 
       this.entities.push({
           id: `e_${Date.now()}_${Math.random()}`,
@@ -324,10 +349,11 @@ export class GameEngine {
   public spawnBoss(config: WaveConfig) {
       const mutation = BossArchitect.mutate();
       const pastTheWall = wavesPastTheWall(this.currentWaveIndex);
-      let hp = 1500 * this.difficultyMods.hp * (1 + this.currentWaveIndex * 0.25) * Math.pow(1.09, pastTheWall);
+      const pressure = campaignPressure(this.currentWaveIndex);
+      let hp = 1500 * this.difficultyMods.hp * (1 + pressure * 12.61) * Math.pow(1.09, pastTheWall);
       if (mutation.traits.includes(BossTrait.JUGGERNAUT)) hp *= 2.5;
 
-      const dmg = 50 * this.difficultyMods.dmg * (1 + this.currentWaveIndex * 0.1);
+      const dmg = 50 * this.difficultyMods.dmg * (1 + pressure * 1.9) * Math.pow(1.06, pastTheWall);
       
       this.entities.push({
           id: `boss_${Date.now()}`,
@@ -355,7 +381,7 @@ export class GameEngine {
       let finalDamage = amount;
       let isCrit = false;
       
-      if (canCrit && Math.random() < stats.critChance) {
+      if (canCrit && Math.random() < Math.min(0.85, stats.critChance + this.organ.critAdd)) {
           isCrit = true;
           finalDamage *= stats.critMultiplier;
           this.sessionStats.critHits++;
@@ -475,6 +501,7 @@ export class GameEngine {
   // --- REVISED: DAMAGE PLAYER LOGIC ---
   private damagePlayer(amount: number, sourcePos: Vector2, onGameOver: () => void, onLifeLost: () => void, stats: PlayerStats, isEnvironmental: boolean = false, sourceEntity?: Entity) {
       if (this.invulnerabilityTimer > 0 || this.isDashing) return;
+      if (this.organ.shield > 0) amount *= (1 - this.organ.shield);
 
       this.player.health -= amount;
       this.sessionStats.damageTaken += amount;
@@ -519,6 +546,12 @@ export class GameEngine {
       if (this.player.health <= 0) {
           this.handlePlayerDeath(onGameOver, onLifeLost, stats);
       }
+  }
+
+  private environmentalHit(amount: number, pos: Vector2, iframe: number, stats: PlayerStats, onGameOver: () => void, onLifeLost: () => void) {
+      if (this.invulnerabilityTimer > 0 || this.isDashing || !this.player.active) return;
+      this.damagePlayer(amount, pos, onGameOver, onLifeLost, stats, true);
+      if (iframe > 0 && this.player.health > 0) this.invulnerabilityTimer = iframe;
   }
 
   public handlePlayerDeath(onGameOver: () => void, onLifeLost: () => void, currentStats: PlayerStats) {
@@ -585,7 +618,7 @@ export class GameEngine {
   }
 
   public prepareWave() {
-      this.particles = []; 
+      this.particles = this.particles.filter(p => p.id === 'bg');
       this.entities = this.entities.filter(e => e.active && e.type === EntityType.PLAYER);
       this.lastShotTime = performance.now();
       this.spawnTimer = 0;
@@ -606,10 +639,20 @@ export class GameEngine {
     this.vacuumingTimer = 0;
     this.waveStartDelay = delay;
 
-    const waveNum = waveIndex + 1; 
+    const waveNum = waveIndex + 1;
     audioManager.setGameState(waveNum, 1.0);
-    // SCALING AJUSTADO: Antes acelerava 0.5 por Wave. Agora 0.12 para não ficar incontrolável.
-    this.bloodFlow.x = -2.5 - (waveIndex * 0.12); 
+    const config = WAVES[Math.min(waveIndex, WAVES.length - 1)];
+    this.bloodFlow.x = config.flowSpeed;
+    const changed = this.organ.onWave(waveIndex, (key) => this.t(key));
+    if (changed) {
+        for (const p of this.particles) {
+            if (p.id === 'bg') { p.damage = 1; p.health = 1; }
+        }
+    }
+    let have = 0;
+    for (const p of this.particles) if (p.id === 'bg' && p.damage !== 1) have++;
+    const budget = cellBudget(this.organ.id);
+    for (let i = have; i < budget; i++) this.spawnBackgroundCell(true); 
     if (waveIndex === 4) achievementManager.track('wave_5', 5);
     if (waveIndex === 9) achievementManager.track('wave_10', 10);
   }
@@ -906,7 +949,8 @@ export class GameEngine {
                     this.spawnText(e.pos, this.t('MSG_BURST'), '#ffcc00', 45);
                     // VARIETY: SOUND CALL FOR MINE EXPLOSION (DASH)
                     audioManager.playMineExplosionDash();
-                    audioManager.playSurge(); 
+                    audioManager.playSurge();
+                    buzz('boom'); 
 
                     this.particles.push({
                         id: 'mine_expl_dash', type: EntityType.PARTICLE, pos: {...e.pos},
@@ -972,7 +1016,7 @@ export class GameEngine {
       } else {
           this.waveTimer += dtSeconds;
           const config = WAVES[Math.min(this.currentWaveIndex, WAVES.length - 1)];
-          const targetFlow = config.flowSpeed - (this.currentWaveIndex * 0.2); 
+          const targetFlow = config.flowSpeed; 
           this.bloodFlow.x = this.bloodFlow.x * 0.95 + targetFlow * 0.05;
           
           let spawnRateMod = 1.0;
@@ -1090,6 +1134,25 @@ export class GameEngine {
       }
     }
 
+    const organHooks = {
+        entities: this.entities,
+        player: this.player,
+        low: this.isLowQuality,
+        time: this.time,
+        t: (key: string) => this.t(key),
+        hurt: (amount: number, pos: Vector2, iframe: number) => this.environmentalHit(amount, pos, iframe, stats, onGameOver, onLifeLost),
+        heal: (amount: number) => {
+            this.player.health = Math.min(this.player.maxHealth, this.player.health + amount);
+        },
+        strike: (e: Entity, amount: number) => { if (e.active) this.damageEnemy(e, amount, false, stats); },
+        shake: (n: number) => { this.shakeIntensity = Math.max(this.shakeIntensity, n); },
+        popup: (pos: Vector2, text: string, color: string, size?: number) => this.spawnText(pos, text, color, size ?? 22),
+        spawn: (e: Entity) => { this.entities.push(e); },
+    };
+    const organLive = this.waveActive && this.waveStartDelay <= 0 && !this.isVacuuming && this.currentWaveIndex >= 0;
+    this.organ.begin(dtSeconds, tick, organLive, organHooks);
+    this.approachBg(dtSeconds);
+
       if (this.player.active) {
       if (this.player.maxHealth !== stats.maxHealth) {
           this.player.maxHealth = stats.maxHealth;
@@ -1100,12 +1163,17 @@ export class GameEngine {
           achievementManager.track('max_hp_200', Math.floor(this.player.maxHealth));
       }
       if (!this.isDashing) {
-          const moveScale = this.adrenalineActive ? tick * 1.5 : tick; 
-          this.player.vel.x += this.inputVector.x * stats.speed * 0.2 * moveScale; 
-          this.player.vel.y += this.inputVector.y * stats.speed * 0.2 * moveScale;
+          const moveScale = this.adrenalineActive ? tick * 1.5 : tick;
+          const pace = this.organ.speedMul;
+          this.player.vel.x += this.inputVector.x * stats.speed * 0.2 * moveScale * pace;
+          this.player.vel.y += this.inputVector.y * stats.speed * 0.2 * moveScale * pace;
           this.player.vel.x *= this.player.drag!;
           this.player.vel.y *= this.player.drag!;
-          this.player.pos.x += this.bloodFlow.x * 0.1 * tick;
+          this.player.pos.x += (this.bloodFlow.x * 0.1 + this.organ.wind.x * 0.75) * tick;
+          this.player.pos.y += this.organ.wind.y * 0.75 * tick;
+      } else {
+          this.player.pos.x += this.organ.wind.x * 0.4 * tick;
+          this.player.pos.y += this.organ.wind.y * 0.4 * tick;
       }
 
       this.player.pos.x += this.player.vel.x * tick;
@@ -1123,7 +1191,7 @@ export class GameEngine {
       }
       
       const now = performance.now();
-      if (now - this.lastShotTime > stats.fireRate) {
+      if (now - this.lastShotTime > stats.fireRate * this.organ.fireMul) {
         const target = this.findTarget();
         if (target) {
           this.shoot(target, stats);
@@ -1134,7 +1202,7 @@ export class GameEngine {
       }
       
       this.entities.forEach(e => {
-          if (e.type === EntityType.ACID_POOL && e.active) {
+          if (e.type === EntityType.ACID_POOL && e.active && !e.id.startsWith('plaque_') && !e.id.startsWith('bile_')) {
               const full = e.value && e.value > 0 ? e.value : 6;
               const left = Math.max(0, e.ttl || 0);
               const grown = 1 - Math.min(1, left / full);
@@ -1194,9 +1262,15 @@ export class GameEngine {
         const drag = e.drag ?? 0.5;
         const isMagnetized = e.type === EntityType.DNA_FRAGMENT && (this.surgeActive || this.isVacuuming);
         const flowInfluence = (e.type === EntityType.ANTIBODY || e.type === EntityType.ACID_POOL || e.type === EntityType.ENEMY_PROJECTILE || isMagnetized) ? 0 : (e.type === EntityType.BOSS ? 0.1 : 1);
-        
-        e.pos.x += (e.vel.x + (this.bloodFlow.x * (1 - drag) * flowInfluence)) * tick;
-        e.pos.y += (e.vel.y + (this.bloodFlow.y * (1 - drag) * flowInfluence)) * tick;
+        let windScale = 1;
+        if (e.type === EntityType.BOSS) windScale = 0.18;
+        else if (e.type === EntityType.ACID_POOL) windScale = e.id.startsWith('bile_') ? 0.45 : 0;
+        else if (e.type === EntityType.ANTIBODY || e.type === EntityType.ENEMY_PROJECTILE) windScale = 0.8;
+        else if (e.type === EntityType.ORGAN_PICKUP) windScale = 1.15;
+        else if (e.type === EntityType.PLAYER) windScale = 0;
+
+        e.pos.x += (e.vel.x + (this.bloodFlow.x * (1 - drag) * flowInfluence) + this.organ.wind.x * windScale) * tick;
+        e.pos.y += (e.vel.y + (this.bloodFlow.y * (1 - drag) * flowInfluence) + this.organ.wind.y * windScale) * tick;
         
         // VARIETY INJECTION: ZIG-ZAG FUNGI
         if (e.type === EntityType.FUNGI && this.player.active) {
@@ -1291,7 +1365,8 @@ export class GameEngine {
                    this.spawnText(other.pos, this.t('MSG_BURST'), '#ffcc00', 55); 
                    // VARIETY: SOUND CALL FOR MINE EXPLOSION (SHOT)
                    audioManager.playMineExplosionShot();
-                   audioManager.playSurge(); 
+                   audioManager.playSurge();
+                   buzz('boom'); 
                    
                    this.particles.push({
                         id: 'mine_expl', type: EntityType.PARTICLE, pos: {...other.pos},
@@ -1368,7 +1443,7 @@ export class GameEngine {
               
               if (dMag > 0) {
                 // SCALING FIX: Speed Cap
-                let waveSpeedFactor = Math.min(1.2, this.currentWaveIndex * 0.05); // Cap em +1.2
+                let waveSpeedFactor = Math.min(1.55, this.currentWaveIndex * (1.2 / 29) + wavesPastTheWall(this.currentWaveIndex) * 0.03);
                 let speed = (0.5 + waveSpeedFactor);
                 
                 speed *= 0.7; 
@@ -1441,10 +1516,16 @@ export class GameEngine {
       }
       
       if (p.id === 'bg') {
+          if (p.damage === 1) {
+              p.health -= dtSeconds * 0.85;
+              if (p.health <= 0) continue;
+          }
           if (!this.isLowQuality) {
+              const style = p.value || 0;
+              const rise = cellRises(style) ? -0.55 : 0;
               const wander = Math.sin(this.time * 0.0011 + p.vel.y) * (0.22 + p.radius * 0.03);
-              p.pos.x += (p.vel.x + this.bloodFlow.x * 0.28) * tick;
-              p.pos.y += wander * tick;
+              p.pos.x += (p.vel.x + this.bloodFlow.x * 0.28 + this.organ.wind.x * 0.35) * tick;
+              p.pos.y += (wander + rise + this.organ.wind.y * 0.35) * tick;
               if (p.pos.y < -40 || p.pos.y > CANVAS_HEIGHT + 40) p.pos.y = Math.random() * CANVAS_HEIGHT;
               if (p.pos.x < -80) {
                   p.pos.x = CANVAS_WIDTH + 12 + Math.random() * 80;
@@ -1479,8 +1560,8 @@ export class GameEngine {
     
     if (!this.isLowQuality) {
         this.bgGap -= dt / 1000;
-        const bgCount = this.particles.reduce((n, p) => n + (p.id === 'bg' ? 1 : 0), 0);
-        if (this.bgGap <= 0 && bgCount < 84) {
+        const bgCount = this.particles.reduce((n, p) => n + (p.id === 'bg' && p.damage !== 1 ? 1 : 0), 0);
+        if (this.bgGap <= 0 && bgCount < cellBudget(this.organ.id)) {
             const cluster = 1 + Math.floor(Math.random() * 3);
             for (let i = 0; i < cluster; i++) this.spawnBackgroundCell(false);
             this.bgGap = 0.35 + Math.random() * 1.7;
@@ -1492,6 +1573,8 @@ export class GameEngine {
         this.acidCue = 0;
     }
     
+    this.organ.end(dtSeconds, organHooks);
+
     this.shakeIntensity *= 0.9;
     if (this.shakeIntensity < 0.5) this.shakeIntensity = 0;
     this.compactInactive(this.entities);
@@ -1742,9 +1825,141 @@ export class GameEngine {
       this.ctx.drawImage(sprite, x - radius, y - radius, d, d);
   }
 
+  private approachBg(dtSeconds: number) {
+      const target = organBg(this.organ.id, this.colors.BG === COLORS_PLATINUM.BG);
+      const tr = parseInt(target.slice(1, 3), 16);
+      const tg = parseInt(target.slice(3, 5), 16);
+      const tb = parseInt(target.slice(5, 7), 16);
+      const k = 1 - Math.exp(-dtSeconds / 0.45);
+      this.bgR += (tr - this.bgR) * k;
+      this.bgG += (tg - this.bgG) * k;
+      this.bgB += (tb - this.bgB) * k;
+      this.bgFill = `rgb(${this.bgR | 0},${this.bgG | 0},${this.bgB | 0})`;
+  }
+
+  private drawOrganPool(e: Entity) {
+      const plaque = e.id.startsWith('plaque_');
+      const full = e.value && e.value > 0 ? e.value : 6;
+      const left = Math.max(0, e.ttl || 0);
+      const life = Math.min(1, left / full);
+      const veil = life < 0.22 ? life / 0.22 : 1;
+      if (plaque) {
+          this.drawPlaque(e, veil);
+          return;
+      }
+      this.ctx.save();
+      this.ctx.translate(e.pos.x, e.pos.y);
+      this.ctx.globalAlpha = 0.78 * veil;
+      this.ctx.fillStyle = '#b6d24a';
+      this.ctx.beginPath();
+      this.ctx.ellipse(0, 0, e.radius, e.radius * 0.72, 0, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.globalAlpha = 0.9 * veil;
+      this.ctx.strokeStyle = '#3d4a12';
+      this.ctx.lineWidth = 3;
+      this.ctx.stroke();
+      this.ctx.restore();
+  }
+
+  private drawPlaque(e: Entity, veil: number) {
+      this.ctx.save();
+      this.ctx.translate(e.pos.x, e.pos.y);
+      this.ctx.globalAlpha = 0.9 * veil;
+
+      this.ctx.beginPath();
+      const n = 12;
+      for (let i = 0; i <= n; i++) {
+          const a = (i / n) * Math.PI * 2;
+          const wob = 1 + 0.08 * Math.sin(a * 3 + this.time / 500);
+          const px = Math.cos(a) * e.radius * 0.62 * wob;
+          const py = Math.sin(a) * e.radius * 0.48 * wob;
+          if (i === 0) this.ctx.moveTo(px, py);
+          else this.ctx.lineTo(px, py);
+      }
+      this.ctx.closePath();
+      this.ctx.fillStyle = '#c2a45c';
+      this.ctx.fill();
+      this.ctx.lineWidth = 2;
+      this.ctx.strokeStyle = 'rgba(92, 74, 36, 0.8)';
+      this.ctx.stroke();
+
+      this.ctx.fillStyle = 'rgba(74, 58, 28, 0.55)';
+      for (let i = 0; i < 3; i++) {
+          this.ctx.beginPath();
+          this.ctx.arc(
+              Math.cos(i * 2.1) * e.radius * 0.18,
+              Math.sin(i * 1.6) * e.radius * 0.12,
+              3.5 + (i % 2) * 1.5,
+              0, Math.PI * 2
+          );
+          this.ctx.fill();
+      }
+      this.ctx.restore();
+  }
+
+  private drawOrganPickup(e: Entity) {
+      const kind = e.value || 1;
+      this.ctx.save();
+      this.ctx.translate(e.pos.x, e.pos.y);
+      this.ctx.globalAlpha = 0.95;
+      if (kind === 1) {
+          const pulse = 0.5 + 0.5 * Math.sin(this.time / 180);
+          this.ctx.fillStyle = `rgba(150, 255, 230, ${0.08 + pulse * 0.08})`;
+          this.ctx.beginPath();
+          this.ctx.arc(0, -4, 48 + pulse * 6, 0, Math.PI * 2);
+          this.ctx.fill();
+          this.ctx.strokeStyle = `rgba(170, 255, 236, ${0.45 + pulse * 0.45})`;
+          this.ctx.lineWidth = 3;
+          this.ctx.stroke();
+
+          this.ctx.fillStyle = '#f6fffc';
+          this.ctx.strokeStyle = '#9dffef';
+          this.ctx.lineWidth = 4;
+          this.ctx.beginPath();
+          this.ctx.moveTo(0, -34);
+          this.ctx.bezierCurveTo(28, -28, 30, 2, 0, 22);
+          this.ctx.bezierCurveTo(-30, 2, -28, -28, 0, -34);
+          this.ctx.closePath();
+          this.ctx.fill();
+          this.ctx.stroke();
+
+          this.ctx.fillStyle = '#7eead4';
+          this.ctx.beginPath();
+          this.ctx.ellipse(-7, -10, 6, 10, -0.4, 0, Math.PI * 2);
+          this.ctx.fill();
+
+          this.ctx.textAlign = 'center';
+          this.ctx.textBaseline = 'middle';
+          this.ctx.lineWidth = 5;
+          this.ctx.strokeStyle = 'rgba(8, 28, 26, 0.7)';
+          this.ctx.fillStyle = '#f3fffb';
+          this.ctx.font = '800 22px "Chakra Petch", sans-serif';
+          this.ctx.strokeText(this.t('MSG_FLUORIDE'), 0, 46);
+          this.ctx.fillText(this.t('MSG_FLUORIDE'), 0, 46);
+          this.ctx.font = '700 15px "Chakra Petch", sans-serif';
+          this.ctx.fillStyle = '#b8fff0';
+          this.ctx.strokeText(this.t('FLUORIDE_HINT'), 0, 66);
+          this.ctx.fillText(this.t('FLUORIDE_HINT'), 0, 66);
+          this.ctx.restore();
+          return;
+      }
+      const glyph = kind === 2 ? 'G' : kind === 3 ? 'O2' : 'D';
+      this.ctx.fillStyle = e.color;
+      this.ctx.beginPath();
+      this.ctx.arc(0, 0, e.radius, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.fillStyle = '#1a1208';
+      this.ctx.font = '700 16px "Chakra Petch", sans-serif';
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.fillText(glyph, 0, 1);
+      this.ctx.restore();
+  }
+
   public draw() {
-    this.ctx.fillStyle = this.colors.BG;
+    this.ctx.fillStyle = this.bgFill;
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    this.organ.drawBackdrop(this.ctx, this.time, this.isLowQuality);
 
     const aberration = (this.adrenalineActive || this.surgeActive) && !this.isLowQuality;
     if (aberration) {
@@ -1801,13 +2016,18 @@ export class GameEngine {
 
     if (!this.isLowQuality) {
         this.ctx.globalCompositeOperation = 'source-over';
-        this.ctx.globalAlpha = 0.12;
-        this.ctx.fillStyle = '#d25a5e';
         for (let i = 0; i < this.particles.length; i++) {
             const p = this.particles[i];
             if (p.id !== 'bg') continue;
+            const fade = p.damage === 1 ? Math.max(0, p.health) : 1;
+            const style = p.value || 0;
+            const bubble = style === 0 || style === 3 || style === 5 || style === 6 || style === 8 || style === 1;
+            this.ctx.globalAlpha = (bubble ? 0.34 : 0.16) * fade;
+            this.ctx.fillStyle = p.color;
             this.ctx.beginPath();
-            this.ctx.ellipse(p.pos.x, p.pos.y, p.radius * 1.45, p.radius * 0.62, p.vel.y, 0, Math.PI * 2);
+            if (style === 7) this.ctx.ellipse(p.pos.x, p.pos.y, p.radius * 2.1, p.radius * 0.55, p.vel.y, 0, Math.PI * 2);
+            else if (bubble) this.ctx.arc(p.pos.x, p.pos.y, p.radius, 0, Math.PI * 2);
+            else this.ctx.ellipse(p.pos.x, p.pos.y, p.radius * 1.45, p.radius * 0.62, p.vel.y, 0, Math.PI * 2);
             this.ctx.fill();
         }
         this.ctx.globalAlpha = 1;
@@ -1955,6 +2175,9 @@ export class GameEngine {
              this.ctx.fill();
         }
         else if (e.type === EntityType.ACID_POOL) {
+            if (e.id.startsWith('plaque_') || e.id.startsWith('bile_')) {
+                this.drawOrganPool(e);
+            } else {
             this.ctx.save();
             this.ctx.translate(e.pos.x, e.pos.y);
             const full = e.value && e.value > 0 ? e.value : 6;
@@ -2006,6 +2229,10 @@ export class GameEngine {
                 this.ctx.fill();
             }
             this.ctx.restore();
+            }
+        }
+        else if (e.type === EntityType.ORGAN_PICKUP) {
+            this.drawOrganPickup(e);
         }
         else if (e.type === EntityType.BIO_MINE) {
             this.ctx.save();
@@ -2259,6 +2486,8 @@ export class GameEngine {
         this.ctx.fillText(e.id, e.pos.x, e.pos.y);
       }
     });
+
+    this.organ.drawHazards(this.ctx, this.player, this.isLowQuality);
 
     this.ctx.restore();
   }
