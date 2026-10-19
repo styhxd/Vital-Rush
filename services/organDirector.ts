@@ -378,7 +378,7 @@ export class OrganDirector {
 
     drawBackdrop(ctx: CanvasRenderingContext2D, time: number, low: boolean) {
         if (this.id === 'heart' && this.pulse > 0.02) {
-            ctx.fillStyle = `rgba(120, 8, 18, ${0.07 * this.pulse})`;
+            ctx.fillStyle = `rgba(140, 18, 28, ${0.11 * this.pulse})`;
             ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         }
         if (low) return;
@@ -388,7 +388,6 @@ export class OrganDirector {
         ctx.lineWidth = 2;
         if (this.id === 'molar') this.drawEnamel(ctx, time);
         else if (this.id === 'liver') this.drawLobules(ctx);
-        else if (this.id === 'heart') this.drawVessel(ctx, time);
         else if (this.id === 'lung') this.drawAlveoli(ctx, time);
         else if (this.id === 'brain') this.drawNeural(ctx, time);
         ctx.restore();
@@ -1808,68 +1807,6 @@ export class OrganDirector {
                 ctx.arc(pen.x, pen.y, 4.5, 0, Math.PI * 2);
                 ctx.fill();
             }
-        }
-        ctx.restore();
-    }
-
-    private drawVessel(ctx: CanvasRenderingContext2D, time: number) {
-        ctx.save();
-        ctx.globalAlpha = 1;
-        const walls: Array<[number, number, number, number]> = [
-            [CANVAS_WIDTH * 0.5, -30, 1100, 250],
-            [CANVAS_WIDTH * 0.5, CANVAS_HEIGHT + 40, 1140, 270],
-            [-50, CANVAS_HEIGHT * 0.5, 280, 520],
-            [CANVAS_WIDTH + 60, CANVAS_HEIGHT * 0.45, 300, 540],
-        ];
-        for (const [x, y, rx, ry] of walls) {
-            const wall = ctx.createRadialGradient(x, y, rx * 0.15, x, y, rx);
-            wall.addColorStop(0, 'rgba(150, 28, 42, 0.42)');
-            wall.addColorStop(0.55, 'rgba(90, 14, 26, 0.22)');
-            wall.addColorStop(1, 'rgba(72, 12, 22, 0)');
-            ctx.fillStyle = wall;
-            ctx.beginPath();
-            ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        this.drawValve(ctx, time);
-        for (let i = 0; i < 6; i++) {
-            const drift = ((time / 110 + i * 340) % (CANVAS_WIDTH + 240)) - 120;
-            const x = CANVAS_WIDTH - drift;
-            const y = 160 + (i * 150) % (CANVAS_HEIGHT - 260) + Math.sin(time / 1400 + i) * 8;
-            const fat = i % 3 === 0 ? 32 : 24;
-            ctx.fillStyle = 'rgba(196, 42, 58, 0.28)';
-            ctx.beginPath();
-            ctx.ellipse(x, y, fat, fat * 0.55, -0.35, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = 'rgba(255, 190, 196, 0.22)';
-            ctx.beginPath();
-            ctx.ellipse(x - 8, y - 4, fat * 0.28, fat * 0.14, -0.5, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        ctx.restore();
-    }
-
-    private drawValve(ctx: CanvasRenderingContext2D, time: number) {
-        const sway = Math.sin(time / 1800) * 1.5;
-        ctx.save();
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        for (let i = 0; i < 5; i++) {
-            const x = 260 + i * 310;
-            const lift = sway + Math.sin(i * 1.7) * 6;
-            ctx.fillStyle = 'rgba(92, 16, 28, 0.45)';
-            ctx.strokeStyle = 'rgba(255, 196, 196, 0.28)';
-            ctx.beginPath();
-            ctx.moveTo(x - 58, 8);
-            ctx.quadraticCurveTo(x - 10, 54 + lift, x + 18, 18);
-            ctx.quadraticCurveTo(x + 40, 46 + lift, x + 70, 6);
-            ctx.quadraticCurveTo(x + 8, 22, x - 58, 8);
-            ctx.fill();
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(x - 46, CANVAS_HEIGHT - 8);
-            ctx.quadraticCurveTo(x, CANVAS_HEIGHT - 62 - lift, x + 62, CANVAS_HEIGHT - 10);
-            ctx.stroke();
         }
         ctx.restore();
     }
