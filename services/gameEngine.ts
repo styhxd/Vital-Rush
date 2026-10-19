@@ -1841,30 +1841,100 @@ export class GameEngine {
       const plaque = e.id.startsWith('plaque_');
       const full = e.value && e.value > 0 ? e.value : 6;
       const left = Math.max(0, e.ttl || 0);
-      const life = Math.min(1, left / full);
-      const veil = life < 0.22 ? life / 0.22 : 1;
+      const age = Math.max(0, full - left);
+      const settle = Math.min(1, age / 1.25);
+      const fade = left < 1.15 ? left / 1.15 : 1;
+      const veil = Math.min(1, age / 0.35) * fade;
       if (plaque) {
-          this.drawPlaque(e, veil);
+          this.drawPlaque(e, veil, settle);
           return;
       }
+      this.drawBile(e, veil, settle);
+  }
+
+  private drawBile(e: Entity, veil: number, settle: number) {
       this.ctx.save();
       this.ctx.translate(e.pos.x, e.pos.y);
-      this.ctx.globalAlpha = 0.78 * veil;
-      this.ctx.fillStyle = '#b6d24a';
+      this.ctx.globalAlpha = 0.92 * veil;
+      const r = e.radius;
+      const flat = 0.92 - 0.34 * settle;
+      const phase = this.time / 680;
       this.ctx.beginPath();
-      this.ctx.ellipse(0, 0, e.radius, e.radius * 0.72, 0, 0, Math.PI * 2);
+      const n = 18;
+      for (let i = 0; i <= n; i++) {
+          const a = (i / n) * Math.PI * 2;
+          const wob = 1 + 0.035 * Math.sin(a * 3 + phase) + 0.02 * Math.cos(a * 2 - phase * 0.6);
+          const px = Math.cos(a) * r * 1.02 * wob;
+          const py = Math.sin(a) * r * flat * wob;
+          if (i === 0) this.ctx.moveTo(px, py);
+          else this.ctx.lineTo(px, py);
+      }
+      this.ctx.closePath();
+      const g = this.ctx.createRadialGradient(-r * 0.22, -r * 0.14, r * 0.04, 0, 0, r);
+      g.addColorStop(0, 'rgba(255, 250, 186, 0.95)');
+      g.addColorStop(0.16, 'rgba(206, 210, 72, 0.9)');
+      g.addColorStop(0.62, 'rgba(148, 158, 36, 0.82)');
+      g.addColorStop(1, 'rgba(46, 54, 12, 0.55)');
+      this.ctx.fillStyle = g;
       this.ctx.fill();
-      this.ctx.globalAlpha = 0.9 * veil;
-      this.ctx.strokeStyle = '#3d4a12';
-      this.ctx.lineWidth = 3;
-      this.ctx.stroke();
+
+      this.ctx.fillStyle = 'rgba(255, 252, 220, 0.85)';
+      this.ctx.beginPath();
+      this.ctx.ellipse(-r * 0.24, -r * 0.12, r * 0.07, r * 0.028, -0.5, 0, Math.PI * 2);
+      this.ctx.fill();
+
+      const spots: Array<[number, number, number]> = [
+          [-0.28, 0.02, 0.09],
+          [0.18, -0.06, 0.07],
+          [0.02, 0.1, 0.055],
+          [-0.08, -0.04, 0.04],
+      ];
+      for (let i = 0; i < spots.length; i++) {
+          const [sx, sy, sr] = spots[i];
+          const rise = ((this.time / 1400 + i * 0.23) % 1) * r * 0.08;
+          const bx = sx * r;
+          const by = sy * r - rise;
+          const br = sr * r;
+          this.ctx.fillStyle = 'rgba(255, 252, 210, 0.22)';
+          this.ctx.beginPath();
+          this.ctx.arc(bx, by, br, 0, Math.PI * 2);
+          this.ctx.fill();
+          this.ctx.strokeStyle = 'rgba(255, 252, 220, 0.55)';
+          this.ctx.lineWidth = 1.5;
+          this.ctx.stroke();
+          this.ctx.fillStyle = 'rgba(255, 255, 245, 0.8)';
+          this.ctx.beginPath();
+          this.ctx.arc(bx - br * 0.28, by - br * 0.3, br * 0.22, 0, Math.PI * 2);
+          this.ctx.fill();
+      }
+      if (settle < 1) {
+          const rest = e.angle && e.angle > 0 ? e.angle : r;
+          this.ctx.globalAlpha = 0.4 * (1 - settle * 0.35) * veil;
+          this.ctx.strokeStyle = 'rgba(255, 248, 186, 0.9)';
+          this.ctx.lineWidth = 2;
+          this.ctx.beginPath();
+          this.ctx.ellipse(0, 0, rest * (0.45 + settle * 0.62), rest * 0.58 * (0.45 + settle * 0.62), 0, 0, Math.PI * 2);
+          this.ctx.stroke();
+      }
       this.ctx.restore();
   }
 
-  private drawPlaque(e: Entity, veil: number) {
+  private drawPlaque(e: Entity, veil: number, settle: number) {
       this.ctx.save();
       this.ctx.translate(e.pos.x, e.pos.y);
       this.ctx.globalAlpha = 0.9 * veil;
+
+      if (settle < 1) {
+          const rest = e.angle && e.angle > 0 ? e.angle : e.radius;
+          this.ctx.fillStyle = 'rgba(92, 74, 36, 0.55)';
+          for (let i = 0; i < 6; i++) {
+              const ang = i * 1.17 + rest * 0.02;
+              const dist = rest * (1.55 - settle * 0.85);
+              this.ctx.beginPath();
+              this.ctx.arc(Math.cos(ang) * dist, Math.sin(ang) * dist * 0.72, 2.4 + (i % 3), 0, Math.PI * 2);
+              this.ctx.fill();
+          }
+      }
 
       this.ctx.beginPath();
       const n = 12;
@@ -1899,9 +1969,18 @@ export class GameEngine {
 
   private drawOrganPickup(e: Entity) {
       const kind = e.value || 1;
+      const base = e.angle && e.angle > 0 ? e.angle : e.radius;
+      const scale = base > 0 ? e.radius / base : 1;
+      const full = e.maxHealth > 2 ? e.maxHealth : 12;
+      const left = Math.max(0, e.ttl || 0);
+      const age = Math.max(0, full - left);
+      let alpha = 0.95;
+      if (age < 0.4) alpha = 0.95 * (age / 0.4);
+      else if (left < 0.9) alpha = 0.95 * (left / 0.9);
       this.ctx.save();
       this.ctx.translate(e.pos.x, e.pos.y);
-      this.ctx.globalAlpha = 0.95;
+      this.ctx.scale(scale, scale);
+      this.ctx.globalAlpha = alpha;
       if (kind === 1) {
           const pulse = 0.5 + 0.5 * Math.sin(this.time / 180);
           this.ctx.fillStyle = `rgba(150, 255, 230, ${0.08 + pulse * 0.08})`;
@@ -1943,10 +2022,57 @@ export class GameEngine {
           this.ctx.restore();
           return;
       }
-      const glyph = kind === 2 ? 'G' : kind === 3 ? 'O2' : 'D';
+      if (kind === 2) {
+          const pulse = 0.5 + 0.5 * Math.sin(this.time / 200);
+          this.ctx.fillStyle = `rgba(255, 214, 120, ${0.1 + pulse * 0.1})`;
+          this.ctx.beginPath();
+          this.ctx.arc(0, -2, 42 + pulse * 6, 0, Math.PI * 2);
+          this.ctx.fill();
+          this.ctx.strokeStyle = `rgba(255, 220, 140, ${0.35 + pulse * 0.4})`;
+          this.ctx.lineWidth = 2.5;
+          this.ctx.stroke();
+
+          this.ctx.fillStyle = '#ffe7a3';
+          this.ctx.strokeStyle = '#fff6d4';
+          this.ctx.lineWidth = 3;
+          this.ctx.beginPath();
+          this.ctx.moveTo(0, -28);
+          this.ctx.bezierCurveTo(20, -18, 18, 8, 0, 22);
+          this.ctx.bezierCurveTo(-18, 8, -20, -18, 0, -28);
+          this.ctx.closePath();
+          this.ctx.fill();
+          this.ctx.stroke();
+
+          this.ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+          this.ctx.beginPath();
+          this.ctx.ellipse(-5, -8, 4, 7, -0.5, 0, Math.PI * 2);
+          this.ctx.fill();
+
+          this.ctx.strokeStyle = '#6a4a10';
+          this.ctx.lineWidth = 3;
+          this.ctx.lineCap = 'round';
+          this.ctx.beginPath();
+          this.ctx.moveTo(0, -2);
+          this.ctx.lineTo(0, 12);
+          this.ctx.moveTo(-7, 5);
+          this.ctx.lineTo(7, 5);
+          this.ctx.stroke();
+
+          this.ctx.textAlign = 'center';
+          this.ctx.textBaseline = 'middle';
+          this.ctx.lineWidth = 5;
+          this.ctx.strokeStyle = 'rgba(48, 32, 8, 0.65)';
+          this.ctx.fillStyle = '#fff4d0';
+          this.ctx.font = '800 20px "Chakra Petch", sans-serif';
+          this.ctx.strokeText(this.t('GLYCOGEN_WORD'), 0, 42);
+          this.ctx.fillText(this.t('GLYCOGEN_WORD'), 0, 42);
+          this.ctx.restore();
+          return;
+      }
+      const glyph = kind === 3 ? 'O2' : 'D';
       this.ctx.fillStyle = e.color;
       this.ctx.beginPath();
-      this.ctx.arc(0, 0, e.radius, 0, Math.PI * 2);
+      this.ctx.arc(0, 0, base, 0, Math.PI * 2);
       this.ctx.fill();
       this.ctx.fillStyle = '#1a1208';
       this.ctx.font = '700 16px "Chakra Petch", sans-serif';
