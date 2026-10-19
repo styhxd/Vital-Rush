@@ -285,7 +285,9 @@ export const Game: React.FC = () => {
   const stageRef = useRef<HTMLDivElement>(null);
   const heartRefs = useRef<Array<SVGSVGElement | null>>([]);
   const [outcomeBeat, setOutcomeBeat] = useState<null | 'win' | 'lose'>(null);
-  const outcomeTimer = useRef<number | null>(null); 
+  const [outcomeLeaving, setOutcomeLeaving] = useState(false);
+  const outcomeTimer = useRef<number | null>(null);
+  const outcomeLeaveTimer = useRef<number | null>(null); 
   
   // State para controlar o tutorial e eventos de Boss
   const [showTutorial, setShowTutorial] = useState(false);
@@ -447,6 +449,10 @@ export const Game: React.FC = () => {
           }
           
           setGameState(GameState.PLAYING);
+          setOutcomeBeat(null);
+          setOutcomeLeaving(false);
+          if (outcomeTimer.current) window.clearTimeout(outcomeTimer.current);
+          if (outcomeLeaveTimer.current) window.clearTimeout(outcomeLeaveTimer.current);
           audioManager.startGameMusic();
           setBossEntity(null);
       }
@@ -580,15 +586,27 @@ export const Game: React.FC = () => {
                 audioManager.stopMusic();
                 audioManager.playPowerUp();
                 setOutcomeBeat('win');
+                setOutcomeLeaving(false);
                 if (outcomeTimer.current) window.clearTimeout(outcomeTimer.current);
-                outcomeTimer.current = window.setTimeout(() => setOutcomeBeat(null), 1700);
+                if (outcomeLeaveTimer.current) window.clearTimeout(outcomeLeaveTimer.current);
+                outcomeLeaveTimer.current = window.setTimeout(() => setOutcomeLeaving(true), 1450);
+                outcomeTimer.current = window.setTimeout(() => {
+                    setOutcomeBeat(null);
+                    setOutcomeLeaving(false);
+                }, 2150);
             },
             () => {
                 setGameState(GameState.GAME_OVER);
                 audioManager.stopMusic();
                 setOutcomeBeat('lose');
+                setOutcomeLeaving(false);
                 if (outcomeTimer.current) window.clearTimeout(outcomeTimer.current);
-                outcomeTimer.current = window.setTimeout(() => setOutcomeBeat(null), 1100);
+                if (outcomeLeaveTimer.current) window.clearTimeout(outcomeLeaveTimer.current);
+                outcomeLeaveTimer.current = window.setTimeout(() => setOutcomeLeaving(true), 900);
+                outcomeTimer.current = window.setTimeout(() => {
+                    setOutcomeBeat(null);
+                    setOutcomeLeaving(false);
+                }, 1550);
             },
             () => {
                 const eng = engineRef.current;
@@ -1113,6 +1131,7 @@ export const Game: React.FC = () => {
             pointer-events: none;
             overflow: hidden;
         }
+        .outcome-leave { animation: outcome-leave 0.7s ease forwards; }
         .outcome-win { background: radial-gradient(circle at center, rgba(255, 226, 150, 0.42), rgba(0, 0, 0, 0.18) 46%, rgba(0, 0, 0, 0.62)); }
         .outcome-lose { background: radial-gradient(circle at center, rgba(160, 0, 20, 0.28), rgba(0, 0, 0, 0.78)); }
         .outcome-flash { position: absolute; inset: 0; background: #fff; animation: outcome-flash 0.5s ease-out forwards; }
@@ -1161,6 +1180,7 @@ export const Game: React.FC = () => {
             animation: outcome-spark 1.15s ease-out forwards;
         }
         @keyframes outcome-flash { 0% { opacity: 0.8; } 100% { opacity: 0; } }
+        @keyframes outcome-leave { from { opacity: 1; } to { opacity: 0; } }
         @keyframes outcome-ring { 0% { transform: scale(0.15); opacity: 1; } 100% { transform: scale(2.8); opacity: 0; } }
         @keyframes outcome-pop { 0% { transform: scale(0.35); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         @keyframes outcome-spark { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-220px) scale(0.3); opacity: 0; } }
@@ -1392,7 +1412,7 @@ export const Game: React.FC = () => {
       )}
       
       {outcomeBeat && (
-        <div className={`outcome-beat ${outcomeBeat === 'win' ? 'outcome-win' : 'outcome-lose'}`}>
+        <div className={`outcome-beat ${outcomeBeat === 'win' ? 'outcome-win' : 'outcome-lose'}${outcomeLeaving ? ' outcome-leave' : ''}`}>
           <div className="outcome-flash" />
           <div className="outcome-ring" />
           {outcomeBeat === 'win' && Array.from({ length: 18 }).map((_, i) => (
@@ -1414,7 +1434,7 @@ export const Game: React.FC = () => {
         </div>
       )}
 
-      <ScreenPresence show={gameState === GameState.WAVE_CLEARED && outcomeBeat !== 'win'}>
+      <ScreenPresence show={gameState === GameState.WAVE_CLEARED && (outcomeBeat !== 'win' || outcomeLeaving)}>
         {(phase) => (
         <OutcomeChart
             variant="cleared"
@@ -1426,6 +1446,16 @@ export const Game: React.FC = () => {
             score={uiData.score}
             onPrimary={deployToWave}
             onSecondary={openShop}
+            onAbandon={() => {
+                if (outcomeTimer.current) window.clearTimeout(outcomeTimer.current);
+                if (outcomeLeaveTimer.current) window.clearTimeout(outcomeLeaveTimer.current);
+                setOutcomeBeat(null);
+                setOutcomeLeaving(false);
+                setIsPaused(false);
+                setGameState(GameState.MENU);
+                audioManager.stopMusic();
+                audioManager.startMenuMusic();
+            }}
             motion={phase}
         />
         )}
@@ -1612,7 +1642,7 @@ export const Game: React.FC = () => {
 
       {/* (LOADOUT, SETTINGS, CREDITS, PAUSED, GAME_OVER) mantidos */}
       
-      <ScreenPresence show={gameState === GameState.GAME_OVER && outcomeBeat !== 'lose'}>
+      <ScreenPresence show={gameState === GameState.GAME_OVER && (outcomeBeat !== 'lose' || outcomeLeaving)}>
         {(phase) => (
         <OutcomeChart
             variant="lost"

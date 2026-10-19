@@ -27,7 +27,7 @@ const THEME: Record<OrganId, { bg: string; accent: string; name: string }> = {
     liver: { bg: '#14160a', accent: '#d6e36a', name: 'ORG_LIVER' },
     heart: { bg: '#2a0508', accent: '#ff5a6a', name: 'ORG_HEART' },
     lung:  { bg: '#1c1218', accent: '#f3c3ce', name: 'ORG_LUNG' },
-    brain: { bg: '#0a0614', accent: '#c9a6ff', name: 'ORG_BRAIN' },
+    brain: { bg: '#070410', accent: '#c9a6ff', name: 'ORG_BRAIN' },
 };
 
 const ENTER_KEY: Partial<Record<OrganId, string>> = {
@@ -93,6 +93,7 @@ export function cellBudget(id: OrganId): number {
     if (id === 'liver') return 64;
     if (id === 'heart') return 96;
     if (id === 'lung') return 32;
+    if (id === 'brain') return 26;
     return 34;
 }
 
@@ -102,7 +103,7 @@ export function rollCellStyle(id: OrganId): number {
     if (id === 'liver') return r < 0.58 ? CELL.VENOUS : CELL.BILE;
     if (id === 'heart') return CELL.RBC;
     if (id === 'lung') return r < 0.34 ? CELL.RBC : r < 0.72 ? CELL.CO2 : CELL.O2;
-    return r < 0.58 ? CELL.MYELIN : r < 0.9 ? CELL.MOTE : CELL.VENOUS;
+    return r < 0.7 ? CELL.MOTE : CELL.MYELIN;
 }
 
 export function cellColor(style: number, organ: OrganId): string {
@@ -113,7 +114,7 @@ export function cellColor(style: number, organ: OrganId): string {
     if (style === CELL.RBC) return organ === 'lung' ? '#e7b4be' : organ === 'heart' ? '#ff4d55' : '#d25a5e';
     if (style === CELL.CO2) return organ === 'lung' ? '#e4d0d6' : '#ead6de';
     if (style === CELL.O2) return organ === 'lung' ? '#d7e3e8' : '#8ee7ff';
-    if (style === CELL.MYELIN) return '#d7d2ea';
+    if (style === CELL.MYELIN) return organ === 'brain' ? '#b7a8d4' : '#d7d2ea';
     return '#c9a6ff';
 }
 
@@ -1181,7 +1182,7 @@ export class OrganDirector {
             } else if (e.value === PICK_DOPAMINE) {
                 this.dopamineT = 4;
                 this.critAdd = 0.22;
-                hooks.popup(hooks.player.pos, hooks.t('MSG_DOPAMINE'), '#e2c6ff', 24);
+                hooks.popup(hooks.player.pos, hooks.t('DOPAMINE_HINT'), '#e2c6ff', 24);
             }
         }
     }
@@ -2344,18 +2345,58 @@ export class OrganDirector {
     }
 
     private drawNeural(ctx: CanvasRenderingContext2D, time: number) {
-        ctx.lineWidth = 1.5;
-        for (let i = 0; i < 7; i++) {
-            const x = 220 + i * 230;
-            const y = 200 + (i % 2) * 420;
+        ctx.save();
+        ctx.globalAlpha = 1;
+        const wash = ctx.createRadialGradient(
+            CANVAS_WIDTH * 0.5, CANVAS_HEIGHT * 0.46, 90,
+            CANVAS_WIDTH * 0.5, CANVAS_HEIGHT * 0.5, 980,
+        );
+        wash.addColorStop(0, 'rgba(58, 28, 96, 0.2)');
+        wash.addColorStop(0.5, 'rgba(24, 10, 44, 0.16)');
+        wash.addColorStop(1, 'rgba(3, 1, 8, 0.5)');
+        ctx.fillStyle = wash;
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+        const folds: Array<[number, number, number, number, number]> = [
+            [-30, 200, 440, 280, 0.2],
+            [CANVAS_WIDTH + 20, 240, 400, 310, 1.1],
+            [-70, 820, 480, 330, 2.1],
+            [CANVAS_WIDTH + 40, 900, 440, 290, 0.7],
+            [460, -30, 540, 190, 1.6],
+            [1480, CANVAS_HEIGHT + 16, 500, 200, 2.7],
+        ];
+        for (const [x, y, rx, ry, phase] of folds) {
+            const breathe = 1 + Math.sin(time / 1500 + phase) * 0.02;
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(1, (ry / rx) * breathe);
+            const g = ctx.createRadialGradient(0, 0, rx * 0.05, 0, 0, rx);
+            g.addColorStop(0, 'rgba(146, 86, 204, 0.5)');
+            g.addColorStop(0.34, 'rgba(86, 36, 140, 0.34)');
+            g.addColorStop(0.68, 'rgba(40, 16, 72, 0.16)');
+            g.addColorStop(1, 'rgba(8, 3, 16, 0)');
+            ctx.fillStyle = g;
             ctx.beginPath();
-            ctx.moveTo(x, y);
-            ctx.lineTo(x + 80, y - 50 + Math.sin(time / 700 + i) * 10);
-            ctx.lineTo(x + 150, y + 30);
-            ctx.moveTo(x + 80, y - 40);
-            ctx.lineTo(x + 110, y - 110);
-            ctx.stroke();
+            ctx.arc(0, 0, rx, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
         }
+
+        for (let i = 0; i < 8; i++) {
+            const sx = 220 + (i * 211) % (CANVAS_WIDTH - 360);
+            const sy = 160 + (i * 277) % (CANVAS_HEIGHT - 260);
+            const glow = 0.12 + 0.05 * Math.sin(time / 980 + i);
+            const r = 16 + (i % 3) * 7;
+            const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 2.4);
+            g.addColorStop(0, `rgba(214, 190, 255, ${glow})`);
+            g.addColorStop(0.38, `rgba(112, 62, 176, ${glow * 0.55})`);
+            g.addColorStop(1, 'rgba(16, 6, 32, 0)');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(sx, sy, r * 2.4, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
     }
 }
 

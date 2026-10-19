@@ -560,7 +560,14 @@ const paint = (ctx: CanvasRenderingContext2D, kind: Kind, time: number, w: numbe
         ctx.stroke();
         ctx.fillStyle = '#e2c6ff';
         ctx.beginPath();
-        ctx.arc(cx, cy, 12, 0, Math.PI * 2);
+        ctx.moveTo(cx, cy - 16);
+        ctx.bezierCurveTo(cx + 14, cy - 4, cx + 12, cy + 8, cx, cy + 14);
+        ctx.bezierCurveTo(cx - 12, cy + 8, cx - 14, cy - 4, cx, cy - 16);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+        ctx.beginPath();
+        ctx.ellipse(cx - 4, cy - 4, 2.4, 4, -0.5, 0, Math.PI * 2);
         ctx.fill();
     } else if (kind === 'dash') {
         const k = (t % 1.2) / 1.2;

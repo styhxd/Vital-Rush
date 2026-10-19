@@ -1857,7 +1857,8 @@ export class GameEngine {
       const lobes = e.lobes;
       if (!lobes || lobes.length < 2 || alpha <= 0.01) return;
       const ctx = this.ctx;
-      const phase = this.time / 700;
+      const liquid = kind === 'acid';
+      const phase = this.time / (liquid ? 480 : 700);
       let cx = 0;
       let cy = 0;
       for (const l of lobes) {
@@ -1873,15 +1874,26 @@ export class GameEngine {
       }
       const path = () => {
           ctx.beginPath();
+          const n = liquid ? (this.isLowQuality ? 14 : 20) : 16;
           for (const l of lobes) {
               const ox = e.pos.x + l.x;
               const oy = e.pos.y + l.y;
-              const n = 16;
+              const seed = l.x * 0.017 + l.y * 0.013;
               for (let i = 0; i <= n; i++) {
                   const a = (i / n) * Math.PI * 2;
-                  const wob = 1 + 0.03 * Math.sin(a * 3 + phase + l.x * 0.01);
-                  const px = ox + Math.cos(a) * l.rx * scale * wob;
-                  const py = oy + Math.sin(a) * l.ry * scale * wob;
+                  let px: number;
+                  let py: number;
+                  if (liquid) {
+                      const base = Math.max(l.rx, l.ry) * scale;
+                      const wob = Math.sin(a * 3 + phase + seed) * base * 0.14
+                          + Math.cos(a * 5 - phase + seed) * base * 0.05;
+                      px = ox + Math.cos(a) * (l.rx * scale + wob);
+                      py = oy + Math.sin(a) * (l.ry * scale + wob);
+                  } else {
+                      const wob = 1 + 0.03 * Math.sin(a * 3 + phase + l.x * 0.01);
+                      px = ox + Math.cos(a) * l.rx * scale * wob;
+                      py = oy + Math.sin(a) * l.ry * scale * wob;
+                  }
                   if (i === 0) ctx.moveTo(px, py);
                   else ctx.lineTo(px, py);
               }
@@ -1905,7 +1917,9 @@ export class GameEngine {
           ctx.stroke();
       }
       ctx.globalAlpha = alpha;
-      const g = ctx.createRadialGradient(cx - reach * 0.12, cy - reach * 0.1, reach * 0.08, cx, cy, reach);
+      const flowX = liquid ? Math.sin(this.time / 1100) * reach * 0.08 : 0;
+      const flowY = liquid ? Math.cos(this.time / 1400) * reach * 0.06 : 0;
+      const g = ctx.createRadialGradient(cx - reach * 0.12 + flowX, cy - reach * 0.1 + flowY, reach * 0.08, cx, cy, reach);
       if (kind === 'plaque') {
           g.addColorStop(0, '#e4d09a');
           g.addColorStop(0.55, '#c2a45c');
@@ -1924,23 +1938,45 @@ export class GameEngine {
       ctx.fillStyle = g;
       path();
       ctx.fill();
-      ctx.globalAlpha = alpha * (kind === 'plaque' ? 0.55 : 0.8);
-      ctx.fillStyle = kind === 'plaque'
-          ? 'rgba(74, 58, 28, 0.7)'
-          : kind === 'bile'
-              ? 'rgba(255, 252, 220, 0.85)'
-              : 'rgba(244, 228, 255, 0.82)';
-      ctx.beginPath();
-      ctx.ellipse(cx - reach * 0.1, cy - reach * 0.08, Math.max(5, reach * 0.055), Math.max(2, reach * 0.022), -0.45, 0, Math.PI * 2);
-      ctx.fill();
-      const spots = Math.min(4, lobes.length + 1);
-      for (let i = 0; i < spots; i++) {
-          const l = lobes[i % lobes.length];
-          const bx = e.pos.x + l.x + Math.cos(i * 2.2) * l.rx * scale * 0.22;
-          const by = e.pos.y + l.y + Math.sin(i * 1.7) * l.ry * scale * 0.18;
+      if (liquid) {
+          ctx.save();
+          path();
+          ctx.clip();
+          const drift = Math.sin(this.time / 860) * Math.min(10, reach * 0.05);
+          ctx.globalAlpha = alpha * 0.5;
+          ctx.fillStyle = 'rgba(244, 228, 255, 0.78)';
           ctx.beginPath();
-          ctx.arc(bx, by, kind === 'plaque' ? 3 : Math.max(2, l.rx * scale * 0.055), 0, Math.PI * 2);
+          ctx.ellipse(cx - reach * 0.1 + drift, cy - reach * 0.08, Math.max(6, reach * 0.07), Math.max(2.4, reach * 0.026), -0.5, 0, Math.PI * 2);
           ctx.fill();
+          ctx.globalAlpha = alpha * 0.9;
+          ctx.fillStyle = '#f6ecff';
+          const bubbles = Math.min(this.isLowQuality ? 5 : 8, lobes.length * 2 + 1);
+          for (let i = 0; i < bubbles; i++) {
+              const l = lobes[i % lobes.length];
+              const bob = (this.time / 900 + i * 0.37) % 1;
+              const span = Math.max(l.rx, l.ry) * scale;
+              const bx = e.pos.x + l.x + Math.cos(i * 2.1) * l.rx * scale * 0.32;
+              const by = e.pos.y + l.y + Math.sin(i * 1.6) * l.ry * scale * 0.22 - bob * span * 0.12;
+              ctx.beginPath();
+              ctx.arc(bx, by, Math.max(2, Math.min(l.rx, l.ry) * scale * (0.03 + (i % 3) * 0.012)), 0, Math.PI * 2);
+              ctx.fill();
+          }
+          ctx.restore();
+      } else {
+          ctx.globalAlpha = alpha * (kind === 'plaque' ? 0.55 : 0.8);
+          ctx.fillStyle = kind === 'plaque' ? 'rgba(74, 58, 28, 0.7)' : 'rgba(255, 252, 220, 0.85)';
+          ctx.beginPath();
+          ctx.ellipse(cx - reach * 0.1, cy - reach * 0.08, Math.max(5, reach * 0.055), Math.max(2, reach * 0.022), -0.45, 0, Math.PI * 2);
+          ctx.fill();
+          const spots = Math.min(4, lobes.length + 1);
+          for (let i = 0; i < spots; i++) {
+              const l = lobes[i % lobes.length];
+              const bx = e.pos.x + l.x + Math.cos(i * 2.2) * l.rx * scale * 0.22;
+              const by = e.pos.y + l.y + Math.sin(i * 1.7) * l.ry * scale * 0.18;
+              ctx.beginPath();
+              ctx.arc(bx, by, kind === 'plaque' ? 3 : Math.max(2, l.rx * scale * 0.055), 0, Math.PI * 2);
+              ctx.fill();
+          }
       }
       ctx.restore();
   }
@@ -2242,16 +2278,46 @@ export class GameEngine {
           this.ctx.restore();
           return;
       }
-      const glyph = 'D';
-      this.ctx.fillStyle = e.color;
+      const pulse = 0.5 + 0.5 * Math.sin(this.time / 190);
+      this.ctx.fillStyle = `rgba(196, 150, 255, ${0.08 + pulse * 0.08})`;
       this.ctx.beginPath();
-      this.ctx.arc(0, 0, base, 0, Math.PI * 2);
+      this.ctx.arc(0, -4, 46 + pulse * 5, 0, Math.PI * 2);
       this.ctx.fill();
-      this.ctx.fillStyle = '#1a1208';
-      this.ctx.font = '700 16px "Chakra Petch", sans-serif';
+      this.ctx.strokeStyle = `rgba(226, 198, 255, ${0.35 + pulse * 0.4})`;
+      this.ctx.lineWidth = 2.5;
+      this.ctx.stroke();
+
+      const drop = this.ctx.createRadialGradient(-6, -12, 3, 0, -2, 28);
+      drop.addColorStop(0, '#fff8ff');
+      drop.addColorStop(0.35, '#d7b4ff');
+      drop.addColorStop(1, '#6a34a8');
+      this.ctx.fillStyle = drop;
+      this.ctx.beginPath();
+      this.ctx.moveTo(0, -32);
+      this.ctx.bezierCurveTo(24, -10, 20, 14, 0, 24);
+      this.ctx.bezierCurveTo(-20, 14, -24, -10, 0, -32);
+      this.ctx.closePath();
+      this.ctx.fill();
+      this.ctx.strokeStyle = 'rgba(255, 248, 255, 0.75)';
+      this.ctx.lineWidth = 1.6;
+      this.ctx.stroke();
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      this.ctx.beginPath();
+      this.ctx.ellipse(-6, -12, 4, 7, -0.5, 0, Math.PI * 2);
+      this.ctx.fill();
+
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'middle';
-      this.ctx.fillText(glyph, 0, 1);
+      this.ctx.lineWidth = 5;
+      this.ctx.strokeStyle = 'rgba(28, 10, 42, 0.72)';
+      this.ctx.fillStyle = '#f7f0ff';
+      this.ctx.font = '800 16px "Chakra Petch", sans-serif';
+      this.ctx.strokeText(this.t('DOPAMINE_WORD'), 0, 42);
+      this.ctx.fillText(this.t('DOPAMINE_WORD'), 0, 42);
+      this.ctx.font = '700 13px "Chakra Petch", sans-serif';
+      this.ctx.fillStyle = '#e2c6ff';
+      this.ctx.strokeText(this.t('DOPAMINE_HINT'), 0, 60);
+      this.ctx.fillText(this.t('DOPAMINE_HINT'), 0, 60);
       this.ctx.restore();
   }
 

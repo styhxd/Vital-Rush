@@ -30,6 +30,30 @@ const chartStyles = `
     .chart-actions button { padding-top: 0.4rem; padding-bottom: 0.4rem; }
     .chart-back { margin-top: 0.3rem; }
 }
+.chart-go {
+    background: #17824c;
+    color: #f4fff8;
+    box-shadow: 0 5px 0 #0c4a2b;
+}
+.chart-go:hover { filter: brightness(1.06); }
+.chart-abandon {
+    margin-top: 0.45rem;
+    display: block;
+    margin-left: auto;
+    margin-right: auto;
+    font-size: 9px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    opacity: 0.55;
+}
+.chart-abandon:hover { opacity: 1; }
+@keyframes chart-arrive {
+    from { opacity: 0; transform: translate3d(0, 36px, 0) scale(0.985); }
+    to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+.chart-arrive {
+    animation: chart-arrive 0.72s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
 @media (min-width: 1024px) and (min-height: 700px) {
     .chart-sheet { width: min(48rem, calc(100vw - 6rem)); }
     .chart-pad { padding: 1.35rem 2rem 1.4rem 4rem; }
@@ -39,18 +63,20 @@ const chartStyles = `
 `;
 
 const ChartPaper = ({
-    title, stamp, stampColor, isPlatinum, motion = 'in', children
+    title, stamp, stampColor, isPlatinum, motion = 'in', arrive = 'snap', children
 }: {
     title: string;
     stamp: string;
     stampColor?: string;
     isPlatinum: boolean;
     motion?: 'in' | 'out';
+    arrive?: 'snap' | 'soft';
     children: React.ReactNode;
 }) => {
     const { ink, band } = inkOf(isPlatinum);
+    const motionClass = motion === 'out' ? 'screen-out' : arrive === 'soft' ? 'chart-arrive' : 'screen-in';
     return (
-        <div className={`absolute inset-0 z-50 flex items-center justify-center p-3 lg:p-8 overflow-hidden ${motion === 'in' ? 'screen-in' : 'screen-out'}`}>
+        <div className={`absolute inset-0 z-50 flex items-center justify-center p-3 lg:p-8 overflow-hidden ${motionClass}`}>
             <style>{chartStyles}</style>
             <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `url(${BACKGROUND})` }} />
             <div className="absolute inset-0 bg-black/60" />
@@ -200,11 +226,12 @@ interface OutcomeChartProps {
     score: number;
     onPrimary: () => void;
     onSecondary?: () => void;
+    onAbandon?: () => void;
     motion?: 'in' | 'out';
 }
 
 export const OutcomeChart: React.FC<OutcomeChartProps> = ({
-    variant, patient, language, isPlatinum, wave, biomass, score, onPrimary, onSecondary, motion
+    variant, patient, language, isPlatinum, wave, biomass, score, onPrimary, onSecondary, onAbandon, motion
 }) => {
     const t = (key: string) => TEXTS[language][key] || key;
     const { ink, band } = inkOf(isPlatinum);
@@ -218,6 +245,7 @@ export const OutcomeChart: React.FC<OutcomeChartProps> = ({
             stampColor={stampColor}
             isPlatinum={isPlatinum}
             motion={motion}
+            arrive={cleared ? 'soft' : 'snap'}
         >
             {patient && <PatientLine patient={patient} language={language} ink={ink} />}
 
@@ -253,12 +281,17 @@ export const OutcomeChart: React.FC<OutcomeChartProps> = ({
                 )}
                 <button
                     onClick={onPrimary}
-                    className="flex-[1.6] py-2 lg:py-4 font-bold tracking-[0.18em] text-[11px] lg:text-base uppercase text-black transition-transform hover:scale-[1.01]"
-                    style={{ background: band, boxShadow: `0 5px 0 ${ink}` }}
+                    className={`flex-[1.6] py-2 lg:py-4 font-bold tracking-[0.18em] text-[11px] lg:text-base uppercase transition-transform hover:scale-[1.01] ${cleared ? 'chart-go' : ''}`}
+                    style={cleared ? undefined : { background: band, color: '#000', boxShadow: `0 5px 0 ${ink}` }}
                 >
                     {cleared ? t('NEXT') : t('RETRY')}
                 </button>
             </div>
+            {cleared && onAbandon && (
+                <button onClick={onAbandon} className="chart-abandon" style={{ color: ink }}>
+                    {t('ABANDON_RUN')}
+                </button>
+            )}
         </ChartPaper>
     );
 };
