@@ -62,11 +62,10 @@ function wavesPastTheWall(waveIndex: number): number {
     return Math.max(0, waveIndex - CAMPAIGN_LAST_INDEX);
 }
 
-// 0 na onda 1, 1 na onda 30. O expoente deixa o começo perto do ritmo antigo
-// e faz a onda 30 encostar no poder que a onda 20 tinha antes.
+// 0 na onda 1, 1 na onda 30. A vida dos inimigos no máximo triplica, não decuplica.
 function campaignPressure(waveIndex: number): number {
     const t = Math.min(Math.max(waveIndex, 0), CAMPAIGN_LAST_INDEX) / CAMPAIGN_LAST_INDEX;
-    return Math.pow(t, 1.35);
+    return Math.pow(t, 1.15);
 }
 
 const GRID_CELL_SIZE = 150;
@@ -316,17 +315,18 @@ export class GameEngine {
       // A rampa vai até a onda 30. O expoente da parede só entra depois do cérebro.
       const pastTheWall = wavesPastTheWall(this.currentWaveIndex);
       const pressure = campaignPressure(this.currentWaveIndex);
-      const isElite = Math.random() < (0.10 + Math.min(0.08, this.currentWaveIndex * 0.0028) + Math.min(0.10, pastTheWall * 0.012));
+      const isElite = Math.random() < (0.04 + pressure * 0.08 + Math.min(0.06, pastTheWall * 0.008));
       if (isElite) {
-          hp *= 3.5;
-          dmg *= 2;
-          val *= 5;
-          radius *= 1.6;
+          hp *= 2.4;
+          dmg *= 1.5;
+          val *= 3;
+          radius *= 1.45;
           speed *= 0.85;
       }
 
-      hp *= (1 + pressure * 9.19) * Math.pow(1.12, pastTheWall);
-      dmg *= (1 + pressure * 2.85) * Math.pow(1.08, pastTheWall);
+      hp *= (1 + pressure * 2.35) * Math.pow(1.04, pastTheWall);
+      dmg *= (1 + pressure * 0.75) * Math.pow(1.025, pastTheWall);
+      val *= 1 + pressure * 0.9;
 
       this.entities.push({
           id: `e_${Date.now()}_${Math.random()}`,
@@ -350,10 +350,10 @@ export class GameEngine {
       const mutation = BossArchitect.mutate();
       const pastTheWall = wavesPastTheWall(this.currentWaveIndex);
       const pressure = campaignPressure(this.currentWaveIndex);
-      let hp = 1500 * this.difficultyMods.hp * (1 + pressure * 12.61) * Math.pow(1.09, pastTheWall);
-      if (mutation.traits.includes(BossTrait.JUGGERNAUT)) hp *= 2.5;
+      let hp = 1200 * this.difficultyMods.hp * (1 + pressure * 2.6) * Math.pow(1.05, pastTheWall);
+      if (mutation.traits.includes(BossTrait.JUGGERNAUT)) hp *= 1.8;
 
-      const dmg = 50 * this.difficultyMods.dmg * (1 + pressure * 1.9) * Math.pow(1.06, pastTheWall);
+      const dmg = 28 * this.difficultyMods.dmg * (1 + pressure * 0.7) * Math.pow(1.03, pastTheWall);
       
       this.entities.push({
           id: `boss_${Date.now()}`,
@@ -1020,12 +1020,18 @@ export class GameEngine {
           this.bloodFlow.x = this.bloodFlow.x * 0.95 + targetFlow * 0.05;
           
           let spawnRateMod = 1.0;
-          if (this.patient.strain === ViralStrain.SWARM) spawnRateMod = 0.5; 
-          if (this.patient.strain === ViralStrain.TITAN) spawnRateMod = 1.5; 
+          if (this.patient.strain === ViralStrain.SWARM) spawnRateMod = 0.72;
+          if (this.patient.strain === ViralStrain.TITAN) spawnRateMod = 1.35;
+          const crowd = this.difficultyMods.crowd ?? 1;
+          const foeCap = this.difficultyMods.cap ?? 16;
+          let foes = 0;
+          for (const ent of this.entities) {
+              if (ent.active && this.isEnemy(ent.type)) foes++;
+          }
 
           if (this.waveTimer < config.duration) {
               this.spawnTimer += safeDt;
-              if (this.spawnTimer >= (config.spawnRate * spawnRateMod) && this.entities.length < this.maxEntities) {
+              if (this.spawnTimer >= (config.spawnRate * spawnRateMod * crowd) && foes < foeCap && this.entities.length < this.maxEntities) {
                 this.spawnEnemy(config);
                 this.spawnTimer = 0;
               }
@@ -1458,17 +1464,14 @@ export class GameEngine {
               const dMag = Math.sqrt(dx*dx + dy*dy);
               
               if (dMag > 0) {
-                // SCALING FIX: Speed Cap
-                let waveSpeedFactor = Math.min(1.55, this.currentWaveIndex * (1.2 / 29) + wavesPastTheWall(this.currentWaveIndex) * 0.03);
-                let speed = (0.5 + waveSpeedFactor);
-                
-                speed *= 0.7; 
-                speed *= this.difficultyMods.speed;
-                if (this.patient.strain === ViralStrain.VOLATILE) speed *= 1.3;
-                if (this.patient.strain === ViralStrain.TITAN) speed *= 0.7;
-                if (e.type === EntityType.VIRUS) speed *= 0.8; 
-                if (e.isElite) speed *= 0.7;
-                if (e.type === EntityType.FUNGI) speed = 0.2; 
+                const climb = Math.min(1, Math.max(0, this.currentWaveIndex) / CAMPAIGN_LAST_INDEX);
+                const wall = Math.min(0.18, wavesPastTheWall(this.currentWaveIndex) * 0.015);
+                let speed = (0.2 + climb * 0.08 + wall) * this.difficultyMods.speed;
+                if (this.patient.strain === ViralStrain.VOLATILE) speed *= 1.18;
+                if (this.patient.strain === ViralStrain.TITAN) speed *= 0.75;
+                if (e.type === EntityType.VIRUS) speed *= 0.82;
+                if (e.isElite) speed *= 0.72;
+                if (e.type === EntityType.FUNGI) speed = 0.16; 
 
                 if (e.type !== EntityType.BOSS) {
                     e.vel.x += (dx / dMag) * speed * tick;

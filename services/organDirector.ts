@@ -226,6 +226,7 @@ export class OrganDirector {
     shield = 0;
     pulse = 0;
     whiteout = 0;
+    storm = 0;
 
     private local = 0;
     private pastWall = 0;
@@ -313,6 +314,7 @@ export class OrganDirector {
         this.wind.y = 0;
         this.pulse = 0;
         this.whiteout = 0;
+        this.storm = 0;
         this.bitePhase = 'idle';
         this.filterPhase = 'idle';
         this.lungPhase = 'idle';
@@ -374,10 +376,11 @@ export class OrganDirector {
             if (this.banner.ttl <= 0) this.banner = null;
         }
         if (this.whiteout > 0) this.whiteout = Math.max(0, this.whiteout - dt);
+        if (this.storm > 0) this.storm = Math.max(0, this.storm - dt * 1.35);
 
         if (!live || !hooks.player.active) return;
 
-        const pace = 1 + this.local * 0.14 + this.pastWall * 0.22;
+        const pace = 1 + this.local * 0.1 + this.pastWall * 0.12;
         if (this.id === 'molar') this.tickMolar(dt, pace, hooks);
         else if (this.id === 'liver') this.tickLiver(dt, pace, hooks);
         else if (this.id === 'heart') this.tickHeart(dt, pace, hooks);
@@ -445,6 +448,7 @@ export class OrganDirector {
         for (const trace of this.traces) this.drawTrace(ctx, trace, low);
         if (this.lungPhase === 'telegraph' || this.lungPhase === 'gust') this.drawGust(ctx, low);
         if (this.lungPhase === 'inhale' || this.lungPhase === 'blast') this.drawCoughBand(ctx, low);
+        if (this.storm > 0.02 && this.whiteout < 0.08) this.drawStorm(ctx);
         for (const bolt of this.bolts) this.drawBolt(ctx, bolt, low);
         this.drawBuffRing(ctx, player);
         if (this.whiteout > 0) {
@@ -939,8 +943,9 @@ export class OrganDirector {
             if (!bolt.fired && bolt.t >= bolt.warn) {
                 bolt.fired = true;
                 audioManager.playHit();
-                hooks.shake(bolt.white ? 18 : 10);
+                hooks.shake(bolt.white ? 18 : 8);
                 if (bolt.white) this.whiteout = 0.35;
+                else this.storm = Math.max(this.storm, 0.26);
             }
         }
     }
@@ -2162,6 +2167,23 @@ export class OrganDirector {
             ctx.strokeText(label, CANVAS_WIDTH / 2, this.bandY);
             ctx.fillText(label, CANVAS_WIDTH / 2, this.bandY);
         }
+        ctx.restore();
+    }
+
+    private drawStorm(ctx: CanvasRenderingContext2D) {
+        const k = Math.min(1, this.storm / 0.26);
+        ctx.save();
+        const glow = ctx.createRadialGradient(
+            CANVAS_WIDTH * 0.5, CANVAS_HEIGHT * 0.45, CANVAS_HEIGHT * 0.2,
+            CANVAS_WIDTH * 0.5, CANVAS_HEIGHT * 0.5, CANVAS_HEIGHT * 0.78,
+        );
+        glow.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        glow.addColorStop(1, `rgba(64, 36, 120, ${0.2 * k})`);
+        ctx.fillStyle = glow;
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        ctx.globalAlpha = 0.055 * k;
+        ctx.fillStyle = '#d9c6ff';
+        ctx.fillRect(0, CANVAS_HEIGHT * 0.16, CANVAS_WIDTH, 14);
         ctx.restore();
     }
 

@@ -90,20 +90,13 @@ export const INITIAL_STATS = {
   surgeRadiusMult: 1.0
 };
 
-// Multiplicadores de dificuldade.
-// ATUALIZAÇÃO DO ARQUITETO: Dano maciço, velocidade controlada.
+// O peso da dificuldade muda o corpo dos bichos, o dano e o quanto cabem na tela.
+// A velocidade sobe pouco: o fim do jogo continua legível.
 export const DIFFICULTY_MODIFIERS = {
-  // TRIAGE (Fácil): Facilitado levemente
-  [Difficulty.EASY]: { hp: 0.7, dmg: 0.7, speed: 0.55, score: 0.8 }, 
-  
-  // RESIDENT (Normal): Mantido original
-  [Difficulty.NORMAL]: { hp: 1.5, dmg: 1.5, speed: 0.85, score: 1.0 }, 
-  
-  // SPECIALIST (Difícil): Levemente aumentado
-  [Difficulty.HARD]: { hp: 3.0, dmg: 3.5, speed: 1.0, score: 1.5 }, 
-  
-  // APEX (Pesadelo): Aumentado a brutalidade
-  [Difficulty.APEX]: { hp: 6.0, dmg: 7.0, speed: 1.25, score: 3.0 } 
+  [Difficulty.EASY]: { hp: 0.72, dmg: 0.6, speed: 0.7, score: 0.9, crowd: 1.25, cap: 12 },
+  [Difficulty.NORMAL]: { hp: 1, dmg: 1, speed: 0.86, score: 1, crowd: 1, cap: 16 },
+  [Difficulty.HARD]: { hp: 1.4, dmg: 1.3, speed: 0.96, score: 1.15, crowd: 0.92, cap: 20 },
+  [Difficulty.APEX]: { hp: 1.85, dmg: 1.65, speed: 1.05, score: 1.3, crowd: 0.84, cap: 24 },
 };
 
 export const PATIENT_NAMES: Record<Language, { first: string[]; last: string[] }> = {
@@ -1053,44 +1046,44 @@ export const TEXTS: TranslationMap = {
   }
 };
 
-// Trinta ondas, seis por órgão. O chefe é o portão no fim de cada cenário.
-// Depois da 30 o índice continua e a última config se repete dentro do cérebro.
+// Trinta ondas, cerca de 21 minutos de combate. O chefe fecha cada órgão.
+// O intervalo de spawn não desce de 620 ms: a pressão do fim vem do cenário, não de uma multidão.
 export const WAVES: WaveConfig[] = [
     // MOLAR
-    { waveNumber: 1, duration: 30, spawnRate: 600, enemyTypes: [EntityType.BACTERIA], flowSpeed: -0.35, hasBoss: false },
-    { waveNumber: 2, duration: 34, spawnRate: 560, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI], flowSpeed: -0.42, hasBoss: false },
-    { waveNumber: 3, duration: 38, spawnRate: 520, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI], flowSpeed: -0.5, hasBoss: false },
-    { waveNumber: 4, duration: 42, spawnRate: 500, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -0.55, hasBoss: false },
-    { waveNumber: 5, duration: 46, spawnRate: 470, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS], flowSpeed: -0.62, hasBoss: false },
-    { waveNumber: 6, duration: 50, spawnRate: 450, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS], flowSpeed: -0.7, hasBoss: true },
+    { waveNumber: 1, duration: 28, spawnRate: 1100, enemyTypes: [EntityType.BACTERIA], flowSpeed: -0.28, hasBoss: false },
+    { waveNumber: 2, duration: 32, spawnRate: 1000, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI], flowSpeed: -0.32, hasBoss: false },
+    { waveNumber: 3, duration: 34, spawnRate: 940, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI], flowSpeed: -0.36, hasBoss: false },
+    { waveNumber: 4, duration: 36, spawnRate: 880, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -0.4, hasBoss: false },
+    { waveNumber: 5, duration: 38, spawnRate: 840, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS], flowSpeed: -0.44, hasBoss: false },
+    { waveNumber: 6, duration: 42, spawnRate: 800, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS], flowSpeed: -0.48, hasBoss: true },
     // FÍGADO
-    { waveNumber: 7, duration: 50, spawnRate: 440, enemyTypes: [EntityType.FUNGI, EntityType.PARASITE], flowSpeed: -0.55, hasBoss: false },
-    { waveNumber: 8, duration: 52, spawnRate: 400, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI], flowSpeed: -0.6, hasBoss: false },
-    { waveNumber: 9, duration: 55, spawnRate: 380, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.65, hasBoss: false },
-    { waveNumber: 10, duration: 58, spawnRate: 360, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.7, hasBoss: false },
-    { waveNumber: 11, duration: 60, spawnRate: 340, enemyTypes: [EntityType.BACTERIA, EntityType.PARASITE], flowSpeed: -0.75, hasBoss: false },
-    { waveNumber: 12, duration: 62, spawnRate: 320, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.8, hasBoss: true },
+    { waveNumber: 7, duration: 38, spawnRate: 860, enemyTypes: [EntityType.FUNGI, EntityType.PARASITE], flowSpeed: -0.36, hasBoss: false },
+    { waveNumber: 8, duration: 40, spawnRate: 820, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI], flowSpeed: -0.4, hasBoss: false },
+    { waveNumber: 9, duration: 40, spawnRate: 780, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.44, hasBoss: false },
+    { waveNumber: 10, duration: 42, spawnRate: 760, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.48, hasBoss: false },
+    { waveNumber: 11, duration: 42, spawnRate: 740, enemyTypes: [EntityType.BACTERIA, EntityType.PARASITE], flowSpeed: -0.5, hasBoss: false },
+    { waveNumber: 12, duration: 46, spawnRate: 700, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.54, hasBoss: true },
     // CORAÇÃO
-    { waveNumber: 13, duration: 64, spawnRate: 310, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -1.15, hasBoss: false },
-    { waveNumber: 14, duration: 66, spawnRate: 290, enemyTypes: [EntityType.FUNGI, EntityType.VIRUS], flowSpeed: -1.25, hasBoss: false },
-    { waveNumber: 15, duration: 68, spawnRate: 270, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.35, hasBoss: false },
-    { waveNumber: 16, duration: 70, spawnRate: 255, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.45, hasBoss: false },
-    { waveNumber: 17, duration: 72, spawnRate: 240, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS], flowSpeed: -1.55, hasBoss: false },
-    { waveNumber: 18, duration: 75, spawnRate: 225, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.65, hasBoss: true },
+    { waveNumber: 13, duration: 40, spawnRate: 780, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -0.62, hasBoss: false },
+    { waveNumber: 14, duration: 42, spawnRate: 740, enemyTypes: [EntityType.FUNGI, EntityType.VIRUS], flowSpeed: -0.68, hasBoss: false },
+    { waveNumber: 15, duration: 42, spawnRate: 700, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.74, hasBoss: false },
+    { waveNumber: 16, duration: 44, spawnRate: 680, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.8, hasBoss: false },
+    { waveNumber: 17, duration: 44, spawnRate: 660, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS], flowSpeed: -0.86, hasBoss: false },
+    { waveNumber: 18, duration: 48, spawnRate: 640, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.92, hasBoss: true },
     // PULMÃO
-    { waveNumber: 19, duration: 75, spawnRate: 220, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI], flowSpeed: -0.8, hasBoss: false },
-    { waveNumber: 20, duration: 78, spawnRate: 205, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.85, hasBoss: false },
-    { waveNumber: 21, duration: 80, spawnRate: 195, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.9, hasBoss: false },
-    { waveNumber: 22, duration: 82, spawnRate: 185, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS], flowSpeed: -0.95, hasBoss: false },
-    { waveNumber: 23, duration: 84, spawnRate: 175, enemyTypes: [EntityType.FUNGI, EntityType.PARASITE], flowSpeed: -1.0, hasBoss: false },
-    { waveNumber: 24, duration: 86, spawnRate: 168, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -1.05, hasBoss: true },
+    { waveNumber: 19, duration: 40, spawnRate: 760, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI], flowSpeed: -0.4, hasBoss: false },
+    { waveNumber: 20, duration: 42, spawnRate: 720, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.44, hasBoss: false },
+    { waveNumber: 21, duration: 44, spawnRate: 680, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.48, hasBoss: false },
+    { waveNumber: 22, duration: 44, spawnRate: 660, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS], flowSpeed: -0.52, hasBoss: false },
+    { waveNumber: 23, duration: 46, spawnRate: 640, enemyTypes: [EntityType.FUNGI, EntityType.PARASITE], flowSpeed: -0.56, hasBoss: false },
+    { waveNumber: 24, duration: 50, spawnRate: 620, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.6, hasBoss: true },
     // CÉREBRO
-    { waveNumber: 25, duration: 80, spawnRate: 190, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.55, hasBoss: false },
-    { waveNumber: 26, duration: 82, spawnRate: 180, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -0.6, hasBoss: false },
-    { waveNumber: 27, duration: 84, spawnRate: 172, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.65, hasBoss: false },
-    { waveNumber: 28, duration: 86, spawnRate: 165, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.7, hasBoss: false },
-    { waveNumber: 29, duration: 88, spawnRate: 158, enemyTypes: [EntityType.FUNGI, EntityType.PARASITE, EntityType.VIRUS], flowSpeed: -0.75, hasBoss: false },
-    { waveNumber: 30, duration: 90, spawnRate: 150, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.8, hasBoss: true },
+    { waveNumber: 25, duration: 44, spawnRate: 760, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.32, hasBoss: false },
+    { waveNumber: 26, duration: 46, spawnRate: 720, enemyTypes: [EntityType.BACTERIA, EntityType.VIRUS], flowSpeed: -0.36, hasBoss: false },
+    { waveNumber: 27, duration: 46, spawnRate: 700, enemyTypes: [EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.38, hasBoss: false },
+    { waveNumber: 28, duration: 48, spawnRate: 680, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.42, hasBoss: false },
+    { waveNumber: 29, duration: 48, spawnRate: 660, enemyTypes: [EntityType.FUNGI, EntityType.PARASITE, EntityType.VIRUS], flowSpeed: -0.46, hasBoss: false },
+    { waveNumber: 30, duration: 54, spawnRate: 640, enemyTypes: [EntityType.BACTERIA, EntityType.FUNGI, EntityType.VIRUS, EntityType.PARASITE], flowSpeed: -0.5, hasBoss: true },
 ];
 
 // O "Shopping" do jogo.
