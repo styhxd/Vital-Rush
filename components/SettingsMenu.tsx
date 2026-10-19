@@ -285,21 +285,21 @@ const HAZARD: Record<Language, Record<string, string>> = {
     PT: {
         plaque: 'PLACA', saliva: 'SALIVA', bite: 'MORDIDA', enamel: 'ESMALTE',
         bile: 'BILE', filter: 'FILTRO', heal: 'CURA',
-        beat: 'SÍSTOLE', ecg: 'ELETRO', ecg2: 'DOIS ELETROS',
+        beat: 'SÍSTOLE', ecg: 'ELETRO', ecg2: 'DOIS ELETROS', clot: 'COÁGULO',
         gust: 'LUFADA', cough: 'TOSSE', oxygen: 'OXIGÊNIO',
         synapse: 'SINAPSE', flash: 'CLARÃO', focus: 'FOCO', chain: 'CADEIA',
     },
     EN: {
         plaque: 'PLAQUE', saliva: 'SALIVA', bite: 'BITE', enamel: 'ENAMEL',
         bile: 'BILE', filter: 'FILTER', heal: 'HEAL',
-        beat: 'SYSTOLE', ecg: 'ECG', ecg2: 'TWO ECGS',
+        beat: 'SYSTOLE', ecg: 'ECG', ecg2: 'TWO ECGS', clot: 'CLOT',
         gust: 'GUST', cough: 'COUGH', oxygen: 'OXYGEN',
         synapse: 'SYNAPSE', flash: 'FLASH', focus: 'FOCUS', chain: 'CHAIN',
     },
     ES: {
         plaque: 'PLACA', saliva: 'SALIVA', bite: 'MORDIDA', enamel: 'ESMALTE',
         bile: 'BILIS', filter: 'FILTRO', heal: 'CURA',
-        beat: 'SÍSTOLE', ecg: 'ELECTRO', ecg2: 'DOS ELECTROS',
+        beat: 'SÍSTOLE', ecg: 'ELECTRO', ecg2: 'DOS ELECTROS', clot: 'COÁGULO',
         gust: 'RÁFAGA', cough: 'TOS', oxygen: 'OXÍGENO',
         synapse: 'SINAPSIS', flash: 'DESTELLO', focus: 'FOCO', chain: 'CADENA',
     },
@@ -323,6 +323,7 @@ const hazardsFor = (organ: OrganId, local: number, language: Language): string[]
     if (organ === 'heart') {
         const list = ['beat'];
         if (local >= 1) list.push(local >= 3 ? 'ecg2' : 'ecg');
+        if (local >= 2) list.push('clot');
         return list.map(word);
     }
     if (organ === 'lung') {

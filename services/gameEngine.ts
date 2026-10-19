@@ -1236,7 +1236,7 @@ export class GameEngine {
                       this.spawnText(
                           { x: this.player.pos.x, y: this.player.pos.y - 16 },
                           `${this.t('MSG_ACID')} -${shown}`,
-                          '#e8ff8a',
+                          '#e7d4ff',
                           22
                       );
                       audioManager.playHit();
@@ -1247,7 +1247,7 @@ export class GameEngine {
                           this.particles.push({
                               id: 'spark', type: EntityType.PARTICLE, pos: { ...this.player.pos },
                               vel: { x: Math.cos(ang) * 2.2, y: -1.5 - Math.random() * 2.5 },
-                              radius: 2.5, health: 1, maxHealth: 1, color: '#d4ff6a', damage: 0, active: true, ttl: 16
+                              radius: 2.5, health: 1, maxHealth: 1, color: '#d7b4ff', damage: 0, active: true, ttl: 16
                           });
                       }
                   }
@@ -1889,12 +1889,22 @@ export class GameEngine {
           }
       };
       ctx.save();
-      ctx.globalAlpha = alpha;
       ctx.lineJoin = 'round';
-      ctx.lineWidth = kind === 'acid' ? 3 : 2.4;
-      ctx.strokeStyle = kind === 'plaque' ? 'rgba(74, 58, 28, 0.85)' : kind === 'bile' ? 'rgba(36, 42, 10, 0.55)' : '#243808';
-      path();
-      ctx.stroke();
+      ctx.lineCap = 'round';
+      if (kind === 'acid') {
+          ctx.globalAlpha = alpha * 0.55;
+          ctx.lineWidth = 20;
+          ctx.strokeStyle = 'rgba(226, 196, 255, 0.95)';
+          path();
+          ctx.stroke();
+      } else {
+          ctx.globalAlpha = alpha;
+          ctx.lineWidth = 2.4;
+          ctx.strokeStyle = kind === 'plaque' ? 'rgba(74, 58, 28, 0.85)' : 'rgba(36, 42, 10, 0.55)';
+          path();
+          ctx.stroke();
+      }
+      ctx.globalAlpha = alpha;
       const g = ctx.createRadialGradient(cx - reach * 0.12, cy - reach * 0.1, reach * 0.08, cx, cy, reach);
       if (kind === 'plaque') {
           g.addColorStop(0, '#e4d09a');
@@ -1906,16 +1916,20 @@ export class GameEngine {
           g.addColorStop(0.7, 'rgba(148, 158, 36, 0.94)');
           g.addColorStop(1, 'rgba(70, 78, 18, 0.92)');
       } else {
-          g.addColorStop(0, '#f4ffb4');
-          g.addColorStop(0.28, '#d6f56e');
-          g.addColorStop(0.72, '#c6f542');
-          g.addColorStop(1, '#7ea318');
+          g.addColorStop(0, 'rgba(244, 226, 255, 0.98)');
+          g.addColorStop(0.22, 'rgba(196, 112, 255, 0.96)');
+          g.addColorStop(0.68, 'rgba(122, 43, 181, 0.96)');
+          g.addColorStop(1, 'rgba(58, 12, 92, 0.94)');
       }
       ctx.fillStyle = g;
       path();
       ctx.fill();
       ctx.globalAlpha = alpha * (kind === 'plaque' ? 0.55 : 0.8);
-      ctx.fillStyle = kind === 'plaque' ? 'rgba(74, 58, 28, 0.7)' : 'rgba(255, 252, 220, 0.85)';
+      ctx.fillStyle = kind === 'plaque'
+          ? 'rgba(74, 58, 28, 0.7)'
+          : kind === 'bile'
+              ? 'rgba(255, 252, 220, 0.85)'
+              : 'rgba(244, 228, 255, 0.82)';
       ctx.beginPath();
       ctx.ellipse(cx - reach * 0.1, cy - reach * 0.08, Math.max(5, reach * 0.055), Math.max(2, reach * 0.022), -0.45, 0, Math.PI * 2);
       ctx.fill();
@@ -2173,7 +2187,62 @@ export class GameEngine {
           this.ctx.restore();
           return;
       }
-      const glyph = kind === 3 ? 'O2' : 'D';
+      if (kind === 3) {
+          const pulse = 0.5 + 0.5 * Math.sin(this.time / 180);
+          this.ctx.fillStyle = `rgba(168, 228, 244, ${0.08 + pulse * 0.08})`;
+          this.ctx.beginPath();
+          this.ctx.arc(0, -6, 48 + pulse * 5, 0, Math.PI * 2);
+          this.ctx.fill();
+          this.ctx.strokeStyle = `rgba(198, 244, 255, ${0.35 + pulse * 0.4})`;
+          this.ctx.lineWidth = 2.5;
+          this.ctx.stroke();
+
+          this.ctx.strokeStyle = 'rgba(236, 252, 255, 0.95)';
+          this.ctx.lineWidth = 3;
+          this.ctx.lineCap = 'round';
+          this.ctx.beginPath();
+          this.ctx.moveTo(-7, -12);
+          this.ctx.lineTo(7, -12);
+          this.ctx.moveTo(-7, -6);
+          this.ctx.lineTo(7, -6);
+          this.ctx.stroke();
+
+          const atom = (x: number, y: number) => {
+              const g = this.ctx.createRadialGradient(x - 5, y - 6, 2, x, y, 16);
+              g.addColorStop(0, '#ffffff');
+              g.addColorStop(0.38, '#b7f2ff');
+              g.addColorStop(1, '#2f93ad');
+              this.ctx.fillStyle = g;
+              this.ctx.beginPath();
+              this.ctx.arc(x, y, 15, 0, Math.PI * 2);
+              this.ctx.fill();
+              this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+              this.ctx.lineWidth = 1.5;
+              this.ctx.stroke();
+              this.ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+              this.ctx.beginPath();
+              this.ctx.ellipse(x - 4, y - 5, 3.2, 2, -0.6, 0, Math.PI * 2);
+              this.ctx.fill();
+          };
+          atom(-18, -8);
+          atom(18, -8);
+
+          this.ctx.textAlign = 'center';
+          this.ctx.textBaseline = 'middle';
+          this.ctx.lineWidth = 5;
+          this.ctx.strokeStyle = 'rgba(8, 28, 36, 0.72)';
+          this.ctx.fillStyle = '#f4fdff';
+          this.ctx.font = '800 18px "Chakra Petch", sans-serif';
+          this.ctx.strokeText(this.t('OXYGEN_WORD'), 0, 26);
+          this.ctx.fillText(this.t('OXYGEN_WORD'), 0, 26);
+          this.ctx.font = '700 14px "Chakra Petch", sans-serif';
+          this.ctx.fillStyle = '#b6f4ff';
+          this.ctx.strokeText(this.t('OXYGEN_HINT'), 0, 46);
+          this.ctx.fillText(this.t('OXYGEN_HINT'), 0, 46);
+          this.ctx.restore();
+          return;
+      }
+      const glyph = 'D';
       this.ctx.fillStyle = e.color;
       this.ctx.beginPath();
       this.ctx.arc(0, 0, base, 0, Math.PI * 2);
@@ -2439,24 +2508,29 @@ export class GameEngine {
                 }
                 this.ctx.closePath();
             };
-            this.ctx.globalAlpha = 0.22 * veil;
-            this.ctx.fillStyle = '#6d8c18';
-            blob(r * 1.18);
+            this.ctx.globalAlpha = 0.32 * veil;
+            this.ctx.fillStyle = '#e6ccff';
+            blob(r * 1.2);
             this.ctx.fill();
-            this.ctx.globalAlpha = 0.92 * veil;
-            this.ctx.fillStyle = '#c6f542';
+            this.ctx.globalAlpha = 0.94 * veil;
+            const body = this.ctx.createRadialGradient(-r * 0.2, -r * 0.12, r * 0.05, 0, 0, r);
+            body.addColorStop(0, '#f3e4ff');
+            body.addColorStop(0.2, '#c47bff');
+            body.addColorStop(0.66, '#7a2bb5');
+            body.addColorStop(1, '#3a0c5c');
+            this.ctx.fillStyle = body;
             blob(r * 0.9);
             this.ctx.fill();
-            this.ctx.lineWidth = Math.max(2.5, r * 0.045);
-            this.ctx.strokeStyle = '#243808';
+            this.ctx.lineWidth = Math.max(2.5, r * 0.05);
+            this.ctx.strokeStyle = 'rgba(236, 214, 255, 0.62)';
             this.ctx.stroke();
-            this.ctx.globalAlpha = 0.4 * veil;
-            this.ctx.fillStyle = '#f3ffb0';
+            this.ctx.globalAlpha = 0.45 * veil;
+            this.ctx.fillStyle = 'rgba(244, 228, 255, 0.7)';
             this.ctx.beginPath();
             this.ctx.ellipse(-r * 0.1, -r * 0.06, r * 0.34, r * 0.16, -0.5, 0, Math.PI * 2);
             this.ctx.fill();
             this.ctx.globalAlpha = 0.85 * veil;
-            this.ctx.fillStyle = '#f7ffd2';
+            this.ctx.fillStyle = '#f6ecff';
             for (let i = 0; i < 5; i++) {
                 const bob = (this.time / 900 + i * 0.37) % 1;
                 const bx = Math.cos(i * 2.1) * r * 0.32;
@@ -2669,7 +2743,7 @@ export class GameEngine {
       this.ctx.globalAlpha = 1.0;
       const burning = this.acidContact > 0;
       this.ctx.fillStyle = burning
-          ? (Math.floor(this.time / 70) % 2 === 0 ? '#e8ff8a' : '#ffffff')
+          ? (Math.floor(this.time / 70) % 2 === 0 ? '#e7d4ff' : '#ffffff')
           : (this.isDashing || this.invulnerabilityTimer > 0 ? this.colors.PLAYER_CORE : this.colors.PLAYER);
       if (this.invulnerabilityTimer > 0 && Math.floor(this.time / 100) % 2 === 0) {
           this.ctx.globalAlpha = 0.5;
@@ -2694,13 +2768,13 @@ export class GameEngine {
       this.ctx.fill();
       if (burning) {
           this.ctx.globalAlpha = 0.9;
-          this.ctx.strokeStyle = '#d4ff6a';
+          this.ctx.strokeStyle = '#d7b4ff';
           this.ctx.lineWidth = 4;
           this.ctx.beginPath();
           this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius + 12 + Math.sin(this.time / 55) * 4, 0, Math.PI * 2);
           this.ctx.stroke();
           this.ctx.globalAlpha = 0.16 + Math.sin(this.time / 50) * 0.06;
-          this.ctx.fillStyle = '#c6f542';
+          this.ctx.fillStyle = '#9a3ad4';
           this.ctx.fillRect(0, 0, CANVAS_WIDTH, 36);
           this.ctx.fillRect(0, CANVAS_HEIGHT - 36, CANVAS_WIDTH, 36);
           this.ctx.fillRect(0, 0, 36, CANVAS_HEIGHT);

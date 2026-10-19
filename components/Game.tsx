@@ -6,7 +6,7 @@ import { organAccent, organNameKey, organVeinStyle, type OrganId } from '../serv
 import { audioManager } from '../services/audioManager';
 import { achievementManager } from '../services/achievementManager';
 import { GameState, PlayerStats, Upgrade, WaveConfig, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
-import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES, SYMPTOMS_KEYS, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES } from '../constants';
+import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES, SYMPTOMS_KEYS, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES, ADRENALINE_MAX_DURATION } from '../constants';
 import { Joystick } from './Joystick';
 import { PauseMenu } from './PauseMenu';
 import { SettingsMenu } from './SettingsMenu';
@@ -263,7 +263,7 @@ export const Game: React.FC = () => {
   const [uiData, setUiData] = useState({ 
     health: 100, maxHealth: 100, score: 0, biomass: 0, 
     wave: 0, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100,
-    combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES,
+    combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, adrenalineLeft: ADRENALINE_MAX_DURATION, lives: INITIAL_LIVES,
     organId: 'molar' as OrganId
   });
   
@@ -280,7 +280,10 @@ export const Game: React.FC = () => {
   const [colors, setColors] = useState<ThemePalette>(COLORS_DEFAULT);
   const [cheatInput, setCheatInput] = useState("");
   const [waveDeck, setWaveDeck] = useState(false);
-  const [heartbreakAnim, setHeartbreakAnim] = useState(false);
+  const [heartbreak, setHeartbreak] = useState<{ index: number; dx: number; dy: number } | null>(null);
+  const heartTimer = useRef<number | null>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
+  const heartRefs = useRef<Array<SVGSVGElement | null>>([]);
   const [outcomeBeat, setOutcomeBeat] = useState<null | 'win' | 'lose'>(null);
   const outcomeTimer = useRef<number | null>(null); 
   
@@ -352,7 +355,7 @@ export const Game: React.FC = () => {
       setUiData({ 
         health: 100, maxHealth: 100, score: 0, biomass: 0, 
         wave: 0, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100,
-        combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES,
+        combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, adrenalineLeft: ADRENALINE_MAX_DURATION, lives: INITIAL_LIVES,
         organId: 'molar'
       });
       setDifficulty(Difficulty.NORMAL);
@@ -522,7 +525,7 @@ export const Game: React.FC = () => {
       setUiData({
           health: godStats.maxHealth, maxHealth: godStats.maxHealth, score: 0, biomass: 0,
           wave: waveNum, waveTime: 0, waveDuration: WAVES[jump].duration, energy: godStats.maxEnergy, maxEnergy: godStats.maxEnergy,
-          combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES,
+          combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, adrenalineLeft: ADRENALINE_MAX_DURATION, lives: INITIAL_LIVES,
           organId: engineRef.current.organ.id
       });
       setWaveDeck(false);
@@ -588,8 +591,26 @@ export const Game: React.FC = () => {
                 outcomeTimer.current = window.setTimeout(() => setOutcomeBeat(null), 1100);
             },
             () => {
-                setHeartbreakAnim(true);
-                setTimeout(() => setHeartbreakAnim(false), 2500); 
+                const eng = engineRef.current;
+                const index = Math.max(0, Math.min(INITIAL_LIVES - 1, eng ? eng.lives : 0));
+                const stage = stageRef.current?.getBoundingClientRect();
+                const heart = heartRefs.current[index]?.getBoundingClientRect();
+                let dx = -220;
+                let dy = -180;
+                if (stage && heart && heart.width > 0) {
+                    let vx = (heart.left + heart.width / 2) - (stage.left + stage.width / 2);
+                    let vy = (heart.top + heart.height / 2) - (stage.top + stage.height / 2);
+                    if (isPortrait && isMobile) {
+                        dx = vy;
+                        dy = -vx;
+                    } else {
+                        dx = vx;
+                        dy = vy;
+                    }
+                }
+                setHeartbreak({ index, dx, dy });
+                if (heartTimer.current) window.clearTimeout(heartTimer.current);
+                heartTimer.current = window.setTimeout(() => setHeartbreak(null), 2800);
             },
             handleBossSpawn
           );
@@ -640,6 +661,7 @@ export const Game: React.FC = () => {
             dashReady: eng.dashCooldownTimer <= 0,
             dashProgress: eng.getDashProgress(stats),
             adrenaline: eng.adrenalineActive,
+            adrenalineLeft: Math.max(0, ADRENALINE_MAX_DURATION - eng.adrenalineTimer),
             lives: eng.lives,
             organId: eng.organ.id
           });
@@ -689,7 +711,7 @@ export const Game: React.FC = () => {
          setUpgrades(UPGRADES.map(u => ({...u}))); 
          setUiData({ 
            health: 100, maxHealth: 100, score: 0, biomass: 0, 
-           wave: 1, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100, combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, lives: INITIAL_LIVES,
+           wave: 1, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100, combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, adrenalineLeft: ADRENALINE_MAX_DURATION, lives: INITIAL_LIVES,
            organId: 'molar'
          });
          
@@ -913,6 +935,7 @@ export const Game: React.FC = () => {
 
   return (
     <div 
+        ref={stageRef}
         className={`select-none ${isPlatinum ? 'bg-[#0a0a1a]' : 'bg-[#0f0505]'} ${isLowPerfMode ? 'perf-mode-low' : ''}`} 
         style={{...containerStyle, fontFamily: 'var(--font-tech)'}}
     >
@@ -926,12 +949,12 @@ export const Game: React.FC = () => {
             20%, 40%, 60%, 80% { transform: translate(8px, 8px) rotate(3deg) scale(1.1); }
         }
         @keyframes crack-left {
-            0% { transform: translate(0, 0) rotate(0); opacity: 0.3; }
-            100% { transform: translate(-100px, 100px) rotate(-45deg); opacity: 0; }
+            0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+            100% { transform: translate(-120px, 80px) rotate(-36deg); opacity: 0; }
         }
         @keyframes crack-right {
-            0% { transform: translate(0, 0) rotate(0); opacity: 0.3; }
-            100% { transform: translate(100px, 100px) rotate(45deg); opacity: 0; }
+            0% { transform: translate(0, 0) rotate(0); opacity: 1; }
+            100% { transform: translate(120px, 80px) rotate(36deg); opacity: 0; }
         }
         @keyframes glitch-text {
             0% { opacity: 1; transform: translate(0); clip-path: inset(0 0 0 0); }
@@ -946,8 +969,8 @@ export const Game: React.FC = () => {
             50% { background-color: rgba(255, 0, 0, 0.4); }
         }
         .anim-shake { animation: heart-shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
-        .anim-break-left { animation: crack-left 1.5s ease-out forwards; animation-delay: 0.5s; }
-        .anim-break-right { animation: crack-right 1.5s ease-out forwards; animation-delay: 0.5s; }
+        .anim-break-left { animation: crack-left 0.75s ease-in forwards; animation-delay: 1.9s; }
+        .anim-break-right { animation: crack-right 0.75s ease-in forwards; animation-delay: 1.9s; }
         .anim-glitch { animation: glitch-text 0.5s steps(5) infinite; }
         .anim-pulse-red { animation: pulse-red 0.5s ease-in-out infinite; }
         @keyframes heart-pulse {
@@ -960,6 +983,126 @@ export const Game: React.FC = () => {
             animation: heart-pulse 1.25s ease-in-out infinite;
         }
         .heart-gone { color: #4a1518; }
+        @keyframes life-flight {
+            0% { transform: translate(var(--dx), var(--dy)) scale(0.05); animation-timing-function: cubic-bezier(.45, .05, .25, 1); }
+            40% { transform: translate(0, 0) scale(0.07); animation-timing-function: cubic-bezier(.2, .85, .25, 1); }
+            66% { transform: translate(0, 0) scale(1); }
+            100% { transform: translate(0, 0) scale(1); }
+        }
+        @keyframes life-label {
+            0%, 58% { opacity: 0; transform: translateX(-50%) translateY(8px); }
+            70% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            88% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        .life-stage {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            width: min(420px, 62vw);
+            aspect-ratio: 1;
+            margin-left: calc(min(420px, 62vw) / -2);
+            margin-top: calc(min(420px, 62vw) / -2);
+        }
+        .life-flight {
+            position: absolute;
+            inset: 0;
+            animation: life-flight 2.7s linear forwards;
+        }
+        .life-lost-label {
+            position: absolute;
+            left: 50%;
+            top: calc(50% + min(188px, 24vh));
+            transform: translateX(-50%);
+            white-space: nowrap;
+            font-family: "Chakra Petch", sans-serif;
+            font-weight: 800;
+            letter-spacing: 0.16em;
+            font-size: clamp(16px, 2.6vw, 34px);
+            color: #fff4f4;
+            text-shadow: 0 0 18px rgba(255, 40, 50, 0.95);
+            animation: life-label 2.7s ease forwards;
+        }
+        @keyframes adrenaline-blink {
+            0%, 100% { opacity: 1; }
+            45% { opacity: 0.35; }
+            55% { opacity: 1; }
+        }
+        @keyframes adrenaline-vignette {
+            0%, 100% { opacity: 0.72; }
+            50% { opacity: 1; }
+        }
+        .adrenaline-hp { animation: adrenaline-blink 0.85s ease-in-out infinite; }
+        .adrenaline-vignette {
+            position: absolute;
+            inset: 0;
+            z-index: 15;
+            pointer-events: none;
+            background: radial-gradient(circle, transparent 38%, rgba(255, 70, 40, 0.22) 72%, rgba(180, 20, 20, 0.62) 100%);
+            animation: adrenaline-vignette 1.15s ease-in-out infinite;
+        }
+        .adrenaline-call {
+            margin-top: 8px;
+            width: min(18rem, 72vw);
+            padding: 7px 9px 8px;
+            border: 1px solid rgba(255, 214, 120, 0.75);
+            background: rgba(28, 14, 6, 0.78);
+            box-shadow: 0 0 16px rgba(255, 180, 60, 0.28);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .adrenaline-copy { min-width: 0; }
+        .adrenaline-clock {
+            position: relative;
+            flex: none;
+            width: 28px;
+            height: 28px;
+            color: #ffe08a;
+        }
+        .adrenaline-clock svg { width: 28px; height: 28px; display: block; }
+        .adrenaline-clock .track { fill: none; stroke: rgba(255, 224, 138, 0.28); stroke-width: 1.15; }
+        .adrenaline-clock .remain {
+            fill: none;
+            stroke: #ffe08a;
+            stroke-width: 1.15;
+            stroke-linecap: round;
+            transform: rotate(-90deg);
+            transform-origin: 16px 16px;
+        }
+        .adrenaline-clock span {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: "Chakra Petch", sans-serif;
+            font-size: 9px;
+            font-weight: 700;
+            letter-spacing: 0;
+            font-variant-numeric: tabular-nums;
+        }
+        .adrenaline-title {
+            font-family: "Chakra Petch", sans-serif;
+            font-weight: 800;
+            letter-spacing: 0.18em;
+            color: #ffe08a;
+            font-size: 11px;
+        }
+        .adrenaline-hint {
+            margin-top: 3px;
+            font-family: "Chakra Petch", sans-serif;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            color: #fff6e4;
+            font-size: 11px;
+            line-height: 1.3;
+        }
+        @media (min-width: 1024px) {
+            .adrenaline-call { max-width: 22rem; padding: 10px 12px; }
+            .adrenaline-title { font-size: 14px; letter-spacing: 0.22em; }
+            .adrenaline-hint { font-size: 13px; }
+        }
         .outcome-beat {
             position: absolute;
             inset: 0;
@@ -1025,6 +1168,9 @@ export const Game: React.FC = () => {
       `}</style>
 
       <div className="vignette"></div>
+      {(gameState === GameState.PLAYING || gameState === GameState.WAVE_CLEARED) && uiData.adrenaline && (
+          <div className="adrenaline-vignette" />
+      )}
       <div className="scanlines"></div>
       {gameState !== GameState.MENU && (
       <div className="vein-overlay" style={organVeinStyle(uiData.organId, isPlatinum)}>
@@ -1033,24 +1179,26 @@ export const Game: React.FC = () => {
       </div>
       )}
 
-      {heartbreakAnim && (
-          <div className="absolute inset-0 flex items-center justify-center z-[150] pointer-events-none overflow-hidden">
-              <div className="relative w-[300px] h-[300px] md:w-[500px] md:h-[500px]"> 
-                  <div className="absolute inset-0 anim-shake anim-break-left opacity-30 mix-blend-screen text-red-600">
-                      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-[0_0_50px_rgba(255,0,0,0.8)]" style={{clipPath: 'polygon(0 0, 50% 0, 55% 25%, 45% 45%, 55% 65%, 45% 85%, 50% 100%, 0 100%)'}}>
-                          <path fill="currentColor" d="M50 88.9L48.2 87.2C20.4 62 2 45.5 2 25.3 2 11.5 12.8 2 26.5 2c7.7 0 15.1 3.5 20 9.1C51.4 5.5 58.8 2 66.5 2 80.2 2 91 11.5 91 25.3c0 20.2-18.4 36.7-46.2 61.9L50 88.9z" />
-                      </svg>
-                  </div>
-                  <div className="absolute inset-0 anim-shake anim-break-right opacity-30 mix-blend-screen text-red-600">
-                      <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-[0_0_50px_rgba(255,0,0,0.8)]" style={{clipPath: 'polygon(100% 0, 50% 0, 55% 25%, 45% 45%, 55% 65%, 45% 85%, 50% 100%, 100% 100%)'}}>
-                          <path fill="currentColor" d="M50 88.9L48.2 87.2C20.4 62 2 45.5 2 25.3 2 11.5 12.8 2 26.5 2c7.7 0 15.1 3.5 20 9.1C51.4 5.5 58.8 2 66.5 2 80.2 2 91 11.5 91 25.3c0 20.2-18.4 36.7-46.2 61.9L50 88.9z" />
-                      </svg>
-                  </div>
-                  <div className="absolute inset-0 flex items-center justify-center">
-                      <h1 className="text-4xl md:text-6xl font-black text-red-500 tracking-[0.4em] anim-glitch opacity-80 mix-blend-overlay">{t('MSG_CRITICAL')}</h1>
+      {heartbreak && (
+          <div className="absolute inset-0 z-[150] pointer-events-none overflow-hidden">
+              <div className="life-stage">
+                  <div
+                      className="life-flight"
+                      style={{ ['--dx' as string]: `${heartbreak.dx}px`, ['--dy' as string]: `${heartbreak.dy}px` }}
+                  >
+                      <div className="absolute inset-0 anim-break-left text-red-600">
+                          <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-[0_0_40px_rgba(255,40,50,0.85)]" style={{clipPath: 'polygon(0 0, 50% 0, 55% 25%, 45% 45%, 55% 65%, 45% 85%, 50% 100%, 0 100%)'}}>
+                              <path fill="currentColor" d="M50 88.9L48.2 87.2C20.4 62 2 45.5 2 25.3 2 11.5 12.8 2 26.5 2c7.7 0 15.1 3.5 20 9.1C51.4 5.5 58.8 2 66.5 2 80.2 2 91 11.5 91 25.3c0 20.2-18.4 36.7-46.2 61.9L50 88.9z" />
+                          </svg>
+                      </div>
+                      <div className="absolute inset-0 anim-break-right text-red-600">
+                          <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-[0_0_40px_rgba(255,40,50,0.85)]" style={{clipPath: 'polygon(100% 0, 50% 0, 55% 25%, 45% 45%, 55% 65%, 45% 85%, 50% 100%, 100% 100%)'}}>
+                              <path fill="currentColor" d="M50 88.9L48.2 87.2C20.4 62 2 45.5 2 25.3 2 11.5 12.8 2 26.5 2c7.7 0 15.1 3.5 20 9.1C51.4 5.5 58.8 2 66.5 2 80.2 2 91 11.5 91 25.3c0 20.2-18.4 36.7-46.2 61.9L50 88.9z" />
+                          </svg>
+                      </div>
                   </div>
               </div>
-              <div className="absolute inset-0 bg-red-900/20 mix-blend-overlay animate-pulse"></div>
+              <div className="life-lost-label">{t('MSG_CRITICAL')}</div>
           </div>
       )}
 
@@ -1114,17 +1262,20 @@ export const Game: React.FC = () => {
         <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between p-2 lg:p-6">
            <div className="flex justify-between items-start">
              <div className="flex flex-col gap-1 lg:gap-3 w-28 lg:w-64">
-                <StatBar label={t('INTEGRITY')} value={uiData.health} max={uiData.maxHealth} colorClass={uiData.adrenaline ? "bg-red-600 animate-pulse" : (isPlatinum ? "bg-gradient-to-r from-purple-500 to-amber-400" : "bg-gradient-to-r from-red-600 to-red-400")} />
+                <div className={uiData.adrenaline ? 'adrenaline-hp' : undefined}>
+                <StatBar label={t('INTEGRITY')} value={uiData.health} max={uiData.maxHealth} colorClass={uiData.adrenaline ? "bg-red-500 shadow-[0_0_12px_rgba(255,40,40,0.85)]" : (isPlatinum ? "bg-gradient-to-r from-purple-500 to-amber-400" : "bg-gradient-to-r from-red-600 to-red-400")} />
+                </div>
                 <StatBar label={t('SURGE_READY')} value={uiData.energy} max={uiData.maxEnergy} colorClass={isPlatinum ? "bg-gradient-to-r from-amber-400 to-white" : "bg-gradient-to-r from-cyan-600 to-cyan-400"} animate={true}/>
                 {/* GLOBAL DASH INDICATOR (NEW) */}
                 <StatBar label={t('DASH')} value={uiData.dashProgress * 100} max={100} colorClass="bg-white/90 shadow-[0_0_10px_white]" animate={uiData.dashReady} />
 
                 <div className="flex gap-1.5 lg:gap-2 mt-1 lg:mt-2">
                     {Array.from({length: INITIAL_LIVES}).map((_, i) => {
-                        const alive = i < uiData.lives;
+                        const alive = i < uiData.lives && heartbreak?.index !== i;
                         return (
                             <svg
                                 key={i}
+                                ref={(node) => { heartRefs.current[i] = node; }}
                                 viewBox="0 0 24 22"
                                 aria-hidden
                                 className={`w-4 h-4 lg:w-7 lg:h-7 ${alive ? 'heart-live' : 'heart-gone'}`}
@@ -1137,8 +1288,25 @@ export const Game: React.FC = () => {
                 </div>
 
                 {uiData.adrenaline && (
-                    <div className="mt-1 lg:mt-2 text-[9px] lg:text-xs font-semibold tracking-[0.16em] text-rose-200/90">
-                        {t('ADRENALINE')}
+                    <div className="adrenaline-call">
+                        <div className="adrenaline-copy">
+                            <div className="adrenaline-title">{t('ADRENALINE')}</div>
+                            <div className="adrenaline-hint">{t('ADRENALINE_HINT')}</div>
+                        </div>
+                        <div className="adrenaline-clock" aria-hidden>
+                            <svg viewBox="0 0 32 32">
+                                <circle className="track" cx="16" cy="16" r="11" />
+                                <circle
+                                    className="remain"
+                                    cx="16"
+                                    cy="16"
+                                    r="11"
+                                    strokeDasharray={69.1}
+                                    strokeDashoffset={69.1 * (1 - Math.max(0, Math.min(1, uiData.adrenalineLeft / ADRENALINE_MAX_DURATION)))}
+                                />
+                            </svg>
+                            <span>{Math.max(0, Math.ceil(uiData.adrenalineLeft))}</span>
+                        </div>
                     </div>
                 )}
              </div>

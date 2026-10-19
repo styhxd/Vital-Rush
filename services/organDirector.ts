@@ -26,7 +26,7 @@ const THEME: Record<OrganId, { bg: string; accent: string; name: string }> = {
     molar: { bg: '#121820', accent: '#d5e2ee', name: 'ORG_MOLAR' },
     liver: { bg: '#14160a', accent: '#d6e36a', name: 'ORG_LIVER' },
     heart: { bg: '#2a0508', accent: '#ff5a6a', name: 'ORG_HEART' },
-    lung:  { bg: '#1a1216', accent: '#f0b7c8', name: 'ORG_LUNG' },
+    lung:  { bg: '#1c1218', accent: '#f3c3ce', name: 'ORG_LUNG' },
     brain: { bg: '#0a0614', accent: '#c9a6ff', name: 'ORG_BRAIN' },
 };
 
@@ -80,10 +80,10 @@ export function organVeinStyle(id: OrganId, platinum: boolean): { filter: string
         molar: 'hue-rotate(190deg) saturate(0.28) brightness(1.25)',
         liver: 'hue-rotate(78deg) saturate(1.35) brightness(0.85)',
         heart: 'saturate(1.25) brightness(1.05)',
-        lung: 'hue-rotate(305deg) saturate(0.55) brightness(1.45)',
+        lung: 'saturate(0.4) brightness(0.82) sepia(0.35)',
         brain: 'hue-rotate(230deg) saturate(1.5) brightness(0.9)',
     };
-    const opacity = id === 'brain' ? 0.1 : id === 'heart' ? 0.28 : id === 'molar' ? 0.16 : 0.2;
+    const opacity = id === 'brain' ? 0.1 : id === 'heart' ? 0.28 : id === 'lung' ? 0.08 : id === 'molar' ? 0.16 : 0.2;
     const filter = platinum ? `${filters[id]} hue-rotate(18deg) sepia(0.35)` : filters[id];
     return { filter, opacity };
 }
@@ -92,7 +92,7 @@ export function cellBudget(id: OrganId): number {
     if (id === 'molar') return 48;
     if (id === 'liver') return 64;
     if (id === 'heart') return 96;
-    if (id === 'lung') return 58;
+    if (id === 'lung') return 32;
     return 34;
 }
 
@@ -111,8 +111,8 @@ export function cellColor(style: number, organ: OrganId): string {
     if (style === CELL.VENOUS) return '#6e2a30';
     if (style === CELL.BILE) return '#c6d24a';
     if (style === CELL.RBC) return organ === 'lung' ? '#e7b4be' : organ === 'heart' ? '#ff4d55' : '#d25a5e';
-    if (style === CELL.CO2) return '#ead6de';
-    if (style === CELL.O2) return '#8ee7ff';
+    if (style === CELL.CO2) return organ === 'lung' ? '#e4d0d6' : '#ead6de';
+    if (style === CELL.O2) return organ === 'lung' ? '#d7e3e8' : '#8ee7ff';
     if (style === CELL.MYELIN) return '#d7d2ea';
     return '#c9a6ff';
 }
@@ -125,6 +125,28 @@ const PICK_FLUORIDE = 1;
 const PICK_GLYCOGEN = 2;
 const PICK_OXYGEN = 3;
 const PICK_DOPAMINE = 4;
+
+const LUNG_CUPS: Array<[number, number, number, number]> = [
+    [40, 160, 380, 300],
+    [-20, 560, 340, 380],
+    [70, 980, 400, 300],
+    [CANVAS_WIDTH - 40, 140, 360, 280],
+    [CANVAS_WIDTH + 10, 540, 380, 400],
+    [CANVAS_WIDTH - 80, 980, 360, 280],
+    [520, -20, 480, 200],
+    [1460, -10, 460, 190],
+    [480, CANVAS_HEIGHT + 10, 520, 210],
+    [1480, CANVAS_HEIGHT + 20, 480, 200],
+];
+
+const LUNG_PORES: Array<[number, number, number, number]> = [
+    [86, 250, 36, 26],
+    [48, 790, 50, 34],
+    [CANVAS_WIDTH - 70, 280, 42, 30],
+    [CANVAS_WIDTH - 110, 840, 38, 28],
+    [640, 28, 54, 22],
+    [1280, CANVAS_HEIGHT - 18, 62, 24],
+];
 
 export interface OrganHooks {
     entities: Entity[];
@@ -158,6 +180,19 @@ interface SalivaRibbon {
     t: number;
     dur: number;
     rinsed: boolean;
+}
+
+interface Clot {
+    x: number;
+    y: number;
+    r: number;
+    age: number;
+    warn: number;
+    vx: number;
+    spin: number;
+    loose: boolean;
+    hit: Set<string>;
+    playerHit: boolean;
 }
 
 interface Trace {
@@ -229,6 +264,9 @@ export class OrganDirector {
 
     private ecgClock = 7;
     private traces: Trace[] = [];
+    private clots: Clot[] = [];
+    private clotClock = 11;
+    private clotN = 0;
     private heartBeat = 0;
     private beatN = 0;
 
@@ -242,7 +280,7 @@ export class OrganDirector {
     private coughPlayer = false;
     private coughBosses = new Set<string>();
     private oxygenClock = 10;
-    private streaks: { x: number; y: number; vx: number; vy: number; life: number }[] = [];
+    private streaks: { x: number; y: number; vx: number; vy: number; life: number; max: number; bend: number }[] = [];
 
     private synapseClock = 6.5;
     private bolts: Bolt[] = [];
@@ -294,6 +332,9 @@ export class OrganDirector {
         this.ecgClock = 8 + quiet * 0.7;
         this.heartBeat = 0;
         this.beatN = 0;
+        this.clots = [];
+        this.clotClock = 9 + quiet * 0.55;
+        this.clotN = 0;
         this.lungClock = 7 + quiet * 0.55;
         this.gustN = 0;
         this.oxygenClock = 9;
@@ -372,6 +413,7 @@ export class OrganDirector {
         }
         if (this.filterPhase === 'on') this.resolveFilter(hooks);
         for (const trace of this.traces) this.resolveTrace(trace, hooks);
+        for (const clot of this.clots) this.resolveClot(clot, hooks);
         if (this.lungPhase === 'blast') this.resolveCough(hooks);
         for (const bolt of this.bolts) this.resolveBolt(bolt, hooks);
     }
@@ -398,9 +440,10 @@ export class OrganDirector {
         if (this.streams.length > 0) this.drawSaliva(ctx, low);
         if (this.bitePhase !== 'idle') this.drawBite(ctx);
         if (this.filterPhase !== 'idle') this.drawFilter(ctx);
+        for (const clot of this.clots) this.drawClot(ctx, clot);
         for (const trace of this.traces) this.drawTrace(ctx, trace, low);
         if (this.lungPhase === 'telegraph' || this.lungPhase === 'gust') this.drawGust(ctx, low);
-        if (this.lungPhase === 'inhale' || this.lungPhase === 'blast') this.drawCoughBand(ctx);
+        if (this.lungPhase === 'inhale' || this.lungPhase === 'blast') this.drawCoughBand(ctx, low);
         for (const bolt of this.bolts) this.drawBolt(ctx, bolt, low);
         this.drawBuffRing(ctx, player);
         if (this.whiteout > 0) {
@@ -684,22 +727,96 @@ export class OrganDirector {
             return tr.x0 > -tr.span - 40;
         });
 
-        if (this.local < 1) return;
-        this.ecgClock -= dt;
-        if (this.ecgClock <= 0) {
-            this.ecgClock = Math.max(10, (19 - this.local * 0.9) / pace);
-            const y = 170 + Math.random() * (CANVAS_HEIGHT - 340);
-            const shape = this.beatN % 4;
-            const spans = [0.56, 0.74, 0.64, 0.84];
-            this.traces.push({ y, x0: CANVAS_WIDTH + 20, age: -1.25, span: CANVAS_WIDTH * spans[shape], shape, hit: new Set(), playerHit: false });
-            audioManager.playHit();
-            hooks.shake(8);
-            if (this.local >= 3) {
-                const y2 = Math.max(140, Math.min(CANVAS_HEIGHT - 140, y + (Math.random() < 0.5 ? -240 : 240)));
-                const shape2 = (shape + 2) % 4;
-                this.traces.push({ y: y2, x0: CANVAS_WIDTH + 20, age: -1.9, span: CANVAS_WIDTH * spans[shape2], shape: shape2, hit: new Set(), playerHit: false });
+        if (this.local >= 1) {
+            this.ecgClock -= dt;
+            if (this.ecgClock <= 0) {
+                this.ecgClock = Math.max(10, (19 - this.local * 0.9) / pace);
+                const y = 170 + Math.random() * (CANVAS_HEIGHT - 340);
+                const shape = this.beatN % 4;
+                const spans = [0.56, 0.74, 0.64, 0.84];
+                this.traces.push({ y, x0: CANVAS_WIDTH + 20, age: -1.25, span: CANVAS_WIDTH * spans[shape], shape, hit: new Set(), playerHit: false });
+                audioManager.playHit();
+                hooks.shake(8);
+                if (this.local >= 3) {
+                    const y2 = Math.max(140, Math.min(CANVAS_HEIGHT - 140, y + (Math.random() < 0.5 ? -240 : 240)));
+                    const shape2 = (shape + 2) % 4;
+                    this.traces.push({ y: y2, x0: CANVAS_WIDTH + 20, age: -1.9, span: CANVAS_WIDTH * spans[shape2], shape: shape2, hit: new Set(), playerHit: false });
+                }
             }
         }
+        this.tickClots(dt, pace, hooks);
+    }
+
+    private tickClots(dt: number, pace: number, hooks: OrganHooks) {
+        this.clots = this.clots.filter(c => {
+            c.age += dt;
+            if (c.age >= 0) {
+                if (!c.loose) {
+                    c.loose = true;
+                    audioManager.playHit();
+                }
+                c.x += c.vx * dt;
+                c.y += Math.sin(c.age * 1.3 + c.spin) * 22 * dt;
+            }
+            return c.x > -c.r - 80 && c.y > -40 && c.y < CANVAS_HEIGHT + 40;
+        });
+        if (this.local < 2 || this.id !== 'heart') return;
+        this.clotClock -= dt;
+        if (this.clotClock > 0) return;
+        this.clotClock = Math.max(8.5, (18 - this.local * 1.1) / pace);
+        this.clotN++;
+        const early = this.local <= 3;
+        this.spawnClot(hooks, early, false);
+        if (this.local >= 4) this.spawnClot(hooks, false, true);
+    }
+
+    private spawnClot(hooks: OrganHooks, early: boolean, partner: boolean) {
+        const r = (early ? 42 : 54) + Math.random() * (early ? 12 : 16);
+        let y = 150 + Math.random() * (CANVAS_HEIGHT - 300);
+        if (partner && this.clots.length) {
+            const other = this.clots[this.clots.length - 1].y;
+            y = other < CANVAS_HEIGHT / 2 ? other + 280 : other - 280;
+            y = Math.max(150, Math.min(CANVAS_HEIGHT - 150, y));
+        } else if (Math.abs(y - hooks.player.pos.y) < 120) {
+            y = y > CANVAS_HEIGHT / 2 ? 180 : CANVAS_HEIGHT - 180;
+        }
+        this.clots.push({
+            x: CANVAS_WIDTH - 140 - Math.random() * (partner ? 80 : 220),
+            y,
+            r,
+            age: (early ? -1.55 : -1.15) - (partner ? 0.7 : 0),
+            warn: early ? 1.55 : 1.15,
+            vx: early ? -260 : -400,
+            spin: Math.random() * Math.PI * 2,
+            loose: false,
+            hit: new Set(),
+            playerHit: false,
+        });
+    }
+
+    private resolveClot(clot: Clot, hooks: OrganHooks) {
+        if (clot.age < 0) return;
+        const touch = (pos: Vector2, radius: number) => {
+            const dx = pos.x - clot.x;
+            const dy = pos.y - clot.y;
+            const reach = clot.r * 0.92 + radius * 0.55;
+            return dx * dx + dy * dy < reach * reach;
+        };
+        for (const e of hooks.entities) {
+            if (!e.active || !this.isFoe(e.type) || clot.hit.has(e.id)) continue;
+            if (!touch(e.pos, e.radius)) continue;
+            clot.hit.add(e.id);
+            if (e.type === EntityType.BOSS) hooks.strike(e, e.maxHealth * 0.12);
+            else hooks.strike(e, e.health + 50);
+        }
+        if (!hooks.player.active || clot.playerHit) return;
+        if (!touch(hooks.player.pos, hooks.player.radius)) return;
+        clot.playerHit = true;
+        hooks.hurt(hooks.player.maxHealth * 0.22, hooks.player.pos, 0.28);
+        hooks.player.vel.x -= 3.2;
+        hooks.shake(14);
+        buzz('thud');
+        hooks.popup(hooks.player.pos, hooks.t('ALERT_CLOT'), '#ffb0b8', 22);
     }
 
     private tickLung(dt: number, pace: number, hooks: OrganHooks) {
@@ -710,8 +827,12 @@ export class OrganDirector {
                 this.spawnPickup(PICK_OXYGEN, '#9aefff');
             }
         }
-        for (const s of this.streaks) s.life -= dt;
-        this.streaks = this.streaks.filter(s => s.life > 0);
+        for (const s of this.streaks) {
+            s.life -= dt;
+            s.x += s.vx * dt;
+            s.y += s.vy * dt;
+        }
+        this.streaks = this.streaks.filter(s => s.life > 0 && s.x > -240 && s.x < CANVAS_WIDTH + 240);
 
         if (this.lungPhase === 'idle') {
             this.lungClock -= dt;
@@ -729,10 +850,12 @@ export class OrganDirector {
             this.wind.x = this.gust.x;
             this.wind.y = this.gust.y;
             this.puff(this.gust.x, this.gust.y, 1);
+            if (!hooks.low) this.puff(this.gust.x, this.gust.y, 1);
             if (this.lungT <= 0) this.restLung(pace);
         } else if (this.lungPhase === 'inhale') {
             this.wind.x = 1.6;
             this.wind.y = (this.bandY - hooks.player.pos.y) * 0.004;
+            this.puff(7.2, 0, 0.55, true);
             if (this.lungT <= 0) {
                 this.lungPhase = 'blast';
                 this.lungT = 0.72;
@@ -744,6 +867,7 @@ export class OrganDirector {
             }
             } else if (this.lungPhase === 'blast') {
             this.shoveBand(hooks, -78);
+            this.puff(-16, 0, 1, true);
             if (this.lungT <= 0) {
                 this.sweepBand(hooks);
                 this.restLung(pace);
@@ -1053,7 +1177,7 @@ export class OrganDirector {
             } else if (e.value === PICK_OXYGEN) {
                 this.oxygenT = 4;
                 this.fireMul = 0.72;
-                hooks.popup(hooks.player.pos, hooks.t('MSG_OXYGEN'), '#9aefff', 24);
+                hooks.popup(hooks.player.pos, hooks.t('OXYGEN_HINT'), '#9aefff', 24);
             } else if (e.value === PICK_DOPAMINE) {
                 this.dopamineT = 4;
                 this.critAdd = 0.22;
@@ -1351,15 +1475,33 @@ export class OrganDirector {
         return pts;
     }
 
-    private puff(vx: number, vy: number, alphaLife: number) {
-        if (this.streaks.length > 28) return;
+    private puff(vx: number, vy: number, strength: number, band = false) {
+        if (this.streaks.length > (band ? 42 : 32)) return;
         const mag = Math.hypot(vx, vy) || 1;
+        const ux = vx / mag;
+        const uy = vy / mag;
+        const speed = (340 + Math.random() * 260) * (0.55 + strength * 0.55);
+        let x = Math.random() * CANVAS_WIDTH;
+        let y = Math.random() * CANVAS_HEIGHT;
+        if (band) {
+            y = this.bandY + (Math.random() - 0.5) * this.bandHalf * 1.65;
+            x = ux < 0 ? CANVAS_WIDTH + Math.random() * 200 : -Math.random() * 200;
+        } else if (ux < -0.25) {
+            x = CANVAS_WIDTH + Math.random() * 180;
+        } else if (ux > 0.25) {
+            x = -Math.random() * 180;
+        } else {
+            y = uy > 0 ? -30 : CANVAS_HEIGHT + 30;
+        }
+        const pull = band ? (this.bandY - y) * 0.4 : 0;
         this.streaks.push({
-            x: Math.random() * CANVAS_WIDTH,
-            y: Math.random() * CANVAS_HEIGHT,
-            vx: (vx / mag) * 18,
-            vy: (vy / mag) * 18,
-            life: 0.25 * alphaLife,
+            x,
+            y,
+            vx: ux * speed,
+            vy: uy * speed + pull,
+            life: 0.48 + Math.random() * 0.38,
+            max: 0.86,
+            bend: (Math.random() - 0.5) * 34,
         });
     }
 
@@ -1811,36 +1953,213 @@ export class OrganDirector {
         ctx.restore();
     }
 
-    private drawGust(ctx: CanvasRenderingContext2D, low: boolean) {
+    private drawClot(ctx: CanvasRenderingContext2D, clot: Clot) {
+        const forming = clot.age < 0;
+        const span = clot.warn || 1.4;
+        const k = forming ? Math.max(0, Math.min(1, 1 + clot.age / span)) : 1;
+        const ease = k * k * (3 - 2 * k);
+        const r = clot.r * (0.2 + 0.8 * ease);
         ctx.save();
-        ctx.strokeStyle = this.lungPhase === 'telegraph' ? 'rgba(240, 183, 200, 0.45)' : 'rgba(234, 214, 222, 0.7)';
-        ctx.lineWidth = 2;
-        const shown = low ? this.streaks.slice(0, 8) : this.streaks;
-        for (const s of shown) {
-            ctx.globalAlpha = Math.max(0, s.life * 3);
+        ctx.translate(clot.x, clot.y);
+        if (forming) {
+            ctx.strokeStyle = `rgba(255, 176, 184, ${0.25 + ease * 0.35})`;
+            ctx.lineWidth = 1.5;
             ctx.beginPath();
-            ctx.moveTo(s.x, s.y);
-            ctx.lineTo(s.x - s.vx * 2.4, s.y - s.vy * 2.4);
+            ctx.ellipse(0, 0, clot.r, clot.r * 0.84, 0, 0, Math.PI * 2);
             ctx.stroke();
+        }
+        if (!forming) {
+            ctx.strokeStyle = 'rgba(255, 186, 186, 0.32)';
+            ctx.lineWidth = 1.5;
+            ctx.lineCap = 'round';
+            for (let i = 0; i < 4; i++) {
+                const a = clot.spin + i * 1.35;
+                const ox = r * 0.35 + Math.cos(a) * r * 0.12;
+                const oy = Math.sin(a) * r * 0.42;
+                ctx.beginPath();
+                ctx.moveTo(ox * 0.25, oy * 0.25);
+                ctx.quadraticCurveTo(ox + 8, oy - 7, ox + 20, oy + 3);
+                ctx.stroke();
+            }
+        }
+        ctx.beginPath();
+        const n = 18;
+        for (let i = 0; i <= n; i++) {
+            const a = (i / n) * Math.PI * 2;
+            const lobe = 1 + 0.13 * Math.sin(a * 3 + clot.spin) + 0.05 * Math.sin(a * 5 - clot.spin);
+            const px = Math.cos(a) * r * lobe;
+            const py = Math.sin(a) * r * 0.84 * lobe;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        const g = ctx.createRadialGradient(-r * 0.28, -r * 0.2, r * 0.06, 0, 0, r);
+        g.addColorStop(0, 'rgba(255, 228, 228, 0.96)');
+        g.addColorStop(0.2, 'rgba(186, 48, 62, 0.96)');
+        g.addColorStop(0.66, 'rgba(96, 14, 26, 0.95)');
+        g.addColorStop(1, 'rgba(32, 6, 10, 0.92)');
+        ctx.fillStyle = g;
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(36, 6, 10, 0.75)';
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255, 240, 240, 0.8)';
+        ctx.beginPath();
+        ctx.ellipse(-r * 0.22, -r * 0.16, Math.max(3, r * 0.14), Math.max(1.5, r * 0.055), -0.55, 0, Math.PI * 2);
+        ctx.fill();
+        if (forming && ease > 0.34 && this.hooks) {
+            const label = this.hooks.t('ALERT_CLOT');
+            ctx.font = '700 20px "Chakra Petch", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = 'rgba(24, 6, 8, 0.55)';
+            ctx.fillStyle = 'rgba(255, 228, 228, 0.94)';
+            ctx.strokeText(label, 0, -r - 16);
+            ctx.fillText(label, 0, -r - 16);
         }
         ctx.restore();
     }
 
-    private drawCoughBand(ctx: CanvasRenderingContext2D) {
-        const blasting = this.lungPhase === 'blast';
+    private drawGust(ctx: CanvasRenderingContext2D, low: boolean) {
+        const telegraph = this.lungPhase === 'telegraph';
+        const mag = Math.hypot(this.gust.x, this.gust.y) || 1;
+        const ux = this.gust.x / mag;
+        const uy = this.gust.y / mag;
         ctx.save();
-        ctx.fillStyle = blasting ? 'rgba(255, 236, 242, 0.28)' : 'rgba(255, 120, 150, 0.16)';
-        ctx.fillRect(0, this.bandY - this.bandHalf, CANVAS_WIDTH, this.bandHalf * 2);
-        if (blasting) {
-            ctx.strokeStyle = 'rgba(255, 250, 252, 0.8)';
-            ctx.lineWidth = 3;
-            for (let i = 0; i < 8; i++) {
-                const y = this.bandY - this.bandHalf + (i + 0.5) * (this.bandHalf * 2 / 8);
+        const wash = ctx.createLinearGradient(
+            CANVAS_WIDTH * 0.5 - ux * 780,
+            CANVAS_HEIGHT * 0.5 - uy * 460,
+            CANVAS_WIDTH * 0.5 + ux * 780,
+            CANVAS_HEIGHT * 0.5 + uy * 460,
+        );
+        const haze = telegraph ? 0.07 : 0.14;
+        wash.addColorStop(0, `rgba(255, 236, 240, ${haze})`);
+        wash.addColorStop(0.45, 'rgba(255, 236, 240, 0)');
+        wash.addColorStop(1, `rgba(255, 250, 252, ${haze * 1.7})`);
+        ctx.fillStyle = wash;
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        const time = this.hooks?.time ?? 0;
+        const sheets = low ? 4 : 8;
+        ctx.lineCap = 'round';
+        for (let i = 0; i < sheets; i++) {
+            const travel = ((time / (telegraph ? 1600 : 780) + i * 0.13) % 1);
+            const along = -0.15 + travel * 1.3;
+            const x = CANVAS_WIDTH * (ux < 0 ? 1 - along : along);
+            const y = (i + 0.5) * (CANVAS_HEIGHT / sheets) + uy * (travel - 0.5) * 220;
+            const len = telegraph ? 90 : 170;
+            const nx = -uy;
+            const ny = ux;
+            const bend = ((i % 2) * 2 - 1) * 22;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.quadraticCurveTo(x - ux * len * 0.5 + nx * bend, y - uy * len * 0.5 + ny * bend, x - ux * len, y - uy * len);
+            ctx.globalAlpha = telegraph ? 0.28 : 0.5;
+            ctx.strokeStyle = 'rgba(255, 236, 242, 0.9)';
+            ctx.lineWidth = telegraph ? 7 : 12;
+            ctx.stroke();
+            ctx.globalAlpha = telegraph ? 0.55 : 0.85;
+            ctx.strokeStyle = '#fffafb';
+            ctx.lineWidth = 1.7;
+            ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+        this.drawFilaments(ctx, low, telegraph ? 0.62 : 1);
+        ctx.restore();
+    }
+
+    private drawFilaments(ctx: CanvasRenderingContext2D, low: boolean, strength: number) {
+        const shown = low ? this.streaks.slice(0, 12) : this.streaks;
+        ctx.save();
+        ctx.lineCap = 'round';
+        for (const s of shown) {
+            const mag = Math.hypot(s.vx, s.vy) || 1;
+            const ux = s.vx / mag;
+            const uy = s.vy / mag;
+            const fade = Math.max(0, Math.min(1, s.life / (s.max || 0.8)));
+            const len = (64 + fade * 96) * (0.6 + strength * 0.55);
+            const nx = -uy;
+            const ny = ux;
+            const x2 = s.x - ux * len;
+            const y2 = s.y - uy * len;
+            const cx = s.x - ux * len * 0.46 + nx * s.bend;
+            const cy = s.y - uy * len * 0.46 + ny * s.bend;
+            ctx.beginPath();
+            ctx.moveTo(s.x, s.y);
+            ctx.quadraticCurveTo(cx, cy, x2, y2);
+            ctx.globalAlpha = fade * (0.16 + strength * 0.22);
+            ctx.strokeStyle = 'rgba(255, 236, 242, 0.95)';
+            ctx.lineWidth = 8 * (0.35 + strength * 0.65);
+            ctx.stroke();
+            ctx.globalAlpha = fade * (0.45 + strength * 0.45);
+            ctx.strokeStyle = '#fff8f9';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            ctx.globalAlpha = fade * 0.4 * strength;
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.ellipse(s.x, s.y, 9 * (0.4 + strength), 3.2, Math.atan2(uy, ux), 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    private drawCoughBand(ctx: CanvasRenderingContext2D, low: boolean) {
+        const blasting = this.lungPhase === 'blast';
+        const warn = blasting ? 1 : Math.max(0, Math.min(1, 1 - this.lungT / 1.05));
+        const time = this.hooks?.time ?? 0;
+        const beat = 0.5 + 0.5 * Math.sin(time / (blasting ? 32 : 170 - warn * 125));
+        const y0 = this.bandY - this.bandHalf;
+        const h = this.bandHalf * 2;
+        const fade = blasting ? Math.max(0, this.lungT) / 0.72 : 1;
+        ctx.save();
+        const edge = blasting ? 0.55 : 0.12 + warn * 0.38 + beat * (0.08 + warn * 0.22);
+        const mid = blasting ? 0.16 + fade * 0.28 : 0.04 + warn * 0.1;
+        const wash = ctx.createLinearGradient(0, y0, 0, y0 + h);
+        wash.addColorStop(0, `rgba(255, 70, 100, ${edge})`);
+        wash.addColorStop(0.18, `rgba(255, 170, 186, ${mid})`);
+        wash.addColorStop(0.5, blasting ? `rgba(255, 244, 246, ${0.12 + fade * 0.28})` : `rgba(255, 150, 168, ${mid * 0.45})`);
+        wash.addColorStop(0.82, `rgba(255, 170, 186, ${mid})`);
+        wash.addColorStop(1, `rgba(255, 70, 100, ${edge})`);
+        ctx.fillStyle = wash;
+        ctx.fillRect(0, y0, CANVAS_WIDTH, h);
+
+        const rail = blasting ? 8 + fade * 6 : 2 + warn * 6 + beat * (1 + warn * 4);
+        ctx.fillStyle = blasting
+            ? `rgba(255, 248, 250, ${0.55 + fade * 0.4})`
+            : `rgba(255, 214, 222, ${0.35 + warn * 0.5 + beat * 0.2})`;
+        ctx.fillRect(0, y0, CANVAS_WIDTH, rail);
+        ctx.fillRect(0, y0 + h - rail, CANVAS_WIDTH, rail);
+
+        if (!low && !blasting) {
+            ctx.strokeStyle = `rgba(255, 236, 240, ${0.25 + warn * 0.55})`;
+            ctx.lineWidth = 1.5;
+            const teeth = 14;
+            for (let i = 0; i < teeth; i++) {
+                const x = (i + 0.5) * (CANVAS_WIDTH / teeth);
+                const reach = 10 + warn * 28 + beat * 8;
                 ctx.beginPath();
-                ctx.moveTo(CANVAS_WIDTH, y);
-                ctx.lineTo(40, y + Math.sin(i) * 12);
+                ctx.moveTo(x, y0 + rail);
+                ctx.lineTo(x, y0 + rail + reach);
+                ctx.moveTo(x, y0 + h - rail);
+                ctx.lineTo(x, y0 + h - rail - reach);
                 ctx.stroke();
             }
+        }
+
+        this.drawFilaments(ctx, low, blasting ? 1 : 0.35 + warn * 0.55);
+
+        if (!blasting && this.hooks) {
+            const label = this.hooks.t('COUGH_WORD');
+            ctx.globalAlpha = 0.45 + warn * 0.35 + beat * 0.2;
+            ctx.font = '800 46px "Chakra Petch", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.lineWidth = 7;
+            ctx.strokeStyle = 'rgba(42, 8, 14, 0.62)';
+            ctx.fillStyle = '#fff4f6';
+            ctx.strokeText(label, CANVAS_WIDTH / 2, this.bandY);
+            ctx.fillText(label, CANVAS_WIDTH / 2, this.bandY);
         }
         ctx.restore();
     }
@@ -1982,14 +2301,46 @@ export class OrganDirector {
         ctx.restore();
     }
 
-    private drawAlveoli(ctx: CanvasRenderingContext2D, time: number) {
-        for (let i = 0; i < 11; i++) {
-            const x = 160 + (i % 4) * 440 + Math.sin(time / 900 + i) * 8;
-            const y = 180 + Math.floor(i / 4) * 280;
+    private drawAlveoli(ctx: CanvasRenderingContext2D, _time: number) {
+        ctx.save();
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = 'rgba(120, 42, 56, 0.28)';
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        const air = ctx.createRadialGradient(
+            CANVAS_WIDTH * 0.5, CANVAS_HEIGHT * 0.46, 60,
+            CANVAS_WIDTH * 0.5, CANVAS_HEIGHT * 0.5, 980,
+        );
+        air.addColorStop(0, 'rgba(255, 206, 214, 0.11)');
+        air.addColorStop(0.58, 'rgba(150, 58, 74, 0.06)');
+        air.addColorStop(1, 'rgba(110, 36, 50, 0.16)');
+        ctx.fillStyle = air;
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+        for (const [x, y, rx, ry] of LUNG_CUPS) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(1, ry / rx);
+            const sac = ctx.createRadialGradient(-rx * 0.12, -rx * 0.08, rx * 0.05, 0, 0, rx);
+            sac.addColorStop(0, 'rgba(236, 168, 180, 0.38)');
+            sac.addColorStop(0.42, 'rgba(188, 82, 102, 0.3)');
+            sac.addColorStop(0.74, 'rgba(124, 40, 56, 0.2)');
+            sac.addColorStop(1, 'rgba(48, 12, 20, 0)');
+            ctx.fillStyle = sac;
             ctx.beginPath();
-            ctx.arc(x, y, 70, 0, Math.PI * 2);
+            ctx.arc(0, 0, rx, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        ctx.fillStyle = 'rgba(22, 6, 10, 0.32)';
+        for (const [x, y, rx, ry] of LUNG_PORES) {
+            ctx.beginPath();
+            ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(255, 206, 214, 0.14)';
             ctx.stroke();
         }
+        ctx.restore();
     }
 
     private drawNeural(ctx: CanvasRenderingContext2D, time: number) {

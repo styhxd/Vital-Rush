@@ -6,7 +6,7 @@ type Kind =
     | 'vital' | 'bacteria' | 'virus' | 'fungi' | 'parasite' | 'boss'
     | 'plaque' | 'saliva' | 'bite' | 'enamel'
     | 'bile' | 'filter' | 'heal'
-    | 'beat' | 'ecg'
+    | 'beat' | 'ecg' | 'clot'
     | 'gust' | 'cough' | 'oxygen'
     | 'synapse' | 'focus'
     | 'dash' | 'surge';
@@ -49,14 +49,15 @@ const COPY: Record<Language, Section[]> = {
             cards: [
                 { kind: 'beat', title: 'SÍSTOLE', body: 'O coração aperta. Você acelera e o sangue empurra junto.' },
                 { kind: 'ecg', title: 'ELETRO', body: 'Uma linha de batimento atravessa a faixa. Não fique nela.' },
+                { kind: 'clot', title: 'COÁGULO', body: 'Uma massa escura se forma e desce com o sangue. Saia antes dela te pegar.' },
             ],
         },
         {
             title: 'PULMÃO',
             cards: [
-                { kind: 'gust', title: 'LUFADA', body: 'O ar empurra para um lado. Dá para ler a direção nos riscos.' },
-                { kind: 'cough', title: 'TOSSE', body: 'Uma faixa avisa e depois dispara, varrendo quem ficou.' },
-                { kind: 'oxygen', title: 'OXIGÊNIO', body: 'Bolha clara. Os tiros saem mais rápido.' },
+                { kind: 'gust', title: 'LUFADA', body: 'O ar atravessa o lugar. Os fios mostram para onde ele empurra.' },
+                { kind: 'cough', title: 'TOSSE', body: 'A faixa pulsa e aperta. Quando estoura, varre quem ficou dentro.' },
+                { kind: 'oxygen', title: 'OXIGÊNIO', body: 'Uma molécula. Pega e os tiros saem mais rápido.' },
             ],
         },
         {
@@ -108,14 +109,15 @@ const COPY: Record<Language, Section[]> = {
             cards: [
                 { kind: 'beat', title: 'SYSTOLE', body: 'The heart squeezes. You speed up and the blood pushes with you.' },
                 { kind: 'ecg', title: 'ECG', body: 'A heartbeat line crosses the band. Stay off it.' },
+                { kind: 'clot', title: 'CLOT', body: 'A dark mass forms, then rides the blood. Get clear before it catches you.' },
             ],
         },
         {
             title: 'LUNG',
             cards: [
-                { kind: 'gust', title: 'GUST', body: 'Air pushes one way. The streaks show the direction.' },
-                { kind: 'cough', title: 'COUGH', body: 'A band warns, then fires and sweeps whoever stayed.' },
-                { kind: 'oxygen', title: 'OXYGEN', body: 'A pale bubble. Shots come out faster.' },
+                { kind: 'gust', title: 'GUST', body: 'Air crosses the place. The strands show which way it pushes.' },
+                { kind: 'cough', title: 'COUGH', body: 'The band pulses and tightens. When it bursts, it sweeps whoever stayed inside.' },
+                { kind: 'oxygen', title: 'OXYGEN', body: 'A molecule. Pick it up and shots come out faster.' },
             ],
         },
         {
@@ -167,14 +169,15 @@ const COPY: Record<Language, Section[]> = {
             cards: [
                 { kind: 'beat', title: 'SÍSTOLE', body: 'El corazón aprieta. Aceleras y la sangre empuja contigo.' },
                 { kind: 'ecg', title: 'ELECTRO', body: 'Una línea de latido cruza la franja. No te quedes ahí.' },
+                { kind: 'clot', title: 'COÁGULO', body: 'Una masa oscura se forma y baja con la sangre. Aléjate antes de que te alcance.' },
             ],
         },
         {
             title: 'PULMÓN',
             cards: [
-                { kind: 'gust', title: 'RÁFAGA', body: 'El aire empuja hacia un lado. Las rayas marcan la dirección.' },
-                { kind: 'cough', title: 'TOS', body: 'Una franja avisa y después dispara, barriendo a quien se quedó.' },
-                { kind: 'oxygen', title: 'OXÍGENO', body: 'Una burbuja clara. Los disparos salen más rápido.' },
+                { kind: 'gust', title: 'RÁFAGA', body: 'El aire cruza el lugar. Los hilos muestran hacia dónde empuja.' },
+                { kind: 'cough', title: 'TOS', body: 'La franja late y se aprieta. Cuando estalla, barre a quien se quedó dentro.' },
+                { kind: 'oxygen', title: 'OXÍGENO', body: 'Una molécula. La tomas y los disparos salen más rápido.' },
             ],
         },
         {
@@ -452,42 +455,90 @@ const paint = (ctx: CanvasRenderingContext2D, kind: Kind, time: number, w: numbe
             else ctx.lineTo(x, cy - wave);
         }
         ctx.stroke();
+    } else if (kind === 'clot') {
+        const x = ((t * 28) % (w + 50)) - 20;
+        const r = 16;
+        ctx.beginPath();
+        for (let i = 0; i <= 16; i++) {
+            const a = (i / 16) * Math.PI * 2;
+            const lobe = 1 + 0.14 * Math.sin(a * 3 + t * 1.4);
+            const px = x + Math.cos(a) * r * lobe;
+            const py = cy + Math.sin(a) * r * 0.82 * lobe;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        const g = ctx.createRadialGradient(x - 4, cy - 3, 2, x, cy, r);
+        g.addColorStop(0, '#ffe4e4');
+        g.addColorStop(0.25, '#ba303e');
+        g.addColorStop(1, '#20060a');
+        ctx.fillStyle = g;
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 186, 186, 0.45)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(x + 6, cy - 4);
+        ctx.quadraticCurveTo(x + 16, cy - 10, x + 24, cy - 2);
+        ctx.stroke();
     } else if (kind === 'gust') {
-        ctx.strokeStyle = 'rgba(234, 214, 222, 0.85)';
-        ctx.lineWidth = 2;
+        const ux = -1;
         for (let i = 0; i < 5; i++) {
-            const x = ((t * 50 + i * 34) % (w + 30)) - 15;
-            const y = 16 + i * 14;
+            const x = ((t * 70 + i * 36) % (w + 50)) - 20;
+            const y = 14 + i * 15;
+            const len = 28 + (i % 3) * 8;
+            ctx.strokeStyle = 'rgba(255, 236, 242, 0.35)';
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
             ctx.beginPath();
             ctx.moveTo(x, y);
-            ctx.lineTo(x - 22, y + 2);
+            ctx.quadraticCurveTo(x - ux * len * 0.5, y - 6 + (i % 2) * 8, x - ux * len, y + 2);
+            ctx.stroke();
+            ctx.strokeStyle = '#fff8f9';
+            ctx.lineWidth = 1.3;
             ctx.stroke();
         }
     } else if (kind === 'cough') {
-        const open = 0.5 + 0.5 * Math.sin(t * 2);
-        ctx.fillStyle = `rgba(255, 120, 150, ${0.18 + open * 0.2})`;
-        ctx.fillRect(0, cy - 16, w, 32);
-        ctx.strokeStyle = 'rgba(255,250,252,0.8)';
-        for (let i = 0; i < 4; i++) {
-            const y = cy - 12 + i * 8;
+        const beat = 0.5 + 0.5 * Math.sin(t * 7);
+        const warn = 0.45 + 0.55 * beat;
+        ctx.fillStyle = `rgba(255, 90, 116, ${0.18 + warn * 0.28})`;
+        ctx.fillRect(0, cy - 22, w, 44);
+        ctx.fillStyle = `rgba(255, 228, 234, ${0.45 + warn * 0.5})`;
+        ctx.fillRect(0, cy - 22, w, 3 + beat * 3);
+        ctx.fillRect(0, cy + 19 - beat * 3, w, 3 + beat * 3);
+        ctx.strokeStyle = `rgba(255, 244, 246, ${0.4 + warn * 0.5})`;
+        ctx.lineWidth = 1.2;
+        for (let i = 0; i < 6; i++) {
+            const x = 12 + i * 26;
+            const reach = 6 + beat * 8;
             ctx.beginPath();
-            ctx.moveTo(w, y);
-            ctx.lineTo(20, y + Math.sin(t * 3 + i) * 3);
+            ctx.moveTo(x, cy - 16);
+            ctx.lineTo(x, cy - 16 + reach);
+            ctx.moveTo(x, cy + 16);
+            ctx.lineTo(x, cy + 16 - reach);
             ctx.stroke();
         }
     } else if (kind === 'oxygen') {
-        const bob = Math.sin(t * 2) * 3;
-        ctx.fillStyle = 'rgba(158, 231, 255, 0.25)';
-        ctx.beginPath();
-        ctx.arc(cx, cy + bob, 24, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#9aefff';
+        const bob = Math.sin(t * 2) * 2;
+        ctx.strokeStyle = 'rgba(236, 252, 255, 0.9)';
         ctx.lineWidth = 2;
-        ctx.stroke();
-        ctx.fillStyle = 'rgba(255,255,255,0.85)';
         ctx.beginPath();
-        ctx.arc(cx - 6, cy - 6 + bob, 4, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.moveTo(cx - 8, cy - 4 + bob);
+        ctx.lineTo(cx + 8, cy - 4 + bob);
+        ctx.moveTo(cx - 8, cy + bob);
+        ctx.lineTo(cx + 8, cy + bob);
+        ctx.stroke();
+        for (const side of [-1, 1]) {
+            const x = cx + side * 14;
+            const y = cy - 2 + bob;
+            const g = ctx.createRadialGradient(x - 3, y - 3, 1, x, y, 10);
+            g.addColorStop(0, '#ffffff');
+            g.addColorStop(0.4, '#b7f2ff');
+            g.addColorStop(1, '#2f93ad');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(x, y, 9, 0, Math.PI * 2);
+            ctx.fill();
+        }
     } else if (kind === 'synapse') {
         const flash = (t % 1.6) > 1.25;
         ctx.strokeStyle = flash ? '#f4edff' : 'rgba(180, 140, 255, 0.7)';
