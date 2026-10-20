@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+
 import { Language } from '../types';
 import { Dossier } from './Dossier';
 
@@ -68,6 +69,12 @@ const COPY: Record<Language, Section[]> = {
             ],
         },
         {
+            title: 'A DOENÇA',
+            cards: [
+                { kind: 'vital', title: 'A ROTA', body: 'Cada paciente é uma das 120 ordens dos cinco órgãos, sem repetir. O sintoma diz por que o Vital entra nessa sequência. O primeiro órgão ainda dá trégua. O último fecha. Depois da onda 30 a mesma rota volta, mais fechada.' },
+            ],
+        },
+        {
             title: 'O QUE VOCÊ FAZ',
             cards: [
                 { kind: 'dash', title: 'DESVIO', body: 'Um impulso. Por um instante nada te acerta.' },
@@ -128,6 +135,12 @@ const COPY: Record<Language, Section[]> = {
             ],
         },
         {
+            title: 'THE DISEASE',
+            cards: [
+                { kind: 'vital', title: 'THE ROUTE', body: 'Each patient is one of the 120 orders of the five organs, with no repeats. The symptom says why Vital goes in that sequence. The first organ still gives you room. The last one closes in. After wave 30 the same route returns, tighter.' },
+            ],
+        },
+        {
             title: 'WHAT YOU DO',
             cards: [
                 { kind: 'dash', title: 'DASH', body: 'A burst. For a moment nothing can hit you.' },
@@ -185,6 +198,12 @@ const COPY: Record<Language, Section[]> = {
             cards: [
                 { kind: 'synapse', title: 'SINAPSIS', body: 'Un rayo une dos puntos. El blanco revienta la pantalla.' },
                 { kind: 'focus', title: 'FOCO', body: 'Una gota violeta. Los críticos salen más seguido.' },
+            ],
+        },
+        {
+            title: 'LA ENFERMEDAD',
+            cards: [
+                { kind: 'vital', title: 'LA RUTA', body: 'Cada paciente es una de las 120 órdenes de los cinco órganos, sin repetir. El síntoma dice por qué Vital entra en esa secuencia. El primer órgano todavía da tregua. El último cierra. Después de la onda 30 la misma ruta vuelve, más cerrada.' },
             ],
         },
         {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Difficulty, Language, PatientProfile } from '../types';
+import { symptomText } from '../services/casebook';
 import { TEXTS } from '../constants';
 
 const BACKGROUND = new URL('../src/assets/background.jpg', import.meta.url).href;
@@ -13,6 +14,7 @@ const chartStyles = `
 .chart-sheet {
     width: min(40rem, calc(100vw - 4.5rem));
     max-height: calc(100dvh - 2.25rem);
+    overflow-y: auto;
 }
 .chart-pad { padding: 0.7rem 0.9rem 0.65rem 2.7rem; }
 .chart-title { font-size: 1.55rem; }
@@ -183,7 +185,9 @@ export const PatientChart: React.FC<PatientChartProps> = ({
             <PatientLine patient={patient} language={language} ink={ink} />
 
             <div className="chart-fields mt-2 lg:mt-5 grid grid-cols-3 gap-2 lg:gap-3">
-                <Field label={t('LABEL_SYMPTOMS')} value={t(patient.symptoms)} ink={ink} />
+                <div className="col-span-3">
+                    <Field label={t('LABEL_SYMPTOMS')} value={symptomText(patient.route, language)} ink={ink} />
+                </div>
                 <Field label={t('STRAIN')} value={t(`STRAIN_${patient.strain}`)} ink={ink} />
                 <Field label={t('DIFFICULTY')} value={t(`DIFF_${difficulty}`)} ink={ink} accent={band} />
             </div>

@@ -3,12 +3,13 @@
  * alguma coisa — quase sempre contra o Vital.
  */
 
-import { Entity, EntityType, Vector2 } from '../types';
+import { Entity, EntityType, Language, OrganId, Vector2 } from '../types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../constants';
 import { audioManager } from './audioManager';
 import { buzz } from './haptics';
+import { CANON_ROUTE } from './casebook';
 
-export type OrganId = 'molar' | 'liver' | 'heart' | 'lung' | 'brain';
+export type { OrganId };
 
 export const CELL = {
     SALIVA: 0,
@@ -45,12 +46,10 @@ export const ORGAN_CHEATS: Record<string, number> = {
     cerebro: 24,
 };
 
-export function organForWave(waveIndex: number): OrganId {
-    if (waveIndex < 6) return 'molar';
-    if (waveIndex < 12) return 'liver';
-    if (waveIndex < 18) return 'heart';
-    if (waveIndex < 24) return 'lung';
-    return 'brain';
+export function organForWave(waveIndex: number, route: OrganId[] = CANON_ROUTE): OrganId {
+    const book = route.length === 5 ? route : CANON_ROUTE;
+    const slot = Math.floor((waveIndex % 30) / 6) % 5;
+    return book[slot];
 }
 
 export function organStart(id: OrganId): number {
@@ -217,6 +216,15 @@ interface Bolt {
     playerHit: boolean;
 }
 
+interface Transit {
+    from: OrganId;
+    to: OrganId;
+    t: number;
+    dur: number;
+    line: string;
+    title: string;
+}
+
 export class OrganDirector {
     id: OrganId = 'molar';
     wind: Vector2 = { x: 0, y: 0 };
@@ -228,8 +236,13 @@ export class OrganDirector {
     whiteout = 0;
     storm = 0;
 
+    private route: OrganId[] = [...CANON_ROUTE];
+    private lang: Language = 'EN';
+    private transit: Transit | null = null;
     private local = 0;
     private pastWall = 0;
+    private lubLatch = false;
+    private ecgCue = false;
     private seq = 1;
     private banner: Banner | null = null;
     private hooks: OrganHooks | null = null;
@@ -293,12 +306,26 @@ export class OrganDirector {
     private bileCue = 0;
     private bileEnemyCue = 0;
 
+    setRoute(route: OrganId[]) {
+        if (route && route.length === 5) this.route = route.slice();
+    }
+
+    setLanguage(lang: Language) {
+        this.lang = lang;
+    }
+
+    transitLeft(): number {
+        if (!this.transit) return 0;
+        return Math.max(0, this.transit.dur - this.transit.t);
+    }
+
     onWave(waveIndex: number, translate: (key: string) => string): boolean {
-        const next = organForWave(waveIndex);
-        const changed = this.id !== next;
-        const entered = changed && !(this.id === 'molar' && next === 'molar');
+        const next = organForWave(waveIndex, this.route);
+        const prev = this.id;
+        const changed = prev !== next;
+        const entered = changed && waveIndex > 0;
         this.id = next;
-        this.local = Math.min(5, Math.max(0, waveIndex - organStart(next)));
+        this.local = waveIndex % 6;
         this.pastWall = Math.max(0, waveIndex - 29);
         this.fluorideT = 0;
         this.rinseT = 0;
@@ -324,14 +351,14 @@ export class OrganDirector {
         const quiet = 5 - this.local;
         this.plaqueClock = 7 + quiet * 0.55;
         this.biteClock = 14;
-        this.fluorideClock = 11;
+        this.fluorideClock = 14;
         this.salivaClock = 10 + quiet * 0.45;
         this.streams = [];
         this.salivaCue = 0;
         this.ridingSaliva = false;
         this.bileClock = 7 + quiet * 0.6;
         this.filterClock = this.local <= 2 ? 16 : 12;
-        this.glycogenClock = 10;
+        this.glycogenClock = 13;
         this.ecgClock = 8 + quiet * 0.7;
         this.heartBeat = 0;
         this.beatN = 0;
@@ -340,13 +367,22 @@ export class OrganDirector {
         this.clotN = 0;
         this.lungClock = 7 + quiet * 0.55;
         this.gustN = 0;
-        this.oxygenClock = 9;
+        this.oxygenClock = 12;
         this.synapseClock = 8 + quiet * 0.65;
-        this.dopamineClock = 11;
+        this.dopamineClock = 14;
         this.synapseN = 0;
-        if (entered && ENTER_KEY[next]) {
-            this.banner = { text: translate(ENTER_KEY[next]!), color: THEME[next].accent, ttl: 2.5 };
+        if (entered) {
+            this.transit = {
+                from: prev,
+                to: next,
+                t: 0,
+                dur: 2.75,
+                line: '',
+                title: translate(THEME[next].name),
+            };
+            audioManager.playTransit(next);
         }
+        audioManager.setScene(next, this.local, waveIndex % 6 === 5);
         return changed;
     }
 
@@ -377,6 +413,11 @@ export class OrganDirector {
         }
         if (this.whiteout > 0) this.whiteout = Math.max(0, this.whiteout - dt);
         if (this.storm > 0) this.storm = Math.max(0, this.storm - dt * 1.35);
+        if (this.transit) {
+            this.transit.t += dt;
+            if (this.transit.t >= this.transit.dur) this.transit = null;
+            return;
+        }
 
         if (!live || !hooks.player.active) return;
 
@@ -480,7 +521,7 @@ export class OrganDirector {
         if (this.local >= 2) {
             this.fluorideClock -= dt;
             if (this.fluorideClock <= 0) {
-                this.fluorideClock = (20 - this.local * 0.6) / pace;
+                this.fluorideClock = (26 - this.local * 0.6) / pace;
                 this.spawnPickup(PICK_FLUORIDE, '#e7fff8');
             }
         }
@@ -673,7 +714,7 @@ export class OrganDirector {
         if (this.local >= 1) {
             this.glycogenClock -= dt;
             if (this.glycogenClock <= 0) {
-                this.glycogenClock = (17 - this.local * 0.4) / pace;
+                this.glycogenClock = (22 - this.local * 0.4) / pace;
                 this.spawnPickup(PICK_GLYCOGEN, '#ffe08a');
             }
         }
@@ -712,13 +753,24 @@ export class OrganDirector {
     }
 
     private tickHeart(dt: number, pace: number, hooks: OrganHooks) {
-        const period = Math.max(0.58, 0.9 - this.local * 0.045 - this.pastWall * 0.02);
-        this.heartBeat += dt;
-        const phase = (this.heartBeat % period) / period;
-        this.pulse = Math.exp(-phase * 14);
-        if (phase < 0.08 && this.systoleT <= 0) {
-            this.beatN++;
-            this.systoleT = 0.16;
+        const glow = audioManager.heartGlow();
+        if (glow >= 0) {
+            this.pulse = glow;
+            if (glow > 0.82 && this.systoleT <= 0 && !this.lubLatch) {
+                this.lubLatch = true;
+                this.beatN++;
+                this.systoleT = 0.16;
+            }
+            if (glow < 0.28) this.lubLatch = false;
+        } else {
+            const period = Math.max(0.58, 0.9 - this.local * 0.045 - this.pastWall * 0.02);
+            this.heartBeat += dt;
+            const phase = (this.heartBeat % period) / period;
+            this.pulse = Math.exp(-phase * 14);
+            if (phase < 0.08 && this.systoleT <= 0) {
+                this.beatN++;
+                this.systoleT = 0.16;
+            }
         }
         if (this.systoleT > 0) {
             const kick = Math.min(1, this.systoleT / 0.1);
@@ -734,13 +786,18 @@ export class OrganDirector {
 
         if (this.local >= 1) {
             this.ecgClock -= dt;
+            if (!this.ecgCue && this.ecgClock < 1.15 && this.ecgClock > 0) {
+                this.ecgCue = true;
+                audioManager.ecgApproach();
+            }
             if (this.ecgClock <= 0) {
+                this.ecgCue = false;
                 this.ecgClock = Math.max(10, (19 - this.local * 0.9) / pace);
+                audioManager.ecgPass();
                 const y = 170 + Math.random() * (CANVAS_HEIGHT - 340);
                 const shape = this.beatN % 4;
                 const spans = [0.56, 0.74, 0.64, 0.84];
                 this.traces.push({ y, x0: CANVAS_WIDTH + 20, age: -1.25, span: CANVAS_WIDTH * spans[shape], shape, hit: new Set(), playerHit: false });
-                audioManager.playHit();
                 hooks.shake(8);
                 if (this.local >= 3) {
                     const y2 = Math.max(140, Math.min(CANVAS_HEIGHT - 140, y + (Math.random() < 0.5 ? -240 : 240)));
@@ -758,7 +815,7 @@ export class OrganDirector {
             if (c.age >= 0) {
                 if (!c.loose) {
                     c.loose = true;
-                    audioManager.playHit();
+                    audioManager.playClot();
                 }
                 c.x += c.vx * dt;
                 c.y += Math.sin(c.age * 1.3 + c.spin) * 22 * dt;
@@ -828,7 +885,7 @@ export class OrganDirector {
         if (this.local >= 1) {
             this.oxygenClock -= dt;
             if (this.oxygenClock <= 0) {
-                this.oxygenClock = (16 - this.local * 0.5) / pace;
+                this.oxygenClock = (21 - this.local * 0.5) / pace;
                 this.spawnPickup(PICK_OXYGEN, '#9aefff');
             }
         }
@@ -850,6 +907,8 @@ export class OrganDirector {
             if (this.lungT <= 0) {
                 this.lungPhase = 'gust';
                 this.lungT = 1.2;
+                audioManager.playBreath();
+                audioManager.lungPush(Math.min(0.12, Math.hypot(this.gust.x, this.gust.y) * 0.012));
             }
         } else if (this.lungPhase === 'gust') {
             this.wind.x = this.gust.x;
@@ -866,7 +925,8 @@ export class OrganDirector {
                 this.lungT = 0.72;
                 this.coughPlayer = false;
                 this.coughBosses.clear();
-                audioManager.playSurge();
+                audioManager.playCough();
+                audioManager.lungPush(-0.08);
                 hooks.shake(28);
                 buzz('thud');
             }
@@ -891,12 +951,15 @@ export class OrganDirector {
             this.coughPlayer = false;
             this.coughBosses.clear();
             this.say('ALERT_COUGH', '#ff5a6a');
+            audioManager.playBreath();
+            audioManager.lungPush(-0.05);
             return;
         }
         const roll = Math.random();
         this.gust = roll < 0.45 ? { x: -8.6, y: 0 } : roll < 0.75 ? { x: -6.4, y: -4.6 } : { x: -6.4, y: 4.6 };
         this.lungPhase = 'telegraph';
         this.lungT = 0.6;
+        audioManager.playBreath();
     }
 
     private restLung(pace: number) {
@@ -908,7 +971,7 @@ export class OrganDirector {
         if (this.local >= 1) {
             this.dopamineClock -= dt;
             if (this.dopamineClock <= 0) {
-                this.dopamineClock = (18 - this.local * 0.4) / pace;
+                this.dopamineClock = (24 - this.local * 0.4) / pace;
                 this.spawnPickup(PICK_DOPAMINE, '#e2c6ff');
             }
         }
@@ -2420,6 +2483,93 @@ export class OrganDirector {
         }
         ctx.restore();
     }
+
+    drawTransit(ctx: CanvasRenderingContext2D) {
+        const tr = this.transit;
+        if (!tr) return;
+        const u = Math.max(0, Math.min(1, tr.t / tr.dur));
+        const veil = Math.sin(Math.PI * Math.min(1, u * 1.05)) * 0.78;
+        const from = THEME[tr.from];
+        const to = THEME[tr.to];
+        const head = -180 + (CANVAS_WIDTH + 360) * easeInOut(u);
+        ctx.save();
+        ctx.fillStyle = `rgba(4, 0, 2, ${veil})`;
+        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+        ctx.globalAlpha = 0.9;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = from.accent;
+        ctx.lineWidth = 46;
+        ctx.beginPath();
+        const y0 = CANVAS_HEIGHT * 0.5;
+        ctx.moveTo(-60, y0);
+        ctx.bezierCurveTo(CANVAS_WIDTH * 0.22, CANVAS_HEIGHT * 0.18, CANVAS_WIDTH * 0.62, CANVAS_HEIGHT * 0.84, head, y0);
+        ctx.stroke();
+        ctx.strokeStyle = to.accent;
+        ctx.lineWidth = 14;
+        ctx.globalAlpha = 0.85;
+        ctx.stroke();
+
+        for (let i = 0; i < 16; i++) {
+            const p = (u * 1.35 + i / 16) % 1;
+            const x = -60 + (head + 60) * p;
+            const bend = Math.sin(p * Math.PI) ;
+            const y = y0 + Math.sin(p * 6.2 + i) * 70 * bend - (tr.to === 'liver' ? (1 - p) * 40 : 0);
+            ctx.globalAlpha = 0.35 + 0.5 * Math.sin(p * Math.PI);
+            if (tr.to === 'heart') {
+                ctx.fillStyle = i % 2 ? '#ff5a6a' : '#7a1020';
+                ctx.beginPath();
+                ctx.ellipse(x, y, 16, 11, p * 4, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (tr.to === 'lung') {
+                ctx.strokeStyle = '#f3c3ce';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(x - 28, y);
+                ctx.quadraticCurveTo(x, y - 18, x + 36, y + 6);
+                ctx.stroke();
+            } else if (tr.to === 'brain') {
+                ctx.strokeStyle = '#c9a6ff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(x - 20, y);
+                ctx.lineTo(x - 6, y - 16);
+                ctx.lineTo(x + 4, y + 10);
+                ctx.lineTo(x + 22, y - 8);
+                ctx.stroke();
+            } else if (tr.to === 'liver') {
+                ctx.fillStyle = '#d6e36a';
+                ctx.beginPath();
+                ctx.ellipse(x, y + 18, 8, 14, 0, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                ctx.fillStyle = '#e7eef4';
+                ctx.beginPath();
+                ctx.arc(x, y, 7, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        if (u > 0.58) {
+            ctx.globalAlpha = (u - 0.58) / 0.42;
+            ctx.fillStyle = to.bg;
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        }
+
+        if (u > 0.16 && u < 0.9) {
+            const fade = Math.min(1, (u - 0.16) / 0.12) * Math.min(1, (0.9 - u) / 0.14);
+            ctx.globalAlpha = fade;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = '#fff8f4';
+            ctx.font = '700 40px "Chakra Petch", sans-serif';
+            wrapText(ctx, tr.line, CANVAS_WIDTH / 2, CANVAS_HEIGHT * 0.4, CANVAS_WIDTH * 0.72, 52);
+            ctx.font = '800 64px "Chakra Petch", sans-serif';
+            ctx.fillStyle = to.accent;
+            ctx.fillText(tr.title, CANVAS_WIDTH / 2, CANVAS_HEIGHT * 0.62);
+        }
+        ctx.restore();
+    }
 }
 
 function pqrst(t: number, shape: number): number {
@@ -2487,6 +2637,29 @@ function popIn(t: number): number {
     const u = Math.max(0, Math.min(1, t)) - 1;
     const c = 1.55;
     return 1 + (c + 1) * u * u * u + c * u * u;
+}
+
+function easeInOut(t: number): number {
+    const u = Math.max(0, Math.min(1, t));
+    return u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+}
+
+function wrapText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, maxWidth: number, lineHeight: number) {
+    const words = text.split(' ');
+    const lines: string[] = [];
+    let line = '';
+    for (const word of words) {
+        const test = line ? `${line} ${word}` : word;
+        if (ctx.measureText(test).width > maxWidth && line) {
+            lines.push(line);
+            line = word;
+        } else {
+            line = test;
+        }
+    }
+    if (line) lines.push(line);
+    const top = y - ((lines.length - 1) * lineHeight) / 2;
+    lines.forEach((row, i) => ctx.fillText(row, x, top + i * lineHeight));
 }
 
 function mixHex(a: string, b: string, t: number): string {

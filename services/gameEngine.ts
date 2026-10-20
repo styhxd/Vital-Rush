@@ -174,7 +174,7 @@ export class GameEngine {
   public forceHighQuality: boolean = false; // Override flag
   public allowSerum: boolean = true;
 
-  private serumClock: number = 8;
+  private serumClock: number = 18;
   private serumIntroduced: boolean = false;
   private serumReady: boolean = false;
   private hpMilestoneSent: boolean = false;
@@ -191,6 +191,7 @@ export class GameEngine {
     this.canvas.width = CANVAS_WIDTH;
     this.canvas.height = CANVAS_HEIGHT;
     this.patient = patient;
+    this.organ.setRoute(patient.route);
     this.currentDifficulty = difficulty;
     this.difficultyMods = DIFFICULTY_MODIFIERS[difficulty];
     this.colors = theme;
@@ -207,7 +208,23 @@ export class GameEngine {
     for (let i = 0; i < cellBudget(this.organ.id); i++) this.spawnBackgroundCell(true);
   }
 
-  public setLanguage(lang: Language) { this.language = lang; }
+  public setLanguage(lang: Language) {
+      this.language = lang;
+      this.organ.setLanguage(lang);
+  }
+
+  private configFor(waveIndex: number): WaveConfig {
+      const base = WAVES[waveIndex % WAVES.length];
+      const lap = Math.floor(waveIndex / WAVES.length);
+      if (lap <= 0) return { ...base, waveNumber: waveIndex + 1 };
+      const tighten = Math.pow(0.9, lap);
+      return {
+          ...base,
+          waveNumber: waveIndex + 1,
+          spawnRate: Math.max(460, Math.round(base.spawnRate * tighten)),
+          flowSpeed: base.flowSpeed * (1 + Math.min(0.35, lap * 0.06)),
+      };
+  }
   private t(key: string): string { return TEXTS[this.language][key] || key; }
 
   public consumeSerum(): boolean {
@@ -311,6 +328,7 @@ export class GameEngine {
       hp *= this.difficultyMods.hp;
       dmg *= this.difficultyMods.dmg;
       val *= this.difficultyMods.score;
+      radius *= this.difficultyMods.bulk ?? 1;
       
       // A rampa vai até a onda 30. O expoente da parede só entra depois do cérebro.
       const pastTheWall = wavesPastTheWall(this.currentWaveIndex);
@@ -477,7 +495,7 @@ export class GameEngine {
           audioManager.playExplosion();
 
           // O power-up voando cobre parte da progressão, então a biomassa cai um pouco.
-          const dnaYield = 0.8;
+          const dnaYield = 1.15;
           this.entities.push({
               id: `dna_${Date.now()}`,
               type: EntityType.DNA_FRAGMENT,
@@ -557,6 +575,7 @@ export class GameEngine {
   public handlePlayerDeath(onGameOver: () => void, onLifeLost: () => void, currentStats: PlayerStats) {
       if (this.lives > 0) {
           this.lives--;
+          audioManager.playCrack();
           onLifeLost(); 
           this.hitStopTimer = 0.2; 
           achievementManager.track('die_10', 1);
@@ -637,13 +656,12 @@ export class GameEngine {
     this.clearBufferTimer = 0; 
     this.isVacuuming = false;  
     this.vacuumingTimer = 0;
-    this.waveStartDelay = delay;
-
     const waveNum = waveIndex + 1;
     audioManager.setGameState(waveNum, 1.0);
-    const config = WAVES[Math.min(waveIndex, WAVES.length - 1)];
+    const config = this.configFor(waveIndex);
     this.bloodFlow.x = config.flowSpeed;
     const changed = this.organ.onWave(waveIndex, (key) => this.t(key));
+    this.waveStartDelay = Math.max(delay, this.organ.transitLeft());
     if (changed) {
         for (const p of this.particles) {
             if (p.id === 'bg') { p.damage = 1; p.health = 1; }
@@ -1015,7 +1033,7 @@ export class GameEngine {
           this.waveStartDelay -= dtSeconds;
       } else {
           this.waveTimer += dtSeconds;
-          const config = WAVES[Math.min(this.currentWaveIndex, WAVES.length - 1)];
+          const config = this.configFor(this.currentWaveIndex);
           const targetFlow = config.flowSpeed; 
           this.bloodFlow.x = this.bloodFlow.x * 0.95 + targetFlow * 0.05;
           
@@ -1061,7 +1079,7 @@ export class GameEngine {
                   this.serumClock -= dtSeconds;
                   if (this.serumClock <= 0) {
                       this.spawnSerum();
-                      this.serumClock = 46 + Math.random() * 16;
+                      this.serumClock = 74 + Math.random() * 28;
                   }
               }
           }
@@ -2870,5 +2888,6 @@ export class GameEngine {
     this.organ.drawHazards(this.ctx, this.player, this.isLowQuality);
 
     this.ctx.restore();
+    this.organ.drawTransit(this.ctx);
   }
 }

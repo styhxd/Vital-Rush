@@ -59,6 +59,8 @@ export enum GameState {
 // "Por que não usou uma lib pronta?" Porque eu gosto de sofrer.
 export type Language = 'EN' | 'PT' | 'ES';
 
+export type OrganId = 'molar' | 'liver' | 'heart' | 'lung' | 'brain';
+
 // Níveis de masoquismo.
 export enum Difficulty {
   EASY = 'TRIAGE',       // Jornalista de games
@@ -81,6 +83,7 @@ export interface PatientProfile {
   name: string;
   age: number;
   symptoms: string;
+  route: OrganId[];
   strain: ViralStrain;
   difficultyMultiplier: number;
 }

@@ -90,13 +90,14 @@ export const INITIAL_STATS = {
   surgeRadiusMult: 1.0
 };
 
-// O peso da dificuldade muda o corpo dos bichos, o dano e o quanto cabem na tela.
-// A velocidade sobe pouco: o fim do jogo continua legível.
+// O Normal de hoje é o Expert antigo com o Titã Blindado já no corpo dos bichos.
+// Easy ficou com o Normal de antes. Hard e Expert sobem a partir daí.
+// crowd maior = mais espaço entre spawns. bulk = tamanho.
 export const DIFFICULTY_MODIFIERS = {
-  [Difficulty.EASY]: { hp: 0.72, dmg: 0.6, speed: 0.7, score: 0.9, crowd: 1.25, cap: 12 },
-  [Difficulty.NORMAL]: { hp: 1, dmg: 1, speed: 0.86, score: 1, crowd: 1, cap: 16 },
-  [Difficulty.HARD]: { hp: 1.4, dmg: 1.3, speed: 0.96, score: 1.15, crowd: 0.92, cap: 20 },
-  [Difficulty.APEX]: { hp: 1.85, dmg: 1.65, speed: 1.05, score: 1.3, crowd: 0.84, cap: 24 },
+  [Difficulty.EASY]: { hp: 1, dmg: 1, speed: 0.86, score: 1, crowd: 1, cap: 16, bulk: 1 },
+  [Difficulty.NORMAL]: { hp: 3.7, dmg: 1.65, speed: 0.78, score: 1.4, crowd: 1.13, cap: 20, bulk: 1.16 },
+  [Difficulty.HARD]: { hp: 4.9, dmg: 2.15, speed: 0.88, score: 1.6, crowd: 1.02, cap: 26, bulk: 1.22 },
+  [Difficulty.APEX]: { hp: 6.4, dmg: 2.7, speed: 0.98, score: 1.85, crowd: 0.92, cap: 30, bulk: 1.28 },
 };
 
 export const PATIENT_NAMES: Record<Language, { first: string[]; last: string[] }> = {
@@ -276,6 +277,7 @@ export const TEXTS: TranslationMap = {
     SYMPTOM_MUTATION: "Rapid Mutation",
     // HUD & In-Game Text
     LABEL_SYMPTOMS: "SYMPTOMS",
+    LABEL_ROUTE: "ROUTE",
     LABEL_ID: "ID",
     LABEL_AUDIO: "AUDIO",
     LABEL_OVERRIDE: "SYSTEM OVERRIDE",
@@ -297,10 +299,10 @@ export const TEXTS: TranslationMap = {
     ORG_HEART: "HEART",
     ORG_LUNG: "LUNG",
     ORG_BRAIN: "BRAIN",
-    ORG_ENTER_LIVER: "DESCENDING — LIVER",
-    ORG_ENTER_HEART: "DESCENDING — HEART",
-    ORG_ENTER_LUNG: "GOING BAD — LUNG",
-    ORG_ENTER_BRAIN: "LAST STOP — BRAIN",
+    ORG_ENTER_LIVER: "LIVER",
+    ORG_ENTER_HEART: "HEART",
+    ORG_ENTER_LUNG: "LUNG",
+    ORG_ENTER_BRAIN: "BRAIN",
     ALERT_COUGH: "ALARM: COUGH!",
     COUGH_WORD: "COUGH",
     ALERT_BITE: "BITE",
@@ -571,6 +573,7 @@ export const TEXTS: TranslationMap = {
     SYMPTOM_MUTATION: "Mutação Rápida",
     // HUD & In-Game Text
     LABEL_SYMPTOMS: "SINTOMAS",
+    LABEL_ROUTE: "ROTA",
     LABEL_ID: "ID",
     LABEL_AUDIO: "ÁUDIO",
     LABEL_OVERRIDE: "SOBREPOSIÇÃO DE SISTEMA",
@@ -592,10 +595,10 @@ export const TEXTS: TranslationMap = {
     ORG_HEART: "CORAÇÃO",
     ORG_LUNG: "PULMÃO",
     ORG_BRAIN: "CÉREBRO",
-    ORG_ENTER_LIVER: "DESCENDO — FÍGADO",
-    ORG_ENTER_HEART: "SEGUINDO — CORAÇÃO",
-    ORG_ENTER_LUNG: "DEU RUIM — PULMÃO",
-    ORG_ENTER_BRAIN: "ÚLTIMA PARADA — CÉREBRO",
+    ORG_ENTER_LIVER: "FÍGADO",
+    ORG_ENTER_HEART: "CORAÇÃO",
+    ORG_ENTER_LUNG: "PULMÃO",
+    ORG_ENTER_BRAIN: "CÉREBRO",
     ALERT_COUGH: "ALARME: TOSSE!",
     COUGH_WORD: "TOSSE",
     ALERT_BITE: "MORDIDA",
@@ -866,6 +869,7 @@ export const TEXTS: TranslationMap = {
     SYMPTOM_MUTATION: "Mutación Rápida",
     // HUD & In-Game Text
     LABEL_SYMPTOMS: "SÍNTOMAS",
+    LABEL_ROUTE: "RUTA",
     LABEL_ID: "ID",
     LABEL_AUDIO: "AUDIO",
     LABEL_OVERRIDE: "ANULACIÓN DEL SISTEMA",
@@ -887,10 +891,10 @@ export const TEXTS: TranslationMap = {
     ORG_HEART: "CORAZÓN",
     ORG_LUNG: "PULMÓN",
     ORG_BRAIN: "CEREBRO",
-    ORG_ENTER_LIVER: "BAJANDO — HÍGADO",
-    ORG_ENTER_HEART: "SIGUIENDO — CORAZÓN",
-    ORG_ENTER_LUNG: "SE PONE FEO — PULMÓN",
-    ORG_ENTER_BRAIN: "ÚLTIMA PARADA — CEREBRO",
+    ORG_ENTER_LIVER: "HÍGADO",
+    ORG_ENTER_HEART: "CORAZÓN",
+    ORG_ENTER_LUNG: "PULMÓN",
+    ORG_ENTER_BRAIN: "CEREBRO",
     ALERT_COUGH: "ALARMA: ¡TOS!",
     COUGH_WORD: "TOS",
     ALERT_BITE: "MORDIDA",

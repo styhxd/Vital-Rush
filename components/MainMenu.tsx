@@ -203,6 +203,7 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
             (elem as any).webkitRequestFullscreen();
         }
         
+        audioManager.menuAccent('play');
         props.onStart();
         audioManager.startMenuMusic();
     };
@@ -359,7 +360,7 @@ const MenuContent = (props: MainMenuProps & { align: 'left' | 'center' }) => {
                 <div className={`text-[10px] lg:text-xs text-gray-500 tracking-widest mb-0.5 lg:mb-2 ${isLeft ? 'text-left' : 'text-center'}`}>{t('DIFFICULTY')}</div>
                 <div className="grid grid-cols-4 gap-1.5 lg:gap-2">
                     {Object.values(Difficulty).map(d => (
-                        <button key={d} data-menu-hit="" onClick={() => onDifficultyChange(d)} className={`text-[9px] lg:text-[10px] font-bold py-1 lg:py-2 border transition-all ${difficulty === d ? 'bg-red-600 text-black border-red-600' : 'bg-transparent text-gray-500 border-gray-800'}`}>
+                        <button key={d} data-menu-hit="" onClick={() => { audioManager.menuAccent('diff'); onDifficultyChange(d); }} className={`text-[9px] lg:text-[10px] font-bold py-1 lg:py-2 border transition-all ${difficulty === d ? 'bg-red-600 text-black border-red-600' : 'bg-transparent text-gray-500 border-gray-800'}`}>
                             {t(`DIFF_${d}`)}
                         </button>
                     ))}
@@ -369,17 +370,17 @@ const MenuContent = (props: MainMenuProps & { align: 'left' | 'center' }) => {
             <div className={`space-y-1.5 lg:space-y-4 w-full ${isLeft ? 'max-w-md' : ''}`}>
                 <MenuButton onClick={onStart}>{t('START')}</MenuButton>
                 <div className="grid grid-cols-2 gap-2 lg:gap-4">
-                  <MenuButton variant="secondary" onClick={onSettings}>{t('MENU_CONFIG')}</MenuButton>
-                  <MenuButton variant="secondary" onClick={onManual}>{t('MENU_EXTRAS')}</MenuButton>
+                  <MenuButton variant="secondary" onClick={() => { audioManager.menuAccent('config'); onSettings(); }}>{t('MENU_CONFIG')}</MenuButton>
+                  <MenuButton variant="secondary" onClick={() => { audioManager.menuAccent('extras'); onManual(); }}>{t('MENU_EXTRAS')}</MenuButton>
                 </div>
                 <div className="grid grid-cols-2 gap-2 lg:gap-4">
-                  <MenuButton variant="secondary" onClick={onControls}>{t('MENU_INFO')}</MenuButton>
-                  <MenuButton variant="secondary" onClick={onAchievements}>{t('MENU_RANKING')}</MenuButton>
+                  <MenuButton variant="secondary" onClick={() => { audioManager.menuAccent('info'); onControls(); }}>{t('MENU_INFO')}</MenuButton>
+                  <MenuButton variant="secondary" onClick={() => { audioManager.menuAccent('ranking'); onAchievements(); }}>{t('MENU_RANKING')}</MenuButton>
                 </div>
                 
                 <div className={`flex gap-2 lg:gap-2 mt-2 lg:mt-6 ${isLeft ? 'justify-start' : 'justify-center'}`}>
                     {(['EN', 'PT', 'ES'] as Language[]).map(l => (
-                      <button key={l} data-menu-hit="" onClick={() => onLanguageChange(l)} className={`text-[10px] lg:text-sm font-bold tracking-widest px-3 lg:px-3 py-1 lg:py-2 border-b-2 transition-all flex items-center gap-2 ${language === l ? 'text-white border-red-500 bg-red-900/20' : 'text-gray-600 border-transparent hover:text-gray-400'}`}>
+                      <button key={l} data-menu-hit="" onClick={() => { audioManager.menuAccent('lang'); onLanguageChange(l); }} className={`text-[10px] lg:text-sm font-bold tracking-widest px-3 lg:px-3 py-1 lg:py-2 border-b-2 transition-all flex items-center gap-2 ${language === l ? 'text-white border-red-500 bg-red-900/20' : 'text-gray-600 border-transparent hover:text-gray-400'}`}>
                         {l}
                       </button>
                     ))}

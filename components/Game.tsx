@@ -6,7 +6,8 @@ import { organAccent, organNameKey, organVeinStyle, type OrganId } from '../serv
 import { audioManager } from '../services/audioManager';
 import { achievementManager } from '../services/achievementManager';
 import { GameState, PlayerStats, Upgrade, WaveConfig, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
-import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES, SYMPTOMS_KEYS, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES, ADRENALINE_MAX_DURATION } from '../constants';
+import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES, ADRENALINE_MAX_DURATION } from '../constants';
+import { CANON_ROUTE, randomRoute } from '../services/casebook';
 import { Joystick } from './Joystick';
 import { PauseMenu } from './PauseMenu';
 import { SettingsMenu } from './SettingsMenu';
@@ -478,11 +479,10 @@ export const Game: React.FC = () => {
       setGameState(GameState.ACHIEVEMENTS);
   }, [gameState]);
 
-  const generatePatient = () => {
+  const generatePatient = (canon = false) => {
       const book = PATIENT_NAMES[language];
       const fName = book.first[Math.floor(Math.random() * book.first.length)];
       const lName = book.last[Math.floor(Math.random() * book.last.length)];
-      const symptomKey = SYMPTOMS_KEYS[Math.floor(Math.random() * SYMPTOMS_KEYS.length)];
       const strains = Object.values(ViralStrain);
       const strain = strains[Math.floor(Math.random() * strains.length)];
       
@@ -490,7 +490,8 @@ export const Game: React.FC = () => {
           id: Math.floor(Math.random() * 99999).toString(),
           name: `${fName} ${lName}`,
           age: Math.floor(Math.random() * 40) + 20,
-          symptoms: symptomKey, 
+          symptoms: 'ROUTE',
+          route: canon ? [...CANON_ROUTE] : randomRoute(),
           strain: strain,
           difficultyMultiplier: 1
       };
@@ -519,7 +520,7 @@ export const Game: React.FC = () => {
       };
 
       audioManager.init();
-      const newPatient = generatePatient();
+      const newPatient = generatePatient(true);
       setPatient(newPatient);
       const jump = waveNum - 1;
       engineRef.current = new GameEngine(canvasRef.current, godStats, newPatient, difficulty, colors);
@@ -584,7 +585,7 @@ export const Game: React.FC = () => {
             () => {
                 setGameState(GameState.WAVE_CLEARED);
                 audioManager.stopMusic();
-                audioManager.playPowerUp();
+                audioManager.playWaveClear();
                 setOutcomeBeat('win');
                 setOutcomeLeaving(false);
                 if (outcomeTimer.current) window.clearTimeout(outcomeTimer.current);
