@@ -12,6 +12,8 @@
 
 import type { OrganId } from '../types';
 
+export type DrumHit = 'kick' | 'snare' | 'hat' | 'tom';
+
 interface Score {
     bpm: number;
     root: number;
@@ -76,6 +78,12 @@ export class AudioManager {
   private lungNudge = 0;
   private lungPushUntil = 0;
   private reverbSend: GainNode | null = null;
+  private fireMs = 450;
+  private drumEvery = 4;
+  private lockedEvery = 0;
+  private grid: { t: number; sixteenth: number }[] = [];
+  private fallbackNext = 0;
+  private fallbackOrigin = 0;
   
   private timerID: number | null = null;
 
@@ -468,6 +476,13 @@ export class AudioManager {
   }
 
   public playShoot() { this.playBuffer('shoot', 0.6, Math.random()*2, 60); }
+  public playDash() { this.playBuffer('shoot', 0.28, 8, 40); }
+  public playBuy() {
+      if (!this.ctx || !this.sfxGain) return;
+      const t = this.ctx.currentTime;
+      this.tone(t, 740, 0.04, 'square', 0.045, 2800, this.sfxGain);
+      this.tone(t + 0.028, 988, 0.055, 'sine', 0.04, 3200, this.sfxGain);
+  }
   public playHit() { this.playBuffer('hit', 0.6, Math.random()*3, 60); }
   public playExplosion() { this.playBuffer('expl', 0.8, 0, 100); }
   public playPowerUp() { this.playBuffer('power', 0.5, 0, 80); }
@@ -501,6 +516,7 @@ export class AudioManager {
   }
 
   public setScene(organ: OrganId, local: number, boss: boolean) {
+      if (organ !== this.organ) this.lockedEvery = 0;
       this.organ = organ;
       this.layer = boss ? 6 : Math.min(6, local + 2);
       this.boss = boss;
@@ -518,30 +534,114 @@ export class AudioManager {
   }
 
   public ecgApproach() {
-      if (!this.ctx) return;
-      this.tempoMul = 1.08;
-      this.tempoBackAt = this.ctx.currentTime + 2.5;
+      if (!this.ctx || !this.sfxGain) return;
+      const t = this.ctx.currentTime;
+      this.tempoMul = 1.12;
+      this.tempoBackAt = t + 1.7;
+      for (let i = 0; i < 8; i++) this.pip(t + i * 0.125, 980, 0.04, 0.14);
   }
 
   public ecgPass() {
       if (!this.ctx || !this.sfxGain) return;
       const t = this.ctx.currentTime;
-      this.tempoMul = 1.08;
-      this.tempoBackAt = t + 1.35;
+      this.tempoMul = 1.06;
+      this.tempoBackAt = t + 1.5;
       const osc = this.ctx.createOscillator();
       const g = this.ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(520, t);
-      osc.frequency.linearRampToValueAtTime(880, t + 0.08);
-      osc.frequency.setValueAtTime(880, t + 0.7);
+      osc.frequency.setValueAtTime(640, t);
+      osc.frequency.linearRampToValueAtTime(760, t + 0.08);
+      osc.frequency.setValueAtTime(760, t + 1.05);
+      osc.frequency.linearRampToValueAtTime(520, t + 1.35);
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.22, t + 0.04);
-      g.gain.setValueAtTime(0.18, t + 0.7);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.05);
+      g.gain.exponentialRampToValueAtTime(0.2, t + 0.03);
+      g.gain.setValueAtTime(0.16, t + 1.05);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
       osc.connect(g);
       g.connect(this.sfxGain);
       osc.start(t);
-      osc.stop(t + 1.1);
+      osc.stop(t + 1.45);
+  }
+
+  public playBiteWarn() {
+      if (!this.ctx || !this.sfxGain) return;
+      const t = this.ctx.currentTime;
+      this.tone(t, 210, 0.35, 'sawtooth', 0.05, 700, this.sfxGain);
+      this.tone(t + 0.16, 140, 0.4, 'triangle', 0.06, 500, this.sfxGain);
+  }
+
+  public playBite() {
+      if (!this.ctx || !this.sfxGain) return;
+      const t = this.ctx.currentTime;
+      this.puff(0.07, 2200, 0.42);
+      this.puff(0.14, 320, 0.28);
+      this.tone(t, 180, 0.12, 'square', 0.12, 900, this.sfxGain);
+      this.tone(t + 0.05, 70, 0.22, 'sine', 0.2, 240, this.sfxGain);
+  }
+
+  public playBubble() {
+      if (!this.ctx || !this.sfxGain) return;
+      const t = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      const start = 420 + Math.random() * 380;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(start, t);
+      osc.frequency.exponentialRampToValueAtTime(90 + Math.random() * 40, t + 0.11);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.11, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
+      osc.connect(g);
+      g.connect(this.sfxGain);
+      osc.start(t);
+      osc.stop(t + 0.14);
+  }
+
+  public playSuction() {
+      if (!this.ctx || !this.sfxGain) return;
+      const t = this.ctx.currentTime;
+      this.puff(0.7, 600, 0.16);
+      this.tone(t, 320, 0.7, 'sine', 0.06, 900, this.sfxGain);
+  }
+
+  public playGulp() {
+      this.playBubble();
+      window.setTimeout(() => this.playBubble(), 70);
+      if (!this.ctx || !this.sfxGain) return;
+      this.tone(this.ctx.currentTime, 90, 0.2, 'sine', 0.12, 300, this.sfxGain);
+  }
+
+  public playDrip() {
+      this.playBubble();
+  }
+
+  public playWet() {
+      this.puff(0.22, 700, 0.14);
+      this.playBubble();
+  }
+
+  public playZap() {
+      if (!this.ctx || !this.sfxGain) return;
+      const t = this.ctx.currentTime;
+      this.puff(0.06, 3200, 0.22);
+      this.tone(t, 1400, 0.08, 'square', 0.07, 4000, this.sfxGain);
+      this.tone(t + 0.04, 220, 0.12, 'sawtooth', 0.06, 1200, this.sfxGain);
+  }
+
+  public playStick() {
+      this.puff(0.1, 240, 0.2);
+  }
+
+  public playGlyph() {
+      if (!this.ctx || !this.sfxGain) return;
+      this.pip(this.ctx.currentTime, 1480, 0.018, 0.035);
+  }
+
+  public playPage() {
+      if (!this.ctx || !this.sfxGain) return;
+      const t = this.ctx.currentTime;
+      this.tone(t, 520, 0.08, 'triangle', 0.07, 1800, this.sfxGain);
+      this.tone(t + 0.06, 780, 0.1, 'sine', 0.05, 2000, this.sfxGain);
   }
 
   public lungPush(amount: number) {
@@ -550,17 +650,35 @@ export class AudioManager {
       this.lungPushUntil = this.ctx.currentTime + 0.85;
   }
 
-  public playBreath() { this.puff(0.32, 900, 0.16); }
+  public playBreath(kind: 'in' | 'out' = 'out') {
+      if (!this.ctx || !this.sfxGain) return;
+      const t = this.ctx.currentTime;
+      const dur = kind === 'in' ? 0.5 : 0.9;
+      this.puff(dur, kind === 'in' ? 520 : 1500, kind === 'in' ? 0.1 : 0.2);
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(kind === 'in' ? 130 : 80, t);
+      osc.frequency.linearRampToValueAtTime(kind === 'in' ? 210 : 150, t + dur * 0.65);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(kind === 'in' ? 0.07 : 0.12, t + dur * 0.4);
+      g.gain.linearRampToValueAtTime(0.0001, t + dur);
+      osc.connect(g);
+      g.connect(this.sfxGain);
+      osc.start(t);
+      osc.stop(t + dur + 0.02);
+  }
   public playCough() {
       this.puff(0.12, 420, 0.28);
       window.setTimeout(() => this.puff(0.1, 280, 0.22), 90);
       window.setTimeout(() => this.puff(0.16, 180, 0.18), 180);
   }
   public playClot() {
+      this.playBubble();
+      window.setTimeout(() => this.playBubble(), 80);
+      window.setTimeout(() => this.playBubble(), 150);
       if (!this.ctx || !this.sfxGain) return;
-      const t = this.ctx.currentTime;
-      this.tone(t, 78, 0.22, 'sine', 0.35, 240, this.sfxGain);
-      this.puff(0.14, 220, 0.2);
+      this.tone(this.ctx.currentTime, 70, 0.28, 'sine', 0.16, 220, this.sfxGain);
   }
   public playCrack() {
       if (!this.ctx || !this.sfxGain) return;
@@ -620,6 +738,7 @@ export class AudioManager {
     this.isPlaying = false;
     this.currentTrack = 'NONE';
     this.lubAt = -1;
+    this.grid = [];
     if (this.timerID !== null) {
         window.clearTimeout(this.timerID);
         this.timerID = null;
@@ -640,6 +759,8 @@ export class AudioManager {
       this.isPlaying = true;
       this.currentTrack = track;
       this.current16thNote = 0;
+      this.lockedEvery = 0;
+      this.grid = [];
       this.nextNoteTime = this.ctx.currentTime + 0.1;
       this.scheduler();
   }
@@ -681,8 +802,141 @@ export class AudioManager {
       return score.root * Math.pow(2, semi / 12);
   }
 
+  public armGun(intervalMs: number) {
+      this.fireMs = Math.max(40, intervalMs);
+  }
+
+  /** Próximo tiro que caiu na grade. Slots velhos são comidos, sem rajada. */
+  public takeDrum(): DrumHit | null {
+      const ctx = this.ctx;
+      const clock = !!ctx && ctx.state === 'running' && this.currentTrack === 'GAME';
+      if (!clock || !ctx) return this.takeFallback();
+      this.fallbackNext = 0;
+      const every = this.pickEvery(this.fireMs, this.liveBpm());
+      this.drumEvery = every;
+      const now = ctx.currentTime;
+      let hit: DrumHit | null = null;
+      let cut = 0;
+      for (let i = 0; i < this.grid.length; i++) {
+          const slot = this.grid[i];
+          if (slot.t > now) break;
+          cut = i + 1;
+          if (now - slot.t > 0.06) continue;
+          if (slot.sixteenth % every !== 0) continue;
+          hit = this.drumVoice(slot.sixteenth, every);
+      }
+      if (cut) this.grid.splice(0, cut);
+      return hit;
+  }
+
+  private takeFallback(): DrumHit | null {
+      const now = performance.now();
+      const bpm = (this.currentTrack === 'MENU' ? SCORES.menu : SCORES[this.organ]).bpm;
+      const every = this.pickEvery(this.fireMs, bpm);
+      this.drumEvery = every;
+      const sixteenth = (60000 / bpm) / 4;
+      const step = sixteenth * every;
+      if (this.fallbackNext <= 0) {
+          this.fallbackOrigin = now;
+          this.fallbackNext = now;
+      }
+      if (now + 12 < this.fallbackNext) return null;
+      if (now - this.fallbackNext > step) {
+          this.fallbackNext += Math.floor((now - this.fallbackNext) / step) * step;
+      }
+      const slot = this.fallbackNext;
+      this.fallbackNext += step;
+      const index = Math.round((slot - this.fallbackOrigin) / sixteenth);
+      return this.drumVoice(((index % 16) + 16) % 16, every);
+  }
+
+  public playDrum(kind: DrumHit) {
+      if (!this.ctx || !this.musicGain || this.ctx.state !== 'running') return;
+      const t = this.ctx.currentTime;
+      const root = SCORES[this.organ].root;
+      const dest = this.musicGain;
+      if (kind === 'kick') {
+          const start = Math.max(48, root * 0.9);
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(start, t);
+          osc.frequency.exponentialRampToValueAtTime(Math.max(32, root * 0.34), t + 0.09);
+          g.gain.setValueAtTime(0.0001, t);
+          g.gain.exponentialRampToValueAtTime(0.5, t + 0.006);
+          g.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+          osc.connect(g);
+          g.connect(dest);
+          osc.start(t);
+          osc.stop(t + 0.15);
+          this.tone(t, start * 1.4, 0.02, 'triangle', 0.06, 420, dest);
+      } else if (kind === 'snare') {
+          this.tone(t, root * 1.5, 0.08, 'triangle', 0.16, 1800, dest);
+          this.puff(0.07, 2100, 0.08, t);
+      } else if (kind === 'hat') {
+          this.puff(0.025, 6800, 0.04, t);
+      } else {
+          this.tone(t, root, 0.06, 'sine', 0.11, 900, dest);
+      }
+  }
+
+  private pickEvery(fireMs: number, bpm: number): number {
+      const sixteenth = (60000 / Math.max(40, bpm)) / 4;
+      const ladder = [8, 4, 2, 1];
+      const legal = ladder.filter((n) => n * sixteenth >= fireMs * 0.78);
+      const pool = legal.length ? legal : [8];
+      const err = (n: number) => Math.abs(Math.log((n * sixteenth) / fireMs));
+      let best = pool[0];
+      let bestErr = Infinity;
+      for (const n of pool) {
+          const e = err(n);
+          if (e < bestErr) { bestErr = e; best = n; }
+      }
+      if (!pool.includes(this.lockedEvery)) {
+          this.lockedEvery = best;
+          return best;
+      }
+      if (best !== this.lockedEvery && bestErr + 0.12 < err(this.lockedEvery)) this.lockedEvery = best;
+      return this.lockedEvery;
+  }
+
+  private drumVoice(sixteenth: number, every: number): DrumHit {
+      const s = sixteenth % 16;
+      if (s === 0) return 'kick';
+      if (s === 8) return every >= 8 ? 'snare' : 'kick';
+      if (s === 4 || s === 12) return 'snare';
+      if (s % 2 === 0) return 'hat';
+      return 'tom';
+  }
+
+  private colorHit(score: Score, chord: number, beat: number, time: number, vol: number, dest: AudioNode) {
+      const degree = chord + (beat % 4 === 0 ? 0 : beat % 4 === 2 ? 4 : 2);
+      const hi = this.hz(score, degree, score.color === 'murk' ? 0 : 1);
+      if (score.color === 'glass') {
+          this.tone(time, hi, 0.2, 'sine', vol, 2800, dest);
+          this.tone(time, hi * 2.01, 0.14, 'sine', vol * 0.32, 4200, dest);
+      } else if (score.color === 'murk') {
+          this.tone(time, hi, 0.3, 'triangle', vol * 0.9, 520, dest);
+      } else if (score.color === 'thump') {
+          this.tone(time, hi, 0.24, 'sine', vol, 900, dest);
+          this.tone(time, hi * 1.5, 0.2, 'triangle', vol * 0.35, 1200, dest);
+      } else if (score.color === 'air') {
+          this.tone(time, hi, 0.26, 'sine', vol, 1800, dest);
+          this.puff(0.1, 880, vol * 0.22, time);
+      } else if (score.color === 'spark') {
+          this.tone(time, hi, 0.1, 'square', vol * 0.4, 2400, dest);
+          this.tone(time, hi * 2, 0.07, 'sine', vol * 0.25, 3600, dest);
+      } else {
+          this.tone(time, hi, 0.22, 'triangle', vol, 1600, dest);
+      }
+  }
+
   private playStep(step: number, time: number) {
       if (!this.ctx || !this.musicGain) return;
+      if (this.currentTrack === 'GAME') {
+          this.grid.push({ t: time, sixteenth: step % 16 });
+          if (this.grid.length > 48) this.grid.splice(0, this.grid.length - 48);
+      }
       const menu = this.currentTrack === 'MENU';
       const key: OrganId | 'menu' = menu ? 'menu' : this.organ;
       const score = SCORES[key];
@@ -693,19 +947,17 @@ export class AudioManager {
       const dest = this.musicGain;
       const cut = score.color === 'murk' ? 520 : score.color === 'spark' ? 3200 : score.color === 'glass' ? 2400 : score.color === 'air' ? 1600 : 1400;
       const wave: OscillatorType = score.color === 'murk' || score.color === 'spark' ? 'sawtooth' : 'triangle';
+      const every = menu ? 4 : this.drumEvery;
 
       if (layers >= 1) {
           if (score.color === 'thump') {
               if (beat % 4 === 0) {
-                  this.tone(time, 58, 0.16, 'sine', 0.42, 180, dest);
-                  this.tone(time, 92, 0.08, 'triangle', 0.18, 400, dest);
+                  this.tone(time, 49, 0.4, 'sine', 0.16, 140, dest);
+                  this.tone(time, 98, 0.36, 'sine', 0.05, 240, dest);
                   this.lubAt = time;
-              } else if (beat % 4 === 1) {
-                  this.tone(time, 74, 0.07, 'sine', 0.16, 220, dest);
               }
-          } else if ([0, 6, 8, 14].includes(beat)) {
-              const vel = beat % 8 === 0 ? 0.34 : 0.18;
-              this.tone(time, score.root / 2, 0.12, 'sine', vel, 200, dest);
+          } else if (beat === 0 || beat === 8) {
+              this.tone(time, score.root / 2, 0.38, 'triangle', 0.16, 260, dest);
           }
       }
 
@@ -715,8 +967,14 @@ export class AudioManager {
           if (off > -50) this.tone(time, this.hz(score, chord + off, -1), 0.22, wave, 0.16, Math.min(cut, 700), dest);
       }
 
-      if (layers >= 3 && (beat % 2 === 1 || score.color === 'air' || score.color === 'glass')) {
-          this.puff(score.color === 'air' ? 0.09 : 0.04, score.color === 'glass' ? 2800 : 1800, score.color === 'air' ? 0.07 : 0.045, time);
+      if (layers >= 3) {
+          let play = false;
+          let vol = 0.06;
+          if (every >= 8) { play = beat === 4 || beat === 12; vol = 0.07; }
+          else if (every >= 4) { play = beat % 4 === 2; vol = 0.06; }
+          else if (every >= 2) { play = beat % 2 === 0; vol = 0.042; }
+          else { play = beat % 2 === 1; vol = 0.028; }
+          if (play) this.colorHit(score, chord, beat, time, vol, dest);
       }
 
       if (layers >= 4 && (beat === 0 || beat === 10)) {
@@ -734,6 +992,20 @@ export class AudioManager {
           const degree = lead[(Math.floor(step / 2) + 3) % lead.length];
           if (degree >= 0) this.tone(time, this.hz(score, degree + 4, 1), 0.28, 'sine', 0.05, cut, dest);
       }
+  }
+
+  private pip(time: number, freq: number, dur: number, vol: number) {
+      if (!this.ctx || !this.sfxGain) return;
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(freq, time);
+      g.gain.setValueAtTime(vol, time);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+      osc.connect(g);
+      g.connect(this.sfxGain);
+      osc.start(time);
+      osc.stop(time + dur + 0.02);
   }
 
   private tone(time: number, freq: number, dur: number, type: OscillatorType, vol: number, cutoff: number, dest: AudioNode) {

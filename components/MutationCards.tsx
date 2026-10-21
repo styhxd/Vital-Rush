@@ -93,16 +93,6 @@ const MutationCard: React.FC<CardProps> = ({
     const ink = RARITY_INK[upgrade.rarity];
     const art = ART[upgrade.id] ?? ART.mitosis;
     const pulsing = pulse?.id === upgrade.id ? pulse : null;
-    const [motion, setMotion] = useState('none');
-
-    useEffect(() => {
-        if (!pulsing) return;
-        setMotion('none');
-        const frame = requestAnimationFrame(() => {
-            setMotion(pulsing.kind === 'ok' ? 'lab-pop 0.48s ease' : 'lab-deny 0.4s ease');
-        });
-        return () => cancelAnimationFrame(frame);
-    }, [pulsing?.token]);
 
     const label = maxed
         ? t('MAXED')
@@ -123,6 +113,7 @@ const MutationCard: React.FC<CardProps> = ({
             aria-label={`${t(upgrade.nameKey)}. ${label}`}
             onClick={() => {
                 if (guard && !guard()) return;
+                if (mode === 'shop' && maxed) return;
                 onPress();
             }}
             onKeyDown={(event) => {
@@ -136,13 +127,15 @@ const MutationCard: React.FC<CardProps> = ({
                 ['--ink' as string]: ink,
                 ['--accent' as string]: art.tint,
                 ['--rank' as string]: rank,
-                animation: motion,
+                touchAction: 'manipulation',
             }}
         >
             <img className="lab-shell" src={CARD_BG} alt="" draggable={false} />
             <span className="lab-wash" style={{ background: wash }} />
             <span className="lab-art-glow" />
             <img className="lab-art" src={art.src} alt="" draggable={false} />
+            <span className="lab-shade" />
+            <span className="lab-snow" />
 
             <div className="lab-rarity">{t(RARITY_KEY[upgrade.rarity])}</div>
             <div className="lab-level">
@@ -171,11 +164,11 @@ const MutationCard: React.FC<CardProps> = ({
             <span className="lab-rim" />
 
             {pulsing?.kind === 'ok' && (
-                <>
+                <span key={pulsing.token}>
                     <span className="lab-flash" />
                     <span className="lab-burst" />
                     {mode === 'shop' && <span className="lab-float">-{pulsing.cost}</span>}
-                </>
+                </span>
             )}
             {pulsing?.kind === 'no' && <span className="lab-deny-flash" />}
         </div>
@@ -197,7 +190,6 @@ export const BioLab: React.FC<LabProps> = ({ upgrades, biomass, language, t, pul
     const [tick, setTick] = useState(false);
     const [showHint, setShowHint] = useState(false);
     const scrollerRef = useRef<HTMLDivElement>(null);
-    const dragRef = useRef({ down: false, y: 0, top: 0, moved: false });
 
     useEffect(() => {
         setTick(true);
@@ -222,30 +214,6 @@ export const BioLab: React.FC<LabProps> = ({ upgrades, biomass, language, t, pul
         };
     }, [upgrades.length]);
 
-    useEffect(() => {
-        const move = (event: PointerEvent) => {
-            const drag = dragRef.current;
-            const el = scrollerRef.current;
-            if (!drag.down || !el || event.pointerType !== 'mouse') return;
-            const dy = event.clientY - drag.y;
-            if (Math.abs(dy) > 8) {
-                drag.moved = true;
-                el.classList.add('is-grabbing');
-            }
-            if (drag.moved) el.scrollTop = drag.top - dy;
-        };
-        const up = () => {
-            dragRef.current.down = false;
-            scrollerRef.current?.classList.remove('is-grabbing');
-        };
-        window.addEventListener('pointermove', move);
-        window.addEventListener('pointerup', up);
-        return () => {
-            window.removeEventListener('pointermove', move);
-            window.removeEventListener('pointerup', up);
-        };
-    }, []);
-
     return (
         <div className="lab-screen">
             <div className="lab-veins" aria-hidden>
@@ -266,19 +234,7 @@ export const BioLab: React.FC<LabProps> = ({ upgrades, biomass, language, t, pul
                 </div>
             </header>
             <div className={`lab-tray ${showHint ? 'has-more' : ''}`}>
-                <div
-                    className="lab-grid"
-                    ref={scrollerRef}
-                    onPointerDown={(event) => {
-                        if (event.pointerType !== 'mouse' || event.button !== 0) return;
-                        dragRef.current = {
-                            down: true,
-                            y: event.clientY,
-                            top: event.currentTarget.scrollTop,
-                            moved: false,
-                        };
-                    }}
-                >
+                <div className="lab-grid" ref={scrollerRef}>
                     {upgrades.map((upgrade) => {
                         const cost = upgradeCost(upgrade);
                         const canAfford = biomass >= cost;
@@ -292,7 +248,6 @@ export const BioLab: React.FC<LabProps> = ({ upgrades, biomass, language, t, pul
                                 canAfford={canAfford}
                                 cost={cost}
                                 pulse={pulse}
-                                guard={() => !dragRef.current.moved}
                                 onPress={() => onBuy(upgrade.id)}
                             />
                         );
@@ -506,7 +461,7 @@ export const mutationCardStyles = `
     overflow-y: auto;
     align-content: start;
     justify-items: stretch;
-    cursor: grab;
+    cursor: auto;
     scrollbar-width: thin;
     scrollbar-color: #e2a01f rgba(255,255,255,0.06);
 }
@@ -516,8 +471,6 @@ export const mutationCardStyles = `
     background: repeating-linear-gradient(-52deg, #24180d 0 4px, #e2a01f 4px 8px);
     border-radius: 8px;
 }
-.lab-grid.is-grabbing,
-.lab-grid.is-grabbing .lab-card { cursor: grabbing; }
 .lab-more {
     position: relative;
     z-index: 2;
@@ -581,8 +534,9 @@ export const mutationCardStyles = `
     outline: none;
     user-select: none;
     transform: translateZ(0);
-    filter: drop-shadow(0 7px 0 rgba(0,0,0,0.4));
-    transition: transform 0.16s cubic-bezier(.2,.7,.2,1), filter 0.16s ease;
+    box-shadow: 0 7px 0 rgba(0,0,0,0.45);
+    transition: transform 0.08s ease, box-shadow 0.08s ease;
+    touch-action: manipulation;
 }
 .lab-shell, .lab-art {
     position: absolute;
@@ -682,7 +636,7 @@ export const mutationCardStyles = `
 }
 .lab-copy {
     position: absolute;
-    z-index: 2;
+    z-index: 3;
     left: 4.2%;
     top: 18.5%;
     width: 61%;
@@ -821,27 +775,68 @@ export const mutationCardStyles = `
     box-shadow: inset 0 0 0 calc(1px + var(--rank) * 5px) var(--ink);
     opacity: calc(0.08 + var(--rank) * 0.92);
 }
+.lab-shade {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    background: rgba(5, 7, 14, 0.72);
+    opacity: 0;
+    pointer-events: none;
+}
 .lab-card.is-hot { cursor: pointer; }
+.lab-card.is-hot .lab-evolve {
+    color: #ffe7a8;
+    text-shadow: 0 1px 0 #1a1008, 0 0 10px rgba(255, 196, 70, 0.85);
+}
 .lab-card.is-hot:hover,
 .lab-card.is-hot:focus-visible {
-    transform: translateY(-4px) scale(1.015);
-    filter: drop-shadow(0 10px 0 rgba(0,0,0,0.32)) drop-shadow(0 0 14px var(--ink));
+    transform: translateY(-3px);
+    box-shadow: 0 10px 0 rgba(0,0,0,0.35), 0 0 0 1px var(--ink);
 }
 .lab-card.is-hot:hover .lab-art,
-.lab-card.is-hot:focus-visible .lab-art { transform: scale(1.05) rotate(-3deg); }
+.lab-card.is-hot:focus-visible .lab-art { transform: scale(1.04); }
 .lab-card.is-hot:active {
-    transform: translateY(2px) scale(0.985);
-    filter: drop-shadow(0 2px 0 rgba(0,0,0,0.5));
-    transition-duration: 0.05s;
+    transform: translateY(1px);
+    box-shadow: 0 2px 0 rgba(0,0,0,0.5);
+    transition-duration: 0.04s;
 }
 .lab-card.is-hot:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-.lab-card.is-poor {
-    cursor: not-allowed;
-    filter: saturate(0.7) brightness(0.9) drop-shadow(0 7px 0 rgba(0,0,0,0.4));
+.lab-card.is-poor { cursor: default; }
+.lab-card.is-poor .lab-shade { opacity: 0.18; }
+.lab-card.is-poor .lab-art { filter: saturate(0.78) brightness(0.86) contrast(1.04); }
+.lab-card.is-poor .lab-snow { opacity: 0.72; }
+.lab-card.is-poor .lab-evolve { opacity: 1; color: #cbbfa8; text-shadow: none; }
+.lab-snow {
+    position: absolute;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    opacity: 0;
+    background:
+        repeating-linear-gradient(0deg, rgba(255,255,255,0.16) 0 1px, transparent 1px 4px),
+        repeating-linear-gradient(90deg, rgba(0,0,0,0.18) 0 2px, transparent 2px 5px);
+    mix-blend-mode: overlay;
+    animation: lab-snow 0.16s steps(3) infinite;
 }
-.lab-card.is-poor .lab-evolve { opacity: 1; color: #cfc6b6; }
+@keyframes lab-snow {
+    0% { background-position: 0 0, 0 0; }
+    50% { background-position: 0 3px, 4px 0; }
+    100% { background-position: 0 -2px, -3px 2px; }
+}
 .lab-card.is-max {
-    filter: saturate(1.15) drop-shadow(0 0 12px rgba(255, 208, 90, 0.4)) drop-shadow(0 7px 0 rgba(0,0,0,0.4));
+    cursor: default;
+    box-shadow: 0 0 0 2px #f0c14a, 0 0 22px rgba(240, 193, 74, 0.55), 0 7px 0 rgba(70, 40, 0, 0.45);
+}
+.lab-card.is-max .lab-evolve {
+    z-index: 6;
+    color: #3a2504;
+    background: linear-gradient(#fff1b8, #e2a01f);
+    border-radius: 4px;
+    box-shadow: 0 0 16px rgba(255, 200, 60, 0.7);
+}
+.lab-card.is-max .lab-rim {
+    box-shadow: inset 0 0 0 3px rgba(255, 214, 90, 0.95);
+    opacity: 1;
 }
 .lab-card.is-offer .lab-evolve { animation: lab-invite 1.15s ease-in-out infinite; }
 .lab-card.is-forced {
@@ -851,7 +846,7 @@ export const mutationCardStyles = `
 .lab-card.is-legendary .lab-name { text-shadow: 0 2px 0 rgba(0,0,0,0.65), 0 0 10px rgba(255, 196, 70, 0.55); }
 .lab-flash, .lab-deny-flash {
     inset: 0;
-    animation: lab-flash 0.5s ease forwards;
+    animation: lab-flash 0.22s ease forwards;
 }
 .lab-flash { background: radial-gradient(circle at 50% 62%, rgba(255, 225, 140, 0.55), transparent 62%); mix-blend-mode: screen; }
 .lab-deny-flash { background: rgba(255, 36, 48, 0.2); }
@@ -1025,7 +1020,7 @@ export const mutationCardStyles = `
     .lab-readout strong { font-size: 26px; }
     .lab-back { margin: 0.15rem auto 0.3rem; font-size: 18px; }
     .lab-card.is-hot:hover,
-    .lab-card.is-hot:focus-visible { transform: translateY(-3px) scale(1.012); }
+    .lab-card.is-hot:focus-visible { transform: translateY(-2px); }
     .serum-screen { gap: 0.4rem; padding: 1vh 3vw 1.2vh; }
     .serum-head h2 { font-size: 22px; }
     .serum-head p { margin: 0.05rem 0 0.25rem; font-size: 11px; }

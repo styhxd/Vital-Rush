@@ -1,6 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
-import { Language } from '../types';
+import { Language, OrganId } from '../types';
+import { hopLine, organPlainName } from '../services/casebook';
+import { bodyNote, closeLabel, crossingTitle, hopNote, sheetKicker, tapHint } from '../services/atlas';
 import { Dossier } from './Dossier';
 
 type Kind =
@@ -69,12 +72,6 @@ const COPY: Record<Language, Section[]> = {
             ],
         },
         {
-            title: 'A DOENÇA',
-            cards: [
-                { kind: 'vital', title: 'A ROTA', body: 'Cada paciente é uma das 120 ordens dos cinco órgãos, sem repetir. O sintoma diz por que o Vital entra nessa sequência. O primeiro órgão ainda dá trégua. O último fecha. Depois da onda 30 a mesma rota volta, mais fechada.' },
-            ],
-        },
-        {
             title: 'O QUE VOCÊ FAZ',
             cards: [
                 { kind: 'dash', title: 'DESVIO', body: 'Um impulso. Por um instante nada te acerta.' },
@@ -135,12 +132,6 @@ const COPY: Record<Language, Section[]> = {
             ],
         },
         {
-            title: 'THE DISEASE',
-            cards: [
-                { kind: 'vital', title: 'THE ROUTE', body: 'Each patient is one of the 120 orders of the five organs, with no repeats. The symptom says why Vital goes in that sequence. The first organ still gives you room. The last one closes in. After wave 30 the same route returns, tighter.' },
-            ],
-        },
-        {
             title: 'WHAT YOU DO',
             cards: [
                 { kind: 'dash', title: 'DASH', body: 'A burst. For a moment nothing can hit you.' },
@@ -198,12 +189,6 @@ const COPY: Record<Language, Section[]> = {
             cards: [
                 { kind: 'synapse', title: 'SINAPSIS', body: 'Un rayo une dos puntos. El blanco revienta la pantalla.' },
                 { kind: 'focus', title: 'FOCO', body: 'Una gota violeta. Los críticos salen más seguido.' },
-            ],
-        },
-        {
-            title: 'LA ENFERMEDAD',
-            cards: [
-                { kind: 'vital', title: 'LA RUTA', body: 'Cada paciente es una de las 120 órdenes de los cinco órganos, sin repetir. El síntoma dice por qué Vital entra en esa secuencia. El primer órgano todavía da tregua. El último cierra. Después de la onda 30 la misma ruta vuelve, más cerrada.' },
             ],
         },
         {
@@ -641,7 +626,25 @@ const Sprite: React.FC<{ kind: Kind }> = ({ kind }) => {
     return <canvas ref={ref} width={168} height={96} className="guide-stage" aria-hidden />;
 };
 
+const ORGANS: OrganId[] = ['molar', 'liver', 'heart', 'lung', 'brain'];
+const INK: Record<OrganId, string> = {
+    molar: '#d5e2ee',
+    liver: '#d6e36a',
+    heart: '#ff5a6a',
+    lung: '#f3c3ce',
+    brain: '#c9a6ff',
+};
+
+type Sheet = { title: string; line: string; bio: string; swatch?: [string, string] };
+
 const styles = `
+.guide-hint {
+    margin: 0 0 0.65rem;
+    color: #e2b060;
+    font-size: 12px;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+}
 .guide-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -652,17 +655,44 @@ const styles = `
     grid-template-columns: 168px minmax(0, 1fr);
     gap: 0.55rem;
     align-items: center;
+    width: 100%;
+    padding: 0;
+    text-align: left;
+    color: inherit;
+    font: inherit;
     background: rgba(255, 244, 220, 0.04);
     border: 1px solid rgba(226, 176, 96, 0.22);
     border-radius: 10px;
     overflow: hidden;
     min-height: 96px;
+    cursor: pointer;
 }
+.guide-card:hover,
+.guide-card:focus-visible {
+    border-color: rgba(255, 216, 120, 0.75);
+    background: rgba(255, 244, 220, 0.08);
+    outline: none;
+}
+.guide-card.is-hop { grid-template-columns: 92px minmax(0, 1fr); min-height: 72px; }
 .guide-stage {
     display: block;
     width: 168px;
     height: 96px;
     background: #14080c;
+}
+.guide-hop {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 92px;
+    height: 72px;
+    padding: 0 14px;
+}
+.guide-hop i {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.35);
 }
 .guide-copy { padding: 0.35rem 0.7rem 0.4rem 0; }
 .guide-copy h3 {
@@ -681,12 +711,89 @@ const styles = `
     line-height: 1.3;
 }
 .guide-section { margin-bottom: 0.85rem; }
+.guide-sheet {
+    position: fixed;
+    inset: 0;
+    z-index: 400;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4vh 5vw;
+    background: rgba(6, 0, 2, 0.78);
+}
+.guide-sheet article {
+    width: min(640px, 100%);
+    max-height: min(78vh, 520px);
+    overflow: auto;
+    padding: 1rem 1.2rem 0.95rem;
+    border-radius: 16px;
+    border: 1px solid rgba(226, 176, 96, 0.55);
+    border-left: 4px solid #e2a01f;
+    background:
+        radial-gradient(ellipse at 0% 0%, rgba(160, 32, 44, 0.38), transparent 52%),
+        linear-gradient(180deg, #2c1416, #120608);
+    box-shadow: 0 16px 0 rgba(0,0,0,0.4);
+    color: #f6f1e6;
+    font-family: 'Chakra Petch', sans-serif;
+}
+.guide-sheet .kicker {
+    color: #e2b060;
+    letter-spacing: 0.2em;
+    font-size: 11px;
+    font-weight: 700;
+}
+.guide-swatch {
+    display: block;
+    height: 4px;
+    margin: 0.45rem 0 0.15rem;
+    border-radius: 4px;
+}
+.guide-sheet h3 {
+    margin: 0.15rem 0 0.4rem;
+    font-family: 'Teko', sans-serif;
+    font-size: clamp(28px, 3vw, 42px);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    line-height: 0.95;
+    color: #fff6e4;
+}
+.guide-sheet .line {
+    margin: 0 0 0.65rem;
+    color: #ffd98a;
+    font-size: 14px;
+    line-height: 1.35;
+}
+.guide-sheet .bio {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #f3eadc;
+}
+.guide-sheet button {
+    margin-top: 0.85rem;
+    padding: 0.28rem 1.2rem 0.16rem;
+    background: linear-gradient(#3a3228, #1a140e);
+    border: 1px solid rgba(226, 176, 96, 0.55);
+    border-radius: 6px;
+    color: #f7f4ee;
+    letter-spacing: 0.18em;
+    font-family: 'Teko', sans-serif;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+.guide-sheet button:hover { color: #ffe08a; }
 @media (max-width: 720px) {
     .guide-grid { grid-template-columns: 1fr; }
     .guide-card { grid-template-columns: 120px minmax(0, 1fr); }
     .guide-stage { width: 120px; height: 72px; }
 }
 `;
+
+function loud(name: string, lang: Language): string {
+    const locale = lang === 'PT' ? 'pt' : lang === 'ES' ? 'es' : 'en';
+    return name.toLocaleUpperCase(locale);
+}
 
 export const FieldGuide: React.FC<{
     language: Language;
@@ -695,25 +802,94 @@ export const FieldGuide: React.FC<{
     onBack: () => void;
 }> = ({ language, title, backLabel, onBack }) => {
     const sections = COPY[language] || COPY.EN;
+    const [open, setOpen] = useState<Sheet | null>(null);
+
+    useEffect(() => {
+        if (!open) return;
+        const onKey = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setOpen(null);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [open]);
+
+    const sheet = open && createPortal(
+        <div className="guide-sheet" onClick={() => setOpen(null)}>
+            <article onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
+                <div className="kicker">{sheetKicker(language)}</div>
+                {open.swatch && (
+                    <i className="guide-swatch" style={{ background: `linear-gradient(90deg, ${open.swatch[0]}, ${open.swatch[1]})` }} />
+                )}
+                <h3>{open.title}</h3>
+                <p className="line">{open.line}</p>
+                <p className="bio">{open.bio}</p>
+                <button type="button" onClick={() => setOpen(null)}>{closeLabel(language)}</button>
+            </article>
+        </div>,
+        document.body,
+    );
+
     return (
         <Dossier title={title} meta="ATLAS" onBack={onBack} backLabel={backLabel} wide>
             <style>{styles}</style>
+            <p className="guide-hint">{tapHint(language)}</p>
             {sections.map(section => (
                 <section key={section.title} className="guide-section">
                     <h4 className="dossier-kicker">{section.title}</h4>
                     <div className="guide-grid">
                         {section.cards.map(card => (
-                            <article key={card.kind} className="guide-card">
+                            <button
+                                key={card.kind}
+                                type="button"
+                                className="guide-card"
+                                onClick={() => setOpen({
+                                    title: card.title,
+                                    line: card.body,
+                                    bio: bodyNote(card.kind, language) || card.body,
+                                })}
+                            >
                                 <Sprite kind={card.kind} />
                                 <div className="guide-copy">
                                     <h3>{card.title}</h3>
                                     <p>{card.body}</p>
                                 </div>
-                            </article>
+                            </button>
                         ))}
                     </div>
                 </section>
             ))}
+            <section className="guide-section">
+                <h4 className="dossier-kicker">{crossingTitle(language)}</h4>
+                <div className="guide-grid">
+                    {ORGANS.flatMap((from) => ORGANS.filter((to) => to !== from).map((to) => {
+                        const titleHop = `${loud(organPlainName(from, language), language)} → ${loud(organPlainName(to, language), language)}`;
+                        const line = hopLine(from, to, language);
+                        return (
+                            <button
+                                key={`${from}>${to}`}
+                                type="button"
+                                className="guide-card is-hop"
+                                onClick={() => setOpen({
+                                    title: titleHop,
+                                    line,
+                                    bio: hopNote(from, to, language) || line,
+                                    swatch: [INK[from], INK[to]],
+                                })}
+                            >
+                                <span className="guide-hop" style={{ background: `linear-gradient(100deg, ${INK[from]}, ${INK[to]})` }}>
+                                    <i style={{ background: INK[from] }} />
+                                    <i style={{ background: INK[to] }} />
+                                </span>
+                                <div className="guide-copy">
+                                    <h3>{titleHop}</h3>
+                                    <p>{line}</p>
+                                </div>
+                            </button>
+                        );
+                    }))}
+                </div>
+            </section>
+            {sheet}
         </Dossier>
     );
 };

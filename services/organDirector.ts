@@ -7,7 +7,7 @@ import { Entity, EntityType, Language, OrganId, Vector2 } from '../types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT } from '../constants';
 import { audioManager } from './audioManager';
 import { buzz } from './haptics';
-import { CANON_ROUTE } from './casebook';
+import { CANON_ROUTE, hopLine } from './casebook';
 
 export type { OrganId };
 
@@ -220,7 +220,8 @@ interface Transit {
     from: OrganId;
     to: OrganId;
     t: number;
-    dur: number;
+    phase: 'in' | 'read' | 'out';
+    shown: number;
     line: string;
     title: string;
 }
@@ -314,9 +315,32 @@ export class OrganDirector {
         this.lang = lang;
     }
 
+    charting(): boolean {
+        return this.transit !== null;
+    }
+
     transitLeft(): number {
         if (!this.transit) return 0;
-        return Math.max(0, this.transit.dur - this.transit.t);
+        if (this.transit.phase !== 'out') return 1;
+        return Math.max(0, 0.62 - this.transit.t);
+    }
+
+    advanceTransit(): boolean {
+        const tr = this.transit;
+        if (!tr) return false;
+        if (tr.phase === 'in' || tr.shown < tr.line.length) {
+            tr.phase = 'read';
+            tr.shown = tr.line.length;
+            audioManager.playPage();
+            return true;
+        }
+        if (tr.phase === 'read') {
+            tr.phase = 'out';
+            tr.t = 0;
+            audioManager.playPage();
+            return true;
+        }
+        return true;
     }
 
     onWave(waveIndex: number, translate: (key: string) => string): boolean {
@@ -376,8 +400,9 @@ export class OrganDirector {
                 from: prev,
                 to: next,
                 t: 0,
-                dur: 2.75,
-                line: '',
+                phase: 'in',
+                shown: 0,
+                line: hopLine(prev, next, this.lang),
                 title: translate(THEME[next].name),
             };
             audioManager.playTransit(next);
@@ -414,8 +439,15 @@ export class OrganDirector {
         if (this.whiteout > 0) this.whiteout = Math.max(0, this.whiteout - dt);
         if (this.storm > 0) this.storm = Math.max(0, this.storm - dt * 1.35);
         if (this.transit) {
-            this.transit.t += dt;
-            if (this.transit.t >= this.transit.dur) this.transit = null;
+            const tr = this.transit;
+            tr.t += dt;
+            if (tr.phase === 'in' && tr.t >= 0.42) tr.phase = 'read';
+            if (tr.phase === 'read' && tr.shown < tr.line.length) {
+                const next = Math.min(tr.line.length, tr.shown + dt * 36);
+                if (Math.floor(next / 3) !== Math.floor(tr.shown / 3)) audioManager.playGlyph();
+                tr.shown = next;
+            }
+            if (tr.phase === 'out' && tr.t >= 0.62) this.transit = null;
             return;
         }
 
@@ -517,6 +549,7 @@ export class OrganDirector {
         if (this.plaqueClock <= 0) {
             this.plaqueClock = Math.max(7.2, (14 - this.local * 1.15) / pace);
             this.spawnPool('plaque_', '#c6b06a', 58 + Math.random() * 28, 8.5);
+            audioManager.playStick();
         }
         if (this.local >= 2) {
             this.fluorideClock -= dt;
@@ -554,6 +587,7 @@ export class OrganDirector {
             }
             this.streams.push(this.makeStream(mid, i));
         }
+        audioManager.playWet();
     }
 
     private makeStream(mid: Vector2, slot: number): SalivaRibbon {
@@ -688,6 +722,7 @@ export class OrganDirector {
                 this.biteT = 2.2;
                 this.biteY = 180 + Math.random() * (CANVAS_HEIGHT - 360);
                 this.biteHit = false;
+                audioManager.playBiteWarn();
             }
             return;
         }
@@ -696,7 +731,7 @@ export class OrganDirector {
             this.bitePhase = 'snap';
             this.biteT = 1.2;
             this.biteHit = false;
-            audioManager.playSurge();
+            audioManager.playBite();
         } else if (this.bitePhase === 'snap' && this.biteT <= 0) {
             this.bitePhase = 'idle';
             this.biteClock = Math.max(11, (20 - this.local * 1.1) / pace);
@@ -708,6 +743,7 @@ export class OrganDirector {
         if (this.bileClock <= 0) {
             this.bileClock = Math.max(7.4, (13 - this.local * 0.95) / pace);
             const pool = this.spawnPool('bile_', '#c6e04a', 84 + Math.random() * 40, 7.5);
+            audioManager.playDrip();
             pool.vel.x = -0.45;
             pool.vel.y = (Math.random() - 0.5) * 0.35;
         }
@@ -729,6 +765,7 @@ export class OrganDirector {
                 this.filterY = 160 + Math.random() * (CANVAS_HEIGHT - 320);
                 this.filterHit = false;
                 this.say('ALERT_FILTER', '#d6e36a');
+                audioManager.playSuction();
             }
         } else {
             this.filterT -= dt;
@@ -740,7 +777,7 @@ export class OrganDirector {
                 this.filterSpan = this.local <= 2 ? 5.2 : 4.5;
                 this.filterT = this.filterSpan;
                 this.filterHit = false;
-                audioManager.playHit();
+                audioManager.playGulp();
             } else if (this.filterPhase === 'on' && this.filterT <= 0) {
                 this.filterPhase = 'fade';
                 this.filterSpan = 0.95;
@@ -819,6 +856,10 @@ export class OrganDirector {
                 }
                 c.x += c.vx * dt;
                 c.y += Math.sin(c.age * 1.3 + c.spin) * 22 * dt;
+            } else {
+                const step = 0.34;
+                const prev = c.age - dt;
+                if (Math.floor(prev / step) !== Math.floor(c.age / step)) audioManager.playBubble();
             }
             return c.x > -c.r - 80 && c.y > -40 && c.y < CANVAS_HEIGHT + 40;
         });
@@ -907,7 +948,7 @@ export class OrganDirector {
             if (this.lungT <= 0) {
                 this.lungPhase = 'gust';
                 this.lungT = 1.2;
-                audioManager.playBreath();
+                audioManager.playBreath('out');
                 audioManager.lungPush(Math.min(0.12, Math.hypot(this.gust.x, this.gust.y) * 0.012));
             }
         } else if (this.lungPhase === 'gust') {
@@ -951,7 +992,7 @@ export class OrganDirector {
             this.coughPlayer = false;
             this.coughBosses.clear();
             this.say('ALERT_COUGH', '#ff5a6a');
-            audioManager.playBreath();
+            audioManager.playBreath('in');
             audioManager.lungPush(-0.05);
             return;
         }
@@ -959,7 +1000,7 @@ export class OrganDirector {
         this.gust = roll < 0.45 ? { x: -8.6, y: 0 } : roll < 0.75 ? { x: -6.4, y: -4.6 } : { x: -6.4, y: 4.6 };
         this.lungPhase = 'telegraph';
         this.lungT = 0.6;
-        audioManager.playBreath();
+        audioManager.playBreath('in');
     }
 
     private restLung(pace: number) {
@@ -1005,7 +1046,7 @@ export class OrganDirector {
         for (const bolt of this.bolts) {
             if (!bolt.fired && bolt.t >= bolt.warn) {
                 bolt.fired = true;
-                audioManager.playHit();
+                audioManager.playZap();
                 hooks.shake(bolt.white ? 18 : 8);
                 if (bolt.white) this.whiteout = 0.35;
                 else this.storm = Math.max(this.storm, 0.26);
@@ -1970,19 +2011,30 @@ export class OrganDirector {
             ctx.stroke();
         };
 
+        const clock = (this.hooks?.time || 0) / 1000;
         if (warned) {
             const preview: Vector2[] = [];
-            const span = 460;
-            const x0 = CANVAS_WIDTH * 0.5 - span * 0.5;
-            const n = low ? 28 : 48;
+            const n = low ? 36 : 80;
+            const span = CANVAS_WIDTH - 80;
+            const sweep = (clock * 0.42) % 1;
+            const head = 40 + sweep * span;
             for (let i = 0; i <= n; i++) {
                 const u = i / n;
-                preview.push({ x: x0 + u * span, y: trace.y - pqrst(u, trace.shape) * 0.92 });
+                const phase = (u * 0.55 + clock * 0.7) % 1;
+                preview.push({ x: 40 + u * span, y: trace.y - pqrst(phase, trace.shape) * 0.9 });
             }
-            stroke(preview, 11, 'rgba(255, 70, 96, 0.22)');
-            stroke(preview, 2.2, 'rgba(255, 228, 232, 0.78)');
+            const drawn = preview.filter(p => p.x <= head);
+            stroke(drawn, 12, 'rgba(255, 70, 96, 0.28)');
+            stroke(drawn, 2.4, 'rgba(255, 236, 240, 0.92)');
+            ctx.strokeStyle = 'rgba(255, 90, 110, 0.9)';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(head, trace.y - 72);
+            ctx.lineTo(head, trace.y + 72);
+            ctx.stroke();
         } else {
-            const pts = low ? this.tracePoints(trace).filter((_, i) => i % 2 === 0) : this.tracePoints(trace);
+            const raw = low ? this.tracePoints(trace).filter((_, i) => i % 2 === 0) : this.tracePoints(trace);
+            const pts = raw.map(p => ({ x: p.x, y: p.y + Math.sin(p.x * 0.018 + clock * 7) * 5 }));
             const glow = ['rgba(255, 36, 64, 0.28)', 'rgba(255, 96, 64, 0.26)', 'rgba(255, 30, 80, 0.34)', 'rgba(255, 170, 150, 0.24)'][trace.shape] || 'rgba(255, 36, 64, 0.28)';
             const ink = ['#fff6f7', '#ffe4d8', '#ffffff', '#ffd0d4'][trace.shape] || '#fff6f7';
             const width = [2.6, 3.3, 1.7, 2.3][trace.shape] || 2.6;
@@ -2017,6 +2069,18 @@ export class OrganDirector {
                 ctx.beginPath();
                 ctx.arc(pen.x, pen.y, 4.5, 0, Math.PI * 2);
                 ctx.fill();
+            }
+            if (peak) {
+                for (let ring = 0; ring < 3; ring++) {
+                    const travel = (clock * 0.85 + ring / 3) % 1;
+                    ctx.globalAlpha = (1 - travel) * 0.75;
+                    ctx.strokeStyle = ring === 1 ? '#fff1f3' : '#ff4a62';
+                    ctx.lineWidth = 3 - travel * 2;
+                    ctx.beginPath();
+                    ctx.ellipse(peak.x, peak.y, 18 + travel * 150, 10 + travel * 46, 0, 0, Math.PI * 2);
+                    ctx.stroke();
+                }
+                ctx.globalAlpha = 1;
             }
         }
         ctx.restore();
@@ -2487,88 +2551,344 @@ export class OrganDirector {
     drawTransit(ctx: CanvasRenderingContext2D) {
         const tr = this.transit;
         if (!tr) return;
-        const u = Math.max(0, Math.min(1, tr.t / tr.dur));
-        const veil = Math.sin(Math.PI * Math.min(1, u * 1.05)) * 0.78;
-        const from = THEME[tr.from];
         const to = THEME[tr.to];
-        const head = -180 + (CANVAS_WIDTH + 360) * easeInOut(u);
+        const enter = tr.phase === 'in' ? Math.min(1, tr.t / 0.42) : 1;
+        const leave = tr.phase === 'out' ? Math.min(1, tr.t / 0.62) : 0;
+        const head = -180 + (CANVAS_WIDTH + 360) * easeInOut(Math.min(1, 0.35 + enter * 0.5));
         ctx.save();
-        ctx.fillStyle = `rgba(4, 0, 2, ${veil})`;
+        ctx.fillStyle = `rgba(4, 0, 2, ${(0.62 + enter * 0.2) * (1 - leave)})`;
         ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-
-        ctx.globalAlpha = 0.9;
-        ctx.lineCap = 'round';
-        ctx.strokeStyle = from.accent;
-        ctx.lineWidth = 46;
-        ctx.beginPath();
-        const y0 = CANVAS_HEIGHT * 0.5;
-        ctx.moveTo(-60, y0);
-        ctx.bezierCurveTo(CANVAS_WIDTH * 0.22, CANVAS_HEIGHT * 0.18, CANVAS_WIDTH * 0.62, CANVAS_HEIGHT * 0.84, head, y0);
-        ctx.stroke();
-        ctx.strokeStyle = to.accent;
-        ctx.lineWidth = 14;
-        ctx.globalAlpha = 0.85;
-        ctx.stroke();
-
-        for (let i = 0; i < 16; i++) {
-            const p = (u * 1.35 + i / 16) % 1;
-            const x = -60 + (head + 60) * p;
-            const bend = Math.sin(p * Math.PI) ;
-            const y = y0 + Math.sin(p * 6.2 + i) * 70 * bend - (tr.to === 'liver' ? (1 - p) * 40 : 0);
-            ctx.globalAlpha = 0.35 + 0.5 * Math.sin(p * Math.PI);
-            if (tr.to === 'heart') {
-                ctx.fillStyle = i % 2 ? '#ff5a6a' : '#7a1020';
-                ctx.beginPath();
-                ctx.ellipse(x, y, 16, 11, p * 4, 0, Math.PI * 2);
-                ctx.fill();
-            } else if (tr.to === 'lung') {
-                ctx.strokeStyle = '#f3c3ce';
-                ctx.lineWidth = 3;
-                ctx.beginPath();
-                ctx.moveTo(x - 28, y);
-                ctx.quadraticCurveTo(x, y - 18, x + 36, y + 6);
-                ctx.stroke();
-            } else if (tr.to === 'brain') {
-                ctx.strokeStyle = '#c9a6ff';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(x - 20, y);
-                ctx.lineTo(x - 6, y - 16);
-                ctx.lineTo(x + 4, y + 10);
-                ctx.lineTo(x + 22, y - 8);
-                ctx.stroke();
-            } else if (tr.to === 'liver') {
-                ctx.fillStyle = '#d6e36a';
-                ctx.beginPath();
-                ctx.ellipse(x, y + 18, 8, 14, 0, 0, Math.PI * 2);
-                ctx.fill();
-            } else {
-                ctx.fillStyle = '#e7eef4';
-                ctx.beginPath();
-                ctx.arc(x, y, 7, 0, Math.PI * 2);
-                ctx.fill();
-            }
-        }
-
-        if (u > 0.58) {
-            ctx.globalAlpha = (u - 0.58) / 0.42;
+        ctx.globalAlpha = 0.9 * (1 - leave * 0.35);
+        paintCrossing(ctx, tr.from, tr.to, Math.min(0.8, 0.2 + enter * 0.6), head);
+        if (leave > 0) {
+            ctx.globalAlpha = leave;
             ctx.fillStyle = to.bg;
             ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         }
 
-        if (u > 0.16 && u < 0.9) {
-            const fade = Math.min(1, (u - 0.16) / 0.12) * Math.min(1, (0.9 - u) / 0.14);
-            ctx.globalAlpha = fade;
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillStyle = '#fff8f4';
-            ctx.font = '700 40px "Chakra Petch", sans-serif';
-            wrapText(ctx, tr.line, CANVAS_WIDTH / 2, CANVAS_HEIGHT * 0.4, CANVAS_WIDTH * 0.72, 52);
-            ctx.font = '800 64px "Chakra Petch", sans-serif';
-            ctx.fillStyle = to.accent;
-            ctx.fillText(tr.title, CANVAS_WIDTH / 2, CANVAS_HEIGHT * 0.62);
+        const slide = (1 - enter) * 80 + leave * 110;
+        ctx.globalAlpha = enter * (1 - leave);
+        const x = 140;
+        const y = CANVAS_HEIGHT * 0.56 + slide;
+        const w = CANVAS_WIDTH - 280;
+        const h = 360;
+        ctx.fillStyle = 'rgba(10, 6, 14, 0.9)';
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = to.accent;
+        ctx.lineWidth = 8;
+        ctx.strokeRect(x, y, w, h);
+        ctx.fillStyle = to.accent;
+        ctx.fillRect(x + 28, y - 26, Math.min(640, 48 + tr.title.length * 28), 52);
+        ctx.fillStyle = '#16080c';
+        ctx.font = '800 36px "Chakra Petch", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(tr.title, x + 48, y);
+        ctx.fillStyle = '#fff8f4';
+        ctx.font = '700 34px "Chakra Petch", sans-serif';
+        ctx.textAlign = 'center';
+        const cursor = tr.phase === 'read' && tr.shown < tr.line.length && Math.floor(tr.t * 6) % 2 === 0 ? '▌' : '';
+        wrapText(ctx, tr.line.slice(0, Math.floor(tr.shown)) + cursor, x + w / 2, y + h * 0.48, w - 140, 46);
+        if (tr.phase === 'read' && tr.shown >= tr.line.length && Math.floor(tr.t * 2) % 2 === 0) {
+            const prompt = this.lang === 'PT' ? 'CLIQUE' : this.lang === 'ES' ? 'PULSA' : 'CLICK';
+            ctx.font = '700 22px "Chakra Petch", sans-serif';
+            ctx.fillStyle = '#ffe7a8';
+            ctx.textAlign = 'right';
+            ctx.fillText(`${prompt}  ▼`, x + w - 40, y + h - 36);
         }
         ctx.restore();
+    }
+}
+
+function paintCrossing(ctx: CanvasRenderingContext2D, fromId: OrganId, toId: OrganId, u: number, head: number) {
+    const key = `${fromId}>${toId}`;
+    ctx.save();
+    ctx.lineCap = 'round';
+    if (key === 'molar>lung') paintAspire(ctx, u);
+    else if (key === 'liver>molar') paintBile(ctx, u);
+    else if (key === 'liver>lung') paintFlood(ctx, u, 'rgba(150, 140, 40, 0.55)');
+    else if (key === 'heart>lung') paintFlood(ctx, u, 'rgba(150, 18, 36, 0.62)');
+    else if (key === 'liver>brain') paintAmmonia(ctx, u);
+    else if (key === 'heart>liver') paintIschemia(ctx, u, head);
+    else if (key === 'lung>molar') paintCough(ctx, u);
+    else if (key === 'lung>liver') paintHypoxia(ctx, u);
+    else if (key === 'lung>brain') paintBlackout(ctx, u);
+    else if (key === 'brain>molar') paintCrack(ctx, u);
+    else if (key === 'brain>liver') paintAxis(ctx, u);
+    else if (key === 'brain>heart') paintStorm(ctx, u);
+    else if (key === 'brain>lung') paintApnea(ctx, u);
+    else paintVein(ctx, fromId, toId, u, head, key === 'heart>brain');
+    ctx.restore();
+}
+
+function paintVein(ctx: CanvasRenderingContext2D, fromId: OrganId, toId: OrganId, u: number, head: number, embolus: boolean) {
+    const from = THEME[fromId];
+    const to = THEME[toId];
+    const y0 = CANVAS_HEIGHT * 0.5;
+    ctx.globalAlpha = 0.9;
+    ctx.strokeStyle = from.accent;
+    ctx.lineWidth = 46;
+    ctx.beginPath();
+    ctx.moveTo(-60, y0);
+    ctx.bezierCurveTo(CANVAS_WIDTH * 0.22, CANVAS_HEIGHT * 0.18, CANVAS_WIDTH * 0.62, CANVAS_HEIGHT * 0.84, head, y0);
+    ctx.stroke();
+    ctx.strokeStyle = to.accent;
+    ctx.lineWidth = 14;
+    ctx.globalAlpha = 0.85;
+    ctx.stroke();
+    if (embolus) {
+        ctx.globalAlpha = 0.95;
+        ctx.fillStyle = '#1a0608';
+        ctx.beginPath();
+        ctx.ellipse(head, y0, 34, 22, 0.4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#ff5a6a';
+        ctx.lineWidth = 3;
+        ctx.stroke();
+    }
+    for (let i = 0; i < 16; i++) {
+        const p = (u * 1.35 + i / 16) % 1;
+        const x = -60 + (head + 60) * p;
+        const bend = Math.sin(p * Math.PI);
+        const y = y0 + Math.sin(p * 6.2 + i) * 70 * bend - (toId === 'liver' ? (1 - p) * 40 : 0);
+        ctx.globalAlpha = 0.35 + 0.5 * Math.sin(p * Math.PI);
+        if (embolus) {
+            ctx.fillStyle = '#4a1018';
+            ctx.beginPath();
+            ctx.ellipse(x, y, 10, 7, p * 3, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (toId === 'heart') {
+            ctx.fillStyle = i % 2 ? '#ff5a6a' : '#7a1020';
+            ctx.beginPath();
+            ctx.ellipse(x, y, 16, 11, p * 4, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (toId === 'lung') {
+            ctx.strokeStyle = '#f3c3ce';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(x - 28, y);
+            ctx.quadraticCurveTo(x, y - 18, x + 36, y + 6);
+            ctx.stroke();
+        } else if (toId === 'brain') {
+            ctx.strokeStyle = '#c9a6ff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x - 20, y);
+            ctx.lineTo(x - 6, y - 16);
+            ctx.lineTo(x + 4, y + 10);
+            ctx.lineTo(x + 22, y - 8);
+            ctx.stroke();
+        } else if (toId === 'liver') {
+            ctx.fillStyle = '#d6e36a';
+            ctx.beginPath();
+            ctx.ellipse(x, y + 18, 8, 14, 0, 0, Math.PI * 2);
+            ctx.fill();
+        } else {
+            ctx.fillStyle = '#e7eef4';
+            ctx.beginPath();
+            ctx.arc(x, y, 7, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+}
+
+function paintAspire(ctx: CanvasRenderingContext2D, u: number) {
+    for (let i = 0; i < 7; i++) {
+        const p = (u * 1.15 + i / 7) % 1;
+        const y = 90 + i * 130;
+        const x = -220 + (CANVAS_WIDTH + 440) * p;
+        ctx.globalAlpha = 0.28 + 0.4 * Math.sin(p * Math.PI);
+        ctx.strokeStyle = i % 2 ? '#f3c3ce' : '#d5e2ee';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.quadraticCurveTo(x + 180, y + 30, x + 460, y + 170);
+        ctx.stroke();
+    }
+    for (let i = 0; i < 14; i++) {
+        const p = (u * 1.35 + i * 0.07) % 1;
+        ctx.globalAlpha = 0.3 + 0.5 * (1 - p);
+        ctx.fillStyle = '#e7eef4';
+        ctx.beginPath();
+        ctx.ellipse(180 + (i * 127) % (CANVAS_WIDTH - 360), -30 + p * CANVAS_HEIGHT * 0.86, 5, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function paintBile(ctx: CanvasRenderingContext2D, u: number) {
+    const rise = easeInOut(u);
+    ctx.globalAlpha = 0.4;
+    ctx.strokeStyle = '#d6e36a';
+    ctx.lineWidth = 26;
+    ctx.beginPath();
+    ctx.moveTo(CANVAS_WIDTH * 0.5, CANVAS_HEIGHT + 30);
+    ctx.bezierCurveTo(CANVAS_WIDTH * 0.4, CANVAS_HEIGHT * 0.62, CANVAS_WIDTH * 0.6, CANVAS_HEIGHT * 0.28, CANVAS_WIDTH * 0.48, 80 + (1 - rise) * 240);
+    ctx.stroke();
+    for (let i = 0; i < 16; i++) {
+        const p = (rise + i / 16) % 1;
+        ctx.globalAlpha = 0.35 + 0.5 * Math.sin(p * Math.PI);
+        ctx.fillStyle = i % 3 === 0 ? '#f4f0a8' : '#c6d84a';
+        ctx.beginPath();
+        ctx.ellipse(CANVAS_WIDTH * (0.22 + (i % 5) * 0.13), CANVAS_HEIGHT + 20 - p * (CANVAS_HEIGHT + 60), 11, 16, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function paintFlood(ctx: CanvasRenderingContext2D, u: number, color: string) {
+    const h = easeInOut(Math.min(1, u * 1.12)) * CANVAS_HEIGHT * 0.9;
+    ctx.globalAlpha = 0.9;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(0, CANVAS_HEIGHT);
+    ctx.lineTo(0, CANVAS_HEIGHT - h);
+    for (let x = 0; x <= CANVAS_WIDTH; x += 36) {
+        ctx.lineTo(x, CANVAS_HEIGHT - h + Math.sin(x * 0.018 + u * 14) * 18);
+    }
+    ctx.lineTo(CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.fill();
+}
+
+function paintAmmonia(ctx: CanvasRenderingContext2D, u: number) {
+    for (let i = 0; i < 8; i++) {
+        const r = (70 + i * 100) * (0.25 + u);
+        ctx.globalAlpha = (0.07 + 0.1 * (1 - i / 8)) * Math.sin(Math.min(1, u) * Math.PI);
+        ctx.fillStyle = i % 2 ? '#e6e28a' : '#c9a6ff';
+        ctx.beginPath();
+        ctx.arc(CANVAS_WIDTH * 0.5, CANVAS_HEIGHT * 0.48, r, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function paintIschemia(ctx: CanvasRenderingContext2D, u: number, head: number) {
+    const y0 = CANVAS_HEIGHT * 0.5;
+    ctx.globalAlpha = 0.9 * (1 - u * 0.4);
+    ctx.strokeStyle = u < 0.45 ? '#ff5a6a' : '#9a9a78';
+    ctx.lineWidth = Math.max(3, 46 * (1 - u * 0.84));
+    ctx.beginPath();
+    ctx.moveTo(-60, y0);
+    ctx.bezierCurveTo(CANVAS_WIDTH * 0.22, CANVAS_HEIGHT * 0.18, CANVAS_WIDTH * 0.62, CANVAS_HEIGHT * 0.84, head, y0);
+    ctx.stroke();
+}
+
+function paintCough(ctx: CanvasRenderingContext2D, u: number) {
+    const burst = Math.min(1, u * 1.35);
+    ctx.strokeStyle = '#f3c3ce';
+    ctx.lineWidth = 4;
+    ctx.globalAlpha = 0.75 * (1 - burst * 0.25);
+    for (let i = 0; i < 9; i++) {
+        const a = -0.7 + i * 0.16;
+        ctx.beginPath();
+        ctx.moveTo(160, CANVAS_HEIGHT * 0.5);
+        ctx.lineTo(160 + Math.cos(a) * burst * 1500, CANVAS_HEIGHT * 0.5 + Math.sin(a) * burst * 380);
+        ctx.stroke();
+    }
+    ctx.fillStyle = '#e7eef4';
+    for (let i = 0; i < 14; i++) {
+        const a = -0.8 + (i / 14) * 1.6;
+        const d = burst * (360 + (i * 97) % 780);
+        ctx.globalAlpha = 0.35 + 0.45 * (1 - burst);
+        ctx.beginPath();
+        ctx.arc(160 + Math.cos(a) * d, CANVAS_HEIGHT * 0.5 + Math.sin(a) * d * 0.32, 4 + (i % 3), 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function paintHypoxia(ctx: CanvasRenderingContext2D, u: number) {
+    ctx.globalAlpha = 0.18 + u * 0.5;
+    ctx.fillStyle = '#163044';
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+    ctx.globalAlpha = 0.2 + 0.4 * (1 - u);
+    ctx.fillStyle = '#d6e36a';
+    ctx.beginPath();
+    ctx.ellipse(CANVAS_WIDTH * 0.62, CANVAS_HEIGHT * 0.5, 240 * (1 - u * 0.4), 150, 0, 0, Math.PI * 2);
+    ctx.fill();
+}
+
+function paintBlackout(ctx: CanvasRenderingContext2D, u: number) {
+    const r = (1 - easeInOut(u)) * 980 + 50;
+    const g = ctx.createRadialGradient(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, r * 0.15, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, r);
+    g.addColorStop(0, 'rgba(24, 10, 40, 0.02)');
+    g.addColorStop(0.5, 'rgba(8, 4, 16, 0.55)');
+    g.addColorStop(1, 'rgba(0, 0, 0, 0.94)');
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+}
+
+function paintCrack(ctx: CanvasRenderingContext2D, u: number) {
+    const pts: Array<[number, number]> = [[380, 160], [560, 250], [500, 400], [760, 370], [840, 540], [1120, 470], [1320, 640], [1560, 520], [1720, 700]];
+    const n = Math.max(2, Math.ceil(u * pts.length));
+    ctx.globalAlpha = 0.95;
+    ctx.strokeStyle = '#f4f7fb';
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < n; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+    ctx.stroke();
+    ctx.strokeStyle = '#c9a6ff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    const tip = pts[n - 1];
+    ctx.fillStyle = '#e7eef4';
+    for (let i = 0; i < 6; i++) {
+        ctx.globalAlpha = 0.55;
+        ctx.beginPath();
+        ctx.arc(tip[0] + (i - 2.5) * 16, tip[1] + ((i * 17) % 24) - 8, 4, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function paintAxis(ctx: CanvasRenderingContext2D, u: number) {
+    ctx.globalAlpha = 0.85 * (1 - u * 0.62);
+    for (let i = 0; i < 5; i++) {
+        ctx.strokeStyle = i % 2 ? '#c9a6ff' : '#d6e36a';
+        ctx.lineWidth = 3;
+        const y = 180 + i * 150;
+        ctx.beginPath();
+        ctx.moveTo(-40, y);
+        ctx.bezierCurveTo(420, y - 70, 980, y + 80, CANVAS_WIDTH * Math.min(1, u * 1.05), y + 16);
+        ctx.stroke();
+    }
+}
+
+function paintStorm(ctx: CanvasRenderingContext2D, u: number) {
+    const flash = Math.sin(u * Math.PI * 5) > 0.2 ? 1 : 0.28;
+    ctx.globalAlpha = 0.85 * flash;
+    ctx.strokeStyle = '#efe6ff';
+    ctx.lineWidth = 3;
+    const bolts = [
+        [[220, 70], [360, 210], [300, 240], [500, 470], [440, 500], [680, 780]],
+        [[980, 40], [920, 210], [1120, 300], [1040, 460], [1260, 700]],
+        [[1580, 90], [1460, 250], [1640, 340], [1500, 560], [1680, 820]],
+    ];
+    for (const bolt of bolts) {
+        ctx.beginPath();
+        ctx.moveTo(bolt[0][0], bolt[0][1]);
+        for (let i = 1; i < bolt.length; i++) ctx.lineTo(bolt[i][0], bolt[i][1]);
+        ctx.stroke();
+    }
+    ctx.globalAlpha = 0.35 + 0.45 * u;
+    ctx.strokeStyle = '#ff5a6a';
+    ctx.lineWidth = 8;
+    ctx.beginPath();
+    ctx.arc(CANVAS_WIDTH * 0.68, CANVAS_HEIGHT * 0.55, 36 + u * 240, 0, Math.PI * 2);
+    ctx.stroke();
+}
+
+function paintApnea(ctx: CanvasRenderingContext2D, u: number) {
+    const amp = 78 * (1 - easeInOut(u));
+    ctx.strokeStyle = '#f3c3ce';
+    ctx.lineWidth = 4;
+    ctx.globalAlpha = 0.85;
+    for (let row = 0; row < 4; row++) {
+        const y = 200 + row * 190;
+        ctx.beginPath();
+        for (let x = 0; x <= CANVAS_WIDTH; x += 18) {
+            const yy = y + Math.sin(x * 0.02 + row) * amp;
+            if (x === 0) ctx.moveTo(x, yy);
+            else ctx.lineTo(x, yy);
+        }
+        ctx.stroke();
     }
 }
 

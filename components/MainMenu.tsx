@@ -156,10 +156,10 @@ interface MainMenuProps {
     difficulty: Difficulty;
     isPlatinum: boolean;
     onStart: () => void;
-    onControls: () => void;
     onManual: () => void;
     onSettings: () => void;
     onAchievements: () => void;
+    onRanking: () => void;
     onLanguageChange: (lang: Language) => void;
     onDifficultyChange: (diff: Difficulty) => void;
 }
@@ -338,7 +338,7 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
 const MenuContent = (props: MainMenuProps & { align: 'left' | 'center' }) => {
     const { 
         language, difficulty, isPlatinum, align,
-        onStart, onControls, onManual, onSettings, onAchievements, 
+        onStart, onManual, onSettings, onAchievements, onRanking, 
         onLanguageChange, onDifficultyChange 
     } = props;
     
@@ -371,11 +371,11 @@ const MenuContent = (props: MainMenuProps & { align: 'left' | 'center' }) => {
                 <MenuButton onClick={onStart}>{t('START')}</MenuButton>
                 <div className="grid grid-cols-2 gap-2 lg:gap-4">
                   <MenuButton variant="secondary" onClick={() => { audioManager.menuAccent('config'); onSettings(); }}>{t('MENU_CONFIG')}</MenuButton>
-                  <MenuButton variant="secondary" onClick={() => { audioManager.menuAccent('extras'); onManual(); }}>{t('MENU_EXTRAS')}</MenuButton>
+                  <MenuButton variant="secondary" onClick={() => { audioManager.menuAccent('extras'); onAchievements(); }}>{t('MENU_EXTRAS')}</MenuButton>
                 </div>
                 <div className="grid grid-cols-2 gap-2 lg:gap-4">
-                  <MenuButton variant="secondary" onClick={() => { audioManager.menuAccent('info'); onControls(); }}>{t('MENU_INFO')}</MenuButton>
-                  <MenuButton variant="secondary" onClick={() => { audioManager.menuAccent('ranking'); onAchievements(); }}>{t('MENU_RANKING')}</MenuButton>
+                  <MenuButton variant="secondary" onClick={() => { audioManager.menuAccent('info'); onManual(); }}>{t('MENU_INFO')}</MenuButton>
+                  <MenuButton variant="secondary" onClick={() => { audioManager.menuAccent('ranking'); onRanking(); }}>{t('MENU_RANKING')}</MenuButton>
                 </div>
                 
                 <div className={`flex gap-2 lg:gap-2 mt-2 lg:mt-6 ${isLeft ? 'justify-start' : 'justify-center'}`}>

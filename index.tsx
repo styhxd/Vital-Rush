@@ -14,7 +14,9 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { Capacitor } from '@capacitor/core';
 import App from './App';
+import './index.css';
 
 const rootElement = document.getElementById('root');
 
@@ -34,3 +36,9 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+if (Capacitor.isNativePlatform()) {
+  void import('@capgo/capacitor-updater')
+    .then(({ CapacitorUpdater }) => CapacitorUpdater.notifyAppReady())
+    .catch(() => {});
+}

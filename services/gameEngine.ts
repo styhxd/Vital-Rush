@@ -13,12 +13,11 @@
 
 import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette, Language } from '../types';
 import { COLORS_DEFAULT, COLORS_PLATINUM, CANVAS_WIDTH, CANVAS_HEIGHT, WAVES, DIFFICULTY_MODIFIERS, INITIAL_LIVES, ADRENALINE_MAX_DURATION, TEXTS } from '../constants';
-import { audioManager } from './audioManager';
+import { audioManager, type DrumHit } from './audioManager';
 import { buzz } from './haptics';
 import { achievementManager } from './achievementManager';
 import { BossArchitect, BossTrait } from './bossArchitect';
 import { OrganDirector, cellBudget, cellColor, cellRises, organBg, rollCellStyle } from './organDirector';
-
 const SIN_TABLE = new Float32Array(360);
 const COS_TABLE = new Float32Array(360);
 for (let i = 0; i < 360; i++) {
@@ -716,7 +715,7 @@ export class GameEngine {
           this.player.vel.y = this.dashVector.y * stats.dashSpeed;
           this.shakeIntensity = 10;
           this.screenShake = { x: -this.dashVector.x * 5, y: -this.dashVector.y * 5 };
-          audioManager.playShoot(); 
+          audioManager.playDash();
       }
   }
 
@@ -1175,6 +1174,7 @@ export class GameEngine {
     };
     const organLive = this.waveActive && this.waveStartDelay <= 0 && !this.isVacuuming && this.currentWaveIndex >= 0;
     this.organ.begin(dtSeconds, tick, organLive, organHooks);
+    if (this.organ.charting()) this.waveStartDelay = Math.max(0.05, this.organ.transitLeft());
     this.approachBg(dtSeconds);
 
       if (this.player.active) {
@@ -1186,7 +1186,7 @@ export class GameEngine {
           this.hpMilestoneSent = true;
           achievementManager.track('max_hp_200', Math.floor(this.player.maxHealth));
       }
-      if (!this.isDashing) {
+      if (!this.isDashing && !this.organ.charting()) {
           const moveScale = this.adrenalineActive ? tick * 1.5 : tick;
           const pace = this.organ.speedMul;
           this.player.vel.x += this.inputVector.x * stats.speed * 0.2 * moveScale * pace;
@@ -1214,12 +1214,12 @@ export class GameEngine {
         this.regenTimer = 0;
       }
       
-      const now = performance.now();
-      if (now - this.lastShotTime > stats.fireRate * this.organ.fireMul) {
+      audioManager.armGun(stats.fireRate * this.organ.fireMul);
+      const drum = audioManager.takeDrum();
+      if (drum && !this.isDashing && this.waveStartDelay <= 0) {
         const target = this.findTarget();
         if (target) {
-          this.shoot(target, stats);
-          this.lastShotTime = now;
+          this.shoot(target, stats, drum);
         } else if (this.sessionStats.timePlayed > 30 && this.sessionStats.bulletsFired === 0) {
             achievementManager.track('pacifist', 30);
         }
@@ -1791,7 +1791,7 @@ export class GameEngine {
     return closest;
   }
 
-  private shoot(target: Entity, stats: PlayerStats) {
+  private shoot(target: Entity, stats: PlayerStats, drum: DrumHit) {
       // SURPRESA 2: CHOQUE DE SISTEMA
       if (this.systemGlitchActive) {
           this.systemGlitchActive = false;
@@ -1826,7 +1826,7 @@ export class GameEngine {
           });
       }
       this.sessionStats.bulletsFired += count;
-      audioManager.playShoot();
+      audioManager.playDrum(drum);
       this.player.vel.x -= Math.cos(angle) * 0.5;
       this.player.vel.y -= Math.sin(angle) * 0.5;
   }

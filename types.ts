@@ -52,7 +52,8 @@ export enum GameState {
   PAUSED_UPGRADE, // (Depreciado? Talvez. Mas tá aqui)
   GAME_OVER,    // Tela de derrota
   LOADOUT,      // Menu in-game
-  ACHIEVEMENTS  // Menu de vaidade
+  ACHIEVEMENTS, // Menu de vaidade
+  RANKING
 }
 
 // Suporte a i18n (Internationalization).

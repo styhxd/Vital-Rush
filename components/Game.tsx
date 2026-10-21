@@ -8,6 +8,7 @@ import { achievementManager } from '../services/achievementManager';
 import { GameState, PlayerStats, Upgrade, WaveConfig, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
 import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES, ADRENALINE_MAX_DURATION } from '../constants';
 import { CANON_ROUTE, randomRoute } from '../services/casebook';
+import { postRun } from '../services/board';
 import { Joystick } from './Joystick';
 import { PauseMenu } from './PauseMenu';
 import { SettingsMenu } from './SettingsMenu';
@@ -18,6 +19,7 @@ import { motionClass, ScreenPresence } from './screenPresence';
 import { BioLab, SerumOffer, mutationCardStyles, rollSerumOffers, serumWindowMs } from './MutationCards';
 import { Dossier } from './Dossier';
 import { FieldGuide } from './FieldGuide';
+import { RankingBoard } from './RankingBoard';
 
 const systemLanguage = (): Language => {
   const tags = typeof navigator === 'undefined'
@@ -274,6 +276,12 @@ export const Game: React.FC = () => {
   const [forceHighQuality, setForceHighQuality] = useState(true);
 
   const [patient, setPatient] = useState<PatientProfile | null>(null);
+  const postedRef = useRef(false);
+  const runMetaRef = useRef({ difficulty: Difficulty.NORMAL, route: [...CANON_ROUTE] });
+  runMetaRef.current = {
+      difficulty,
+      route: patient?.route?.length === 5 ? patient.route : [...CANON_ROUTE],
+  };
   const [audioSettings, setAudioSettings] = useState(audioManager.settings);
   const [isMuted, setIsMuted] = useState(false);
   const [activeAchievement, setActiveAchievement] = useState<Achievement | null>(null);
@@ -396,6 +404,7 @@ export const Game: React.FC = () => {
       if ((gameState !== GameState.PLAYING && gameState !== GameState.WAVE_CLEARED) || isPaused) return;
       
       if (isDown) {
+        if ((e.code === 'Space' || e.code === 'Enter') && engineRef.current?.organ.advanceTransit()) return;
         keys.add(e.code);
         if (e.code === 'Space') triggerUltimate();
         if (e.code === 'ShiftLeft' || e.code === 'KeyE') triggerDash();
@@ -421,9 +430,17 @@ export const Game: React.FC = () => {
 
     window.addEventListener('keydown', (e) => handleKey(e, true));
     window.addEventListener('keyup', (e) => handleKey(e, false));
+    const advanceChart = (e: Event) => {
+      if (engineRef.current?.organ.advanceTransit()) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('pointerdown', advanceChart, true);
     return () => {
        window.removeEventListener('keydown', (e) => handleKey(e, true));
        window.removeEventListener('keyup', (e) => handleKey(e, false));
+       window.removeEventListener('pointerdown', advanceChart, true);
     };
   }, [gameState, triggerUltimate, triggerDash, isPaused]);
 
@@ -521,6 +538,7 @@ export const Game: React.FC = () => {
 
       audioManager.init();
       const newPatient = generatePatient(true);
+      postedRef.current = false;
       setPatient(newPatient);
       const jump = waveNum - 1;
       engineRef.current = new GameEngine(canvasRef.current, godStats, newPatient, difficulty, colors);
@@ -562,6 +580,19 @@ export const Game: React.FC = () => {
       }
   }
 
+  const rememberRun = useCallback(() => {
+      if (postedRef.current) return;
+      const score = Math.round(engineRef.current?.score ?? 0);
+      if (score <= 0) return;
+      postedRef.current = true;
+      postRun({
+          at: Date.now(),
+          score,
+          difficulty: runMetaRef.current.difficulty,
+          route: runMetaRef.current.route,
+      });
+  }, []);
+
   const loop = useCallback((time: number) => {
     if (!engineRef.current) {
         animationFrameRef.current = requestAnimationFrame(loop);
@@ -598,6 +629,7 @@ export const Game: React.FC = () => {
             },
             () => {
                 setGameState(GameState.GAME_OVER);
+                rememberRun();
                 audioManager.stopMusic();
                 setOutcomeBeat('lose');
                 setOutcomeLeaving(false);
@@ -688,7 +720,7 @@ export const Game: React.FC = () => {
     }
     
     animationFrameRef.current = requestAnimationFrame(loop);
-  }, [gameState, stats, isPaused, isLowPerfMode, handleBossSpawn, difficulty]);
+  }, [gameState, stats, isPaused, isLowPerfMode, handleBossSpawn, difficulty, rememberRun]);
 
   useEffect(() => {
     lastTimeRef.current = performance.now();
@@ -719,6 +751,7 @@ export const Game: React.FC = () => {
      audioManager.init(); 
      
      const newPatient = generatePatient();
+     postedRef.current = false;
      setPatient(newPatient);
 
      if (canvasRef.current) {
@@ -775,7 +808,8 @@ export const Game: React.FC = () => {
           if (eng.energy > newStats.maxEnergy) eng.energy = newStats.maxEnergy;
           if (eng.player.maxHealth >= 200) achievementManager.track('max_hp_200', Math.floor(eng.player.maxHealth));
           setStats(newStats);
-          audioManager.playPowerUp();
+          if (free) audioManager.playPowerUp();
+          else audioManager.playBuy();
 
           const nextUpgrades = upgradesRef.current.map(u => u.id === upgradeId ? { ...u, level: nextLevel } : u);
           upgradesRef.current = nextUpgrades;
@@ -1453,6 +1487,7 @@ export const Game: React.FC = () => {
                 setOutcomeBeat(null);
                 setOutcomeLeaving(false);
                 setIsPaused(false);
+                rememberRun();
                 setGameState(GameState.MENU);
                 audioManager.stopMusic();
                 audioManager.startMenuMusic();
@@ -1469,10 +1504,10 @@ export const Game: React.FC = () => {
           difficulty={difficulty}
           isPlatinum={isPlatinum}
           onStart={() => { handleStartGame(); audioManager.startMenuMusic(); }}
-          onControls={() => openControls(true)}
           onManual={() => setGameState(GameState.MANUAL)}
           onSettings={openSettings}
           onAchievements={openAchievements}
+          onRanking={() => setGameState(GameState.RANKING)}
           onLanguageChange={setLanguage}
           onDifficultyChange={setDifficulty}
       />
@@ -1571,12 +1606,25 @@ export const Game: React.FC = () => {
         )}
       </ScreenPresence>
 
+      <ScreenPresence show={gameState === GameState.RANKING}>
+        {(phase) => (
+          <div className={`absolute inset-0 z-50 ${motionClass(phase)}`}>
+            <RankingBoard
+              language={language}
+              title={t('MENU_RANKING')}
+              backLabel={t('BACK')}
+              onBack={() => setGameState(GameState.MENU)}
+            />
+          </div>
+        )}
+      </ScreenPresence>
+
       <ScreenPresence show={gameState === GameState.MANUAL}>
         {(phase) => (
         <div className={`absolute inset-0 z-50 ${motionClass(phase)}`}>
            <FieldGuide
               language={language}
-              title={t('MANUAL')}
+              title={t('MENU_INFO')}
               backLabel={t('BACK')}
               onBack={() => setGameState(GameState.MENU)}
            />
@@ -1684,7 +1732,8 @@ export const Game: React.FC = () => {
           onResume={togglePause} 
           onSettings={openSettings}
           onQuit={() => {
-              togglePause(); // Unpause logic
+              rememberRun();
+              togglePause();
               setGameState(GameState.MENU);
           }}
       />
