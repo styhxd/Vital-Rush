@@ -802,10 +802,40 @@ export const mutationCardStyles = `
 }
 .lab-card.is-hot:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .lab-card.is-poor { cursor: default; }
-.lab-card.is-poor .lab-shade { opacity: 0.18; }
-.lab-card.is-poor .lab-art { filter: saturate(0.78) brightness(0.86) contrast(1.04); }
-.lab-card.is-poor .lab-snow { opacity: 0.72; }
-.lab-card.is-poor .lab-evolve { opacity: 1; color: #cbbfa8; text-shadow: none; }
+.lab-card.is-poor .lab-shell {
+    filter: brightness(0.52) saturate(0.72) sepia(0.34) hue-rotate(-14deg) contrast(1.08);
+}
+.lab-card.is-poor .lab-wash { opacity: 0.2; }
+.lab-card.is-poor .lab-art-glow { opacity: 0.05; }
+.lab-card.is-poor .lab-shade {
+    z-index: 1;
+    opacity: 1;
+    background: rgba(168, 24, 32, 0.58);
+    mix-blend-mode: multiply;
+}
+.lab-card.is-poor .lab-snow {
+    z-index: 2;
+    opacity: 0.82;
+    mix-blend-mode: screen;
+    background-image:
+        repeating-linear-gradient(0deg, rgba(255, 120, 110, 0.2) 0 1px, transparent 1px 4px),
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 1  0 0 0 0 0.24  0 0 0 0 0.2  1.15 0 0 0 -0.45'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    background-size: 100% 4px, 160px 160px;
+}
+.lab-card.is-poor .lab-art {
+    z-index: 3;
+    filter: saturate(0.9) brightness(0.96) contrast(1.04) drop-shadow(0 6px 0 rgba(0,0,0,0.4));
+}
+.lab-card.is-poor .lab-rarity,
+.lab-card.is-poor .lab-copy,
+.lab-card.is-poor .lab-evolve { z-index: 5; }
+.lab-card.is-poor .lab-level,
+.lab-card.is-poor .lab-meter,
+.lab-card.is-poor .lab-key { z-index: 6; }
+.lab-card.is-poor .lab-rim { z-index: 4; }
+.lab-card.is-poor .lab-scan,
+.lab-card.is-poor .lab-glint { display: none; }
+.lab-card.is-poor .lab-evolve { opacity: 1; color: #f0b2a8; text-shadow: 0 1px 0 rgba(0,0,0,0.8); }
 .lab-snow {
     position: absolute;
     inset: 0;
@@ -816,12 +846,12 @@ export const mutationCardStyles = `
         repeating-linear-gradient(0deg, rgba(255,255,255,0.16) 0 1px, transparent 1px 4px),
         repeating-linear-gradient(90deg, rgba(0,0,0,0.18) 0 2px, transparent 2px 5px);
     mix-blend-mode: overlay;
-    animation: lab-snow 0.16s steps(3) infinite;
+    animation: lab-snow 0.14s steps(4) infinite;
 }
 @keyframes lab-snow {
     0% { background-position: 0 0, 0 0; }
-    50% { background-position: 0 3px, 4px 0; }
-    100% { background-position: 0 -2px, -3px 2px; }
+    50% { background-position: 0 2px, 52px -36px; }
+    100% { background-position: 0 -1px, -24px 28px; }
 }
 .lab-card.is-max {
     cursor: default;
@@ -1027,6 +1057,6 @@ export const mutationCardStyles = `
     .serum-mark svg { width: 30px; height: 30px; }
 }
 @media (prefers-reduced-motion: reduce) {
-    .lab-scan, .lab-glint, .lab-more, .lab-card.is-offer .lab-evolve { animation: none; }
+    .lab-scan, .lab-glint, .lab-more, .lab-card.is-offer .lab-evolve, .lab-snow { animation: none; }
 }
 `;
