@@ -487,6 +487,7 @@ export class OrganDirector {
             this.strikeBand(this.biteY, 150, hooks, 0.48, 0.08, 0.34);
             hooks.shake(42);
             buzz('thud');
+            audioManager.playBite();
         }
         if (this.filterPhase === 'on') this.resolveFilter(hooks);
         for (const trace of this.traces) this.resolveTrace(trace, hooks);
@@ -731,7 +732,6 @@ export class OrganDirector {
             this.bitePhase = 'snap';
             this.biteT = 1.2;
             this.biteHit = false;
-            audioManager.playBite();
         } else if (this.bitePhase === 'snap' && this.biteT <= 0) {
             this.bitePhase = 'idle';
             this.biteClock = Math.max(11, (20 - this.local * 1.1) / pace);

@@ -88,9 +88,9 @@ export class AudioManager {
   private timerID: number | null = null;
 
   public settings = {
-    master: 0.8,
-    music: 0.6,
-    sfx: 0.7
+    master: 0.82,
+    music: 1,
+    sfx: 0.42
   };
 
   // Escalas Musicais
@@ -122,8 +122,11 @@ export class AudioManager {
     this.musicFilter.Q.value = 1;
 
     this.compressor = this.ctx.createDynamicsCompressor();
-    this.compressor.threshold.value = -12;
-    this.compressor.ratio.value = 8;
+    this.compressor.threshold.value = -8;
+    this.compressor.knee.value = 12;
+    this.compressor.ratio.value = 3;
+    this.compressor.attack.value = 0.012;
+    this.compressor.release.value = 0.28;
     
     this.musicGain.connect(this.musicFilter);
     this.musicFilter.connect(this.compressor);
@@ -468,11 +471,17 @@ export class AudioManager {
   }
 
   public updateVolumes() {
-    if (!this.masterGain || !this.ctx) return;
+    if (!this.masterGain || !this.musicGain || !this.sfxGain || !this.ctx) return;
     const now = this.ctx.currentTime;
-    this.masterGain.gain.setTargetAtTime(this.settings.master, now, 0.1);
-    this.musicGain!.gain.setTargetAtTime(this.settings.music, now, 0.1);
-    this.sfxGain!.gain.setTargetAtTime(this.settings.sfx, now, 0.1);
+    const master = Math.max(0, Math.min(1, this.settings.master));
+    const music = Math.max(0, Math.min(1, this.settings.music)) * 1.35;
+    const sfx = Math.max(0, Math.min(1, this.settings.sfx)) * 0.58;
+    this.masterGain.gain.cancelScheduledValues(now);
+    this.musicGain.gain.cancelScheduledValues(now);
+    this.sfxGain.gain.cancelScheduledValues(now);
+    this.masterGain.gain.setValueAtTime(master, now);
+    this.musicGain.gain.setValueAtTime(music, now);
+    this.sfxGain.gain.setValueAtTime(sfx, now);
   }
 
   public playShoot() { this.playBuffer('shoot', 0.6, Math.random()*2, 60); }
@@ -573,10 +582,12 @@ export class AudioManager {
   public playBite() {
       if (!this.ctx || !this.sfxGain) return;
       const t = this.ctx.currentTime;
-      this.puff(0.07, 2200, 0.42);
-      this.puff(0.14, 320, 0.28);
-      this.tone(t, 180, 0.12, 'square', 0.12, 900, this.sfxGain);
-      this.tone(t + 0.05, 70, 0.22, 'sine', 0.2, 240, this.sfxGain);
+      this.puff(0.03, 3800, 0.72);
+      this.puff(0.07, 640, 0.58);
+      this.tone(t, 860, 0.028, 'square', 0.16, 2400, this.sfxGain);
+      this.tone(t, 168, 0.07, 'triangle', 0.28, 700, this.sfxGain);
+      this.tone(t, 62, 0.22, 'sine', 0.62, 180, this.sfxGain);
+      this.tone(t + 0.02, 41, 0.28, 'sine', 0.4, 120, this.sfxGain);
   }
 
   public playBubble() {

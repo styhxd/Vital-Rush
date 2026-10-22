@@ -282,8 +282,9 @@ export const Game: React.FC = () => {
       difficulty,
       route: patient?.route?.length === 5 ? patient.route : [...CANON_ROUTE],
   };
-  const [audioSettings, setAudioSettings] = useState(audioManager.settings);
+  const [audioSettings, setAudioSettings] = useState(() => ({ ...audioManager.settings }));
   const [isMuted, setIsMuted] = useState(false);
+  const heardMasterRef = useRef(audioManager.settings.master);
   const [activeAchievement, setActiveAchievement] = useState<Achievement | null>(null);
   const [isPlatinum, setIsPlatinum] = useState(false);
   const [colors, setColors] = useState<ThemePalette>(COLORS_DEFAULT);
@@ -912,20 +913,27 @@ export const Game: React.FC = () => {
   };
 
   const toggleMute = () => {
-      const newVal = !isMuted;
-      setIsMuted(newVal);
-      if (newVal) {
-          audioManager.settings.master = 0;
+      const next = !isMuted;
+      if (next) {
+          const live = audioManager.settings.master;
+          if (live > 0.001) heardMasterRef.current = live;
+          audioManager.settings = { ...audioManager.settings, master: 0 };
       } else {
-          audioManager.settings.master = audioSettings.master;
+          const master = heardMasterRef.current > 0.001 ? heardMasterRef.current : 0.82;
+          const restored = { ...audioSettings, master };
+          audioManager.settings = restored;
+          setAudioSettings(restored);
+          audioManager.resume();
       }
+      setIsMuted(next);
       audioManager.updateVolumes();
   };
   
   const updateAudio = (type: 'master' | 'music' | 'sfx', val: number) => {
-      const newSettings = { ...audioSettings, [type]: val };
-      setAudioSettings(newSettings);
-      audioManager.settings = newSettings;
+      const nextSettings = { ...audioSettings, [type]: val };
+      setAudioSettings(nextSettings);
+      if (type === 'master' && val > 0.001) heardMasterRef.current = val;
+      audioManager.settings = isMuted ? { ...nextSettings, master: 0 } : nextSettings;
       audioManager.updateVolumes();
   }
   
