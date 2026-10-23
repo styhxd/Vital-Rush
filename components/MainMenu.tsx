@@ -5,11 +5,19 @@ import { TEXTS } from '../constants';
 import { audioManager } from '../services/audioManager';
 import { IntroSequence } from './IntroSequence';
 import { useScreenPresence } from './screenPresence';
+import vitalRaw from '../src/vectors/vital.svg?raw';
 
-// --- ASSETS CONFIGURATION ---
-const VITAL_HERO = new URL('../src/assets/vital.png', import.meta.url).href;
-const VIRUS = new URL('../src/assets/virus.png', import.meta.url).href;
+// Vectors live in src/vectors. The virus stays an image so the idle motion
+// and the button hit-test keep the same element. Vital is inline so the eye
+// bloom and the charge in the guns actually run.
+const VIRUS = new URL('../src/vectors/virus.svg', import.meta.url).href;
 const BACKGROUND = new URL('../src/assets/background.jpg', import.meta.url).href;
+const VITAL_MARKUP = vitalRaw
+    .replace(/^<\?xml[^>]*>\s*/, '')
+    .replace(
+        /<svg\b[^>]*>/,
+        '<svg class="vital-hero" viewBox="0 0 1289 1221" role="img" aria-label="Vital" xmlns="http://www.w3.org/2000/svg">'
+    );
 
 const MenuButton = ({ onClick, children, variant = 'primary', selected = false }: any) => {
     const base = "w-full py-2 lg:py-4 font-bold text-[10px] lg:text-xl tracking-widest uppercase clip-path-polygon transition-all hover:scale-105 shadow-[0_0_10px_rgba(0,0,0,0.4)] lg:shadow-[0_0_20px_rgba(0,0,0,0.4)] relative overflow-hidden group";
@@ -219,10 +227,10 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
         <div className={`absolute inset-0 bg-black flex items-center justify-center z-50 overflow-hidden ${present.phase === 'out' ? 'screen-out' : ''}`}>
             <style>{`
                 @keyframes vital-breath {
-                    0%, 100% { transform: scaleX(1) scaleY(1); }
-                    28% { transform: scaleX(0.982) scaleY(1.04); }
-                    52% { transform: scaleX(1) scaleY(1); }
-                    78% { transform: scaleX(1.035) scaleY(0.986); }
+                    0%, 100% { transform: scaleX(1) scaleY(1) rotate(0deg); }
+                    22% { transform: scaleX(0.96) scaleY(1.07) rotate(-0.75deg); }
+                    48% { transform: scaleX(1.02) scaleY(0.982) rotate(0.35deg); }
+                    74% { transform: scaleX(1.065) scaleY(0.955) rotate(1deg); }
                 }
                 @keyframes vital-arrive {
                     from { opacity: 0; transform: translate3d(34%, 10%, 0); }
@@ -261,6 +269,7 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     100% { transform: translate(-50%, -50%) rotate(-2deg); }
                 }
                 .anim-vital { animation: vital-breath 6.5s linear infinite; transform-origin: center bottom; will-change: transform; }
+                .vital-hero { height: 100%; width: auto; display: block; overflow: visible; }
                 .vital-arrive { animation: vital-arrive 1.25s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both; }
                 .bg-arrive { animation: bg-arrive 1.2s cubic-bezier(0.16, 1, 0.3, 1) both; }
                 .menu-arrive { animation: menu-arrive 0.95s cubic-bezier(0.16, 1, 0.3, 1) 0.22s both; }
@@ -318,11 +327,11 @@ export const MainMenu: React.FC<MainMenuProps> = (props) => {
                     ))}
 
                     <div className="vital-anchor absolute right-[2%] lg:right-[5%] bottom-0 lg:bottom-[-5%] h-[76%] lg:h-[90%] z-20 pointer-events-none flex items-end justify-end vital-arrive">
-                         <div className="h-full anim-vital">
-                         <img src={VITAL_HERO} alt="Vital" className="h-full w-auto max-w-none object-contain"
+                         <div
+                            className="h-full anim-vital"
                             style={{ filter: isPlatinum ? 'drop-shadow(0 0 30px rgba(255, 215, 0, 0.4))' : 'drop-shadow(0 0 30px rgba(0, 255, 255, 0.3))' }}
+                            dangerouslySetInnerHTML={{ __html: VITAL_MARKUP }}
                          />
-                         </div>
                     </div>
 
                     <div className="absolute left-0 top-0 h-full w-full lg:w-[45%] z-30 flex flex-col justify-center p-4 lg:p-16 scale-90 lg:scale-100 origin-left">
