@@ -33,7 +33,7 @@ export const Joystick: React.FC<JoystickProps> = ({ onMove }) => {
       const rect = zone.getBoundingClientRect();
       const localX = clientX - rect.left;
       const localY = clientY - rect.top;
-      const pad = VISUAL_SIZE / 2;
+      const pad = VISUAL_SIZE / 2 + 18;
       const x = Math.min(Math.max(localX, pad), rect.width - 16);
       const y = Math.min(Math.max(localY, pad), rect.height - pad);
       return { x, y, clientX: rect.left + x, clientY: rect.top + y };

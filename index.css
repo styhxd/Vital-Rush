@@ -3,4 +3,17 @@
 @import "@fontsource/chakra-petch/600.css";
 @import "@fontsource/chakra-petch/700.css";
 @import "@fontsource/teko/500.css";
-@import "@fontsource/teko/600.css";
+.hud-safe {
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  padding-right: calc(20px + env(safe-area-inset-right, 0px));
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  padding-left: calc(20px + env(safe-area-inset-left, 0px));
+}
+@media (min-width: 1024px) {
+  .hud-safe {
+    padding-top: calc(24px + env(safe-area-inset-top, 0px));
+    padding-right: calc(28px + env(safe-area-inset-right, 0px));
+    padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px));
+    padding-left: calc(28px + env(safe-area-inset-left, 0px));
+  }
+}

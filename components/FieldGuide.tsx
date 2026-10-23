@@ -604,9 +604,18 @@ const paint = (ctx: CanvasRenderingContext2D, kind: Kind, time: number, w: numbe
 };
 
 const ecgShape = (t: number) => {
-    const g = (c: number, amp: number, width: number) =>
-        amp * Math.exp(-((t - c) * (t - c)) / (2 * width * width));
-    return g(0.18, 6, 0.03) + g(0.34, -5, 0.012) + g(0.4, 22, 0.008) + g(0.46, -9, 0.012) + g(0.66, 8, 0.04);
+    const keys: Array<[number, number]> = [
+        [0, 0], [0.14, 0], [0.2, 6], [0.26, 0], [0.36, 0],
+        [0.4, -5], [0.44, 22], [0.48, -9], [0.52, 0],
+        [0.64, 0], [0.74, 8], [0.84, 0], [1, 0],
+    ];
+    if (t <= keys[0][0]) return keys[0][1];
+    for (let i = 1; i < keys.length; i++) {
+        const [t0, a0] = keys[i - 1];
+        const [t1, a1] = keys[i];
+        if (t <= t1) return a0 + (a1 - a0) * ((t - t0) / (t1 - t0 || 1));
+    }
+    return 0;
 };
 
 const Sprite: React.FC<{ kind: Kind }> = ({ kind }) => {

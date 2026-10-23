@@ -14,7 +14,6 @@
 
 import { useEffect } from 'react';
 import { StatusBar } from '@capacitor/status-bar';
-import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Game } from './components/Game';
 import { audioManager } from './services/audioManager';
@@ -23,14 +22,8 @@ export default function App() {
 
   useEffect(() => {
     const enforceImmersion = async () => {
-      // 1. Tenta travar a orientação (Nativo)
-      try {
-        await ScreenOrientation.lock({ orientation: 'landscape' });
-      } catch (e) {
-        // Fallback silencioso para navegadores desktop que não suportam lock
-      }
-
-      // 2. Esconde a StatusBar e faz o App desenhar "em cima" dela (Nativo)
+      // Paisagem nos dois sentidos. O manifesto trava sensorLandscape;
+      // um lock('landscape') do plugin prende só um dos lados.
       try {
         await StatusBar.setOverlaysWebView({ overlay: true });
         await StatusBar.hide();

@@ -813,7 +813,7 @@ export class OrganDirector {
 
         if (this.local >= 1) {
             this.ecgClock -= dt;
-            if (!this.ecgCue && this.ecgClock < 1.15 && this.ecgClock > 0) {
+            if (!this.ecgCue && this.ecgClock < 1.55 && this.ecgClock > 0) {
                 this.ecgCue = true;
                 audioManager.ecgApproach();
             }
@@ -1567,7 +1567,7 @@ export class OrganDirector {
 
     private tracePoints(trace: Trace): Vector2[] {
         const pts: Vector2[] = [];
-        const n = 56;
+        const n = 120;
         for (let i = 0; i <= n; i++) {
             const u = i / n;
             pts.push({ x: trace.x0 + u * trace.span, y: trace.y - pqrst(u, trace.shape) });
@@ -1987,17 +1987,12 @@ export class OrganDirector {
             if (pts.length < 2) return;
             ctx.beginPath();
             ctx.moveTo(pts[0].x, pts[0].y);
-            for (let i = 1; i < pts.length - 1; i++) {
-                const mx = (pts[i].x + pts[i + 1].x) / 2;
-                const my = (pts[i].y + pts[i + 1].y) / 2;
-                ctx.quadraticCurveTo(pts[i].x, pts[i].y, mx, my);
-            }
-            const last = pts[pts.length - 1];
-            ctx.lineTo(last.x, last.y);
+            for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
             ctx.strokeStyle = color;
             ctx.lineWidth = width;
-            ctx.lineJoin = 'round';
-            ctx.lineCap = 'round';
+            ctx.lineJoin = 'miter';
+            ctx.miterLimit = 2.5;
+            ctx.lineCap = 'butt';
             ctx.stroke();
         };
 
@@ -2024,7 +2019,7 @@ export class OrganDirector {
             ctx.stroke();
         } else {
             const raw = low ? this.tracePoints(trace).filter((_, i) => i % 2 === 0) : this.tracePoints(trace);
-            const pts = raw.map(p => ({ x: p.x, y: p.y + Math.sin(p.x * 0.018 + clock * 7) * 5 }));
+            const pts = raw;
             const glow = ['rgba(255, 36, 64, 0.28)', 'rgba(255, 96, 64, 0.26)', 'rgba(255, 30, 80, 0.34)', 'rgba(255, 170, 150, 0.24)'][trace.shape] || 'rgba(255, 36, 64, 0.28)';
             const ink = ['#fff6f7', '#ffe4d8', '#ffffff', '#ffd0d4'][trace.shape] || '#fff6f7';
             const width = [2.6, 3.3, 1.7, 2.3][trace.shape] || 2.6;
@@ -2882,25 +2877,28 @@ function paintApnea(ctx: CanvasRenderingContext2D, u: number) {
     }
 }
 
-function pqrst(t: number, shape: number): number {
-    const g = (center: number, amp: number, width: number) =>
-        amp * Math.exp(-((t - center) * (t - center)) / (2 * width * width));
+function ecgKeys(shape: number): Array<[number, number]> {
     if (shape === 1) {
-        return g(0.2, 12, 0.04) + g(0.42, -20, 0.02) + g(0.52, 62, 0.018) + g(0.64, -18, 0.02) + g(0.82, 30, 0.045);
+        return [[0, 0], [0.16, 0], [0.22, 12], [0.28, 0], [0.4, 0], [0.44, -22], [0.49, 64], [0.53, -20], [0.57, 0], [0.7, 0], [0.8, 28], [0.9, 0], [1, 0]];
     }
     if (shape === 2) {
-        return g(0.28, -10, 0.012) + g(0.33, 78, 0.0045) + g(0.37, -40, 0.008) + g(0.52, 14, 0.02);
+        return [[0, 0], [0.3, 0], [0.34, -12], [0.37, 86], [0.4, -36], [0.44, 0], [0.62, 0], [0.7, 12], [0.78, 0], [1, 0]];
     }
     if (shape === 3) {
-        return g(0.14, 18, 0.028) + g(0.32, 34, 0.012) + g(0.4, -16, 0.01) + g(0.55, 16, 0.02) + g(0.7, 26, 0.032);
+        return [[0, 0], [0.1, 0], [0.16, 20], [0.22, 0], [0.34, 0], [0.38, -8], [0.43, 36], [0.47, -14], [0.51, 0], [0.64, 0], [0.74, -18], [0.84, 0], [1, 0]];
     }
-    return (
-        g(0.18, 16, 0.026) +
-        g(0.33, -14, 0.011) +
-        g(0.39, 74, 0.007) +
-        g(0.455, -30, 0.011) +
-        g(0.66, 24, 0.036)
-    );
+    return [[0, 0], [0.14, 0], [0.2, 14], [0.26, 0], [0.36, 0], [0.395, -16], [0.43, 74], [0.465, -28], [0.5, 0], [0.62, 0], [0.72, 22], [0.82, 0], [1, 0]];
+}
+
+function pqrst(t: number, shape: number): number {
+    const keys = ecgKeys(shape);
+    if (t <= keys[0][0]) return keys[0][1];
+    for (let i = 1; i < keys.length; i++) {
+        const [t0, a0] = keys[i - 1];
+        const [t1, a1] = keys[i];
+        if (t <= t1) return a0 + (a1 - a0) * ((t - t0) / (t1 - t0 || 1));
+    }
+    return keys[keys.length - 1][1];
 }
 
 function synapsePoints(a: Vector2, b: Vector2): Vector2[] {

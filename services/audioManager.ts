@@ -597,7 +597,8 @@ export class AudioManager {
       const t = this.ctx.currentTime;
       this.tempoMul = 1.12;
       this.tempoBackAt = t + 1.7;
-      for (let i = 0; i < 8; i++) this.pip(t + i * 0.125, 980, 0.04, 0.14);
+      // A bedside monitor sits near 1 kHz. This run is a fast heart, about 170 bpm, still separate pips.
+      for (let i = 0; i < 5; i++) this.monitorBeep(t + i * 0.35, 1000, 0.11, 0.2);
   }
 
   public ecgPass(at?: { x: number; y: number } | null) {
@@ -607,20 +608,29 @@ export class AudioManager {
       this.tempoMul = 1.06;
       this.tempoBackAt = t + 1.5;
       const osc = this.ctx.createOscillator();
+      const over = this.ctx.createOscillator();
       const g = this.ctx.createGain();
+      const g2 = this.ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(640, t);
-      osc.frequency.linearRampToValueAtTime(760, t + 0.08);
-      osc.frequency.setValueAtTime(760, t + 1.05);
-      osc.frequency.linearRampToValueAtTime(520, t + 1.35);
+      over.type = 'sine';
+      osc.frequency.setValueAtTime(1000, t);
+      over.frequency.setValueAtTime(2000, t);
       g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.2, t + 0.03);
-      g.gain.setValueAtTime(0.16, t + 1.05);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+      g.gain.exponentialRampToValueAtTime(0.16, t + 0.04);
+      g.gain.setValueAtTime(0.16, t + 1.15);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.45);
+      g2.gain.setValueAtTime(0.0001, t);
+      g2.gain.exponentialRampToValueAtTime(0.03, t + 0.04);
+      g2.gain.setValueAtTime(0.03, t + 1.15);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t + 1.45);
       osc.connect(g);
+      over.connect(g2);
       g.connect(dest);
+      g2.connect(dest);
       osc.start(t);
-      osc.stop(t + 1.45);
+      over.start(t);
+      osc.stop(t + 1.5);
+      over.stop(t + 1.5);
   }
 
   public playBiteWarn(at?: { x: number; y: number } | null) {
@@ -1054,6 +1064,32 @@ export class AudioManager {
           const degree = lead[(Math.floor(step / 2) + 3) % lead.length];
           if (degree >= 0) this.tone(time, this.hz(score, degree + 4, 1), 0.28, 'sine', 0.05, cut, dest);
       }
+  }
+
+  private monitorBeep(time: number, freq: number, dur: number, vol: number) {
+      if (!this.ctx || !this.sfxGain) return;
+      const osc = this.ctx.createOscillator();
+      const over = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      const g2 = this.ctx.createGain();
+      osc.type = 'sine';
+      over.type = 'sine';
+      osc.frequency.setValueAtTime(freq, time);
+      over.frequency.setValueAtTime(freq * 2, time);
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.exponentialRampToValueAtTime(vol, time + 0.008);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+      g2.gain.setValueAtTime(0.0001, time);
+      g2.gain.exponentialRampToValueAtTime(vol * 0.22, time + 0.004);
+      g2.gain.exponentialRampToValueAtTime(0.0001, time + dur * 0.4);
+      osc.connect(g);
+      over.connect(g2);
+      g.connect(this.sfxGain);
+      g2.connect(this.sfxGain);
+      osc.start(time);
+      over.start(time);
+      osc.stop(time + dur + 0.02);
+      over.stop(time + dur + 0.02);
   }
 
   private pip(time: number, freq: number, dur: number, vol: number) {

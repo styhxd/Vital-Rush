@@ -336,7 +336,11 @@ export const Game: React.FC = () => {
     };
     checkLayout();
     window.addEventListener('resize', checkLayout);
-    return () => window.removeEventListener('resize', checkLayout);
+    window.addEventListener('orientationchange', checkLayout);
+    return () => {
+      window.removeEventListener('resize', checkLayout);
+      window.removeEventListener('orientationchange', checkLayout);
+    };
   }, []);
 
   useEffect(() => {
@@ -753,13 +757,7 @@ export const Game: React.FC = () => {
          const elem = document.documentElement;
          if (!document.fullscreenElement) {
              if (elem.requestFullscreen) {
-                 elem.requestFullscreen().then(() => {
-                     // TENTATIVA DE TRAVA NATIVA APÓS FULLSCREEN
-                     if ('orientation' in screen && 'lock' in screen.orientation) {
-                         // @ts-ignore - TS as vezes reclama do lock
-                         screen.orientation.lock('landscape').catch((err) => console.log('Orientation lock failed:', err));
-                     }
-                 }).catch((err) => {
+                 elem.requestFullscreen().catch((err) => {
                     console.log("Fullscreen blocked:", err);
                  });
              } else if ((elem as any).webkitRequestFullscreen) {
@@ -1343,7 +1341,7 @@ export const Game: React.FC = () => {
           </div>
       )}
 
-      <div className={`absolute top-4 left-1/2 transform -translate-x-1/2 z-[100] transition-all duration-500 ease-out ${activeAchievement ? 'translate-y-0 opacity-100' : '-translate-y-20 opacity-0'}`}>
+      <div className="absolute left-1/2 z-[100] -translate-x-1/2 transition-all duration-500 ease-out" style={{ top: 'calc(12px + env(safe-area-inset-top, 0px))', transform: activeAchievement ? 'translate(-50%, 0)' : 'translate(-50%, -140%)' }}>
           {activeAchievement && (
               <div className={`flex items-center gap-2 lg:gap-4 p-2 lg:p-4 rounded border-2 shadow-[0_0_30px_rgba(0,0,0,0.8)] backdrop-blur-md min-w-[220px] lg:min-w-[300px]
                   ${isPlatinum 
@@ -1360,7 +1358,7 @@ export const Game: React.FC = () => {
       </div>
 
       {(gameState === GameState.PLAYING || gameState === GameState.WAVE_CLEARED || gameState === GameState.LOADOUT) && (
-        <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between p-2 lg:p-6">
+        <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between hud-safe">
            <div className="flex justify-between items-start">
              <div className="flex flex-col gap-1 lg:gap-3 w-28 lg:w-64">
                 <div className={uiData.adrenaline ? 'adrenaline-hp' : undefined}>
@@ -1450,8 +1448,14 @@ export const Game: React.FC = () => {
            {isMobile && !isPaused && (
              <div className="absolute inset-0 z-10 pointer-events-none">
                  <div
-                    className="absolute bottom-6 right-6 flex gap-4 items-end"
-                    style={{ opacity: showTutorial ? 0 : 1, pointerEvents: showTutorial ? 'none' : 'auto', transition: 'opacity 280ms ease' }}
+                    className="absolute flex gap-4 items-end"
+                    style={{
+                        opacity: showTutorial ? 0 : 1,
+                        pointerEvents: showTutorial ? 'none' : 'auto',
+                        transition: 'opacity 280ms ease',
+                        right: 'calc(16px + env(safe-area-inset-right, 0px))',
+                        bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
+                    }}
                  >
                      <button 
                         onTouchStart={(e) => {
