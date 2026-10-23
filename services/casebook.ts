@@ -50,12 +50,6 @@ const OPEN: Record<Language, Record<OrganId, string>> = {
     },
 };
 
-const CLOSE: Record<Language, string> = {
-    PT: 'O Vital entra pelo primeiro foco. Cada órgão seguinte fecha mais, e o último não dá trégua.',
-    EN: 'Vital goes in through the first focus. Each next organ shuts tighter, and the last one gives no quarter.',
-    ES: 'Vital entra por el primer foco. Cada órgano siguiente cierra más, y el último no da tregua.',
-};
-
 const HOP: Record<Language, Record<string, string>> = {
     PT: {
         'molar>liver': 'As bactérias da gengiva descem pela veia porta e infectam o fígado',

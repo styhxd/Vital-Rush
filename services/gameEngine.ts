@@ -11,8 +11,8 @@
  * ATUALIZAÇÃO V4.8: MUTAÇÕES PROCEDURAIS DE ELITE
  */
 
-import { Entity, EntityType, Vector2, PlayerStats, GameState, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette, Language } from '../types';
-import { COLORS_DEFAULT, COLORS_PLATINUM, CANVAS_WIDTH, CANVAS_HEIGHT, WAVES, DIFFICULTY_MODIFIERS, INITIAL_LIVES, ADRENALINE_MAX_DURATION, TEXTS } from '../constants';
+import { Entity, EntityType, Vector2, PlayerStats, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette, Language } from '../types';
+import { COLORS_PLATINUM, CANVAS_WIDTH, CANVAS_HEIGHT, WAVES, DIFFICULTY_MODIFIERS, INITIAL_LIVES, ADRENALINE_MAX_DURATION, TEXTS } from '../constants';
 import { audioManager, type DrumHit } from './audioManager';
 import { buzz } from './haptics';
 import { achievementManager } from './achievementManager';
@@ -113,7 +113,6 @@ export class GameEngine {
       idleTime: 0
   };
   
-  private lastInputTime: number = 0;
   private patient: PatientProfile;
   private difficultyMods: any;
   private currentDifficulty: Difficulty;
@@ -144,7 +143,6 @@ export class GameEngine {
   private bgG = 20;
   private bgB = 12;
   private bgFill = '#1c140c'; 
-  private lastShotTime: number = 0;
   private spawnTimer: number = 0;
   private regenTimer: number = 0;
   private screenShake: Vector2 = { x: 0, y: 0 };
@@ -201,7 +199,6 @@ export class GameEngine {
     this.bgB = parseInt(this.bgFill.slice(5, 7), 16);
     
     this.player = this.createPlayer(initialStats);
-    this.lastInputTime = Date.now();
     this.forceHighQuality = true;
     
     for (let i = 0; i < cellBudget(this.organ.id); i++) this.spawnBackgroundCell(true);
@@ -638,7 +635,6 @@ export class GameEngine {
   public prepareWave() {
       this.particles = this.particles.filter(p => p.id === 'bg');
       this.entities = this.entities.filter(e => e.active && e.type === EntityType.PLAYER);
-      this.lastShotTime = performance.now();
       this.spawnTimer = 0;
       this.regenTimer = 0;
       this.grid.clear(); 

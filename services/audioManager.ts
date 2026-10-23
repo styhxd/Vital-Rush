@@ -68,7 +68,6 @@ export class AudioManager {
   private current16thNote: number = 0;
   
   // Estado do Jogo
-  private currentWave: number = 1;
   private organ: OrganId = 'molar';
   private layer = 2;
   private boss = false;
@@ -92,11 +91,6 @@ export class AudioManager {
     music: 1,
     sfx: 0.42
   };
-
-  // Escalas Musicais
-  private readonly SCALE_MAJOR = [0, 4, 7, 12]; 
-  private readonly SCALE_MINOR = [0, 3, 7, 10]; 
-  private readonly SCALE_DARK  = [0, 1, 6, 8]; 
 
   constructor() {}
 
@@ -160,7 +154,6 @@ export class AudioManager {
   private lastFilterFreq = -1;
 
   public setGameState(wave: number, healthRatio: number) {
-      this.currentWave = wave;
       if (this.musicFilter && this.ctx) {
           let targetFreq = 22000;
           if (healthRatio < 0.3) {

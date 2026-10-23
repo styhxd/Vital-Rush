@@ -12,7 +12,7 @@
  * sobre a StatusBar e Orientação.
  */
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { StatusBar } from '@capacitor/status-bar';
 import { ScreenOrientation } from '@capacitor/screen-orientation';
 import { App as CapacitorApp } from '@capacitor/app';

@@ -165,7 +165,7 @@ interface MainMenuProps {
 }
 
 export const MainMenu: React.FC<MainMenuProps> = (props) => {
-    const { isVisible, language, isPlatinum } = props;
+    const { isVisible, isPlatinum } = props;
     
     const [showIntro, setShowIntro] = useState(true);
     const present = useScreenPresence(isVisible && !showIntro);

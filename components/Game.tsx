@@ -5,7 +5,7 @@ import { GameEngine, comboDamageMultiplier, COMBO_RAMP_KILLS } from '../services
 import { organAccent, organNameKey, organVeinStyle, type OrganId } from '../services/organDirector';
 import { audioManager } from '../services/audioManager';
 import { achievementManager } from '../services/achievementManager';
-import { GameState, PlayerStats, Upgrade, WaveConfig, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
+import { GameState, PlayerStats, Upgrade, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
 import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES, ADRENALINE_MAX_DURATION } from '../constants';
 import { CANON_ROUTE, randomRoute } from '../services/casebook';
 import { postRun } from '../services/board';
@@ -61,23 +61,6 @@ const IconButton = ({ onClick, icon }: any) => (
   </button>
 );
 
-const readableInk = (hex: string) => {
-    const n = parseInt(hex.replace('#', ''), 16);
-    const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-    const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    if (lum > 0.55) return hex;
-    const lift = (c: number) => Math.round(c + (255 - c) * 0.62);
-    return `rgb(${lift(r)}, ${lift(g)}, ${lift(b)})`;
-};
-
-const DatabaseCard = ({ title, desc, color }: any) => (
-    <div className="dossier-card relative overflow-hidden pl-3">
-        <div className="absolute top-3 bottom-3 left-0 w-1 rounded-full" style={{ backgroundColor: color }}></div>
-        <h3 style={{ color: readableInk(color) }}>{title}</h3>
-        <p>{desc}</p>
-    </div>
-);
-
 const IconSpeaker = ({ muted }: { muted: boolean }) => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 lg:h-6 lg:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         {muted ? (
@@ -92,12 +75,6 @@ const IconSpeaker = ({ muted }: { muted: boolean }) => (
 const IconDNA = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 lg:h-6 lg:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-    </svg>
-);
-
-const IconTrophy = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 lg:h-6 lg:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" />
     </svg>
 );
 
@@ -935,11 +912,6 @@ export const Game: React.FC = () => {
       if (type === 'master' && val > 0.001) heardMasterRef.current = val;
       audioManager.settings = isMuted ? { ...nextSettings, master: 0 } : nextSettings;
       audioManager.updateVolumes();
-  }
-  
-  const openControls = (fromMenu: boolean) => {
-      setLastGameState(fromMenu ? GameState.MENU : GameState.PLAYING);
-      setGameState(GameState.CONTROLS);
   }
   
   const goBackFromControls = () => {

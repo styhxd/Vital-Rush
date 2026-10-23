@@ -5,8 +5,6 @@
  * ------------------------------------------------------------------
  */
 
-import { EntityType, Entity, Vector2 } from '../types';
-
 export enum BossTrait {
     SPRINTER = 'SPRINTER',   // Dá dashes na direção do player
     TOXIC = 'TOXIC',       // Solta poças de ácido

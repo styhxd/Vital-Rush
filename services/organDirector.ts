@@ -31,13 +31,6 @@ const THEME: Record<OrganId, { bg: string; accent: string; name: string }> = {
     brain: { bg: '#070410', accent: '#c9a6ff', name: 'ORG_BRAIN' },
 };
 
-const ENTER_KEY: Partial<Record<OrganId, string>> = {
-    liver: 'ORG_ENTER_LIVER',
-    heart: 'ORG_ENTER_HEART',
-    lung: 'ORG_ENTER_LUNG',
-    brain: 'ORG_ENTER_BRAIN',
-};
-
 export const ORGAN_CHEATS: Record<string, number> = {
     molar: 0,
     figado: 6,
@@ -275,7 +268,6 @@ export class OrganDirector {
     private filterT = 0;
     private filterX = 900;
     private filterY = 500;
-    private filterHit = false;
     private glycogenClock = 12;
 
     private ecgClock = 7;
@@ -763,7 +755,6 @@ export class OrganDirector {
                 this.filterT = this.filterSpan;
                 this.filterX = CANVAS_WIDTH * (0.38 + Math.random() * 0.4);
                 this.filterY = 160 + Math.random() * (CANVAS_HEIGHT - 320);
-                this.filterHit = false;
                 this.say('ALERT_FILTER', '#d6e36a');
                 audioManager.playSuction();
             }
@@ -776,7 +767,6 @@ export class OrganDirector {
                 this.filterPhase = 'on';
                 this.filterSpan = this.local <= 2 ? 5.2 : 4.5;
                 this.filterT = this.filterSpan;
-                this.filterHit = false;
                 audioManager.playGulp();
             } else if (this.filterPhase === 'on' && this.filterT <= 0) {
                 this.filterPhase = 'fade';
