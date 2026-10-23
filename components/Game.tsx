@@ -217,6 +217,19 @@ const TutorialOverlay = ({ isMobile, t }: { isMobile: boolean; t: (key: string) 
 
 // --- MAIN COMPONENT ---
 
+const PREFS_KEY = 'vr-prefs';
+
+function readPrefs(): { master?: number; music?: number; sfx?: number; mono?: boolean; lean?: boolean } {
+  try {
+    const raw = localStorage.getItem(PREFS_KEY);
+    if (!raw) return {};
+    const data = JSON.parse(raw);
+    return data && typeof data === 'object' ? data : {};
+  } catch {
+    return {};
+  }
+}
+
 export const Game: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
@@ -228,6 +241,7 @@ export const Game: React.FC = () => {
   const levelRef = useRef<Record<string, number>>({});
   const serumLockRef = useRef(false);
   const serumResolvedRef = useRef(false);
+  const intermissionRef = useRef(false);
   const grantRef = useRef<(id: string, free: boolean) => boolean>(() => false); 
   
   const [gameState, setGameState] = useState<GameState>(GameState.MENU);
@@ -250,7 +264,7 @@ export const Game: React.FC = () => {
   const [isMobile, setIsMobile] = useState(false);
   const [isPortrait, setIsPortrait] = useState(false);
   const [isLowPerfMode, setIsLowPerfMode] = useState(false); 
-  const [forceHighQuality, setForceHighQuality] = useState(true);
+  const [leanGraphics, setLeanGraphics] = useState(() => readPrefs().lean === true);
 
   const [patient, setPatient] = useState<PatientProfile | null>(null);
   const postedRef = useRef(false);
@@ -259,7 +273,17 @@ export const Game: React.FC = () => {
       difficulty,
       route: patient?.route?.length === 5 ? patient.route : [...CANON_ROUTE],
   };
-  const [audioSettings, setAudioSettings] = useState(() => ({ ...audioManager.settings }));
+  const [audioSettings, setAudioSettings] = useState(() => {
+    const prefs = readPrefs();
+    const next = {
+      master: typeof prefs.master === 'number' ? prefs.master : audioManager.settings.master,
+      music: typeof prefs.music === 'number' ? prefs.music : audioManager.settings.music,
+      sfx: typeof prefs.sfx === 'number' ? prefs.sfx : audioManager.settings.sfx,
+      mono: prefs.mono === true,
+    };
+    audioManager.settings = { ...audioManager.settings, ...next };
+    return next;
+  });
   const [isMuted, setIsMuted] = useState(false);
   const heardMasterRef = useRef(audioManager.settings.master);
   const [activeAchievement, setActiveAchievement] = useState<Achievement | null>(null);
@@ -274,6 +298,16 @@ export const Game: React.FC = () => {
   const [outcomeBeat, setOutcomeBeat] = useState<null | 'win' | 'lose'>(null);
   const [outcomeLeaving, setOutcomeLeaving] = useState(false);
   const outcomeTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem(PREFS_KEY, JSON.stringify({ ...audioSettings, lean: leanGraphics }));
+  }, [audioSettings, leanGraphics]);
+
+  const paintLook = (eng: GameEngine) => {
+    eng.leanGraphics = leanGraphics;
+    eng.forceHighQuality = !leanGraphics;
+    eng.isLowQuality = leanGraphics;
+  };
   const outcomeLeaveTimer = useRef<number | null>(null); 
   
   // State para controlar o tutorial e eventos de Boss
@@ -429,6 +463,7 @@ export const Game: React.FC = () => {
 
   const deployToWave = useCallback(() => {
       if (engineRef.current) {
+          intermissionRef.current = false;
           lastTimeRef.current = performance.now();
           const nextWaveIdx = engineRef.current.currentWaveIndex === -1 ? 0 : engineRef.current.currentWaveIndex + 1;
           
@@ -519,9 +554,10 @@ export const Game: React.FC = () => {
       postedRef.current = false;
       setPatient(newPatient);
       const jump = waveNum - 1;
+      intermissionRef.current = false;
       engineRef.current = new GameEngine(canvasRef.current, godStats, newPatient, difficulty, colors);
       engineRef.current.setLanguage(language);
-      engineRef.current.forceHighQuality = forceHighQuality;
+      paintLook(engineRef.current);
       setStats(godStats);
       setUpgrades(maxedUpgrades);
       engineRef.current.startWave(jump);
@@ -571,6 +607,23 @@ export const Game: React.FC = () => {
       });
   }, []);
 
+  const finishWave = useCallback(() => {
+      if (intermissionRef.current) return;
+      intermissionRef.current = true;
+      setGameState(GameState.WAVE_CLEARED);
+      audioManager.stopMusic();
+      audioManager.playWaveClear();
+      setOutcomeBeat('win');
+      setOutcomeLeaving(false);
+      if (outcomeTimer.current) window.clearTimeout(outcomeTimer.current);
+      if (outcomeLeaveTimer.current) window.clearTimeout(outcomeLeaveTimer.current);
+      outcomeLeaveTimer.current = window.setTimeout(() => setOutcomeLeaving(true), 1450);
+      outcomeTimer.current = window.setTimeout(() => {
+          setOutcomeBeat(null);
+          setOutcomeLeaving(false);
+      }, 2150);
+  }, []);
+
   const loop = useCallback((time: number) => {
     if (!engineRef.current) {
         animationFrameRef.current = requestAnimationFrame(loop);
@@ -591,20 +644,7 @@ export const Game: React.FC = () => {
           engineRef.current.update(
             dt, 
             stats, 
-            () => {
-                setGameState(GameState.WAVE_CLEARED);
-                audioManager.stopMusic();
-                audioManager.playWaveClear();
-                setOutcomeBeat('win');
-                setOutcomeLeaving(false);
-                if (outcomeTimer.current) window.clearTimeout(outcomeTimer.current);
-                if (outcomeLeaveTimer.current) window.clearTimeout(outcomeLeaveTimer.current);
-                outcomeLeaveTimer.current = window.setTimeout(() => setOutcomeLeaving(true), 1450);
-                outcomeTimer.current = window.setTimeout(() => {
-                    setOutcomeBeat(null);
-                    setOutcomeLeaving(false);
-                }, 2150);
-            },
+            () => finishWave(),
             () => {
                 setGameState(GameState.GAME_OVER);
                 rememberRun();
@@ -643,6 +683,8 @@ export const Game: React.FC = () => {
             },
             handleBossSpawn
           );
+      if (engineRef.current.currentWaveIndex >= 0 && !engineRef.current.waveActive) finishWave();
+
       if (engineRef.current.consumeSerum()) {
           const ids = rollSerumOffers(upgradesRef.current);
           if (ids.length > 0) {
@@ -698,7 +740,7 @@ export const Game: React.FC = () => {
     }
     
     animationFrameRef.current = requestAnimationFrame(loop);
-  }, [gameState, stats, isPaused, isLowPerfMode, handleBossSpawn, difficulty, rememberRun]);
+  }, [gameState, stats, isPaused, isLowPerfMode, handleBossSpawn, difficulty, rememberRun, finishWave]);
 
   useEffect(() => {
     lastTimeRef.current = performance.now();
@@ -733,9 +775,10 @@ export const Game: React.FC = () => {
      setPatient(newPatient);
 
      if (canvasRef.current) {
+         intermissionRef.current = false;
          engineRef.current = new GameEngine(canvasRef.current, INITIAL_STATS, newPatient, difficulty, colors);
          engineRef.current.setLanguage(language);
-         engineRef.current.forceHighQuality = forceHighQuality; // Apply existing setting
+         paintLook(engineRef.current);
          
          setStats(INITIAL_STATS);
          setUpgrades(UPGRADES.map(u => ({...u}))); 
@@ -879,14 +922,27 @@ export const Game: React.FC = () => {
     }
   };
 
+  const waveFinished = () => {
+      const eng = engineRef.current;
+      return !!eng && eng.currentWaveIndex >= 0 && !eng.waveActive;
+  };
+
   const togglePause = () => {
-      setIsPaused(p => !p);
       if (!isPaused) {
+          setIsPaused(true);
           audioManager.stopMusic();
-      } else {
-          lastTimeRef.current = performance.now();
-          audioManager.startGameMusic();
+          return;
       }
+      lastTimeRef.current = performance.now();
+      setIsPaused(false);
+      if (waveFinished() || gameState === GameState.WAVE_CLEARED) {
+          if (waveFinished()) {
+              intermissionRef.current = true;
+              setGameState(GameState.WAVE_CLEARED);
+          }
+          return;
+      }
+      if (gameState === GameState.PLAYING) audioManager.startGameMusic();
   };
 
   const toggleMute = () => {
@@ -917,19 +973,26 @@ export const Game: React.FC = () => {
   const goBackFromControls = () => {
       if (lastGameState === GameState.MENU) {
           setGameState(GameState.MENU);
-      } else {
-          lastTimeRef.current = performance.now();
-          setGameState(GameState.PLAYING);
-          if (!isPaused) setIsPaused(true); 
+          return;
       }
+      lastTimeRef.current = performance.now();
+      if (lastGameState === GameState.WAVE_CLEARED || waveFinished()) {
+          intermissionRef.current = true;
+          setIsPaused(false);
+          setGameState(GameState.WAVE_CLEARED);
+          return;
+      }
+      setGameState(GameState.PLAYING);
+      if (!isPaused) setIsPaused(true);
   }
 
-  // Novo Handler para Settings (Acessível do Menu e do Pause)
   const openSettings = () => {
       if (gameState === GameState.MENU) {
           setLastGameState(GameState.MENU);
+      } else if (gameState === GameState.WAVE_CLEARED || (isPaused && waveFinished())) {
+          setLastGameState(GameState.WAVE_CLEARED);
       } else if (isPaused) {
-          setLastGameState(GameState.PLAYING); // Vai voltar para o Pause (que é tecnicamente PLAYING + isPaused)
+          setLastGameState(GameState.PLAYING);
       } else {
           setLastGameState(gameState);
       }
@@ -940,9 +1003,12 @@ export const Game: React.FC = () => {
       setWaveDeck(false);
       if (lastGameState === GameState.MENU) {
           setGameState(GameState.MENU);
+      } else if (lastGameState === GameState.WAVE_CLEARED || waveFinished()) {
+          intermissionRef.current = true;
+          setIsPaused(false);
+          setGameState(GameState.WAVE_CLEARED);
       } else {
           setGameState(GameState.PLAYING);
-          // Se veio do pause, mantém pausado.
           if (!isPaused) setIsPaused(true);
       }
   };
@@ -1449,7 +1515,7 @@ export const Game: React.FC = () => {
         </div>
       )}
 
-      <ScreenPresence show={gameState === GameState.WAVE_CLEARED && (outcomeBeat !== 'win' || outcomeLeaving)}>
+      <ScreenPresence show={gameState === GameState.WAVE_CLEARED}>
         {(phase) => (
         <OutcomeChart
             variant="cleared"
@@ -1466,6 +1532,7 @@ export const Game: React.FC = () => {
                 if (outcomeLeaveTimer.current) window.clearTimeout(outcomeLeaveTimer.current);
                 setOutcomeBeat(null);
                 setOutcomeLeaving(false);
+                intermissionRef.current = false;
                 setIsPaused(false);
                 rememberRun();
                 setGameState(GameState.MENU);
@@ -1497,20 +1564,29 @@ export const Game: React.FC = () => {
           isVisible={gameState === GameState.SETTINGS}
           language={language}
           audioSettings={audioSettings}
-          forceHighQuality={forceHighQuality} // Passa o estado
+          leanGraphics={leanGraphics}
           onUpdateAudio={updateAudio}
           onLanguageChange={setLanguage}
-          onSystemPurge={handleSystemPurge} // WIRING UP THE SOFT RESET
+          onSystemPurge={handleSystemPurge}
           cheatInput={cheatInput}
           onCheatInput={handleCheatInput}
           waveDeck={waveDeck}
           onPickWave={launchGodRun}
           onCancelDeck={() => setWaveDeck(false)}
-          onToggleHighQuality={() => { // Função de toggle
-              const newVal = !forceHighQuality;
-              setForceHighQuality(newVal);
-              if (engineRef.current) engineRef.current.forceHighQuality = newVal;
-              if (newVal) audioManager.playPowerUp(); else audioManager.playHit();
+          onToggleLean={() => {
+              const next = !leanGraphics;
+              setLeanGraphics(next);
+              if (engineRef.current) {
+                  engineRef.current.leanGraphics = next;
+                  engineRef.current.forceHighQuality = !next;
+                  engineRef.current.isLowQuality = next;
+              }
+              if (next) audioManager.playHit(); else audioManager.playPowerUp();
+          }}
+          onToggleMono={() => {
+              const next = { ...audioSettings, mono: !audioSettings.mono };
+              setAudioSettings(next);
+              audioManager.settings = isMuted ? { ...next, master: 0 } : next;
           }}
           onClose={closeSettings}
       />

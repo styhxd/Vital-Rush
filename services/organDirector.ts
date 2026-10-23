@@ -332,7 +332,7 @@ export class OrganDirector {
             audioManager.playPage();
             return true;
         }
-        return true;
+        return false;
     }
 
     onWave(waveIndex: number, translate: (key: string) => string): boolean {
@@ -479,7 +479,7 @@ export class OrganDirector {
             this.strikeBand(this.biteY, 150, hooks, 0.48, 0.08, 0.34);
             hooks.shake(42);
             buzz('thud');
-            audioManager.playBite();
+            audioManager.playBite({ x: CANVAS_WIDTH / 2, y: this.biteY });
         }
         if (this.filterPhase === 'on') this.resolveFilter(hooks);
         for (const trace of this.traces) this.resolveTrace(trace, hooks);
@@ -541,8 +541,8 @@ export class OrganDirector {
         this.plaqueClock -= dt;
         if (this.plaqueClock <= 0) {
             this.plaqueClock = Math.max(7.2, (14 - this.local * 1.15) / pace);
-            this.spawnPool('plaque_', '#c6b06a', 58 + Math.random() * 28, 8.5);
-            audioManager.playStick();
+            const plaque = this.spawnPool('plaque_', '#c6b06a', 58 + Math.random() * 28, 8.5);
+            audioManager.playStick(plaque.pos);
         }
         if (this.local >= 2) {
             this.fluorideClock -= dt;
@@ -580,7 +580,7 @@ export class OrganDirector {
             }
             this.streams.push(this.makeStream(mid, i));
         }
-        audioManager.playWet();
+        audioManager.playWet(this.streams[this.streams.length - 1]?.mid);
     }
 
     private makeStream(mid: Vector2, slot: number): SalivaRibbon {
@@ -715,7 +715,7 @@ export class OrganDirector {
                 this.biteT = 2.2;
                 this.biteY = 180 + Math.random() * (CANVAS_HEIGHT - 360);
                 this.biteHit = false;
-                audioManager.playBiteWarn();
+                audioManager.playBiteWarn({ x: CANVAS_WIDTH / 2, y: this.biteY });
             }
             return;
         }
@@ -735,7 +735,7 @@ export class OrganDirector {
         if (this.bileClock <= 0) {
             this.bileClock = Math.max(7.4, (13 - this.local * 0.95) / pace);
             const pool = this.spawnPool('bile_', '#c6e04a', 84 + Math.random() * 40, 7.5);
-            audioManager.playDrip();
+            audioManager.playDrip(pool.pos);
             pool.vel.x = -0.45;
             pool.vel.y = (Math.random() - 0.5) * 0.35;
         }
@@ -756,7 +756,7 @@ export class OrganDirector {
                 this.filterX = CANVAS_WIDTH * (0.38 + Math.random() * 0.4);
                 this.filterY = 160 + Math.random() * (CANVAS_HEIGHT - 320);
                 this.say('ALERT_FILTER', '#d6e36a');
-                audioManager.playSuction();
+                audioManager.playSuction({ x: this.filterX, y: this.filterY });
             }
         } else {
             this.filterT -= dt;
@@ -767,7 +767,7 @@ export class OrganDirector {
                 this.filterPhase = 'on';
                 this.filterSpan = this.local <= 2 ? 5.2 : 4.5;
                 this.filterT = this.filterSpan;
-                audioManager.playGulp();
+                audioManager.playGulp({ x: this.filterX, y: this.filterY });
             } else if (this.filterPhase === 'on' && this.filterT <= 0) {
                 this.filterPhase = 'fade';
                 this.filterSpan = 0.95;
@@ -820,8 +820,8 @@ export class OrganDirector {
             if (this.ecgClock <= 0) {
                 this.ecgCue = false;
                 this.ecgClock = Math.max(10, (19 - this.local * 0.9) / pace);
-                audioManager.ecgPass();
                 const y = 170 + Math.random() * (CANVAS_HEIGHT - 340);
+                audioManager.ecgPass({ x: CANVAS_WIDTH * 0.5, y });
                 const shape = this.beatN % 4;
                 const spans = [0.56, 0.74, 0.64, 0.84];
                 this.traces.push({ y, x0: CANVAS_WIDTH + 20, age: -1.25, span: CANVAS_WIDTH * spans[shape], shape, hit: new Set(), playerHit: false });
@@ -842,14 +842,14 @@ export class OrganDirector {
             if (c.age >= 0) {
                 if (!c.loose) {
                     c.loose = true;
-                    audioManager.playClot();
+                    audioManager.playClot({ x: c.x, y: c.y });
                 }
                 c.x += c.vx * dt;
                 c.y += Math.sin(c.age * 1.3 + c.spin) * 22 * dt;
             } else {
                 const step = 0.34;
                 const prev = c.age - dt;
-                if (Math.floor(prev / step) !== Math.floor(c.age / step)) audioManager.playBubble();
+                if (Math.floor(prev / step) !== Math.floor(c.age / step)) audioManager.playBubble({ x: c.x, y: c.y });
             }
             return c.x > -c.r - 80 && c.y > -40 && c.y < CANVAS_HEIGHT + 40;
         });
@@ -938,7 +938,7 @@ export class OrganDirector {
             if (this.lungT <= 0) {
                 this.lungPhase = 'gust';
                 this.lungT = 1.2;
-                audioManager.playBreath('out');
+                audioManager.playBreath('out', { x: CANVAS_WIDTH * 0.5, y: CANVAS_HEIGHT * 0.5 });
                 audioManager.lungPush(Math.min(0.12, Math.hypot(this.gust.x, this.gust.y) * 0.012));
             }
         } else if (this.lungPhase === 'gust') {
@@ -956,7 +956,7 @@ export class OrganDirector {
                 this.lungT = 0.72;
                 this.coughPlayer = false;
                 this.coughBosses.clear();
-                audioManager.playCough();
+                audioManager.playCough({ x: CANVAS_WIDTH * 0.72, y: this.bandY });
                 audioManager.lungPush(-0.08);
                 hooks.shake(28);
                 buzz('thud');
@@ -982,7 +982,7 @@ export class OrganDirector {
             this.coughPlayer = false;
             this.coughBosses.clear();
             this.say('ALERT_COUGH', '#ff5a6a');
-            audioManager.playBreath('in');
+            audioManager.playBreath('in', { x: CANVAS_WIDTH * 0.7, y: this.bandY });
             audioManager.lungPush(-0.05);
             return;
         }
@@ -990,7 +990,7 @@ export class OrganDirector {
         this.gust = roll < 0.45 ? { x: -8.6, y: 0 } : roll < 0.75 ? { x: -6.4, y: -4.6 } : { x: -6.4, y: 4.6 };
         this.lungPhase = 'telegraph';
         this.lungT = 0.6;
-        audioManager.playBreath('in');
+        audioManager.playBreath('in', { x: CANVAS_WIDTH * 0.82, y: CANVAS_HEIGHT * 0.5 });
     }
 
     private restLung(pace: number) {
@@ -1036,7 +1036,7 @@ export class OrganDirector {
         for (const bolt of this.bolts) {
             if (!bolt.fired && bolt.t >= bolt.warn) {
                 bolt.fired = true;
-                audioManager.playZap();
+                audioManager.playZap({ x: (bolt.a.x + bolt.b.x) / 2, y: (bolt.a.y + bolt.b.y) / 2 });
                 hooks.shake(bolt.white ? 18 : 8);
                 if (bolt.white) this.whiteout = 0.35;
                 else this.storm = Math.max(this.storm, 0.26);

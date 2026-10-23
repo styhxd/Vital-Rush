@@ -89,8 +89,12 @@ export class AudioManager {
   public settings = {
     master: 0.82,
     music: 1,
-    sfx: 0.42
+    sfx: 0.42,
+    mono: false,
   };
+
+  private ear = { x: 960, y: 540 };
+  private shotDue = 0;
 
   constructor() {}
 
@@ -129,6 +133,18 @@ export class AudioManager {
     
     this.compressor.connect(this.masterGain);
     this.masterGain.connect(this.ctx.destination);
+    const listener = this.ctx.listener;
+    if (listener.positionX) {
+        listener.positionX.value = 0;
+        listener.positionY.value = 0;
+        listener.positionZ.value = 0;
+        listener.forwardX.value = 0;
+        listener.forwardY.value = 0;
+        listener.forwardZ.value = -1;
+        listener.upX.value = 0;
+        listener.upY.value = 1;
+        listener.upZ.value = 0;
+    }
     this.buildReverb();
     
     // Tenta carregar sons. Se falhar por segurança do browser, não quebra a app.
@@ -433,7 +449,47 @@ export class AudioManager {
       return offlineCtx.startRendering();
   }
 
-  private playBuffer(name: string, vol: number = 1.0, pitchSemitones: number = 0, throttleMs: number = 0) {
+  public setEar(x: number, y: number) {
+      this.ear.x = x;
+      this.ear.y = y;
+  }
+
+  private dropLater(node: AudioNode, life: number) {
+      if (!this.sfxGain || node === this.sfxGain) return;
+      window.setTimeout(() => { try { node.disconnect(); } catch { /* already gone */ } }, Math.ceil((life + 0.12) * 1000));
+  }
+
+  private sfxOut(at?: { x: number; y: number } | null, life = 0.45): AudioNode {
+      const dest = this.sfxGain;
+      const ctx = this.ctx;
+      if (!dest || !ctx) return dest as AudioNode;
+      if (!at || this.settings.mono) return dest;
+      const x = Math.max(-0.68, Math.min(0.68, (at.x - this.ear.x) / 960));
+      const z = Math.max(-0.48, Math.min(0.48, (at.y - this.ear.y) / 820));
+      try {
+          const panner = ctx.createPanner();
+          panner.panningModel = 'HRTF';
+          panner.distanceModel = 'inverse';
+          panner.refDistance = 340;
+          panner.maxDistance = 2600;
+          panner.rolloffFactor = 0.65;
+          const now = ctx.currentTime;
+          panner.positionX.setValueAtTime(x * 2.6, now);
+          panner.positionY.setValueAtTime(0, now);
+          panner.positionZ.setValueAtTime(-0.4 + z * 2, now);
+          panner.connect(dest);
+          this.dropLater(panner, life);
+          return panner;
+      } catch {
+          const pan = ctx.createStereoPanner();
+          pan.pan.value = x;
+          pan.connect(dest);
+          this.dropLater(pan, life);
+          return pan;
+      }
+  }
+
+  private playBuffer(name: string, vol: number = 1.0, pitchSemitones: number = 0, throttleMs: number = 0, at?: { x: number; y: number } | null) {
       if (!this.ctx || this.ctx.state !== 'running') return;
       if (!this.buffers[name]) return;
       
@@ -457,7 +513,8 @@ export class AudioManager {
       if (name === 'hat' || name === 'kick' || name === 'bass') {
           gain.connect(this.musicGain!);
       } else {
-          gain.connect(this.sfxGain!);
+          const life = (source.buffer?.duration ?? 0.3) / Math.max(0.25, source.playbackRate.value);
+          gain.connect(this.sfxOut(at, life));
       }
       
       source.start();
@@ -485,16 +542,16 @@ export class AudioManager {
       this.tone(t, 740, 0.04, 'square', 0.045, 2800, this.sfxGain);
       this.tone(t + 0.028, 988, 0.055, 'sine', 0.04, 3200, this.sfxGain);
   }
-  public playHit() { this.playBuffer('hit', 0.6, Math.random()*3, 60); }
-  public playExplosion() { this.playBuffer('expl', 0.8, 0, 100); }
-  public playPowerUp() { this.playBuffer('power', 0.5, 0, 80); }
-  public playSurge() { this.playBuffer('surge', 0.6, 0, 500); }
+  public playHit(at?: { x: number; y: number } | null) { this.playBuffer('hit', 0.6, Math.random()*3, 60, at); }
+  public playExplosion(at?: { x: number; y: number } | null) { this.playBuffer('expl', 0.8, 0, 100, at); }
+  public playPowerUp(at?: { x: number; y: number } | null) { this.playBuffer('power', 0.5, 0, 80, at); }
+  public playSurge(at?: { x: number; y: number } | null) { this.playBuffer('surge', 0.6, 0, 500, at); }
   
-  public playMineExplosionShot() { this.playBuffer('mine_expl_heavy', 0.6, 0, 150); } 
-  public playMineExplosionDash() { this.playBuffer('mine_expl_dash', 0.9, 0, 150); }
+  public playMineExplosionShot(at?: { x: number; y: number } | null) { this.playBuffer('mine_expl_heavy', 0.6, 0, 150, at); } 
+  public playMineExplosionDash(at?: { x: number; y: number } | null) { this.playBuffer('mine_expl_dash', 0.9, 0, 150, at); }
   
-  public playBossDash() { this.playBuffer('boss_dash', 0.7, 0, 300); }
-  public playEnemyShoot() { this.playBuffer('enemy_shoot', 0.4, Math.random()*2, 80); }
+  public playBossDash(at?: { x: number; y: number } | null) { this.playBuffer('boss_dash', 0.7, 0, 300, at); }
+  public playEnemyShoot(at?: { x: number; y: number } | null) { this.playBuffer('enemy_shoot', 0.4, Math.random()*2, 80, at); }
 
   private buildReverb() {
       if (!this.ctx || !this.musicGain || !this.compressor || this.reverbSend) return;
@@ -543,8 +600,9 @@ export class AudioManager {
       for (let i = 0; i < 8; i++) this.pip(t + i * 0.125, 980, 0.04, 0.14);
   }
 
-  public ecgPass() {
+  public ecgPass(at?: { x: number; y: number } | null) {
       if (!this.ctx || !this.sfxGain) return;
+      const dest = this.sfxOut(at, 1.5);
       const t = this.ctx.currentTime;
       this.tempoMul = 1.06;
       this.tempoBackAt = t + 1.5;
@@ -560,31 +618,34 @@ export class AudioManager {
       g.gain.setValueAtTime(0.16, t + 1.05);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
       osc.connect(g);
-      g.connect(this.sfxGain);
+      g.connect(dest);
       osc.start(t);
       osc.stop(t + 1.45);
   }
 
-  public playBiteWarn() {
+  public playBiteWarn(at?: { x: number; y: number } | null) {
       if (!this.ctx || !this.sfxGain) return;
+      const dest = this.sfxOut(at, 0.6);
       const t = this.ctx.currentTime;
-      this.tone(t, 210, 0.35, 'sawtooth', 0.05, 700, this.sfxGain);
-      this.tone(t + 0.16, 140, 0.4, 'triangle', 0.06, 500, this.sfxGain);
+      this.tone(t, 210, 0.35, 'sawtooth', 0.05, 700, dest);
+      this.tone(t + 0.16, 140, 0.4, 'triangle', 0.06, 500, dest);
   }
 
-  public playBite() {
+  public playBite(at?: { x: number; y: number } | null) {
       if (!this.ctx || !this.sfxGain) return;
+      const dest = this.sfxOut(at);
       const t = this.ctx.currentTime;
-      this.puff(0.03, 3800, 0.72);
-      this.puff(0.07, 640, 0.58);
-      this.tone(t, 860, 0.028, 'square', 0.16, 2400, this.sfxGain);
-      this.tone(t, 168, 0.07, 'triangle', 0.28, 700, this.sfxGain);
-      this.tone(t, 62, 0.22, 'sine', 0.62, 180, this.sfxGain);
-      this.tone(t + 0.02, 41, 0.28, 'sine', 0.4, 120, this.sfxGain);
+      this.puff(0.03, 3800, 0.72, undefined, dest);
+      this.puff(0.07, 640, 0.58, undefined, dest);
+      this.tone(t, 860, 0.028, 'square', 0.16, 2400, dest);
+      this.tone(t, 168, 0.07, 'triangle', 0.28, 700, dest);
+      this.tone(t, 62, 0.22, 'sine', 0.62, 180, dest);
+      this.tone(t + 0.02, 41, 0.28, 'sine', 0.4, 120, dest);
   }
 
-  public playBubble() {
+  public playBubble(at?: { x: number; y: number } | null) {
       if (!this.ctx || !this.sfxGain) return;
+      const dest = this.sfxOut(at);
       const t = this.ctx.currentTime;
       const osc = this.ctx.createOscillator();
       const g = this.ctx.createGain();
@@ -596,44 +657,46 @@ export class AudioManager {
       g.gain.exponentialRampToValueAtTime(0.11, t + 0.012);
       g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12);
       osc.connect(g);
-      g.connect(this.sfxGain);
+      g.connect(dest);
       osc.start(t);
       osc.stop(t + 0.14);
   }
 
-  public playSuction() {
+  public playSuction(at?: { x: number; y: number } | null) {
       if (!this.ctx || !this.sfxGain) return;
+      const dest = this.sfxOut(at, 0.85);
       const t = this.ctx.currentTime;
-      this.puff(0.7, 600, 0.16);
-      this.tone(t, 320, 0.7, 'sine', 0.06, 900, this.sfxGain);
+      this.puff(0.7, 600, 0.16, undefined, dest);
+      this.tone(t, 320, 0.7, 'sine', 0.06, 900, dest);
   }
 
-  public playGulp() {
-      this.playBubble();
-      window.setTimeout(() => this.playBubble(), 70);
+  public playGulp(at?: { x: number; y: number } | null) {
+      this.playBubble(at);
+      window.setTimeout(() => this.playBubble(at), 70);
       if (!this.ctx || !this.sfxGain) return;
-      this.tone(this.ctx.currentTime, 90, 0.2, 'sine', 0.12, 300, this.sfxGain);
+      this.tone(this.ctx.currentTime, 90, 0.2, 'sine', 0.12, 300, this.sfxOut(at));
   }
 
-  public playDrip() {
-      this.playBubble();
+  public playDrip(at?: { x: number; y: number } | null) {
+      this.playBubble(at);
   }
 
-  public playWet() {
-      this.puff(0.22, 700, 0.14);
-      this.playBubble();
+  public playWet(at?: { x: number; y: number } | null) {
+      this.puff(0.22, 700, 0.14, undefined, this.sfxOut(at));
+      this.playBubble(at);
   }
 
-  public playZap() {
+  public playZap(at?: { x: number; y: number } | null) {
       if (!this.ctx || !this.sfxGain) return;
+      const dest = this.sfxOut(at);
       const t = this.ctx.currentTime;
-      this.puff(0.06, 3200, 0.22);
-      this.tone(t, 1400, 0.08, 'square', 0.07, 4000, this.sfxGain);
-      this.tone(t + 0.04, 220, 0.12, 'sawtooth', 0.06, 1200, this.sfxGain);
+      this.puff(0.06, 3200, 0.22, undefined, dest);
+      this.tone(t, 1400, 0.08, 'square', 0.07, 4000, dest);
+      this.tone(t + 0.04, 220, 0.12, 'sawtooth', 0.06, 1200, dest);
   }
 
-  public playStick() {
-      this.puff(0.1, 240, 0.2);
+  public playStick(at?: { x: number; y: number } | null) {
+      this.puff(0.1, 240, 0.2, undefined, this.sfxOut(at));
   }
 
   public playGlyph() {
@@ -654,11 +717,12 @@ export class AudioManager {
       this.lungPushUntil = this.ctx.currentTime + 0.85;
   }
 
-  public playBreath(kind: 'in' | 'out' = 'out') {
+  public playBreath(kind: 'in' | 'out' = 'out', at?: { x: number; y: number } | null) {
       if (!this.ctx || !this.sfxGain) return;
-      const t = this.ctx.currentTime;
       const dur = kind === 'in' ? 0.5 : 0.9;
-      this.puff(dur, kind === 'in' ? 520 : 1500, kind === 'in' ? 0.1 : 0.2);
+      const dest = this.sfxOut(at, dur);
+      const t = this.ctx.currentTime;
+      this.puff(dur, kind === 'in' ? 520 : 1500, kind === 'in' ? 0.1 : 0.2, undefined, dest);
       const osc = this.ctx.createOscillator();
       const g = this.ctx.createGain();
       osc.type = 'sine';
@@ -668,21 +732,22 @@ export class AudioManager {
       g.gain.linearRampToValueAtTime(kind === 'in' ? 0.07 : 0.12, t + dur * 0.4);
       g.gain.linearRampToValueAtTime(0.0001, t + dur);
       osc.connect(g);
-      g.connect(this.sfxGain);
+      g.connect(dest);
       osc.start(t);
       osc.stop(t + dur + 0.02);
   }
-  public playCough() {
-      this.puff(0.12, 420, 0.28);
-      window.setTimeout(() => this.puff(0.1, 280, 0.22), 90);
-      window.setTimeout(() => this.puff(0.16, 180, 0.18), 180);
+  public playCough(at?: { x: number; y: number } | null) {
+      const dest = this.sfxOut(at);
+      this.puff(0.12, 420, 0.28, undefined, dest);
+      window.setTimeout(() => this.puff(0.1, 280, 0.22, undefined, this.sfxOut(at)), 90);
+      window.setTimeout(() => this.puff(0.16, 180, 0.18, undefined, this.sfxOut(at)), 180);
   }
-  public playClot() {
-      this.playBubble();
-      window.setTimeout(() => this.playBubble(), 80);
-      window.setTimeout(() => this.playBubble(), 150);
+  public playClot(at?: { x: number; y: number } | null) {
+      this.playBubble(at);
+      window.setTimeout(() => this.playBubble(at), 80);
+      window.setTimeout(() => this.playBubble(at), 150);
       if (!this.ctx || !this.sfxGain) return;
-      this.tone(this.ctx.currentTime, 70, 0.28, 'sine', 0.16, 220, this.sfxGain);
+      this.tone(this.ctx.currentTime, 70, 0.28, 'sine', 0.16, 220, this.sfxOut(at));
   }
   public playCrack() {
       if (!this.ctx || !this.sfxGain) return;
@@ -807,30 +872,23 @@ export class AudioManager {
   }
 
   public armGun(intervalMs: number) {
-      this.fireMs = Math.max(40, intervalMs);
+      this.fireMs = Math.max(140, intervalMs);
   }
 
-  /** Próximo tiro que caiu na grade. Slots velhos são comidos, sem rajada. */
+  /** Um tiro a cada fireMs de verdade. A grade antiga comia níveis inteiros da mitose. */
   public takeDrum(): DrumHit | null {
-      const ctx = this.ctx;
-      const clock = !!ctx && ctx.state === 'running' && this.currentTrack === 'GAME';
-      if (!clock || !ctx) return this.takeFallback();
-      this.fallbackNext = 0;
-      const every = this.pickEvery(this.fireMs, this.liveBpm());
-      this.drumEvery = every;
-      const now = ctx.currentTime;
-      let hit: DrumHit | null = null;
-      let cut = 0;
-      for (let i = 0; i < this.grid.length; i++) {
-          const slot = this.grid[i];
-          if (slot.t > now) break;
-          cut = i + 1;
-          if (now - slot.t > 0.06) continue;
-          if (slot.sixteenth % every !== 0) continue;
-          hit = this.drumVoice(slot.sixteenth, every);
-      }
-      if (cut) this.grid.splice(0, cut);
-      return hit;
+      const now = performance.now();
+      const step = this.fireMs;
+      if (this.shotDue <= 0) this.shotDue = now;
+      if (this.shotDue - now > step) this.shotDue = now + step;
+      if (now + 8 < this.shotDue) return null;
+      if (now - this.shotDue > step) this.shotDue = now;
+      const firedAt = this.shotDue;
+      this.shotDue += step;
+      const bpm = this.ctx && this.currentTrack === 'GAME' ? this.liveBpm() : 104;
+      const sixteenth = (60000 / Math.max(40, bpm)) / 4;
+      const index = Math.round(firedAt / sixteenth);
+      return this.drumVoice(((index % 16) + 16) % 16, 2);
   }
 
   private takeFallback(): DrumHit | null {
@@ -1031,7 +1089,7 @@ export class AudioManager {
       osc.stop(time + dur + 0.03);
   }
 
-  private puff(dur: number, cutoff: number, vol: number, when?: number) {
+  private puff(dur: number, cutoff: number, vol: number, when?: number, dest?: AudioNode) {
       if (!this.ctx || !this.sfxGain) return;
       const time = when ?? this.ctx.currentTime;
       const frames = Math.max(1, Math.floor(this.ctx.sampleRate * dur));
@@ -1049,7 +1107,7 @@ export class AudioManager {
       g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
       src.connect(f);
       f.connect(g);
-      g.connect(when === undefined ? this.sfxGain : this.musicGain || this.sfxGain);
+      g.connect(dest ?? (when === undefined ? this.sfxGain : this.musicGain || this.sfxGain));
       src.start(time);
       src.stop(time + dur + 0.02);
   }

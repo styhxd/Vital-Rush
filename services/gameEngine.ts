@@ -127,6 +127,7 @@ export class GameEngine {
   public dashDuration: number = 0;
   private dashVector: Vector2 = { x: 0, y: 0 };
   private dashTrailTimer: number = 0;
+  private dashStruck = new Set<string>();
   
   public currentWaveIndex: number = -1; 
   public waveTimer: number = 0;
@@ -168,7 +169,8 @@ export class GameEngine {
   private vacuumingTimer: number = 0; 
   
   public isLowQuality: boolean = false; 
-  public forceHighQuality: boolean = false; // Override flag
+  public forceHighQuality: boolean = false;
+  public leanGraphics: boolean = false;
   public allowSerum: boolean = true;
 
   private serumClock: number = 18;
@@ -386,7 +388,7 @@ export class GameEngine {
           mutation: mutation
       });
       
-      audioManager.playSurge(); 
+      audioManager.playSurge({ x: CANVAS_WIDTH * 0.82, y: CANVAS_HEIGHT / 2 }); 
   }
 
   public damageEnemy(target: Entity, amount: number, canCrit: boolean, stats: PlayerStats): boolean {
@@ -488,7 +490,7 @@ export class GameEngine {
               this.spawnText(this.player.pos, `+${heal}`, '#00ff00', 18);
           }
 
-          audioManager.playExplosion();
+          audioManager.playExplosion(target.pos);
 
           // O power-up voando cobre parte da progressão, então a biomassa cai um pouco.
           const dnaYield = 1.15;
@@ -555,7 +557,7 @@ export class GameEngine {
           }
       }
 
-      if (!isEnvironmental || amount >= 2) audioManager.playHit();
+      if (!isEnvironmental || amount >= 2) audioManager.playHit(sourcePos);
 
       if (this.player.health <= 0) {
           this.handlePlayerDeath(onGameOver, onLifeLost, stats);
@@ -680,7 +682,7 @@ export class GameEngine {
       if (!force) {
           this.spawnText(this.player.pos, this.t('MSG_SURGE'), this.colors.PLAYER_CORE, 45);
       }
-      audioManager.playSurge();
+      audioManager.playSurge(this.player.pos);
       this.entities.forEach(e => {
           if (e.type === EntityType.DNA_FRAGMENT && e.active) {
               const dx = this.player.pos.x - e.pos.x;
@@ -701,6 +703,7 @@ export class GameEngine {
       if (this.dashCooldownTimer <= 0 && !this.isDashing) {
           this.dashCooldownTimer = stats.dashCooldown / 1000;
           this.isDashing = true;
+          this.dashStruck.clear();
           this.dashDuration = 0.2; 
           let dx = this.inputVector.x;
           let dy = this.inputVector.y;
@@ -715,7 +718,7 @@ export class GameEngine {
       }
   }
 
-  private manageOrbitals(stats: PlayerStats) {
+  private manageOrbitals(stats: PlayerStats, dtSeconds: number) {
       let orbitalCount = 0;
       for(const e of this.entities) if (e.type === EntityType.ORBITAL) orbitalCount++;
 
@@ -728,7 +731,7 @@ export class GameEngine {
                   vel: { x: 0, y: 0 },
                   radius: 8,
                   health: 1, maxHealth: 1, color: this.colors.ORBITAL,
-                  damage: stats.damage * 0.5, 
+                  damage: stats.damage * 0.75, 
                   active: true,
                   orbitOffset: (i / stats.orbitals) * 360 
               });
@@ -737,12 +740,13 @@ export class GameEngine {
       
       for(const e of this.entities) {
           if (e.type === EntityType.ORBITAL && e.active) {
-              const radius = 60;
+              const radius = 92 + Math.min(3, stats.orbitals - 1) * 8;
               const speed = 3; 
               const angleIdx = ((this.time / 10 * speed) + (e.orbitOffset || 0));
               e.pos.x = this.player.pos.x + getCos(angleIdx) * radius;
               e.pos.y = this.player.pos.y + getSin(angleIdx) * radius;
-              e.damage = stats.damage * 0.5;
+              e.damage = stats.damage * 0.75;
+              if (e.shootTimer && e.shootTimer > 0) e.shootTimer = Math.max(0, e.shootTimer - dtSeconds);
           }
       }
   }
@@ -824,7 +828,7 @@ export class GameEngine {
               e.vel.y = (dy / dMag) * dashMag;
               m.dashTimer = 4.0;
               // VARIETY: SOUND CALL FOR BOSS DASH
-              audioManager.playBossDash();
+              audioManager.playBossDash(e.pos);
           }
       }
 
@@ -854,8 +858,7 @@ export class GameEngine {
                   });
               }
               m.shootTimer = 2.5;
-              // VARIETY: SOUND CALL FOR ENEMY SHOOT (BOSS)
-              audioManager.playEnemyShoot();
+              audioManager.playEnemyShoot(e.pos);
           }
       }
   }
@@ -869,23 +872,7 @@ export class GameEngine {
   public update(dt: number, stats: PlayerStats, onWaveClear: () => void, onGameOver: () => void, onLifeLost: () => void, onBossSpawn?: () => void) {
     if (dt > 32) dt = 32; 
 
-    if (!this.forceHighQuality) {
-        this.perfCheckTimer += dt;
-        if (this.perfCheckTimer > 500) { 
-            const avgFrameTime = this.frameTimes.reduce((a,b) => a+b, 0) / (this.frameTimes.length || 1);
-            if (avgFrameTime > 20) {
-                this.isLowQuality = true;
-            } else if (avgFrameTime < 14) {
-                this.isLowQuality = false;
-            }
-            this.frameTimes = [];
-            this.perfCheckTimer = 0;
-        }
-    } else {
-        this.isLowQuality = false;
-    }
-    
-    this.frameTimes.push(dt);
+    this.isLowQuality = this.leanGraphics;
 
     if (this.hitStopTimer > 0) {
         this.hitStopTimer -= (dt / 1000);
@@ -945,7 +932,7 @@ export class GameEngine {
         this.comboCount = 0; 
     }
 
-    if (this.player.active) this.manageOrbitals(stats);
+      if (this.player.active) this.manageOrbitals(stats, dtSeconds);
 
     if (this.isDashing) {
         this.dashDuration -= dtSeconds;
@@ -961,8 +948,8 @@ export class GameEngine {
                     achievementManager.track('mine_pop_20', 1);
                     this.spawnText(e.pos, this.t('MSG_BURST'), '#ffcc00', 45);
                     // VARIETY: SOUND CALL FOR MINE EXPLOSION (DASH)
-                    audioManager.playMineExplosionDash();
-                    audioManager.playSurge();
+                    audioManager.playMineExplosionDash(e.pos);
+                    audioManager.playSurge(e.pos);
                     buzz('boom'); 
 
                     this.particles.push({
@@ -990,8 +977,9 @@ export class GameEngine {
 
         if (stats.dashDamage > 0) {
             for (const e of this.entities) {
-                if ((this.isEnemy(e.type) || e.type === EntityType.BOSS) && e.active) {
+                if ((this.isEnemy(e.type) || e.type === EntityType.BOSS) && e.active && !this.dashStruck.has(e.id)) {
                     if (distSq(this.player.pos, e.pos) < (this.player.radius + e.radius) ** 2) {
+                        this.dashStruck.add(e.id);
                         if (this.damageEnemy(e, stats.dashDamage, false, stats)) {
                             this.sessionStats.dashKills++;
                             achievementManager.track('dash_kill_50', 1);
@@ -1048,12 +1036,10 @@ export class GameEngine {
                 this.spawnEnemy(config);
                 this.spawnTimer = 0;
               }
-          } else {
-              if (config.hasBoss && !this.bossSpawned) {
-                  this.spawnBoss(config);
-                  this.bossSpawned = true;
-                  if (onBossSpawn) onBossSpawn();
-              }
+          } else if (config.hasBoss && !this.bossSpawned) {
+              this.spawnBoss(config);
+              this.bossSpawned = true;
+              if (onBossSpawn) onBossSpawn();
           }
           
           const bossActive = this.entities.some(e => e.type === EntityType.BOSS && e.active);
@@ -1083,23 +1069,23 @@ export class GameEngine {
           const bossRemaining = this.entities.some(e => e.active && e.type === EntityType.BOSS);
           
           if (this.waveTimer >= config.duration) {
-              if (!enemiesRemaining && (!config.hasBoss || (this.bossSpawned && !bossRemaining))) {
-                  this.isVacuuming = true; 
-              } else if (!config.hasBoss && !bossRemaining) {
-                  const hasVisibleEnemies = this.entities.some(e => 
-                      (this.isEnemy(e.type) || e.type === EntityType.BOSS) && e.active &&
+              const bossStillDue = config.hasBoss && (!this.bossSpawned || bossRemaining);
+              if (!bossStillDue && !enemiesRemaining) {
+                  this.isVacuuming = true;
+              } else if (!bossStillDue) {
+                  const hasVisibleEnemies = this.entities.some(e =>
+                      this.isEnemy(e.type) && e.active &&
                       e.pos.x > -50 && e.pos.x < CANVAS_WIDTH + 50 &&
                       e.pos.y > -50 && e.pos.y < CANVAS_HEIGHT + 50
                   );
-
                   if (!hasVisibleEnemies) {
                       this.clearBufferTimer += dtSeconds;
-                      if (this.clearBufferTimer > 3.0) {
-                          this.killAllEnemies(); 
+                      if (this.clearBufferTimer > 2.4) {
+                          this.killAllEnemies();
                           this.isVacuuming = true;
                       }
                   } else {
-                      this.clearBufferTimer = 0; 
+                      this.clearBufferTimer = 0;
                   }
               }
           }
@@ -1170,10 +1156,13 @@ export class GameEngine {
     };
     const organLive = this.waveActive && this.waveStartDelay <= 0 && !this.isVacuuming && this.currentWaveIndex >= 0;
     this.organ.begin(dtSeconds, tick, organLive, organHooks);
-    if (this.organ.charting()) this.waveStartDelay = Math.max(0.05, this.organ.transitLeft());
+    if (this.organ.charting() && this.waveTimer <= 0 && !this.isVacuuming) {
+        this.waveStartDelay = Math.max(0.05, this.organ.transitLeft());
+    }
     this.approachBg(dtSeconds);
 
       if (this.player.active) {
+      audioManager.setEar(this.player.pos.x, this.player.pos.y);
       if (this.player.maxHealth !== stats.maxHealth) {
           this.player.maxHealth = stats.maxHealth;
           this.player.health = Math.min(this.player.health, this.player.maxHealth);
@@ -1259,7 +1248,7 @@ export class GameEngine {
                           '#e7d4ff',
                           22
                       );
-                      audioManager.playHit();
+                      audioManager.playHit(this.player.pos);
                       this.shakeIntensity = Math.max(this.shakeIntensity, 14);
                       const sparks = this.isLowQuality ? 2 : 5;
                       for (let k = 0; k < sparks; k++) {
@@ -1333,12 +1322,12 @@ export class GameEngine {
                         pos: { ...e.pos },
                         vel: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
                         radius: 12, health: 1, maxHealth: 1, color: this.colors.ENEMY_PROJECTILE,
-                        damage: 15 * this.difficultyMods.dmg, active: true, drag: 0
+                        damage: Math.max(4, e.damage * 0.28), active: true, drag: 0
                     });
                     
                     e.shootTimer = 3.5; 
                     // VARIETY: SOUND CALL FOR ENEMY SHOOT
-                    audioManager.playEnemyShoot();
+                    audioManager.playEnemyShoot(e.pos);
                 }
             }
         }
@@ -1400,8 +1389,8 @@ export class GameEngine {
                    this.shakeIntensity = 25;
                    this.spawnText(other.pos, this.t('MSG_BURST'), '#ffcc00', 55); 
                    // VARIETY: SOUND CALL FOR MINE EXPLOSION (SHOT)
-                   audioManager.playMineExplosionShot();
-                   audioManager.playSurge();
+                   audioManager.playMineExplosionShot(other.pos);
+                   audioManager.playSurge(other.pos);
                    buzz('boom'); 
                    
                    this.particles.push({
@@ -1443,16 +1432,18 @@ export class GameEngine {
            }
 
            if (this.isEnemy(other.type) || other.type === EntityType.BOSS) {
+             if (e.type === EntityType.ORBITAL && (e.shootTimer ?? 0) > 0) break;
              const rSum = e.radius + other.radius;
              if (Math.abs(e.pos.x - other.pos.x) < rSum && Math.abs(e.pos.y - other.pos.y) < rSum) {
                  if (distSq(e.pos, other.pos) < rSum * rSum) {
                    if (e.type === EntityType.ANTIBODY) e.active = false;
+                   if (e.type === EntityType.ORBITAL) e.shootTimer = 0.72;
                    
                    const comboPower = comboDamageMultiplier(this.comboCount);
                    this.damageEnemy(other, e.damage * (e.type === EntityType.ORBITAL ? 1 : comboPower), e.type === EntityType.ANTIBODY, stats);
                    
                    if (e.type === EntityType.ANTIBODY) {
-                       audioManager.playHit();
+                       audioManager.playHit(e.pos);
                        if (!this.isLowQuality) {
                            const angle = Math.atan2(e.vel.y, e.vel.x);
                            for(let j=0; j<2; j++) { 
@@ -1497,8 +1488,9 @@ export class GameEngine {
               if (dMag < pSum * 0.8) {
                  if (this.invulnerabilityTimer <= 0 && !this.isDashing) {
                      if (stats.thorns > 0) this.damageEnemy(e, stats.thorns, false, stats);
-                     let damage = e.type === EntityType.BOSS ? 25 : (e.isElite ? 2.5 : 0.6); // Aumentado ~20%
+                     let damage = e.type === EntityType.BOSS ? 25 : (e.isElite ? 2.5 : 0.6);
                      damage *= this.difficultyMods.dmg;
+                     if (e.type === EntityType.VIRUS) damage = Math.max(damage, e.damage * (e.isElite ? 0.62 : 0.55));
                      // Damage from enemy collision uses protection logic
                      this.damagePlayer(damage, e.pos, onGameOver, onLifeLost, stats, false, e);
                  }
@@ -1531,7 +1523,7 @@ export class GameEngine {
               this.sessionStats.biomassCollected += val;
               achievementManager.track('biomass_10k', val);
               if (this.biomass >= 3000) achievementManager.track('rich', 3000);
-              audioManager.playPowerUp();
+              audioManager.playPowerUp(e.pos);
             }
           }
         }
@@ -1667,7 +1659,7 @@ export class GameEngine {
           if (distSq(this.player.pos, e.pos) < reach * reach) {
               e.active = false;
               this.serumReady = true;
-              audioManager.playPowerUp();
+              audioManager.playPowerUp(e.pos);
               return;
           }
       }

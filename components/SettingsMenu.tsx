@@ -11,12 +11,13 @@ import { Dossier } from './Dossier';
 interface SettingsMenuProps {
     isVisible: boolean;
     language: Language;
-    audioSettings: { master: number; music: number; sfx: number };
-    forceHighQuality: boolean; // NEW PROP
+    audioSettings: { master: number; music: number; sfx: number; mono: boolean };
+    leanGraphics: boolean;
     onUpdateAudio: (type: 'master' | 'music' | 'sfx', val: number) => void;
     onLanguageChange: (lang: Language) => void;
     onSystemPurge: () => void;
-    onToggleHighQuality: () => void; // NEW PROP
+    onToggleLean: () => void;
+    onToggleMono: () => void;
     cheatInput: string;
     onCheatInput: (e: React.ChangeEvent<HTMLInputElement>) => void;
     waveDeck: boolean;
@@ -29,11 +30,12 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
     isVisible, 
     language, 
     audioSettings, 
-    forceHighQuality,
+    leanGraphics,
     onUpdateAudio, 
     onLanguageChange,
     onSystemPurge,
-    onToggleHighQuality,
+    onToggleLean,
+    onToggleMono,
     cheatInput,
     onCheatInput,
     waveDeck,
@@ -180,6 +182,13 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                     <Meter label={t('MASTER_OUTPUT')} value={audioSettings.master} onChange={(v) => onUpdateAudio('master', v)} />
                     <Meter label={t('MUSIC_STREAM')} value={audioSettings.music} onChange={(v) => onUpdateAudio('music', v)} />
                     <Meter label={t('SFX_FEEDBACK')} value={audioSettings.sfx} onChange={(v) => onUpdateAudio('sfx', v)} />
+                    <div className="dossier-card mb-2 mt-2">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="font-['Teko'] text-[16px] leading-none tracking-wide">{t('MONO_AUDIO')}</div>
+                            <Switch on={audioSettings.mono} onClick={onToggleMono} />
+                        </div>
+                        <p className="mt-2 text-[#e7b0a4]">{t('MONO_HINT')}</p>
+                    </div>
                     </section>
                     <section>
                     <h3 className="dossier-kicker">{t('VISUAL_OPTICS')}</h3>
@@ -193,7 +202,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                     <div className="dossier-card mb-2">
                         <div className="flex items-center justify-between gap-4">
                             <div className="font-['Teko'] text-[16px] leading-none tracking-wide">{t('HIGH_QUALITY')}</div>
-                            <Switch on={forceHighQuality} onClick={onToggleHighQuality} />
+                            <Switch on={leanGraphics} onClick={onToggleLean} />
                         </div>
                         <p className="mt-2 text-[#e7b0a4]">{t('HQ_WARNING')}</p>
                     </div>

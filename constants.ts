@@ -14,7 +14,7 @@
  * O equilíbrio deve ser mantido. Nada vem de graça.
  */
 
-import { Upgrade, EntityType, WaveConfig, Language, Difficulty, Achievement, ThemePalette } from './types';
+import { Upgrade, EntityType, WaveConfig, Language, Difficulty, Achievement, ThemePalette, PlayerStats } from './types';
 
 // --- PALETA DE CORES ---
 export const COLORS_DEFAULT: ThemePalette = {
@@ -343,7 +343,7 @@ export const TEXTS: TranslationMap = {
     STAT_ENERGY: "Pulse bar",
     STAT_LEVEL: "Level",
     RARITY_COMMON: "Common",
-    RARITY_RARE: "Raw",
+    RARITY_RARE: "Rare",
     RARITY_EPIC: "Epic",
     RARITY_LEGENDARY: "Legendary",
     PAUSE_HINT: "Take a breath. Nothing moves until you continue.",
@@ -367,31 +367,33 @@ export const TEXTS: TranslationMap = {
     CRT_DESC: "CRT SCANLINES & VIGNETTE",
     SYSTEM_PURGE: "SYSTEM PURGE (RESET DATA)",
     CONFIRM_PURGE: "⚠️ CONFIRM PURGE? ⚠️",
-    HIGH_QUALITY: "FORCE HIGH QUALITY",
-    HQ_WARNING: "WARNING: Disabling performance mode may cause severe lag on this device.",
+    HIGH_QUALITY: "LIGHTEN THE GAME",
+    HQ_WARNING: "Smoother on this device. The picture gets plainer.",
+    MONO_AUDIO: "MONO AUDIO",
+    MONO_HINT: "Turn this on if only one ear of the headphones works. Sounds stop coming from where the fight is.",
     // Upgrades
     UP_MITOSIS_NAME: "RAPID MITOSIS",
-    UP_MITOSIS_DESC: "Fire speed 6% faster",
+    UP_MITOSIS_DESC: "Fire speed 7% faster",
     UP_MEMBRANE_NAME: "TITANIUM MEMBRANE",
     UP_MEMBRANE_DESC: "+12% max HP and a full heal",
     UP_ENZYME_NAME: "HYPER ENZYMES",
     UP_ENZYME_DESC: "+8% damage",
     UP_MULTISHOT_NAME: "ADAPTIVE SPLIT",
-    UP_MULTISHOT_DESC: "+1 projectile, -25% damage",
+    UP_MULTISHOT_DESC: "+1 projectile. The volley hits 18% harder if the shots land",
     UP_ENERGY_NAME: "MITOCHONDRIAL STIMULATION",
     UP_ENERGY_DESC: "Pulse and dodge recharge 8% faster",
     UP_GIGA_NAME: "CYTOKINE STORM",
-    UP_GIGA_DESC: "+1 projectile, +20% damage, full heal",
+    UP_GIGA_DESC: "+1 projectile, the volley hits 20% harder, full heal",
     UP_ORBITAL_NAME: "ANTIBODIES",
-    UP_ORBITAL_DESC: "Adds +1 autonomous defensive antibody",
+    UP_ORBITAL_DESC: "An antibody orbits you and strikes for 75% of a shot",
     UP_DASH_NAME: "PLASMA TRAIL",
-    UP_DASH_DESC: "Dodge deals 15 damage to enemies you pass through",
+    UP_DASH_DESC: "Dodge deals 18 damage to each enemy you pass through",
     UP_CRIT_NAME: "PRECISION OPTICS",
-    UP_CRIT_DESC: "+4% crit chance, +0.15x crit damage",
+    UP_CRIT_DESC: "+5% crit chance, +0.20x crit damage",
     UP_THORNS_NAME: "SPINY CELLS",
-    UP_THORNS_DESC: "Deals 1.5 contact damage to attackers",
+    UP_THORNS_DESC: "Touching an enemy deals 8 damage back",
     UP_LIFE_NAME: "MACROPHAGES",
-    UP_LIFE_DESC: "Critical kills heal +1 HP",
+    UP_LIFE_DESC: "Critical kills heal 2",
     UP_MAGNET_NAME: "MAGNETIC FIELD",
     UP_MAGNET_DESC: "+10% magnet range and pulse radius",
     // Achievements
@@ -639,7 +641,7 @@ export const TEXTS: TranslationMap = {
     STAT_ENERGY: "Barra do pulso",
     STAT_LEVEL: "Nível",
     RARITY_COMMON: "Comum",
-    RARITY_RARE: "Cru",
+    RARITY_RARE: "Raro",
     RARITY_EPIC: "Épico",
     RARITY_LEGENDARY: "Lendário",
     PAUSE_HINT: "Respira. Nada se mexe até você continuar.",
@@ -663,31 +665,33 @@ export const TEXTS: TranslationMap = {
     CRT_DESC: "SCANLINES & VINHETA",
     SYSTEM_PURGE: "PURGAR SISTEMA (APAGAR)",
     CONFIRM_PURGE: "⚠️ CONFIRMAR PURGA? ⚠️",
-    HIGH_QUALITY: "FORÇAR ALTA QUALIDADE",
-    HQ_WARNING: "AVISO: Desativar o modo desempenho pode causar lentidão severa neste dispositivo.",
+    HIGH_QUALITY: "ALIVIAR O JOGO",
+    HQ_WARNING: "Fica mais leve neste aparelho. A imagem fica mais simples.",
+    MONO_AUDIO: "SOM MONO",
+    MONO_HINT: "Ligue se o fone só toca de um lado. O som deixa de vir de onde a briga está.",
     // Upgrades
     UP_MITOSIS_NAME: "MITOSE RÁPIDA",
-    UP_MITOSIS_DESC: "Velocidade de disparo 6% maior",
+    UP_MITOSIS_DESC: "Velocidade de disparo 7% maior",
     UP_MEMBRANE_NAME: "MEMBRANA DE TITÂNIO",
     UP_MEMBRANE_DESC: "+12% de HP máximo e cura total",
     UP_ENZYME_NAME: "HIPER ENZIMAS",
     UP_ENZYME_DESC: "+8% de dano",
     UP_MULTISHOT_NAME: "DIVISÃO ADAPTATIVA",
-    UP_MULTISHOT_DESC: "+1 projétil, -25% de dano",
+    UP_MULTISHOT_DESC: "+1 projétil. A salva acerta 18% mais forte se os tiros pegarem",
     UP_ENERGY_NAME: "ESTIMULAÇÃO MITOCÔNDRIA",
     UP_ENERGY_DESC: "Recarga do pulso e do desvio 8% mais rápida",
     UP_GIGA_NAME: "TEMPESTADE DE CITOCINAS",
-    UP_GIGA_DESC: "+1 projétil, +20% de dano e cura total",
+    UP_GIGA_DESC: "+1 projétil, a salva acerta 20% mais forte e cura total",
     UP_ORBITAL_NAME: "ANTICORPOS",
-    UP_ORBITAL_DESC: "Adiciona +1 anticorpo defensivo autônomo",
+    UP_ORBITAL_DESC: "Um anticorpo gira ao seu redor e golpeia por 75% de um tiro",
     UP_DASH_NAME: "RASTRO DE PLASMA",
-    UP_DASH_DESC: "O desvio causa 15 de dano aos inimigos que você atravessa",
+    UP_DASH_DESC: "O desvio causa 18 de dano a cada inimigo que você atravessa",
     UP_CRIT_NAME: "ÓPTICA DE PRECISÃO",
-    UP_CRIT_DESC: "+4% de chance crítica, +0,15x de dano crítico",
+    UP_CRIT_DESC: "+5% de chance crítica, +0,20x de dano crítico",
     UP_THORNS_NAME: "CÉLULAS ESPINHOSAS",
-    UP_THORNS_DESC: "Causa 1,5 de dano de contato aos atacantes",
+    UP_THORNS_DESC: "Encostar num inimigo devolve 8 de dano",
     UP_LIFE_NAME: "MACRÓFAGOS",
-    UP_LIFE_DESC: "Abates críticos curam +1 de vida",
+    UP_LIFE_DESC: "Abates críticos curam 2 de vida",
     UP_MAGNET_NAME: "CAMPO MAGNÉTICO",
     UP_MAGNET_DESC: "+10% de alcance do ímã e do pulso",
     // Achievements
@@ -935,7 +939,7 @@ export const TEXTS: TranslationMap = {
     STAT_ENERGY: "Barra del pulso",
     STAT_LEVEL: "Nivel",
     RARITY_COMMON: "Común",
-    RARITY_RARE: "Crudo",
+    RARITY_RARE: "Raro",
     RARITY_EPIC: "Épico",
     RARITY_LEGENDARY: "Legendario",
     PAUSE_HINT: "Respira. Nada se mueve hasta que continúes.",
@@ -959,31 +963,33 @@ export const TEXTS: TranslationMap = {
     CRT_DESC: "LÍNEAS CRT Y VIÑETA",
     SYSTEM_PURGE: "PURGAR SISTEMA (BORRAR)",
     CONFIRM_PURGE: "⚠️ ¿CONFIRMAR PURGA? ⚠️",
-    HIGH_QUALITY: "FORZAR ALTA CALIDAD",
-    HQ_WARNING: "AVISO: Desactivar el modo de rendimiento puede causar lag severo en este dispositivo.",
+    HIGH_QUALITY: "ALIGERAR EL JUEGO",
+    HQ_WARNING: "Va más ligero en este aparato. La imagen se ve más simple.",
+    MONO_AUDIO: "SONIDO MONO",
+    MONO_HINT: "Actívalo si el auricular solo suena de un lado. El sonido deja de venir de donde está la pelea.",
     // Upgrades
     UP_MITOSIS_NAME: "MITOSIS RÁPIDA",
-    UP_MITOSIS_DESC: "Velocidad de disparo un 6% mayor",
+    UP_MITOSIS_DESC: "Velocidad de disparo un 7% mayor",
     UP_MEMBRANE_NAME: "MEMBRANA DE TITANIO",
     UP_MEMBRANE_DESC: "+12% de vida máx. y cura total",
     UP_ENZYME_NAME: "HIPER ENZIMAS",
     UP_ENZYME_DESC: "+8% de daño",
     UP_MULTISHOT_NAME: "DIVISIÓN ADAPTATIVA",
-    UP_MULTISHOT_DESC: "+1 proyectil, -25% de daño",
+    UP_MULTISHOT_DESC: "+1 proyectil. La salva pega un 18% más fuerte si los tiros aciertan",
     UP_ENERGY_NAME: "ESTIMULACIÓN MITOCONDRIAL",
     UP_ENERGY_DESC: "El pulso y el esquive recargan un 8% más rápido",
     UP_GIGA_NAME: "TORMENTA DE CITOCINAS",
-    UP_GIGA_DESC: "+1 proyectil, +20% de daño y cura total",
+    UP_GIGA_DESC: "+1 proyectil, la salva pega un 20% más fuerte y cura total",
     UP_ORBITAL_NAME: "ANTICUERPOS",
-    UP_ORBITAL_DESC: "Añade +1 anticuerpo defensivo autónomo",
+    UP_ORBITAL_DESC: "Un anticuerpo gira a tu alrededor y golpea por el 75% de un tiro",
     UP_DASH_NAME: "RASTRO DE PLASMA",
-    UP_DASH_DESC: "El esquive causa 15 de daño a los enemigos que atraviesas",
+    UP_DASH_DESC: "El esquive causa 18 de daño a cada enemigo que atraviesas",
     UP_CRIT_NAME: "ÓPTICA DE PRECISIÓN",
-    UP_CRIT_DESC: "+4% de probabilidad crítica, +0,15x de daño crítico",
+    UP_CRIT_DESC: "+5% de probabilidad crítica, +0,20x de daño crítico",
     UP_THORNS_NAME: "CÉLULAS ESPINOSAS",
-    UP_THORNS_DESC: "Causa 1,5 de daño de contacto a los atacantes",
+    UP_THORNS_DESC: "Tocar a un enemigo devuelve 8 de daño",
     UP_LIFE_NAME: "MACRÓFAGOS",
-    UP_LIFE_DESC: "Las bajas críticas curan +1 de vida",
+    UP_LIFE_DESC: "Las bajas críticas curan 2 de vida",
     UP_MAGNET_NAME: "CAMPO MAGNÉTICO",
     UP_MAGNET_DESC: "+10% de alcance del imán y del pulso",
     // Achievements
@@ -1092,58 +1098,64 @@ export const WAVES: WaveConfig[] = [
 
 // O "Shopping" do jogo.
 // Inflação aplicada. Tudo custa o olho da cara.
+const volley = (s: PlayerStats, harder: number) => {
+  const count = s.bulletCount + 1;
+  const total = s.damage * s.bulletCount * harder;
+  return { ...s, bulletCount: count, damage: total / count };
+};
+
 export const UPGRADES: Upgrade[] = [
   {
     id: 'mitosis',
     nameKey: 'UP_MITOSIS_NAME',
     descKey: 'UP_MITOSIS_DESC',
     rarity: 'COMMON',
-    baseCost: 200,
-    costMultiplier: 1.8,
+    baseCost: 150,
+    costMultiplier: 1.42,
     level: 0,
     maxLevel: 10,
-    apply: (s) => ({ ...s, fireRate: Math.max(150, s.fireRate * 0.94) }) // Nerfado (era 0.92)
+    apply: (s) => ({ ...s, fireRate: Math.max(140, s.fireRate * 0.93) })
   },
   {
     id: 'enzyme',
     nameKey: 'UP_ENZYME_NAME',
     descKey: 'UP_ENZYME_DESC',
     rarity: 'RARE',
-    baseCost: 350,
-    costMultiplier: 1.8,
+    baseCost: 190,
+    costMultiplier: 1.42,
     level: 0,
     maxLevel: 10,
-    apply: (s) => ({ ...s, damage: s.damage * 1.08 }) // Nerfado (era 1.10)
+    apply: (s) => ({ ...s, damage: s.damage * 1.08 })
   },
   {
     id: 'membrane',
     nameKey: 'UP_MEMBRANE_NAME',
     descKey: 'UP_MEMBRANE_DESC',
     rarity: 'COMMON',
-    baseCost: 250,
-    costMultiplier: 1.6,
+    baseCost: 200,
+    costMultiplier: 1.3,
     level: 0,
     maxLevel: 10,
-    apply: (s) => ({ ...s, maxHealth: Math.floor(s.maxHealth * 1.12) }) // Nerfado (era 1.15). Cura total é aplicada na compra.
+    apply: (s) => ({ ...s, maxHealth: Math.floor(s.maxHealth * 1.12) })
   },
   {
     id: 'multishot',
     nameKey: 'UP_MULTISHOT_NAME',
     descKey: 'UP_MULTISHOT_DESC',
     rarity: 'EPIC',
-    baseCost: 1000,
-    costMultiplier: 2.5,
+    baseCost: 520,
+    costMultiplier: 1.38,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, bulletCount: s.bulletCount + 1, damage: s.damage * 0.75 }) // Nerfado (penalidade maior -25%)
+    apply: (s) => volley(s, 1.18)
   },
   {
     id: 'orbitals',
     nameKey: 'UP_ORBITAL_NAME',
     descKey: 'UP_ORBITAL_DESC',
     rarity: 'EPIC',
-    baseCost: 1500, // Ficou caro demais pra comprar no começo
-    costMultiplier: 3.0,
+    baseCost: 380,
+    costMultiplier: 1.55,
     level: 0,
     maxLevel: 4,
     apply: (s) => ({ ...s, orbitals: s.orbitals + 1 })
@@ -1153,76 +1165,76 @@ export const UPGRADES: Upgrade[] = [
     nameKey: 'UP_CRIT_NAME',
     descKey: 'UP_CRIT_DESC',
     rarity: 'RARE',
-    baseCost: 500,
-    costMultiplier: 2.0,
+    baseCost: 200,
+    costMultiplier: 1.5,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, critChance: s.critChance + 0.04, critMultiplier: s.critMultiplier + 0.15 }) // Nerfado
+    apply: (s) => ({ ...s, critChance: s.critChance + 0.05, critMultiplier: s.critMultiplier + 0.2 })
   },
   {
     id: 'dash_dmg',
     nameKey: 'UP_DASH_NAME',
     descKey: 'UP_DASH_DESC',
-    rarity: 'COMMON',
-    baseCost: 300,
-    costMultiplier: 1.8,
+    rarity: 'RARE',
+    baseCost: 240,
+    costMultiplier: 1.34,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, dashDamage: s.dashDamage + 15 }) // Nerfado (era 20)
+    apply: (s) => ({ ...s, dashDamage: s.dashDamage + 18 })
   },
   {
     id: 'thorns',
     nameKey: 'UP_THORNS_NAME',
     descKey: 'UP_THORNS_DESC',
     rarity: 'COMMON',
-    baseCost: 400,
-    costMultiplier: 2.0,
+    baseCost: 130,
+    costMultiplier: 1.4,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, thorns: s.thorns + 1.5 }) // Nerfado (2 -> 1.5)
+    apply: (s) => ({ ...s, thorns: s.thorns + 8 })
   },
   {
     id: 'lifesteal',
     nameKey: 'UP_LIFE_NAME',
     descKey: 'UP_LIFE_DESC',
     rarity: 'LEGENDARY',
-    baseCost: 3000, // Preço AUMENTADO (era 2000)
-    costMultiplier: 4.0, // Inflação AUMENTADA (era 3.5)
+    baseCost: 760,
+    costMultiplier: 1.6,
     level: 0,
     maxLevel: 3,
-    apply: (s) => ({ ...s, lifesteal: s.lifesteal + 1 }) // +1 de vida por abate crítico, por nível
+    apply: (s) => ({ ...s, lifesteal: s.lifesteal + 2 })
   },
   {
     id: 'magnet',
     nameKey: 'UP_MAGNET_NAME',
     descKey: 'UP_MAGNET_DESC',
     rarity: 'COMMON',
-    baseCost: 200,
-    costMultiplier: 1.5,
+    baseCost: 150,
+    costMultiplier: 1.4,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, magnetRadius: s.magnetRadius * 1.10, surgeRadiusMult: s.surgeRadiusMult * 1.1 }) // Nerfado
+    apply: (s) => ({ ...s, magnetRadius: s.magnetRadius * 1.10, surgeRadiusMult: s.surgeRadiusMult * 1.1 })
   },
   {
     id: 'energy_core',
     nameKey: 'UP_ENERGY_NAME',
     descKey: 'UP_ENERGY_DESC',
     rarity: 'RARE',
-    baseCost: 400,
-    costMultiplier: 1.8,
+    baseCost: 260,
+    costMultiplier: 1.46,
     level: 0,
     maxLevel: 5,
-    apply: (s) => ({ ...s, maxEnergy: Math.max(50, s.maxEnergy * 0.92), dashCooldown: Math.max(400, s.dashCooldown * 0.92) }) // Nerfado (8%)
+    apply: (s) => ({ ...s, maxEnergy: Math.max(50, s.maxEnergy * 0.92), dashCooldown: Math.max(400, s.dashCooldown * 0.92) })
   },
   {
     id: 'giga_blast',
     nameKey: 'UP_GIGA_NAME',
     descKey: 'UP_GIGA_DESC',
     rarity: 'LEGENDARY',
-    baseCost: 3000, // Aumentado (era 2500)
-    costMultiplier: 3.5, // Aumentado (era 3.0)
+    baseCost: 980,
+    costMultiplier: 1.62,
     level: 0,
     maxLevel: 3,
-    apply: (s) => ({ ...s, bulletCount: s.bulletCount + 1, damage: s.damage * 1.20 }) // NERFADO: +1 Proj (era +2). Cura total é aplicada na compra.
+    apply: (s) => volley(s, 1.2)
   }
 ];
