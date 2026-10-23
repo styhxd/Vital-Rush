@@ -95,6 +95,7 @@ export class AudioManager {
 
   private ear = { x: 960, y: 540 };
   private shotDue = 0;
+  private drive: Float32Array | null = null;
 
   constructor() {}
 
@@ -120,11 +121,11 @@ export class AudioManager {
     this.musicFilter.Q.value = 1;
 
     this.compressor = this.ctx.createDynamicsCompressor();
-    this.compressor.threshold.value = -8;
-    this.compressor.knee.value = 12;
-    this.compressor.ratio.value = 3;
-    this.compressor.attack.value = 0.012;
-    this.compressor.release.value = 0.28;
+    this.compressor.threshold.value = -16;
+    this.compressor.knee.value = 18;
+    this.compressor.ratio.value = 2;
+    this.compressor.attack.value = 0.02;
+    this.compressor.release.value = 0.32;
     
     this.musicGain.connect(this.musicFilter);
     this.musicFilter.connect(this.compressor);
@@ -254,18 +255,18 @@ export class AudioManager {
           osc.start();
       });
 
-      // HIT
-      this.buffers['hit'] = await this.renderOffline(0.1, (c) => {
+      // HIT: a short dull thud. The square blip was louder than the drums.
+      this.buffers['hit'] = await this.renderOffline(0.09, (c) => {
           const osc = c.createOscillator();
           const g = c.createGain();
-          osc.type = 'square';
-          osc.frequency.setValueAtTime(200, 0);
-          osc.frequency.exponentialRampToValueAtTime(10, 0.1);
-          g.gain.setValueAtTime(0.2, 0);
-          g.gain.exponentialRampToValueAtTime(0.01, 0.1);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(150, 0);
+          osc.frequency.exponentialRampToValueAtTime(62, 0.09);
+          g.gain.setValueAtTime(0.34, 0);
+          g.gain.exponentialRampToValueAtTime(0.01, 0.09);
           const f = c.createBiquadFilter();
           f.type = 'lowpass';
-          f.frequency.value = 800; 
+          f.frequency.value = 420;
           osc.connect(f);
           f.connect(g);
           g.connect(c.destination);
@@ -542,7 +543,7 @@ export class AudioManager {
       this.tone(t, 740, 0.04, 'square', 0.045, 2800, this.sfxGain);
       this.tone(t + 0.028, 988, 0.055, 'sine', 0.04, 3200, this.sfxGain);
   }
-  public playHit(at?: { x: number; y: number } | null) { this.playBuffer('hit', 0.6, Math.random()*3, 60, at); }
+  public playHit(at?: { x: number; y: number } | null) { this.playBuffer('hit', 0.26, 0, 50, at); }
   public playExplosion(at?: { x: number; y: number } | null) { this.playBuffer('expl', 0.8, 0, 100, at); }
   public playPowerUp(at?: { x: number; y: number } | null) { this.playBuffer('power', 0.5, 0, 80, at); }
   public playSurge(at?: { x: number; y: number } | null) { this.playBuffer('surge', 0.6, 0, 500, at); }
@@ -637,20 +638,17 @@ export class AudioManager {
       if (!this.ctx || !this.sfxGain) return;
       const dest = this.sfxOut(at, 0.6);
       const t = this.ctx.currentTime;
-      this.tone(t, 210, 0.35, 'sawtooth', 0.05, 700, dest);
-      this.tone(t + 0.16, 140, 0.4, 'triangle', 0.06, 500, dest);
+      this.tone(t, 78, 0.4, 'sine', 0.08, 180, dest);
+      this.tone(t + 0.18, 52, 0.46, 'sine', 0.1, 140, dest);
   }
 
   public playBite(at?: { x: number; y: number } | null) {
-      if (!this.ctx || !this.sfxGain) return;
-      const dest = this.sfxOut(at);
+      if (!this.ctx || !this.musicGain || !this.sfxGain) return;
       const t = this.ctx.currentTime;
-      this.puff(0.03, 3800, 0.72, undefined, dest);
-      this.puff(0.07, 640, 0.58, undefined, dest);
-      this.tone(t, 860, 0.028, 'square', 0.16, 2400, dest);
-      this.tone(t, 168, 0.07, 'triangle', 0.28, 700, dest);
-      this.tone(t, 62, 0.22, 'sine', 0.62, 180, dest);
-      this.tone(t + 0.02, 41, 0.28, 'sine', 0.4, 120, dest);
+      const body = this.musicGain;
+      this.play808(t, 128, 34, 0.4, 0.78, body);
+      this.play808(t + 0.02, 64, 30, 0.32, 0.46, body);
+      this.puff(0.12, 220, 0.16, t, this.sfxOut(at, 0.4));
   }
 
   public playBubble(at?: { x: number; y: number } | null) {
@@ -949,33 +947,60 @@ export class AudioManager {
       return this.drumVoice(((index % 16) + 16) % 16, every);
   }
 
+  /** Soft clip, then a low pass, so the 808 speaks on a phone without a bright edge. */
+  private driveCurve(): Float32Array {
+      if (this.drive) return this.drive;
+      const n = 1024;
+      const curve = new Float32Array(n);
+      for (let i = 0; i < n; i++) {
+          const x = (i / (n - 1)) * 2 - 1;
+          curve[i] = Math.tanh(x * 2.1) * 0.86;
+      }
+      this.drive = curve;
+      return curve;
+  }
+
+  private play808(time: number, startHz: number, endHz: number, dur: number, peak: number, dest: AudioNode) {
+      if (!this.ctx) return;
+      const osc = this.ctx.createOscillator();
+      const shape = this.ctx.createWaveShaper();
+      const tone = this.ctx.createBiquadFilter();
+      const g = this.ctx.createGain();
+      shape.curve = this.driveCurve() as Float32Array<ArrayBuffer>;
+      shape.oversample = '2x';
+      osc.type = 'sine';
+      const start = Math.max(46, startHz);
+      const end = Math.max(28, Math.min(endHz, start - 1));
+      osc.frequency.setValueAtTime(start, time);
+      osc.frequency.exponentialRampToValueAtTime(end, time + Math.min(0.055, dur * 0.32));
+      tone.type = 'lowpass';
+      tone.frequency.setValueAtTime(240, time);
+      tone.Q.value = 0.45;
+      g.gain.setValueAtTime(0.0001, time);
+      g.gain.exponentialRampToValueAtTime(Math.max(0.001, peak), time + 0.003);
+      g.gain.exponentialRampToValueAtTime(0.0001, time + Math.max(0.04, dur));
+      osc.connect(shape);
+      shape.connect(tone);
+      tone.connect(g);
+      g.connect(dest);
+      osc.start(time);
+      osc.stop(time + dur + 0.03);
+  }
+
   public playDrum(kind: DrumHit) {
       if (!this.ctx || !this.musicGain || this.ctx.state !== 'running') return;
       const t = this.ctx.currentTime;
-      const root = SCORES[this.organ].root;
       const dest = this.musicGain;
       if (kind === 'kick') {
-          const start = Math.max(48, root * 0.9);
-          const osc = this.ctx.createOscillator();
-          const g = this.ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(start, t);
-          osc.frequency.exponentialRampToValueAtTime(Math.max(32, root * 0.34), t + 0.09);
-          g.gain.setValueAtTime(0.0001, t);
-          g.gain.exponentialRampToValueAtTime(0.5, t + 0.006);
-          g.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
-          osc.connect(g);
-          g.connect(dest);
-          osc.start(t);
-          osc.stop(t + 0.15);
-          this.tone(t, start * 1.4, 0.02, 'triangle', 0.06, 420, dest);
+          this.play808(t, 156, 41, 0.48, 0.72, dest);
+          this.play808(t, 78, 41, 0.4, 0.22, dest);
       } else if (kind === 'snare') {
-          this.tone(t, root * 1.5, 0.08, 'triangle', 0.16, 1800, dest);
-          this.puff(0.07, 2100, 0.08, t);
+          this.play808(t, 180, 96, 0.12, 0.14, dest);
+          this.puff(0.07, 360, 0.05, t, dest);
       } else if (kind === 'hat') {
-          this.puff(0.025, 6800, 0.04, t);
+          this.play808(t, 108, 64, 0.045, 0.045, dest);
       } else {
-          this.tone(t, root, 0.06, 'sine', 0.11, 900, dest);
+          this.play808(t, 124, 54, 0.16, 0.16, dest);
       }
   }
 

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine, comboDamageMultiplier, COMBO_RAMP_KILLS } from '../services/gameEngine';
-import { organAccent, organBg, organNameKey, organVeinStyle, type OrganId } from '../services/organDirector';
+import { organAccent, organNameKey, organVeinStyle, type OrganId } from '../services/organDirector';
 import { audioManager } from '../services/audioManager';
 import { achievementManager } from '../services/achievementManager';
 import { GameState, PlayerStats, Upgrade, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
@@ -295,6 +295,7 @@ export const Game: React.FC = () => {
   const heartTimer = useRef<number | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const vignetteRef = useRef<HTMLDivElement>(null);
+  const marginFrameRef = useRef<HTMLDivElement>(null);
   const heartRefs = useRef<Array<SVGSVGElement | null>>([]);
   const [outcomeBeat, setOutcomeBeat] = useState<null | 'win' | 'lose' | 'organ'>(null);
   const [outcomeLeaving, setOutcomeLeaving] = useState(false);
@@ -801,6 +802,13 @@ export const Game: React.FC = () => {
         veil.style.width = canvas.style.width;
         veil.style.height = canvas.style.height;
       }
+      const lip = marginFrameRef.current;
+      if (lip) {
+        lip.style.left = canvas.style.left;
+        lip.style.top = canvas.style.top;
+        lip.style.width = canvas.style.width;
+        lip.style.height = canvas.style.height;
+      }
     };
     fit();
     const watch = new ResizeObserver(fit);
@@ -1092,13 +1100,8 @@ export const Game: React.FC = () => {
         className={`select-none ${isPlatinum ? 'bg-[#0a0a1a]' : 'bg-[#0f0505]'} ${isLowPerfMode ? 'perf-mode-low' : ''}`} 
         style={{...containerStyle, fontFamily: 'var(--font-tech)'}}
     >
-      <div
-        className="organ-margin"
-        aria-hidden
-        style={{ background: organBg(uiData.organId, isPlatinum) }}
-      >
-        <div className="organ-margin-edge" style={{ color: organAccent(uiData.organId) }} />
-      </div>
+      <div className="organ-margin" aria-hidden />
+      <div ref={marginFrameRef} className="organ-margin-frame" aria-hidden />
       <canvas ref={canvasRef} className="playfield" />
       
       {/* CSS Injection for Dynamic Keyframes */}
@@ -1326,19 +1329,16 @@ export const Game: React.FC = () => {
         @keyframes outcome-ring { 0% { transform: scale(0.15); opacity: 1; } 100% { transform: scale(2.8); opacity: 0; } }
         @keyframes outcome-pop { 0% { transform: scale(0.35); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         @keyframes outcome-spark { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-220px) scale(0.3); opacity: 0; } }
-        .organ-margin { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
-        .organ-margin-edge {
+        .organ-margin { position: absolute; inset: 0; z-index: 0; background: #050403; pointer-events: none; }
+        .organ-margin-frame {
             position: absolute;
-            inset: -8%;
-            background:
-                radial-gradient(ellipse at 0% 50%, currentColor, transparent 58%),
-                radial-gradient(ellipse at 100% 50%, currentColor, transparent 58%);
-            opacity: 0.14;
-            filter: blur(28px);
+            z-index: 0;
+            pointer-events: none;
+            box-shadow: 0 0 56px 18px rgba(255, 236, 214, 0.05);
         }
         .playfield { position: absolute; z-index: 1; display: block; }
         .playfield-vignette { right: auto; bottom: auto; z-index: 2; }
-        .perf-mode-low .organ-margin-edge { filter: none; opacity: 0.1; }
+        .perf-mode-low .organ-margin-frame { box-shadow: none; }
         .outcome-stack { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
         .trophy-rays {
             position: absolute;
