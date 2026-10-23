@@ -1,8 +1,8 @@
 
 
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from 'react';
 import { GameEngine, comboDamageMultiplier, COMBO_RAMP_KILLS } from '../services/gameEngine';
-import { organAccent, organNameKey, organVeinStyle, type OrganId } from '../services/organDirector';
+import { organAccent, organBg, organNameKey, organVeinStyle, type OrganId } from '../services/organDirector';
 import { audioManager } from '../services/audioManager';
 import { achievementManager } from '../services/achievementManager';
 import { GameState, PlayerStats, Upgrade, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
@@ -294,9 +294,12 @@ export const Game: React.FC = () => {
   const [heartbreak, setHeartbreak] = useState<{ index: number; dx: number; dy: number } | null>(null);
   const heartTimer = useRef<number | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const vignetteRef = useRef<HTMLDivElement>(null);
   const heartRefs = useRef<Array<SVGSVGElement | null>>([]);
-  const [outcomeBeat, setOutcomeBeat] = useState<null | 'win' | 'lose'>(null);
+  const [outcomeBeat, setOutcomeBeat] = useState<null | 'win' | 'lose' | 'organ'>(null);
   const [outcomeLeaving, setOutcomeLeaving] = useState(false);
+  const [passage, setPassage] = useState(false);
+  const passageRef = useRef(false);
   const outcomeTimer = useRef<number | null>(null);
 
   useEffect(() => {
@@ -420,6 +423,10 @@ export const Game: React.FC = () => {
       if ((gameState !== GameState.PLAYING && gameState !== GameState.WAVE_CLEARED) || isPaused) return;
       
       if (isDown) {
+        if (engineRef.current?.organ.charting()) {
+          if (e.code === 'Space' || e.code === 'Enter') engineRef.current.organ.advanceTransit();
+          return;
+        }
         if ((e.code === 'Space' || e.code === 'Enter') && engineRef.current?.organ.advanceTransit()) return;
         keys.add(e.code);
         if (e.code === 'Space') triggerUltimate();
@@ -490,6 +497,7 @@ export const Game: React.FC = () => {
           if (outcomeLeaveTimer.current) window.clearTimeout(outcomeLeaveTimer.current);
           audioManager.startGameMusic();
           setBossEntity(null);
+          setPassage(engineRef.current.organ.charting());
       }
   }, []);
 
@@ -616,16 +624,26 @@ export const Game: React.FC = () => {
       intermissionRef.current = true;
       setGameState(GameState.WAVE_CLEARED);
       audioManager.stopMusic();
-      audioManager.playWaveClear();
-      setOutcomeBeat('win');
+      const organHop = engineRef.current?.organ.willLeave(engineRef.current.currentWaveIndex) ?? false;
+      if (organHop) audioManager.playTrophy();
+      else audioManager.playWaveClear();
+      setOutcomeBeat(organHop ? 'organ' : 'win');
       setOutcomeLeaving(false);
       if (outcomeTimer.current) window.clearTimeout(outcomeTimer.current);
       if (outcomeLeaveTimer.current) window.clearTimeout(outcomeLeaveTimer.current);
-      outcomeLeaveTimer.current = window.setTimeout(() => setOutcomeLeaving(true), 1450);
+      const hold = organHop ? 3200 : 2600;
+      outcomeLeaveTimer.current = window.setTimeout(() => setOutcomeLeaving(true), hold);
       outcomeTimer.current = window.setTimeout(() => {
           setOutcomeBeat(null);
           setOutcomeLeaving(false);
-      }, 2150);
+          const eng = engineRef.current;
+          if (organHop && eng?.beginPassage()) {
+              passageRef.current = true;
+              setPassage(true);
+              lastTimeRef.current = performance.now();
+              setGameState(GameState.PLAYING);
+          }
+      }, hold + 700);
   }, []);
 
   const loop = useCallback((time: number) => {
@@ -687,6 +705,13 @@ export const Game: React.FC = () => {
             },
             handleBossSpawn
           );
+      if (passageRef.current && !engineRef.current.organ.charting()) {
+          passageRef.current = false;
+          setPassage(false);
+          intermissionRef.current = true;
+          setGameState(GameState.WAVE_CLEARED);
+      }
+
       if (engineRef.current.currentWaveIndex >= 0 && !engineRef.current.waveActive) finishWave();
 
       if (engineRef.current.consumeSerum()) {
@@ -740,6 +765,7 @@ export const Game: React.FC = () => {
             lives: eng.lives,
             organId: eng.organ.id
           });
+          setPassage(passageRef.current || eng.organ.charting());
       }
     }
     
@@ -751,6 +777,40 @@ export const Game: React.FC = () => {
     animationFrameRef.current = requestAnimationFrame(loop);
     return () => { if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current); }
   }, [loop]);
+
+  useLayoutEffect(() => {
+    const stage = stageRef.current;
+    const canvas = canvasRef.current;
+    if (!stage || !canvas) return;
+    const fit = () => {
+      const w = stage.clientWidth;
+      const h = stage.clientHeight;
+      if (w < 2 || h < 2) return;
+      const target = 16 / 9;
+      const wide = w / h > target;
+      const cw = wide ? h * target : w;
+      const ch = wide ? h : w / target;
+      canvas.style.width = `${cw}px`;
+      canvas.style.height = `${ch}px`;
+      canvas.style.left = `${(w - cw) / 2}px`;
+      canvas.style.top = `${(h - ch) / 2}px`;
+      const veil = vignetteRef.current;
+      if (veil) {
+        veil.style.left = canvas.style.left;
+        veil.style.top = canvas.style.top;
+        veil.style.width = canvas.style.width;
+        veil.style.height = canvas.style.height;
+      }
+    };
+    fit();
+    const watch = new ResizeObserver(fit);
+    watch.observe(stage);
+    window.addEventListener('resize', fit);
+    return () => {
+      watch.disconnect();
+      window.removeEventListener('resize', fit);
+    };
+  }, [isPortrait, isMobile]);
 
   const handleStartGame = () => {
      try {
@@ -819,11 +879,7 @@ export const Game: React.FC = () => {
 
           const eng = engineRef.current;
           eng.player.maxHealth = newStats.maxHealth;
-          if (upgradeId === 'membrane' || upgradeId === 'giga_blast') {
-              eng.player.health = newStats.maxHealth;
-          } else {
-              eng.player.health = Math.min(eng.player.health, newStats.maxHealth);
-          }
+          eng.player.health = Math.min(eng.player.health, newStats.maxHealth);
           if (eng.energy > newStats.maxEnergy) eng.energy = newStats.maxEnergy;
           if (eng.player.maxHealth >= 200) achievementManager.track('max_hp_200', Math.floor(eng.player.maxHealth));
           setStats(newStats);
@@ -1036,7 +1092,14 @@ export const Game: React.FC = () => {
         className={`select-none ${isPlatinum ? 'bg-[#0a0a1a]' : 'bg-[#0f0505]'} ${isLowPerfMode ? 'perf-mode-low' : ''}`} 
         style={{...containerStyle, fontFamily: 'var(--font-tech)'}}
     >
-      <canvas ref={canvasRef} className="relative z-[1] block w-full h-full object-contain" />
+      <div
+        className="organ-margin"
+        aria-hidden
+        style={{ background: organBg(uiData.organId, isPlatinum) }}
+      >
+        <div className="organ-margin-edge" style={{ color: organAccent(uiData.organId) }} />
+      </div>
+      <canvas ref={canvasRef} className="playfield" />
       
       {/* CSS Injection for Dynamic Keyframes */}
       <style>{`
@@ -1263,10 +1326,41 @@ export const Game: React.FC = () => {
         @keyframes outcome-ring { 0% { transform: scale(0.15); opacity: 1; } 100% { transform: scale(2.8); opacity: 0; } }
         @keyframes outcome-pop { 0% { transform: scale(0.35); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         @keyframes outcome-spark { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-220px) scale(0.3); opacity: 0; } }
+        .organ-margin { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+        .organ-margin-edge {
+            position: absolute;
+            inset: -8%;
+            background:
+                radial-gradient(ellipse at 0% 50%, currentColor, transparent 58%),
+                radial-gradient(ellipse at 100% 50%, currentColor, transparent 58%);
+            opacity: 0.14;
+            filter: blur(28px);
+        }
+        .playfield { position: absolute; z-index: 1; display: block; }
+        .playfield-vignette { right: auto; bottom: auto; z-index: 2; }
+        .perf-mode-low .organ-margin-edge { filter: none; opacity: 0.1; }
+        .outcome-stack { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .trophy-rays {
+            position: absolute;
+            width: min(72vh, 620px);
+            height: min(72vh, 620px);
+            border-radius: 50%;
+            background: repeating-conic-gradient(from 0deg, rgba(255, 220, 140, 0) 0 10deg, rgba(255, 214, 120, 0.4) 10deg 14deg);
+            animation: trophy-spin 16s linear infinite;
+            -webkit-mask-image: radial-gradient(circle, #000 16%, transparent 68%);
+            mask-image: radial-gradient(circle, #000 16%, transparent 68%);
+        }
+        .trophy-mark {
+            width: min(26vh, 168px);
+            height: min(26vh, 168px);
+            filter: drop-shadow(0 0 18px rgba(255, 210, 120, 0.9));
+            animation: outcome-pop 0.7s cubic-bezier(.2, 1.45, .35, 1) both;
+        }
+        @keyframes trophy-spin { to { transform: rotate(360deg); } }
         ${mutationCardStyles}
       `}</style>
 
-      <div className="vignette"></div>
+      <div ref={vignetteRef} className="vignette playfield-vignette"></div>
       {(gameState === GameState.PLAYING || gameState === GameState.WAVE_CLEARED) && uiData.adrenaline && (
           <div className="adrenaline-vignette" />
       )}
@@ -1357,7 +1451,7 @@ export const Game: React.FC = () => {
           )}
       </div>
 
-      {(gameState === GameState.PLAYING || gameState === GameState.WAVE_CLEARED || gameState === GameState.LOADOUT) && (
+      {(gameState === GameState.PLAYING || gameState === GameState.WAVE_CLEARED || gameState === GameState.LOADOUT) && !passage && (
         <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between hud-safe">
            <div className="flex justify-between items-start">
              <div className="flex flex-col gap-1 lg:gap-3 w-28 lg:w-64">
@@ -1497,10 +1591,11 @@ export const Game: React.FC = () => {
       )}
       
       {outcomeBeat && (
-        <div className={`outcome-beat ${outcomeBeat === 'win' ? 'outcome-win' : 'outcome-lose'}${outcomeLeaving ? ' outcome-leave' : ''}`}>
+        <div className={`outcome-beat ${outcomeBeat === 'lose' ? 'outcome-lose' : 'outcome-win'}${outcomeLeaving ? ' outcome-leave' : ''}`}>
           <div className="outcome-flash" />
           <div className="outcome-ring" />
-          {outcomeBeat === 'win' && Array.from({ length: 18 }).map((_, i) => (
+          {outcomeBeat === 'organ' && <div className="trophy-rays" />}
+          {outcomeBeat !== 'lose' && Array.from({ length: outcomeBeat === 'organ' ? 28 : 18 }).map((_, i) => (
             <span
               key={i}
               className="outcome-spark"
@@ -1511,15 +1606,28 @@ export const Game: React.FC = () => {
               }}
             />
           ))}
-          <div className="outcome-copy">
-            <div className="outcome-kicker">{outcomeBeat === 'win' ? t('WAVE_WIN') : t('GAME_OVER')}</div>
-            <div className="outcome-wave">{t('WAVE')} {uiData.wave}</div>
-            {outcomeBeat === 'win' && <div className="outcome-sub">{t('WAVE_WIN_SUB')}</div>}
+          <div className="outcome-stack">
+            {outcomeBeat === 'organ' && (
+              <svg className="trophy-mark" viewBox="0 0 120 120" aria-hidden>
+                <circle cx="60" cy="60" r="50" fill="none" stroke="#ffe7a8" strokeWidth="3" />
+                <circle cx="60" cy="60" r="40" fill="none" stroke="#fff4cc" strokeWidth="1" opacity="0.7" />
+                <path d="M38 36h44v20c0 16-9 26-22 26s-22-10-22-26V36z" fill="#ffe7a8" />
+                <path d="M38 42H26c0 14 7 20 14 20M82 42h12c0 14-7 20-14 20" fill="none" stroke="#ffe7a8" strokeWidth="5" strokeLinejoin="round" />
+                <path d="M52 82h16v8H52zM42 94h36v7H42z" fill="#ffe7a8" />
+                <circle cx="60" cy="48" r="7" fill="#fff8e4" />
+              </svg>
+            )}
+            <div className="outcome-copy">
+              <div className="outcome-kicker">{outcomeBeat === 'lose' ? t('GAME_OVER') : outcomeBeat === 'organ' ? t('ORGAN_CLEAR') : t('WAVE_WIN')}</div>
+              <div className="outcome-wave">{outcomeBeat === 'organ' ? t(organNameKey(uiData.organId)) : `${t('WAVE')} ${uiData.wave}`}</div>
+              {outcomeBeat === 'win' && <div className="outcome-sub">{t('WAVE_WIN_SUB')}</div>}
+              {outcomeBeat === 'organ' && <div className="outcome-sub">{t('ORGAN_CLEAR_SUB')}</div>}
+            </div>
           </div>
         </div>
       )}
 
-      <ScreenPresence show={gameState === GameState.WAVE_CLEARED}>
+      <ScreenPresence show={gameState === GameState.WAVE_CLEARED && !outcomeBeat}>
         {(phase) => (
         <OutcomeChart
             variant="cleared"
@@ -1781,7 +1889,7 @@ export const Game: React.FC = () => {
         />
       )}
 
-      {isMobile && !isPaused && !serum && !showTutorial && gameState === GameState.PLAYING && <Joystick onMove={handleJoystickMove} />}
+      {isMobile && !isPaused && !serum && !showTutorial && !passage && gameState === GameState.PLAYING && <Joystick onMove={handleJoystickMove} />}
       
       {/* NEW PAUSE MENU IMPLEMENTATION */}
       <PauseMenu 

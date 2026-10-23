@@ -149,6 +149,7 @@ export interface PlayerStats {
   magnetRadius: number;
   maxHealth: number;
   regen: number;
+  guard: number;        // Escudo permanente: fração do dano que não entra
   maxEnergy: number;
   dashSpeed: number;
   dashCooldown: number;

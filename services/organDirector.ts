@@ -209,15 +209,25 @@ interface Bolt {
     playerHit: boolean;
 }
 
-interface Transit {
+interface Voyage {
     from: OrganId;
     to: OrganId;
     t: number;
-    phase: 'in' | 'read' | 'out';
+    phase: 'exit' | 'black' | 'read' | 'cross' | 'enter';
     shown: number;
     line: string;
     title: string;
+    fromTitle: string;
+    x0: number;
+    y0: number;
+    anchored: boolean;
+    landed: boolean;
 }
+
+const EXIT_S = 1.72;
+const BLACK_S = 0.46;
+const CROSS_S = 2.9;
+const ENTER_S = 1.22;
 
 export class OrganDirector {
     id: OrganId = 'molar';
@@ -232,7 +242,7 @@ export class OrganDirector {
 
     private route: OrganId[] = [...CANON_ROUTE];
     private lang: Language = 'EN';
-    private transit: Transit | null = null;
+    private voyage: Voyage | null = null;
     private local = 0;
     private pastWall = 0;
     private lubLatch = false;
@@ -308,31 +318,120 @@ export class OrganDirector {
     }
 
     charting(): boolean {
-        return this.transit !== null;
+        return this.voyage !== null;
+    }
+
+    willLeave(waveIndex: number): boolean {
+        return organForWave(waveIndex, this.route) !== organForWave(waveIndex + 1, this.route);
+    }
+
+    /** Cutscene entre órgãos, antes da ficha. O id visual só muda na chegada. */
+    openVoyage(nextWave: number, translate: (key: string) => string) {
+        const to = organForWave(nextWave, this.route);
+        const from = this.id;
+        if (from === to || this.voyage) return;
+        this.armVoyage(from, to, translate);
     }
 
     transitLeft(): number {
-        if (!this.transit) return 0;
-        if (this.transit.phase !== 'out') return 1;
-        return Math.max(0, 0.62 - this.transit.t);
+        return this.voyage ? 1 : 0;
     }
 
     advanceTransit(): boolean {
-        const tr = this.transit;
+        const tr = this.voyage;
         if (!tr) return false;
-        if (tr.phase === 'in' || tr.shown < tr.line.length) {
-            tr.phase = 'read';
-            tr.shown = tr.line.length;
-            audioManager.playPage();
-            return true;
-        }
+        if (tr.phase === 'exit' || tr.phase === 'black' || tr.phase === 'enter') return false;
         if (tr.phase === 'read') {
-            tr.phase = 'out';
+            if (tr.shown < tr.line.length) {
+                tr.shown = tr.line.length;
+                audioManager.playPage();
+                return true;
+            }
+            tr.phase = 'cross';
             tr.t = 0;
             audioManager.playPage();
+            audioManager.playTransit(tr.to);
+            return true;
+        }
+        if (tr.phase === 'cross' && tr.t >= 0.9) {
+            this.beginArrival();
             return true;
         }
         return false;
+    }
+
+    placePlayer(player: Entity): boolean {
+        const tr = this.voyage;
+        if (!tr) return false;
+        if (!tr.anchored) return false;
+        if (tr.phase === 'exit') {
+            const p = this.exitPoint(tr);
+            player.pos.x = p.x;
+            player.pos.y = p.y;
+            player.vel.x = 22;
+            player.vel.y = 0;
+            return true;
+        }
+        if (tr.phase === 'enter') {
+            const p = this.enterPoint(tr);
+            player.pos.x = p.x;
+            player.pos.y = p.y;
+            player.vel.x = 16 * (1 - Math.min(1, tr.t / ENTER_S));
+            player.vel.y = 0;
+            return true;
+        }
+        player.pos.x = -320;
+        player.pos.y = CANVAS_HEIGHT / 2;
+        player.vel.x = 0;
+        player.vel.y = 0;
+        return true;
+    }
+
+    private armVoyage(from: OrganId, to: OrganId, translate: (key: string) => string) {
+        this.voyage = {
+            from,
+            to,
+            t: 0,
+            phase: 'exit',
+            shown: 0,
+            line: hopLine(from, to, this.lang),
+            title: translate(THEME[to].name),
+            fromTitle: translate(THEME[from].name),
+            x0: 0,
+            y0: CANVAS_HEIGHT / 2,
+            anchored: false,
+            landed: false,
+        };
+        audioManager.playDepart();
+    }
+
+    private beginArrival() {
+        const tr = this.voyage;
+        if (!tr || tr.phase === 'enter') return;
+        tr.phase = 'enter';
+        tr.t = 0;
+        if (!tr.landed) {
+            tr.landed = true;
+            this.id = tr.to;
+            audioManager.setScene(tr.to, 0, false);
+            audioManager.playArrive();
+        }
+    }
+
+    private exitPoint(tr: Voyage): { x: number; y: number } {
+        const u = easeIn(Math.min(1, tr.t / EXIT_S));
+        return {
+            x: tr.x0 + (CANVAS_WIDTH + 160 - tr.x0) * u,
+            y: tr.y0 + (CANVAS_HEIGHT * 0.5 - tr.y0) * 0.22 * u,
+        };
+    }
+
+    private enterPoint(tr: Voyage): { x: number; y: number } {
+        const u = easeOut(Math.min(1, tr.t / ENTER_S));
+        return {
+            x: -90 + (CANVAS_WIDTH / 6 + 90) * u,
+            y: CANVAS_HEIGHT / 2 + Math.sin(u * Math.PI) * -36,
+        };
     }
 
     onWave(waveIndex: number, translate: (key: string) => string): boolean {
@@ -340,7 +439,6 @@ export class OrganDirector {
         const prev = this.id;
         const changed = prev !== next;
         const entered = changed && waveIndex > 0;
-        this.id = next;
         this.local = waveIndex % 6;
         this.pastWall = Math.max(0, waveIndex - 29);
         this.fluorideT = 0;
@@ -388,18 +486,11 @@ export class OrganDirector {
         this.dopamineClock = 14;
         this.synapseN = 0;
         if (entered) {
-            this.transit = {
-                from: prev,
-                to: next,
-                t: 0,
-                phase: 'in',
-                shown: 0,
-                line: hopLine(prev, next, this.lang),
-                title: translate(THEME[next].name),
-            };
-            audioManager.playTransit(next);
+            this.armVoyage(prev, next, translate);
+        } else {
+            this.id = next;
         }
-        audioManager.setScene(next, this.local, waveIndex % 6 === 5);
+        audioManager.setScene(entered ? prev : next, this.local, waveIndex % 6 === 5);
         return changed;
     }
 
@@ -430,16 +521,30 @@ export class OrganDirector {
         }
         if (this.whiteout > 0) this.whiteout = Math.max(0, this.whiteout - dt);
         if (this.storm > 0) this.storm = Math.max(0, this.storm - dt * 1.35);
-        if (this.transit) {
-            const tr = this.transit;
-            tr.t += dt;
-            if (tr.phase === 'in' && tr.t >= 0.42) tr.phase = 'read';
-            if (tr.phase === 'read' && tr.shown < tr.line.length) {
-                const next = Math.min(tr.line.length, tr.shown + dt * 36);
-                if (Math.floor(next / 3) !== Math.floor(tr.shown / 3)) audioManager.playGlyph();
-                tr.shown = next;
+        if (this.voyage) {
+            const tr = this.voyage;
+            if (!tr.anchored) {
+                tr.x0 = hooks.player.pos.x;
+                tr.y0 = hooks.player.pos.y;
+                tr.anchored = true;
             }
-            if (tr.phase === 'out' && tr.t >= 0.62) this.transit = null;
+            const step = Math.min(0.05, dt);
+            tr.t += step;
+            if (tr.phase === 'exit' && tr.t >= EXIT_S) {
+                tr.phase = 'black';
+                tr.t = 0;
+            } else if (tr.phase === 'black' && tr.t >= BLACK_S) {
+                tr.phase = 'read';
+                tr.t = 0;
+            } else if (tr.phase === 'read' && tr.shown < tr.line.length) {
+                const nextShown = Math.min(tr.line.length, tr.shown + step * 34);
+                if (Math.floor(nextShown / 3) !== Math.floor(tr.shown / 3)) audioManager.playGlyph();
+                tr.shown = nextShown;
+            } else if (tr.phase === 'cross' && tr.t >= CROSS_S) {
+                this.beginArrival();
+            } else if (tr.phase === 'enter' && tr.t >= ENTER_S) {
+                this.voyage = null;
+            }
             return;
         }
 
@@ -461,7 +566,7 @@ export class OrganDirector {
         this.settlePools(hooks);
         this.expirePickups(dt, hooks);
         this.collectPickups(hooks);
-        if (!hooks.player.active) return;
+        if (!hooks.player.active || this.charting()) return;
 
         if (this.stuckIn(hooks.player.pos, 'plaque_')) {
             this.cariesCue -= dt;
@@ -2534,55 +2639,249 @@ export class OrganDirector {
     }
 
     drawTransit(ctx: CanvasRenderingContext2D) {
-        const tr = this.transit;
+        const tr = this.voyage;
         if (!tr) return;
         const to = THEME[tr.to];
-        const enter = tr.phase === 'in' ? Math.min(1, tr.t / 0.42) : 1;
-        const leave = tr.phase === 'out' ? Math.min(1, tr.t / 0.62) : 0;
-        const head = -180 + (CANVAS_WIDTH + 360) * easeInOut(Math.min(1, 0.35 + enter * 0.5));
+        const from = THEME[tr.from];
         ctx.save();
-        ctx.fillStyle = `rgba(4, 0, 2, ${(0.62 + enter * 0.2) * (1 - leave)})`;
-        ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-        ctx.globalAlpha = 0.9 * (1 - leave * 0.35);
-        paintCrossing(ctx, tr.from, tr.to, Math.min(0.8, 0.2 + enter * 0.6), head);
-        if (leave > 0) {
-            ctx.globalAlpha = leave;
-            ctx.fillStyle = to.bg;
+        if (tr.phase === 'exit' && tr.anchored) {
+            const u = Math.min(1, tr.t / EXIT_S);
+            const here = this.exitPoint(tr);
+            ctx.globalAlpha = 0.35 * u;
+            ctx.strokeStyle = from.accent;
+            ctx.lineWidth = 3;
+            for (let i = 0; i < 7; i++) {
+                const y = here.y - 70 + i * 24;
+                const span = 80 + u * 420;
+                ctx.beginPath();
+                ctx.moveTo(here.x - span, y);
+                ctx.lineTo(here.x - 36, y);
+                ctx.stroke();
+            }
+            const veil = u < 0.72 ? 0 : (u - 0.72) / 0.28;
+            ctx.globalAlpha = veil;
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            ctx.restore();
+            return;
+        }
+        if (tr.phase === 'black' || tr.phase === 'read') {
+            ctx.fillStyle = '#000';
             ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         }
-
-        const slide = (1 - enter) * 80 + leave * 110;
-        ctx.globalAlpha = enter * (1 - leave);
-        const x = 140;
-        const y = CANVAS_HEIGHT * 0.56 + slide;
-        const w = CANVAS_WIDTH - 280;
-        const h = 360;
-        ctx.fillStyle = 'rgba(10, 6, 14, 0.9)';
-        ctx.fillRect(x, y, w, h);
-        ctx.strokeStyle = to.accent;
-        ctx.lineWidth = 8;
-        ctx.strokeRect(x, y, w, h);
-        ctx.fillStyle = to.accent;
-        ctx.fillRect(x + 28, y - 26, Math.min(640, 48 + tr.title.length * 28), 52);
-        ctx.fillStyle = '#16080c';
-        ctx.font = '800 36px "Chakra Petch", sans-serif';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(tr.title, x + 48, y);
-        ctx.fillStyle = '#fff8f4';
-        ctx.font = '700 34px "Chakra Petch", sans-serif';
-        ctx.textAlign = 'center';
-        const cursor = tr.phase === 'read' && tr.shown < tr.line.length && Math.floor(tr.t * 6) % 2 === 0 ? '▌' : '';
-        wrapText(ctx, tr.line.slice(0, Math.floor(tr.shown)) + cursor, x + w / 2, y + h * 0.48, w - 140, 46);
-        if (tr.phase === 'read' && tr.shown >= tr.line.length && Math.floor(tr.t * 2) % 2 === 0) {
-            const prompt = this.lang === 'PT' ? 'CLIQUE' : this.lang === 'ES' ? 'PULSA' : 'CLICK';
-            ctx.font = '700 22px "Chakra Petch", sans-serif';
-            ctx.fillStyle = '#ffe7a8';
-            ctx.textAlign = 'right';
-            ctx.fillText(`${prompt}  ▼`, x + w - 40, y + h - 36);
+        if (tr.phase === 'read') {
+            this.drawHopCard(ctx, tr, to.accent);
+        }
+        if (tr.phase === 'cross') {
+            const u = easeInOut(Math.min(1, tr.t / CROSS_S));
+            const head = -160 + (CANVAS_WIDTH + 320) * u;
+            ctx.fillStyle = '#05030a';
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            const wash = ctx.createRadialGradient(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, 40, CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, 980);
+            wash.addColorStop(0, to.bg);
+            wash.addColorStop(1, '#000');
+            ctx.globalAlpha = 0.55 + u * 0.35;
+            ctx.fillStyle = wash;
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            ctx.globalAlpha = 1;
+            paintCrossing(ctx, tr.from, tr.to, u, head);
+            paintDrift(ctx, tr.from, tr.to, u);
+            paintTraveler(ctx, tr.from, tr.to, u);
+            ctx.globalAlpha = 0.9;
+            ctx.font = '800 28px "Chakra Petch", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = to.accent;
+            ctx.fillText(tr.title, CANVAS_WIDTH / 2, CANVAS_HEIGHT - 78);
+            if (tr.t > 1.05 && Math.floor(tr.t * 2) % 2 === 0) {
+                const prompt = this.lang === 'PT' ? 'CLIQUE' : this.lang === 'ES' ? 'PULSA' : 'CLICK';
+                ctx.font = '700 18px "Chakra Petch", sans-serif';
+                ctx.fillStyle = '#ffe7a8';
+                ctx.fillText(prompt, CANVAS_WIDTH / 2, CANVAS_HEIGHT - 42);
+            }
+        }
+        if (tr.phase === 'enter') {
+            const a = Math.max(0, 1 - tr.t / 0.42);
+            ctx.fillStyle = `rgba(0,0,0,${a})`;
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         }
         ctx.restore();
     }
+
+    private drawHopCard(ctx: CanvasRenderingContext2D, tr: Voyage, accent: string) {
+        const x = 180;
+        const y = CANVAS_HEIGHT * 0.3;
+        const w = CANVAS_WIDTH - 360;
+        const h = 460;
+        ctx.fillStyle = 'rgba(12, 8, 16, 0.94)';
+        ctx.fillRect(x, y, w, h);
+        ctx.strokeStyle = '#ffe7a8';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(x + 16, y + 16, w - 32, h - 32);
+        ctx.strokeStyle = accent;
+        ctx.lineWidth = 8;
+        ctx.strokeRect(x, y, w, h);
+        ctx.fillStyle = accent;
+        ctx.fillRect(x + 48, y - 22, Math.min(720, 80 + tr.title.length * 26), 44);
+        ctx.fillStyle = '#14080c';
+        ctx.font = '800 28px "Chakra Petch", sans-serif';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(tr.title, x + 68, y);
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffe7a8';
+        ctx.font = '700 22px "Chakra Petch", sans-serif';
+        ctx.fillText(`${tr.fromTitle}   →   ${tr.title}`, x + w / 2, y + 78);
+        ctx.fillStyle = '#fff8f4';
+        ctx.font = '700 36px "Chakra Petch", sans-serif';
+        const cursor = tr.shown < tr.line.length && Math.floor(tr.t * 6) % 2 === 0 ? '▌' : '';
+        wrapText(ctx, tr.line.slice(0, Math.floor(tr.shown)) + cursor, x + w / 2, y + h * 0.52, w - 160, 48);
+        if (tr.shown >= tr.line.length && Math.floor(tr.t * 2) % 2 === 0) {
+            const prompt = this.lang === 'PT' ? 'CLIQUE' : this.lang === 'ES' ? 'PULSA' : 'CLICK';
+            ctx.font = '700 22px "Chakra Petch", sans-serif';
+            ctx.fillStyle = '#ffe7a8';
+            ctx.fillText(`${prompt}  ▼`, x + w / 2, y + h - 48);
+        }
+    }
+}
+
+function easeIn(t: number): number {
+    const u = Math.max(0, Math.min(1, t));
+    return u * u;
+}
+
+function easeOut(t: number): number {
+    const u = Math.max(0, Math.min(1, t));
+    return 1 - (1 - u) * (1 - u);
+}
+
+function cubic(a: number, b: number, c: number, d: number, t: number): number {
+    const u = 1 - t;
+    return u * u * u * a + 3 * u * u * t * b + 3 * u * t * t * c + t * t * t * d;
+}
+
+function passagePoint(fromId: OrganId, toId: OrganId, u: number): { x: number; y: number } {
+    const key = `${fromId}>${toId}`;
+    const y0 = CANVAS_HEIGHT * 0.5;
+    const across = -80 + (CANVAS_WIDTH + 180) * u;
+    if (key === 'molar>liver') {
+        return { x: across, y: 160 + u * (CANVAS_HEIGHT * 0.62) + Math.sin(u * Math.PI) * 40 };
+    }
+    if (key === 'molar>heart') {
+        return { x: across, y: y0 + Math.sin(u * Math.PI * 4) * (40 + u * 20) };
+    }
+    if (key === 'molar>lung') {
+        return { x: across, y: y0 + 90 - Math.sin(u * Math.PI) * 320 };
+    }
+    if (key === 'molar>brain') {
+        return { x: across, y: CANVAS_HEIGHT * 0.78 - u * CANVAS_HEIGHT * 0.5 };
+    }
+    if (key === 'liver>molar') {
+        return { x: CANVAS_WIDTH * (0.42 + 0.2 * Math.sin(u * Math.PI)), y: CANVAS_HEIGHT + 40 - u * (CANVAS_HEIGHT + 120) };
+    }
+    if (key === 'liver>heart') {
+        return { x: across, y: y0 + 80 - u * 40 };
+    }
+    if (key === 'liver>lung' || key === 'heart>lung') {
+        const tide = easeInOut(Math.min(1, u * 1.05)) * CANVAS_HEIGHT * 0.72;
+        return { x: across, y: CANVAS_HEIGHT - tide - 30 + Math.sin(u * 10) * 16 };
+    }
+    if (key === 'liver>brain') {
+        return { x: CANVAS_WIDTH * (0.3 + u * 0.55), y: CANVAS_HEIGHT * 0.72 - u * CANVAS_HEIGHT * 0.42 };
+    }
+    if (key === 'heart>molar') {
+        return { x: -80 + (CANVAS_WIDTH + 180) * easeIn(u), y: y0 + Math.sin(u * 18) * 18 };
+    }
+    if (key === 'heart>liver') {
+        return { x: across * (0.55 + 0.45 * (1 - u * 0.35)), y: y0 + u * 220 };
+    }
+    if (key === 'heart>brain') {
+        const climb = u < 0.45 ? u / 0.45 : 1;
+        const run = u < 0.45 ? 0 : (u - 0.45) / 0.55;
+        return { x: CANVAS_WIDTH * 0.28 + run * CANVAS_WIDTH * 0.8, y: CANVAS_HEIGHT * 0.78 - climb * CANVAS_HEIGHT * 0.5 };
+    }
+    if (key === 'lung>molar') {
+        const burst = easeIn(u);
+        return { x: 160 + Math.cos(-0.15) * burst * 1900, y: y0 + Math.sin(-0.15) * burst * 280 };
+    }
+    if (key === 'lung>liver') {
+        return { x: CANVAS_WIDTH * (0.35 + u * 0.5), y: y0 - 40 + u * 280 };
+    }
+    if (key === 'lung>heart') {
+        return { x: across, y: y0 - Math.sin(u * Math.PI) * 60 };
+    }
+    if (key === 'lung>brain') {
+        return { x: CANVAS_WIDTH * (0.2 + u * 0.6), y: y0 - u * 180 };
+    }
+    if (key === 'brain>molar') {
+        const pts: Array<[number, number]> = [[380, 160], [560, 250], [760, 370], [1120, 470], [1560, 520], [CANVAS_WIDTH + 40, 640]];
+        const f = u * (pts.length - 1);
+        const i = Math.min(pts.length - 2, Math.floor(f));
+        const k = f - i;
+        return { x: pts[i][0] + (pts[i + 1][0] - pts[i][0]) * k, y: pts[i][1] + (pts[i + 1][1] - pts[i][1]) * k };
+    }
+    if (key === 'brain>liver') {
+        return { x: across, y: 280 + Math.sin(u * Math.PI * 2) * 70 };
+    }
+    if (key === 'brain>heart') {
+        const bolts = [0.05, 0.22, 0.4, 0.58, 0.78, 1];
+        const ys = [70, 210, 300, 470, 620, 780];
+        const f = u * (bolts.length - 1);
+        const i = Math.min(bolts.length - 2, Math.floor(f));
+        const k = f - i;
+        return { x: 220 + (bolts[i] + (bolts[i + 1] - bolts[i]) * k) * (CANVAS_WIDTH * 0.7), y: ys[i] + (ys[i + 1] - ys[i]) * k };
+    }
+    if (key === 'brain>lung') {
+        const amp = 78 * (1 - easeInOut(u));
+        return { x: across, y: y0 + Math.sin(u * Math.PI * 3) * amp };
+    }
+    return {
+        x: cubic(-80, CANVAS_WIDTH * 0.22, CANVAS_WIDTH * 0.62, CANVAS_WIDTH + 80, u),
+        y: cubic(y0, CANVAS_HEIGHT * 0.18, CANVAS_HEIGHT * 0.84, y0, u),
+    };
+}
+
+function paintDrift(ctx: CanvasRenderingContext2D, fromId: OrganId, toId: OrganId, u: number) {
+    const accent = THEME[toId].accent;
+    for (let i = 0; i < 26; i++) {
+        const p = (u * 1.2 + i / 26) % 1;
+        const pt = passagePoint(fromId, toId, p);
+        ctx.globalAlpha = 0.2 + 0.6 * Math.sin(p * Math.PI);
+        ctx.fillStyle = i % 3 === 0 ? '#fff8e8' : accent;
+        ctx.beginPath();
+        ctx.arc(pt.x + Math.sin(i * 2.2 + p * 8) * 36, pt.y + Math.cos(i * 1.7) * 26, 3 + (i % 5), 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+function paintTraveler(ctx: CanvasRenderingContext2D, fromId: OrganId, toId: OrganId, u: number) {
+    for (let i = 6; i >= 1; i--) {
+        const p = Math.max(0, u - i * 0.035);
+        const ghost = passagePoint(fromId, toId, p);
+        ctx.globalAlpha = 0.08 * (7 - i);
+        ctx.fillStyle = '#7ef6ff';
+        ctx.beginPath();
+        ctx.arc(ghost.x, ghost.y, 18 - i, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    const pt = passagePoint(fromId, toId, u);
+    const glow = ctx.createRadialGradient(pt.x, pt.y, 4, pt.x, pt.y, 70);
+    glow.addColorStop(0, 'rgba(255,255,255,0.95)');
+    glow.addColorStop(0.35, 'rgba(0, 255, 255, 0.55)');
+    glow.addColorStop(1, 'rgba(0, 255, 255, 0)');
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, 70, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.ellipse(pt.x, pt.y, 26, 22, u * 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#00ffff';
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, 10, 0, Math.PI * 2);
+    ctx.fill();
 }
 
 function paintCrossing(ctx: CanvasRenderingContext2D, fromId: OrganId, toId: OrganId, u: number, head: number) {
@@ -2610,16 +2909,16 @@ function paintVein(ctx: CanvasRenderingContext2D, fromId: OrganId, toId: OrganId
     const from = THEME[fromId];
     const to = THEME[toId];
     const y0 = CANVAS_HEIGHT * 0.5;
-    ctx.globalAlpha = 0.9;
+    ctx.globalAlpha = 0.95;
     ctx.strokeStyle = from.accent;
-    ctx.lineWidth = 46;
+    ctx.lineWidth = 78;
     ctx.beginPath();
     ctx.moveTo(-60, y0);
     ctx.bezierCurveTo(CANVAS_WIDTH * 0.22, CANVAS_HEIGHT * 0.18, CANVAS_WIDTH * 0.62, CANVAS_HEIGHT * 0.84, head, y0);
     ctx.stroke();
     ctx.strokeStyle = to.accent;
-    ctx.lineWidth = 14;
-    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = 22;
+    ctx.globalAlpha = 0.9;
     ctx.stroke();
     if (embolus) {
         ctx.globalAlpha = 0.95;
@@ -2684,7 +2983,7 @@ function paintAspire(ctx: CanvasRenderingContext2D, u: number) {
         const x = -220 + (CANVAS_WIDTH + 440) * p;
         ctx.globalAlpha = 0.28 + 0.4 * Math.sin(p * Math.PI);
         ctx.strokeStyle = i % 2 ? '#f3c3ce' : '#d5e2ee';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 8;
         ctx.beginPath();
         ctx.moveTo(x, y);
         ctx.quadraticCurveTo(x + 180, y + 30, x + 460, y + 170);
@@ -2758,8 +3057,8 @@ function paintIschemia(ctx: CanvasRenderingContext2D, u: number, head: number) {
 function paintCough(ctx: CanvasRenderingContext2D, u: number) {
     const burst = Math.min(1, u * 1.35);
     ctx.strokeStyle = '#f3c3ce';
-    ctx.lineWidth = 4;
-    ctx.globalAlpha = 0.75 * (1 - burst * 0.25);
+    ctx.lineWidth = 10;
+    ctx.globalAlpha = 0.9 * (1 - burst * 0.2);
     for (let i = 0; i < 9; i++) {
         const a = -0.7 + i * 0.16;
         ctx.beginPath();
@@ -2827,7 +3126,7 @@ function paintAxis(ctx: CanvasRenderingContext2D, u: number) {
     ctx.globalAlpha = 0.85 * (1 - u * 0.62);
     for (let i = 0; i < 5; i++) {
         ctx.strokeStyle = i % 2 ? '#c9a6ff' : '#d6e36a';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 8;
         const y = 180 + i * 150;
         ctx.beginPath();
         ctx.moveTo(-40, y);
@@ -2863,8 +3162,8 @@ function paintStorm(ctx: CanvasRenderingContext2D, u: number) {
 function paintApnea(ctx: CanvasRenderingContext2D, u: number) {
     const amp = 78 * (1 - easeInOut(u));
     ctx.strokeStyle = '#f3c3ce';
-    ctx.lineWidth = 4;
-    ctx.globalAlpha = 0.85;
+    ctx.lineWidth = 9;
+    ctx.globalAlpha = 0.95;
     for (let row = 0; row < 4; row++) {
         const y = 200 + row * 190;
         ctx.beginPath();

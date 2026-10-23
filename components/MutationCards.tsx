@@ -44,9 +44,9 @@ export function serumWindowMs(difficulty: Difficulty): number {
 export function rollSerumOffers(upgrades: Upgrade[]): string[] {
     const pool = upgrades.filter(u => u.level < u.maxLevel);
     if (pool.length === 0) return [];
-    const count = pool.length <= 2 ? pool.length : (Math.random() < 0.62 ? 3 : 2);
+    const count = pool.length <= 2 ? pool.length : (Math.random() < 0.3 ? 3 : 2);
     const weight = (u: Upgrade) => {
-        const rarity = u.rarity === 'LEGENDARY' ? 0.5 : u.rarity === 'EPIC' ? 0.8 : u.rarity === 'RARE' ? 1 : 1.12;
+        const rarity = u.rarity === 'LEGENDARY' ? 0.28 : u.rarity === 'EPIC' ? 0.55 : u.rarity === 'RARE' ? 1 : 1.12;
         return rarity * (1.35 - (u.level / u.maxLevel) * 0.45);
     };
     const bag = [...pool];

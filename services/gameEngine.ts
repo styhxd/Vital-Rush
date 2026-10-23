@@ -173,7 +173,7 @@ export class GameEngine {
   public leanGraphics: boolean = false;
   public allowSerum: boolean = true;
 
-  private serumClock: number = 18;
+  private serumClock: number = 72;
   private serumIntroduced: boolean = false;
   private serumReady: boolean = false;
   private hpMilestoneSent: boolean = false;
@@ -518,6 +518,7 @@ export class GameEngine {
   private damagePlayer(amount: number, sourcePos: Vector2, onGameOver: () => void, onLifeLost: () => void, stats: PlayerStats, isEnvironmental: boolean = false, sourceEntity?: Entity) {
       if (this.invulnerabilityTimer > 0 || this.isDashing) return;
       if (this.organ.shield > 0) amount *= (1 - this.organ.shield);
+      if (stats.guard > 0) amount *= (1 - Math.min(0.45, stats.guard));
 
       this.player.health -= amount;
       this.sessionStats.damageTaken += amount;
@@ -641,6 +642,12 @@ export class GameEngine {
       this.regenTimer = 0;
       this.grid.clear(); 
       this.vacuumingTimer = 0; 
+  }
+
+  public beginPassage(): boolean {
+      if (this.currentWaveIndex < 0 || !this.organ.willLeave(this.currentWaveIndex)) return false;
+      this.organ.openVoyage(this.currentWaveIndex + 1, (key) => this.t(key));
+      return this.organ.charting();
   }
 
   public startWave(waveIndex: number, delay: number = 0) {
@@ -889,9 +896,10 @@ export class GameEngine {
         } else {
             timeScale = 0.4;
         }
-    } else {
-        this.adrenalineActive = false;
-    }
+        } else {
+            this.adrenalineActive = false;
+        }
+        if (this.organ.charting()) timeScale = 1;
     
     if (this.player.active) {
         const healthRatio = Math.max(0, this.player.health / this.player.maxHealth);
@@ -1060,7 +1068,7 @@ export class GameEngine {
                   this.serumClock -= dtSeconds;
                   if (this.serumClock <= 0) {
                       this.spawnSerum();
-                      this.serumClock = 74 + Math.random() * 28;
+                      this.serumClock = 118 + Math.random() * 40;
                   }
               }
           }
@@ -1171,6 +1179,14 @@ export class GameEngine {
           this.hpMilestoneSent = true;
           achievementManager.track('max_hp_200', Math.floor(this.player.maxHealth));
       }
+      if (this.organ.charting()) {
+          this.inputVector.x = 0;
+          this.inputVector.y = 0;
+          this.shakeIntensity = 0;
+      }
+      if (this.organ.placePlayer(this.player)) {
+          this.isDashing = false;
+      } else {
       if (!this.isDashing && !this.organ.charting()) {
           const moveScale = this.adrenalineActive ? tick * 1.5 : tick;
           const pace = this.organ.speedMul;
@@ -1192,6 +1208,7 @@ export class GameEngine {
       if (this.player.pos.x > CANVAS_WIDTH - this.player.radius) this.player.pos.x = CANVAS_WIDTH - this.player.radius;
       if (this.player.pos.y < this.player.radius) this.player.pos.y = this.player.radius;
       if (this.player.pos.y > CANVAS_HEIGHT - this.player.radius) this.player.pos.y = CANVAS_HEIGHT - this.player.radius;
+      }
 
       this.regenTimer += safeDt;
       if (this.regenTimer > 2000 && stats.regen > 0) {
@@ -1201,7 +1218,7 @@ export class GameEngine {
       
       audioManager.armGun(stats.fireRate * this.organ.fireMul);
       const drum = audioManager.takeDrum();
-      if (drum && !this.isDashing && this.waveStartDelay <= 0) {
+      if (drum && !this.isDashing && this.waveStartDelay <= 0 && !this.organ.charting()) {
         const target = this.findTarget();
         if (target) {
           this.shoot(target, stats, drum);

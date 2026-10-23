@@ -775,6 +775,33 @@ export class AudioManager {
       osc.stop(t + 0.24);
       this.puff(0.08, 1800, 0.35);
   }
+  public playDepart() {
+      if (!this.ctx || !this.musicGain) return;
+      const t = this.ctx.currentTime;
+      this.puff(0.62, 980, 0.2, t);
+      this.tone(t, 146, 0.72, 'sine', 0.1, 1200, this.musicGain);
+      this.tone(t + 0.1, 220, 0.5, 'triangle', 0.08, 1700, this.musicGain);
+      this.tone(t + 0.28, 349, 0.42, 'sine', 0.06, 2000, this.musicGain);
+  }
+  public playArrive() {
+      if (!this.ctx || !this.musicGain) return;
+      const t = this.ctx.currentTime;
+      this.puff(0.28, 520, 0.1, t);
+      this.tone(t, 392, 0.5, 'sine', 0.1, 1600, this.musicGain);
+      this.tone(t + 0.14, 523.25, 0.62, 'triangle', 0.09, 1900, this.musicGain);
+      this.tone(t + 0.3, 659.25, 0.7, 'sine', 0.06, 2100, this.musicGain);
+  }
+  public playTrophy() {
+      if (!this.ctx || !this.musicGain) return;
+      const t = this.ctx.currentTime;
+      const notes = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+      notes.forEach((freq, i) => this.tone(t + i * 0.11, freq, 0.78, 'triangle', 0.15, 2500, this.musicGain!));
+      this.tone(t + 0.48, 523.25, 1.15, 'sine', 0.09, 1400, this.musicGain);
+      this.tone(t + 0.48, 659.25, 1.15, 'sine', 0.07, 1600, this.musicGain);
+      this.tone(t + 0.48, 783.99, 1.25, 'triangle', 0.09, 1900, this.musicGain);
+      this.puff(0.36, 1500, 0.14, t + 0.42);
+      this.tone(t + 0.95, 1568, 0.85, 'sine', 0.06, 2400, this.musicGain);
+  }
   public playWaveClear() {
       if (!this.ctx || !this.musicGain) return;
       const t = this.ctx.currentTime;
