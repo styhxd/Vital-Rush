@@ -14,7 +14,7 @@ O nome, a idade e o foco saem na hora. Esta foi a Iracema.
 
 <img src="docs/prontuario.jpg" alt="Prontuário da Iracema Bittencourt, abscesso na polpa do molar" width="100%">
 
-No molar a faixa avisa e as paredes fecham. O golpe é quando elas se encontram.
+No molar, cuidado para não ser mordido! Uma faixa avisa e os dentes se fecham. O golpe é quando elas se encontram.
 
 <img src="docs/molar.jpg" alt="Onda 5 no molar, a mordida fechando dos dois lados" width="100%">
 
