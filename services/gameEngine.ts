@@ -1384,26 +1384,28 @@ export class GameEngine {
           const bossActive = this.entities.some(e => e.type === EntityType.BOSS && e.active);
           const shouldSpawnMines = this.waveTimer < config.duration || bossActive;
 
-          if (shouldSpawnMines && Math.random() < 0.005) { 
-              // O fluxo do sangue vai para a esquerda. Nascer colado nesse lado
-              // some na hora. A tela é mais larga que alta, então quem cruza
-              // na vertical anda mais devagar.
-              const vertical = Math.random() < 0.4;
+          if (shouldSpawnMines && Math.random() < 0.005) {
+              const fromLeft = Math.random() < 0.5;
+              const fromTop = Math.random() < 0.5;
+              const alongSide = Math.random() < 0.5;
+              const near = 36 + Math.random() * 220;
+              const off = 30 + Math.random() * 28;
+              const power = 0.7 + Math.random() * 0.95;
+              const flowPull = Math.abs(this.bloodFlow.x) * 0.9;
               let x: number;
               let y: number;
               let vx: number;
               let vy: number;
-              if (vertical) {
-                  x = CANVAS_WIDTH * (0.3 + Math.random() * 0.58);
-                  const fromTop = Math.random() < 0.5;
-                  y = fromTop ? -24 : CANVAS_HEIGHT + 24;
-                  vy = (fromTop ? 1 : -1) * (0.16 + Math.random() * 0.08);
-                  vx = (Math.random() - 0.45) * 0.12;
+              if (alongSide) {
+                  x = fromLeft ? -off : CANVAS_WIDTH + off;
+                  y = fromTop ? near : CANVAS_HEIGHT - near;
+                  vx = fromLeft ? flowPull + power : -power;
+                  vy = (fromTop ? 1 : -1) * power * 0.22 * (0.55 + Math.random());
               } else {
-                  y = 70 + Math.random() * (CANVAS_HEIGHT - 140);
-                  x = CANVAS_WIDTH * (0.34 + Math.random() * 0.62);
-                  vx = (Math.random() < 0.62 ? -1 : 1) * (0.28 + Math.random() * 0.16);
-                  vy = (Math.random() - 0.5) * 0.1;
+                  y = fromTop ? -off : CANVAS_HEIGHT + off;
+                  x = fromLeft ? near : CANVAS_WIDTH - near;
+                  vy = (fromTop ? 1 : -1) * power * 0.46;
+                  vx = fromLeft ? flowPull + power * 0.18 : -power * (0.15 + Math.random() * 0.25);
               }
               this.entities.push({
                   id: `mine_${Date.now()}`, type: EntityType.BIO_MINE,
