@@ -689,7 +689,7 @@ export class OrganDirector {
         if (this.systoleT > 0) this.systoleT -= dt;
         if (this.glycogenT > 0 && hooks.player.active) {
             this.glycogenT -= dt;
-            hooks.heal(hooks.player.maxHealth * 0.018 * dt);
+            hooks.heal(hooks.player.maxHealth * 0.004 * dt);
         }
         if (this.banner) {
             this.banner.ttl -= dt;
@@ -1541,7 +1541,7 @@ export class OrganDirector {
                 this.shield = 0.5;
                 hooks.popup(hooks.player.pos, hooks.t('MSG_FLUORIDE'), '#e7fff8', 24);
             } else if (e.value === PICK_GLYCOGEN) {
-                this.glycogenT = 1.5;
+                this.glycogenT = 2.2;
                 hooks.popup(hooks.player.pos, hooks.t('MSG_GLYCOGEN'), '#ffe08a', 24);
             } else if (e.value === PICK_OXYGEN) {
                 this.oxygenT = 4;
@@ -2064,6 +2064,33 @@ export class OrganDirector {
             ctx.beginPath();
             ctx.arc(x - rad * 0.28, y - rad * 0.3, Math.max(0.7, rad * 0.32), 0, Math.PI * 2);
             ctx.fill();
+        }
+
+        const word = 'SALIVA';
+        if (samples.length > 8) {
+            const size = Math.max(14, Math.min(24, s.half * 0.42));
+            ctx.fillStyle = 'rgba(255, 252, 248, 0.62)';
+            ctx.font = `500 ${size}px "Chakra Petch", sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            if (!low) {
+                ctx.shadowColor = 'rgba(255, 255, 255, 0.28)';
+                ctx.shadowBlur = 3;
+            }
+            const last = word.length - 1;
+            for (let i = 0; i < word.length; i++) {
+                const along = 0.05 + (i / last) * 0.9;
+                const p = samples[Math.min(samples.length - 1, Math.floor(along * (samples.length - 1)))];
+                const bank = -0.82 + (i / last) * 1.64;
+                const wobble = Math.sin(time * 0.55 + i * 1.15) * 0.1;
+                const limp = Math.sin(time * 0.7 + i * 0.85) * 0.42;
+                ctx.save();
+                ctx.translate(p.x + p.nx * p.w * (bank + wobble), p.y + p.ny * p.w * (bank + wobble));
+                ctx.rotate(limp);
+                ctx.fillText(word[i], 0, 0);
+                ctx.restore();
+            }
+            ctx.shadowBlur = 0;
         }
         ctx.restore();
 

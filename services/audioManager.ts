@@ -73,6 +73,9 @@ export class AudioManager {
   private boss = false;
   private tempoMul = 1;
   private tempoBackAt = 0;
+  private cadenceMul = 1;
+  private cadenceTarget = 1;
+  private shotCursor = -1;
   private lubAt = -1;
   private lungNudge = 0;
   private lungPushUntil = 0;
@@ -547,6 +550,16 @@ export class AudioManager {
   public playHit(at?: { x: number; y: number } | null) { this.playBuffer('hit', 0.26, 0, 50, at); }
   public playExplosion(at?: { x: number; y: number } | null) { this.playBuffer('expl', 0.8, 0, 100, at); }
   public playPowerUp(at?: { x: number; y: number } | null) { this.playBuffer('power', 0.5, 0, 80, at); }
+  public playCoin(at?: { x: number; y: number } | null) {
+      if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+      const now = performance.now();
+      if (now - (this.lastPlayTime['coin'] || 0) < 46) return;
+      this.lastPlayTime['coin'] = now;
+      const dest = this.sfxOut(at, 0.16);
+      const t = this.ctx.currentTime;
+      this.tone(t, 988, 0.045, 'sine', 0.016, 3200, dest);
+      this.tone(t + 0.055, 1318, 0.07, 'sine', 0.011, 3600, dest);
+  }
   public playSurge(at?: { x: number; y: number } | null) { this.playBuffer('surge', 0.6, 0, 500, at); }
   
   public playMineExplosionShot(at?: { x: number; y: number } | null) { this.playBuffer('mine_expl_heavy', 0.6, 0, 150, at); } 
@@ -910,6 +923,9 @@ export class AudioManager {
       this.isPlaying = true;
       this.currentTrack = track;
       this.current16thNote = 0;
+      this.cadenceMul = 1;
+      this.cadenceTarget = 1;
+      this.shotCursor = -1;
       this.lockedEvery = 0;
       this.grid = [];
       this.nextNoteTime = this.ctx.currentTime + 0.1;
@@ -918,7 +934,8 @@ export class AudioManager {
 
   private liveBpm(): number {
       const score = this.currentTrack === 'MENU' ? SCORES.menu : SCORES[this.organ];
-      let bpm = score.bpm * (this.boss && this.currentTrack === 'GAME' ? 1.12 : 1) * this.tempoMul;
+      const cadence = this.currentTrack === 'GAME' ? this.cadenceMul : 1;
+      let bpm = score.bpm * (this.boss && this.currentTrack === 'GAME' ? 1.12 : 1) * this.tempoMul * cadence;
       if (this.currentTrack === 'GAME' && this.organ === 'lung' && this.ctx) {
           const wob = 1 + 0.045 * Math.sin(this.ctx.currentTime * 0.7);
           const push = this.ctx.currentTime < this.lungPushUntil ? this.lungNudge : 0;
@@ -933,6 +950,10 @@ export class AudioManager {
       if (this.tempoBackAt > 0 && now > this.tempoBackAt) {
           this.tempoMul = 1;
           this.tempoBackAt = 0;
+      }
+      if (this.currentTrack === 'GAME') {
+          this.cadenceMul += (this.cadenceTarget - this.cadenceMul) * 0.14;
+          if (Math.abs(this.cadenceMul - this.cadenceTarget) < 0.004) this.cadenceMul = this.cadenceTarget;
       }
       if (this.nextNoteTime < now - 0.2) this.nextNoteTime = now;
       let iterations = 0;
@@ -955,22 +976,46 @@ export class AudioManager {
 
   public armGun(intervalMs: number) {
       this.fireMs = Math.max(140, intervalMs);
+      if (this.currentTrack !== 'GAME') return;
+      const score = SCORES[this.organ];
+      const base = score.bpm * (this.boss ? 1.12 : 1) * this.tempoMul;
+      const fit = this.fitCadence(this.fireMs, base);
+      if (fit.every !== this.drumEvery) this.shotCursor = -1;
+      this.drumEvery = fit.every;
+      this.cadenceTarget = fit.cadence;
   }
 
-  /** Um tiro a cada fireMs de verdade. A grade antiga comia níveis inteiros da mitose. */
+  /** A cadência escolhe a subdivisão, e o tempo da música estica até o tiro cair nela. */
+  private fitCadence(fireMs: number, baseBpm: number): { every: number; cadence: number } {
+      const ladder = [8, 4, 2, 1];
+      let best = { every: this.drumEvery || 4, cadence: 1, err: Infinity };
+      for (const every of ladder) {
+          const natural = every * (60000 / Math.max(40, baseBpm)) / 4;
+          const cadence = Math.max(0.78, Math.min(1.68, natural / fireMs));
+          const actual = natural / cadence;
+          let err = Math.abs(Math.log(actual / fireMs));
+          if (every === this.drumEvery) err -= 0.012;
+          if (err < best.err) best = { every, cadence, err };
+      }
+      return best;
+  }
+
   public takeDrum(): DrumHit | null {
-      const now = performance.now();
-      const step = this.fireMs;
-      if (this.shotDue <= 0) this.shotDue = now;
-      if (this.shotDue - now > step) this.shotDue = now + step;
-      if (now + 8 < this.shotDue) return null;
-      if (now - this.shotDue > step) this.shotDue = now;
-      const firedAt = this.shotDue;
-      this.shotDue += step;
-      const bpm = this.ctx && this.currentTrack === 'GAME' ? this.liveBpm() : 104;
-      const sixteenth = (60000 / Math.max(40, bpm)) / 4;
-      const index = Math.round(firedAt / sixteenth);
-      return this.drumVoice(((index % 16) + 16) % 16, 2);
+      if (!this.ctx || this.currentTrack !== 'GAME' || this.grid.length === 0) return this.takeFallback();
+      const now = this.ctx.currentTime;
+      const every = Math.max(1, this.drumEvery);
+      let due: { t: number; sixteenth: number } | null = null;
+      for (let i = this.grid.length - 1; i >= 0; i--) {
+          const slot = this.grid[i];
+          if (slot.t > now + 0.02) continue;
+          if (slot.sixteenth % every !== 0) continue;
+          if (slot.t <= this.shotCursor + 0.01) break;
+          due = slot;
+          break;
+      }
+      if (!due) return null;
+      this.shotCursor = due.t;
+      return this.drumVoice(due.sixteenth, every);
   }
 
   private takeFallback(): DrumHit | null {

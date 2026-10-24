@@ -41,15 +41,17 @@ export function serumWindowMs(difficulty: Difficulty): number {
     return SERUM_WINDOW_MS;
 }
 
+export function serumWeight(u: Upgrade): number {
+    const rarity = u.rarity === 'LEGENDARY' ? 0.035 : u.rarity === 'EPIC' ? 0.12 : u.rarity === 'RARE' ? 0.34 : 1;
+    const heal = u.id === 'membrane' || u.id === 'lifesteal' ? 0.28 : 1;
+    return rarity * heal * (1.2 - (u.level / u.maxLevel) * 0.4);
+}
+
 export function rollSerumOffers(upgrades: Upgrade[]): string[] {
     const pool = upgrades.filter(u => u.level < u.maxLevel);
     if (pool.length === 0) return [];
     const count = pool.length <= 2 ? pool.length : (Math.random() < 0.3 ? 3 : 2);
-    const weight = (u: Upgrade) => {
-        const rarity = u.rarity === 'LEGENDARY' ? 0.28 : u.rarity === 'EPIC' ? 0.55 : u.rarity === 'RARE' ? 1 : 1.12;
-        const heal = u.id === 'membrane' || u.id === 'lifesteal' ? 0.32 : 1;
-        return rarity * heal * (1.35 - (u.level / u.maxLevel) * 0.45);
-    };
+    const weight = (u: Upgrade) => serumWeight(u);
     const bag = [...pool];
     const picked: string[] = [];
     while (picked.length < count && bag.length) {
@@ -95,6 +97,12 @@ const MutationCard: React.FC<CardProps> = ({
     const art = ART[upgrade.id] ?? ART.mitosis;
     const pulsing = pulse?.id === upgrade.id ? pulse : null;
 
+    const fire = () => {
+        if (guard && !guard()) return;
+        if (mode === 'shop' && maxed) return;
+        onPress();
+    };
+
     const label = maxed
         ? t('MAXED')
         : mode === 'offer'
@@ -112,15 +120,14 @@ const MutationCard: React.FC<CardProps> = ({
             tabIndex={alive || mode === 'shop' ? 0 : -1}
             aria-disabled={!alive && mode === 'shop'}
             aria-label={`${t(upgrade.nameKey)}. ${label}`}
-            onClick={() => {
-                if (guard && !guard()) return;
-                if (mode === 'shop' && maxed) return;
-                onPress();
+            onClick={(event) => {
+                event.stopPropagation();
+                fire();
             }}
             onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                     event.preventDefault();
-                    onPress();
+                    fire();
                 }
             }}
             className={`lab-card is-${upgrade.rarity.toLowerCase()} ${mode === 'offer' ? 'is-offer' : ''} ${alive ? 'is-hot' : ''} ${!alive && !maxed ? 'is-poor' : ''} ${maxed ? 'is-max' : ''} ${forced ? 'is-forced' : ''}`}
@@ -353,8 +360,9 @@ export const mutationCardStyles = `
     display: flex;
     flex-direction: column;
     background:
-        radial-gradient(ellipse at 50% 38%, rgba(132, 28, 40, 0.46), rgba(16, 4, 8, 0.94) 70%),
-        #120408;
+        radial-gradient(ellipse at 50% 0%, rgba(226, 168, 72, 0.16), transparent 36%),
+        radial-gradient(ellipse at 50% 78%, rgba(110, 16, 28, 0.5), rgba(14, 4, 8, 0.96) 70%),
+        #14060a;
     overflow: hidden;
 }
 .lab-veins {
@@ -375,12 +383,13 @@ export const mutationCardStyles = `
     justify-content: space-between;
     align-items: center;
     gap: 1rem;
-    margin: 0.55rem 2.4% 0.35rem;
-    padding: 0.35rem 0.9rem 0.35rem 0.7rem;
-    border: 1px solid rgba(226, 176, 96, 0.32);
-    border-radius: 10px;
-    background: linear-gradient(180deg, rgba(42, 24, 18, 0.72), rgba(12, 4, 6, 0.55));
-    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.35), 0 6px 0 rgba(0,0,0,0.25);
+    margin: 0.55rem 2.4% 0;
+    padding: 0.42rem 0.85rem 0.38rem;
+    background:
+        linear-gradient(180deg, rgba(255, 220, 150, 0.16), rgba(42, 16, 12, 0.35));
+    border: 1px solid rgba(226, 160, 31, 0.72);
+    border-bottom: none;
+    box-shadow: inset 0 0 0 1px rgba(18, 6, 8, 0.85);
 }
 .lab-brand {
     display: flex;
@@ -390,35 +399,39 @@ export const mutationCardStyles = `
 }
 .lab-brand svg { width: 28px; height: 28px; flex: none; }
 .lab-brand span {
-    color: #f6f1e6;
+    color: #fff6e4;
     font-family: 'Teko', sans-serif;
-    font-size: clamp(22px, 2.4vw, 34px);
-    letter-spacing: 0.08em;
-    line-height: 1;
-    transform: translateY(0.21em);
+    font-size: clamp(26px, 2.6vw, 40px);
+    letter-spacing: 0.06em;
+    line-height: 0.85;
+    transform: translateY(0.08em);
     text-shadow: 0 2px 0 rgba(0,0,0,0.55);
 }
 .lab-readout {
     display: flex;
     align-items: center;
-    gap: 0.55rem;
+    gap: 0.45rem;
+    padding: 0.15rem 0.7rem 0.12rem 0.45rem;
+    border-radius: 999px;
+    background: radial-gradient(circle at 18% 50%, #ffe7a8, #c48820 42%, #5c3a0c 78%);
+    box-shadow: inset 0 0 0 2px rgba(255, 236, 180, 0.7), 0 4px 0 rgba(0,0,0,0.35);
 }
 .lab-readout span {
-    color: #f4f1ea;
+    color: #3a240c;
     font-weight: 700;
-    letter-spacing: 0.12em;
-    font-size: clamp(10px, 1.15vw, 14px);
+    letter-spacing: 0.14em;
+    font-size: clamp(10px, 1.05vw, 13px);
     line-height: 1;
-    transform: translateY(0.11em);
+    transform: translateY(0.08em);
 }
 .lab-readout strong {
-    color: #ffd84a;
+    color: #2a1608;
     font-family: 'Teko', sans-serif;
-    font-size: clamp(28px, 3vw, 42px);
+    font-size: clamp(26px, 2.6vw, 38px);
     font-weight: 600;
     line-height: 1;
-    transform: translateY(0.085em);
-    text-shadow: 0 0 14px rgba(255, 196, 40, 0.7);
+    transform: translateY(0.06em);
+    text-shadow: 0 1px 0 rgba(255, 244, 210, 0.45);
 }
 .lab-readout strong.is-tick { animation: lab-biomass 0.28s ease; }
 .lab-tray {
@@ -427,22 +440,18 @@ export const mutationCardStyles = `
     flex: 1;
     min-height: 0;
     container-type: inline-size;
-    margin: 0.15rem 2.2% 0.15rem;
-    border: 1px solid rgba(226, 176, 96, 0.34);
-    border-radius: 16px;
+    margin: 0 2.4% 0;
+    border: 1px solid rgba(226, 160, 31, 0.72);
+    border-radius: 0;
     background:
-        linear-gradient(180deg, rgba(255, 214, 140, 0.05), transparent 18%),
-        rgba(0, 0, 0, 0.22);
-    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.45), inset 0 0 48px rgba(0,0,0,0.28);
+        linear-gradient(180deg, rgba(255, 214, 150, 0.05), transparent 14%),
+        #12060a;
+    box-shadow:
+        inset 0 0 0 5px #12060a,
+        inset 0 0 0 6px rgba(226, 160, 31, 0.28);
 }
 .lab-tray::before {
-    content: '';
-    position: absolute;
-    inset: 7px;
-    border: 1px solid rgba(226, 176, 96, 0.14);
-    border-radius: 11px;
-    pointer-events: none;
-    z-index: 2;
+    content: none;
 }
 .lab-tray.has-more::after {
     content: '';
@@ -483,18 +492,17 @@ export const mutationCardStyles = `
     align-self: center;
     display: flex;
     align-items: center;
-    gap: 0.45rem;
-    margin: 0.2rem auto 0;
-    padding: 0.16rem 0.75rem 0.12rem;
-    background: rgba(12, 6, 4, 0.88);
-    border: 1px solid rgba(226, 176, 96, 0.6);
-    border-radius: 999px;
+    gap: 0.4rem;
+    margin: 0.15rem auto 0;
+    padding: 0;
+    background: none;
+    border: none;
     color: #ffe08a;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.18em;
     font-weight: 700;
     font-size: 11px;
     pointer-events: none;
-    box-shadow: 0 3px 0 rgba(0,0,0,0.35);
+    box-shadow: none;
     animation: lab-hint 1.35s ease-in-out infinite;
 }
 .lab-more i {
@@ -508,22 +516,23 @@ export const mutationCardStyles = `
 .lab-back {
     position: relative;
     z-index: 1;
-    margin: 0.35rem auto 0.7rem;
-    padding: 0.28rem 1.5rem 0.18rem;
-    background: linear-gradient(#3a3228, #1a140e);
-    border: 1px solid rgba(226, 176, 96, 0.5);
-    border-radius: 6px;
-    color: #f7f4ee;
+    margin: 0.2rem auto 0.55rem;
+    padding: 0.2rem 0.2rem 0.15rem;
+    background: none;
+    border: none;
+    border-bottom: 1px solid rgba(226, 176, 96, 0.7);
+    border-radius: 0;
+    color: #f7f1e4;
     letter-spacing: 0.22em;
     font-family: 'Teko', sans-serif;
     font-size: clamp(18px, 1.8vw, 26px);
     line-height: 1;
     cursor: pointer;
-    box-shadow: 0 4px 0 #0a0604;
-    transition: transform 0.12s ease, box-shadow 0.12s ease, color 0.12s ease;
+    box-shadow: none;
+    transition: color 0.12s ease;
 }
-.lab-back:hover { color: #ffe08a; transform: translateY(-2px); }
-.lab-back:active { transform: translateY(2px); box-shadow: 0 1px 0 #0a0604; }
+.lab-back:hover { color: #ffe08a; }
+.lab-back:active { color: #fff; }
 .lab-slot {
     position: relative;
     width: 100%;
@@ -809,8 +818,8 @@ export const mutationCardStyles = `
 @media (hover: hover) and (pointer: fine) {
     .lab-card.is-hot:hover,
     .lab-card.is-hot:focus-visible {
-        transform: translateY(-3px);
-        box-shadow: 0 10px 0 rgba(0,0,0,0.35), 0 0 0 1px var(--ink);
+        box-shadow: 0 10px 0 rgba(0,0,0,0.28), 0 0 0 1px var(--ink), 0 0 22px color-mix(in srgb, var(--accent) 35%, transparent);
+        filter: brightness(1.05);
     }
     .lab-card.is-hot:hover .lab-art,
     .lab-card.is-hot:focus-visible .lab-art { transform: scale(1.04); }
@@ -841,8 +850,8 @@ export const mutationCardStyles = `
 .serum-slot:nth-child(2) .lab-scan { animation-delay: -2.4s; }
 .lab-slot:nth-child(3n) .lab-glint { animation-delay: -3s; }
 .lab-card.is-hot:active {
-    transform: translateY(1px);
-    box-shadow: 0 2px 0 rgba(0,0,0,0.5);
+    filter: brightness(0.94);
+    box-shadow: 0 4px 0 rgba(0,0,0,0.5);
     transition-duration: 0.04s;
 }
 .lab-card.is-hot:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }

@@ -17,7 +17,7 @@ import { LoadoutMenu } from './LoadoutMenu';
 import { MainMenu } from './MainMenu';
 import { OutcomeChart, PatientChart } from './PatientChart';
 import { motionClass, ScreenPresence } from './screenPresence';
-import { BioLab, SerumOffer, mutationCardStyles, rollSerumOffers, serumWindowMs } from './MutationCards';
+import { BioLab, SerumOffer, mutationCardStyles, rollSerumOffers, serumWeight, serumWindowMs } from './MutationCards';
 import { Dossier } from './Dossier';
 import { FieldGuide } from './FieldGuide';
 import { RankingBoard } from './RankingBoard';
@@ -466,6 +466,8 @@ export const Game: React.FC = () => {
     window.addEventListener('keyup', (e) => handleKey(e, false));
     const advanceChart = (e: Event) => {
       if (isPaused) return;
+      const node = e.target;
+      if (node instanceof Element && node.closest('.lab-screen, .serum-screen, .lab-card')) return;
       const eng = engineRef.current;
       if (!eng) return;
       if (eng.advanceBossCard()) {
@@ -1000,7 +1002,16 @@ export const Game: React.FC = () => {
           setSerumNow(now);
           if (now < serum.endsAt || serumResolvedRef.current) return;
           serumResolvedRef.current = true;
-          const id = serum.ids[Math.floor(Math.random() * serum.ids.length)];
+          const pool = serum.ids
+            .map(id => upgradesRef.current.find(u => u.id === id))
+            .filter((u): u is Upgrade => !!u);
+          const total = pool.reduce((sum, u) => sum + serumWeight(u), 0);
+          let roll = Math.random() * (total || 1);
+          let id = pool[0]?.id || serum.ids[0];
+          for (const u of pool) {
+            roll -= serumWeight(u);
+            if (roll <= 0) { id = u.id; break; }
+          }
           setSerumCollapse(id);
           window.setTimeout(() => closeSerum(id), 420);
       }, 80);
@@ -1586,7 +1597,7 @@ export const Game: React.FC = () => {
                 </div>
                 <StatBar label={t('SURGE_READY')} value={uiData.energy} max={uiData.maxEnergy} colorClass={isPlatinum ? "bg-gradient-to-r from-amber-400 to-white" : "bg-gradient-to-r from-cyan-600 to-cyan-400"} animate={true}/>
                 {/* GLOBAL DASH INDICATOR (NEW) */}
-                <StatBar label={t('DASH')} value={uiData.dashProgress * 100} max={100} colorClass="bg-white/90 shadow-[0_0_10px_white]" animate={uiData.dashReady} />
+                <StatBar label={t('DASH')} value={uiData.dashProgress * 100} max={100} colorClass="bg-gradient-to-r from-cyan-300 to-white shadow-[0_0_12px_rgba(170,245,255,0.95)]" animate={uiData.dashReady} />
 
                 <div className="flex gap-1.5 lg:gap-2 mt-1 lg:mt-2">
                     {Array.from({length: INITIAL_LIVES}).map((_, i) => {
@@ -1685,13 +1696,23 @@ export const Game: React.FC = () => {
                         }}
                         onClick={!isMobile ? triggerDash : undefined}
                         disabled={!uiData.dashReady}
-                        className={`w-14 h-14 lg:w-16 lg:h-16 rounded-full border-2 flex items-center justify-center relative transition-all duration-100 active:scale-95
+                        className={`w-14 h-14 lg:w-16 lg:h-16 rounded-full border-2 flex flex-col items-center justify-center relative overflow-hidden transition-all duration-100 active:scale-95
                             ${uiData.dashReady
-                                ? 'border-white bg-white/20' 
-                                : 'border-white/10 bg-black/40 opacity-50'}`}
+                                ? 'border-white bg-cyan-300/80 text-slate-950 shadow-[0_0_22px_rgba(170,245,255,0.95)]'
+                                : 'border-cyan-200/70 bg-black/70 text-cyan-50'}`}
                      >
-                         <div className={`absolute inset-0 bg-white/30 rounded-full transition-all duration-500 ${uiData.dashReady ? 'scale-0' : 'scale-100'}`} style={{clipPath: 'polygon(0 0, 100% 0, 100% 100%, 0% 100%)'}}></div>
-                         <span className="font-bold text-[10px] lg:text-xs">{t('DASH')}</span>
+                         <span
+                            className="absolute inset-0 rounded-full"
+                            style={{
+                                background: `conic-gradient(${uiData.dashReady ? 'rgba(255,255,255,0.55)' : 'rgba(186,246,255,0.9)'} ${uiData.dashProgress * 360}deg, transparent 0deg)`,
+                                opacity: uiData.dashReady ? 0.85 : 1,
+                            }}
+                         />
+                         <svg viewBox="0 0 32 32" className="relative w-6 h-6 lg:w-7 lg:h-7" aria-hidden>
+                             <path d="M5 16h16M14 8l8 8-8 8" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+                             <path d="M4 16h5" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" opacity="0.7" />
+                         </svg>
+                         <span className="relative font-bold text-[8px] lg:text-[10px] leading-none mt-0.5">{t('DASH')}</span>
                      </button>
 
                      <button 
@@ -1702,13 +1723,22 @@ export const Game: React.FC = () => {
                         }}
                         onClick={!isMobile ? triggerUltimate : undefined}
                         disabled={uiData.energy < uiData.maxEnergy}
-                        className={`w-16 h-16 lg:w-24 lg:h-24 rounded-full border-2 lg:border-4 flex items-center justify-center relative transition-all duration-100 active:scale-95
+                        className={`w-16 h-16 lg:w-24 lg:h-24 rounded-full border-2 lg:border-4 flex flex-col items-center justify-center relative overflow-hidden transition-all duration-100 active:scale-95
                             ${uiData.energy >= uiData.maxEnergy 
-                                ? (isPlatinum ? 'border-amber-400 bg-amber-900/40 shadow-[0_0_30px_rgba(255,215,0,0.4)]' : 'border-cyan-400 bg-cyan-900/40 shadow-[0_0_30px_rgba(0,255,255,0.4)]')
-                                : 'border-white/10 bg-black/40 grayscale opacity-50'}`}
+                                ? (isPlatinum ? 'border-amber-100 bg-amber-400/70 text-amber-950 shadow-[0_0_32px_rgba(255,210,80,0.95)]' : 'border-white bg-cyan-300/75 text-slate-950 shadow-[0_0_32px_rgba(120,250,255,0.95)]')
+                                : 'border-cyan-100/55 bg-black/72 text-cyan-50'}`}
                      >
-                         <div className={`absolute inset-0 rounded-full border border-dashed border-white/20 ${uiData.energy >= uiData.maxEnergy ? 'animate-spin-slow' : ''}`}></div>
-                         <span className={`font-bold text-[10px] lg:text-sm tracking-widest ${uiData.energy >= uiData.maxEnergy ? (isPlatinum ? 'text-amber-200' : 'text-cyan-200') : 'text-white/30'}`}>{t('SURGE_READY')}</span>
+                         <span
+                            className="absolute inset-0"
+                            style={{
+                                background: `conic-gradient(${uiData.energy >= uiData.maxEnergy ? 'rgba(210,255,255,0.28)' : 'rgba(120,220,255,0.45)'} ${(uiData.energy / Math.max(1, uiData.maxEnergy)) * 360}deg, transparent 0deg)`,
+                            }}
+                         />
+                         <div className={`absolute inset-1 rounded-full border border-dashed ${uiData.energy >= uiData.maxEnergy ? 'border-white/50 animate-spin-slow' : 'border-white/15'}`}></div>
+                         <svg viewBox="0 0 32 32" className="relative w-6 h-6 lg:w-9 lg:h-9" aria-hidden>
+                             <path d="M18 3 L8 18 h7 l-2 11 12-16 h-7 z" fill="currentColor" />
+                         </svg>
+                         <span className="relative font-bold text-[8px] lg:text-xs tracking-widest leading-none">{t('SURGE_READY')}</span>
                      </button>
                  </div>
              </div>

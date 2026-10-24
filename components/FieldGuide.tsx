@@ -36,7 +36,7 @@ const COPY: Record<Language, Section[]> = {
             title: 'MOLAR',
             cards: [
                 { kind: 'plaque', title: 'PLACA', body: 'Mancha parada. Ficar em cima come a vida e segura o passo. A saliva desfaz.' },
-                { kind: 'saliva', title: 'SALIVA', body: 'Fita que passa. Limpa a placa, te carrega e deixa o dano mais fraco por um instante.' },
+                { kind: 'saliva', title: 'SALIVA', body: 'Fita molhada. O nome vai escrito dentro, de um lado ao outro. Limpa a placa e te carrega.' },
                 { kind: 'bite', title: 'MORDIDA', body: 'A faixa avisa. As paredes fecham. O golpe e o barulho são quando se encontram.' },
                 { kind: 'enamel', title: 'ESMALTE', body: 'Gota clara. Por uns segundos o dano chega pela metade.' },
             ],
@@ -45,8 +45,8 @@ const COPY: Record<Language, Section[]> = {
             title: 'FÍGADO',
             cards: [
                 { kind: 'bile', title: 'BILE', body: 'Poça no chão. Não persegue. Quem fica dentro queima aos poucos.' },
-                { kind: 'filter', title: 'FILTRO', body: 'Puxa o que está solto para o centro. Chegar no meio machuca.' },
-                { kind: 'heal', title: 'CURA', body: 'Gota dourada. A vida volta aos poucos, por alguns segundos.' },
+                { kind: 'filter', title: 'COADOR', body: 'Coador — puxa. O que está solto vai pro centro. Chegar no meio machuca.' },
+                { kind: 'heal', title: 'AÇÚCAR', body: 'Açúcar — cura. Gota dourada do fígado. A vida volta devagar, por uns segundos.' },
             ],
         },
         {
@@ -76,7 +76,7 @@ const COPY: Record<Language, Section[]> = {
             title: 'O QUE VOCÊ FAZ',
             cards: [
                 { kind: 'dash', title: 'DESVIO', body: 'Um tranco curto. Nesse piscar o dano não entra. Depois tem espera.' },
-                { kind: 'surge', title: 'PULSO', body: 'Onda que empurra, fere o que está perto e puxa o DNA.' },
+                { kind: 'surge', title: 'PULSO', body: 'Choque numa parte, empurra outra, e tem quem resiste. O DNA volta.' },
             ],
         },
     ],
@@ -105,8 +105,8 @@ const COPY: Record<Language, Section[]> = {
             title: 'LIVER',
             cards: [
                 { kind: 'bile', title: 'BILE', body: 'A puddle on the floor. It does not chase. Staying in it burns, a little at a time.' },
-                { kind: 'filter', title: 'FILTER', body: 'It pulls loose things to the center. Reaching the middle hurts.' },
-                { kind: 'heal', title: 'HEAL', body: 'A gold drop. Health comes back slowly, for a few seconds.' },
+                { kind: 'filter', title: 'SIEVE', body: 'Sieve — pulls. Loose things go to the center. Reaching the middle hurts.' },
+                { kind: 'heal', title: 'SUGAR', body: 'Sugar — heal. A gold drop from the liver. Health comes back slowly, for a few seconds.' },
             ],
         },
         {
@@ -136,7 +136,7 @@ const COPY: Record<Language, Section[]> = {
             title: 'WHAT YOU DO',
             cards: [
                 { kind: 'dash', title: 'DASH', body: 'A short jerk. In that blink damage does not get in. Then you wait.' },
-                { kind: 'surge', title: 'PULSE', body: 'A wave that shoves, hurts what is close, and pulls DNA in.' },
+                { kind: 'surge', title: 'PULSE', body: 'Shocks some, shoves others, and a few resist. DNA comes back.' },
             ],
         },
     ],
@@ -165,8 +165,8 @@ const COPY: Record<Language, Section[]> = {
             title: 'HÍGADO',
             cards: [
                 { kind: 'bile', title: 'BILIS', body: 'Charco en el suelo. No persigue. Quedarse dentro quema de a poco.' },
-                { kind: 'filter', title: 'FILTRO', body: 'Jala lo suelto al centro. Llegar al medio lastima.' },
-                { kind: 'heal', title: 'CURA', body: 'Gota dorada. La vida vuelve de a poco, por unos segundos.' },
+                { kind: 'filter', title: 'COLADOR', body: 'Colador — jala. Lo suelto va al centro. Llegar al medio lastima.' },
+                { kind: 'heal', title: 'AZÚCAR', body: 'Azúcar — cura. Gota dorada del hígado. La vida vuelve despacio, por unos segundos.' },
             ],
         },
         {
@@ -196,7 +196,7 @@ const COPY: Record<Language, Section[]> = {
             title: 'LO QUE HACES',
             cards: [
                 { kind: 'dash', title: 'ESQUIVE', body: 'Un tirón corto. En ese parpadeo el daño no entra. Después hay espera.' },
-                { kind: 'surge', title: 'PULSO', body: 'Onda que empuja, hiere lo que está cerca y atrae el ADN.' },
+                { kind: 'surge', title: 'PULSO', body: 'Choque en una parte, empuja otra, y hay quien resiste. El ADN vuelve.' },
             ],
         },
     ],

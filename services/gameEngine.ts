@@ -18,8 +18,6 @@ import { buzz } from './haptics';
 import { achievementManager } from './achievementManager';
 import { bossFor, drawBossShape, mutationFrom } from './bosses';
 import { OrganDirector, cellBudget, cellColor, cellRises, organBg, rollCellStyle } from './organDirector';
-import { hopLine } from './casebook';
-
 const BOSS_GRACE = 1.15;
 
 export interface BossCard {
@@ -170,12 +168,15 @@ export class GameEngine {
   private bgOrgan = ''; 
   private spawnTimer: number = 0;
   private regenTimer: number = 0;
+  private leechLock: number = 0;
   private screenShake: Vector2 = { x: 0, y: 0 };
   private shakeIntensity: number = 0;
   
   private surgeActive: boolean = false;
   private deathSurgeActive: boolean = false; 
   private surgeRadius: number = 0;
+  private surgeTouch = new Set<string>();
+  private surgeZapAt = 0;
   public adrenalineActive: boolean = false;
   public adrenalineTimer: number = 0;
   public adrenalineExhausted: boolean = false;
@@ -423,9 +424,9 @@ export class GameEngine {
       this.openBossCard(spec);
   }
 
-  private openBossCard(spec: { short: Record<Language, string>; disease: Record<Language, string>; intro: Record<Language, string>; color: string; from: Parameters<typeof hopLine>[0]; to: Parameters<typeof hopLine>[1] }) {
+  private openBossCard(spec: { short: Record<Language, string>; disease: Record<Language, string>; intro: Record<Language, string>; color: string }) {
       const lang = this.language;
-      const line = `${spec.intro[lang]} ${hopLine(spec.from, spec.to, lang)}`.trim();
+      const line = spec.intro[lang];
       this.bossCard = {
           name: spec.short[lang],
           disease: spec.disease[lang],
@@ -631,10 +632,11 @@ export class GameEngine {
           this.score += scoreGain;
           if (this.score >= 50000) achievementManager.track('score_50k', 50000);
           
-          if (isCrit && stats.lifesteal > 0) {
-              const heal = stats.lifesteal;
+          if (isCrit && stats.lifesteal > 0 && this.leechLock <= 0) {
+              const heal = Math.max(1, Math.round(stats.lifesteal * 0.5));
               this.player.health = Math.min(this.player.maxHealth, this.player.health + heal);
               this.spawnText(this.player.pos, `+${heal}`, '#00ff00', 18);
+              this.leechLock = 1.15;
           }
 
           audioManager.playExplosion(target.pos);
@@ -655,7 +657,7 @@ export class GameEngine {
                   type: EntityType.DNA_FRAGMENT,
                   pos: { x: target.pos.x, y: target.pos.y },
                   vel: { x: Math.cos(ang) * kick, y: Math.sin(ang) * kick },
-                  radius: 5,
+                  radius: 7,
                   health: 1, maxHealth: 1,
                   color: this.colors.DNA,
                   damage: 0, active: true,
@@ -860,6 +862,7 @@ export class GameEngine {
       this.surgeActive = true;
       this.deathSurgeActive = force; 
       this.surgeRadius = 0;
+      this.surgeTouch.clear();
       this.shakeIntensity = force ? 40 : 30;
       if (!force) {
           this.spawnText(this.player.pos, this.t('MSG_SURGE'), this.colors.PLAYER_CORE, 45);
@@ -879,6 +882,67 @@ export class GameEngine {
           }
       });
     }
+  }
+
+  private surgeFate(id: string): number {
+      let h = 2166136261;
+      for (let i = 0; i < id.length; i++) {
+          h ^= id.charCodeAt(i);
+          h = Math.imul(h, 16777619);
+      }
+      return (h >>> 0) % 10;
+  }
+
+  private holdOnScreen(e: Entity) {
+      const pad = e.radius + 48;
+      const roomX = e.vel.x < 0 ? e.pos.x - pad : CANVAS_WIDTH - pad - e.pos.x;
+      const roomY = e.vel.y < 0 ? e.pos.y - pad : CANVAS_HEIGHT - pad - e.pos.y;
+      const capX = Math.max(0, roomX) * 0.045;
+      const capY = Math.max(0, roomY) * 0.045;
+      if (e.vel.x < -capX) e.vel.x = -capX;
+      if (e.vel.x > capX) e.vel.x = capX;
+      if (e.vel.y < -capY) e.vel.y = -capY;
+      if (e.vel.y > capY) e.vel.y = capY;
+  }
+
+  private sparkShock(e: Entity) {
+      const now = performance.now();
+      if (now - this.surgeZapAt > 90) {
+          this.surgeZapAt = now;
+          audioManager.playZap(e.pos);
+      }
+      if (this.particles.length > (this.isLowQuality ? 36 : 190)) return;
+      const bolts = this.isLowQuality ? 1 : 2;
+      const segs = this.isLowQuality ? 3 : 5;
+      for (let b = 0; b < bolts; b++) {
+          const ang = Math.random() * Math.PI * 2;
+          let x = e.pos.x + Math.cos(ang) * (e.radius + 34);
+          let y = e.pos.y + Math.sin(ang) * (e.radius + 26);
+          for (let s = 0; s < segs; s++) {
+              const remain = segs - s;
+              const tx = e.pos.x + (x - e.pos.x) * ((remain - 1) / segs);
+              const ty = e.pos.y + (y - e.pos.y) * ((remain - 1) / segs);
+              const jx = (Math.random() - 0.5) * (s === segs - 1 ? 4 : 16);
+              const jy = (Math.random() - 0.5) * (s === segs - 1 ? 4 : 16);
+              const nx = tx + jx;
+              const ny = ty + jy;
+              this.particles.push({
+                  id: 'zap',
+                  type: EntityType.PARTICLE,
+                  pos: { x, y },
+                  vel: { x: nx - x, y: ny - y },
+                  radius: s === 0 ? 3.4 : 2.1,
+                  health: 1,
+                  maxHealth: 1,
+                  color: s % 2 === 0 ? '#f7feff' : '#8ef6ff',
+                  damage: 0,
+                  active: true,
+                  ttl: 8 + (s % 3),
+              });
+              x = nx;
+              y = ny;
+          }
+      }
   }
 
   public triggerDash(stats: PlayerStats) {
@@ -1426,15 +1490,49 @@ export class GameEngine {
               const dy = e.pos.y - this.player.pos.y;
               const dist = Math.sqrt(d);
               
-              if (dist > 0.1) { 
-                  if (e.type !== EntityType.BOSS) {
-                      e.vel.x += (dx/dist) * 25; 
-                      e.vel.y += (dy/dist) * 25;
-                  }
-                  
-                  if (this.damageEnemy(e, 8, false, stats)) {
-                      this.sessionStats.surgeKills++;
-                      achievementManager.track('surge_kill_100', 1);
+              if (dist > 0.1) {
+                  if (this.deathSurgeActive) {
+                      if (e.type !== EntityType.BOSS) {
+                          e.vel.x += (dx / dist) * 25;
+                          e.vel.y += (dy / dist) * 25;
+                      }
+                      if (this.damageEnemy(e, 8, false, stats)) {
+                          this.sessionStats.surgeKills++;
+                          achievementManager.track('surge_kill_100', 1);
+                      }
+                  } else if (!this.surgeTouch.has(e.id)) {
+                      this.surgeTouch.add(e.id);
+                      const fate = this.surgeFate(e.id);
+                      const boss = e.type === EntityType.BOSS;
+                      const shock = !boss && fate < 4;
+                      const shove = !boss && fate >= 4 && fate < 8;
+                      const portion = shock ? 0.14 : shove ? 0.02 : 0.008;
+                      const flat = shock ? 22 : shove ? 4 : 2;
+                      const kick = shock ? 0.45 : shove ? 3.4 : 0.15;
+                      if (shock) {
+                          e.vel.x *= 0.2;
+                          e.vel.y *= 0.2;
+                          e.hitFlash = 12;
+                          this.sparkShock(e);
+                      } else {
+                          e.hitFlash = shove ? 4 : 2;
+                      }
+                      e.vel.x += (dx / dist) * kick;
+                      e.vel.y += (dy / dist) * kick;
+                      const cap = shock ? 1.1 : shove ? 3.4 : 0.7;
+                      const mag = Math.hypot(e.vel.x, e.vel.y);
+                      if (mag > cap) {
+                          e.vel.x *= cap / mag;
+                          e.vel.y *= cap / mag;
+                      }
+                      this.holdOnScreen(e);
+                      const pad = e.radius + 64;
+                      e.pos.x = Math.min(CANVAS_WIDTH - pad, Math.max(pad, e.pos.x));
+                      e.pos.y = Math.min(CANVAS_HEIGHT - pad, Math.max(pad, e.pos.y));
+                      if (this.damageEnemy(e, flat + e.maxHealth * portion, false, stats)) {
+                          this.sessionStats.surgeKills++;
+                          achievementManager.track('surge_kill_100', 1);
+                      }
                   }
               }
            }
@@ -1443,6 +1541,7 @@ export class GameEngine {
       if (this.surgeRadius > CANVAS_WIDTH * 1.5) {
           this.surgeActive = false;
           this.deathSurgeActive = false;
+          this.surgeTouch.clear();
       }
     }
 
@@ -1513,8 +1612,9 @@ export class GameEngine {
       if (this.player.pos.y > CANVAS_HEIGHT - this.player.radius) this.player.pos.y = CANVAS_HEIGHT - this.player.radius;
       }
 
+      if (this.leechLock > 0) this.leechLock -= dtSeconds;
       this.regenTimer += safeDt;
-      if (this.regenTimer > 3400 && stats.regen > 0) {
+      if (this.regenTimer > 11000 && stats.regen > 0) {
         this.player.health = Math.min(this.player.health + stats.regen, this.player.maxHealth);
         this.regenTimer = 0;
       }
@@ -1855,7 +1955,22 @@ export class GameEngine {
               this.sessionStats.biomassCollected += val;
               achievementManager.track('biomass_10k', val);
               if (this.biomass >= 3000) achievementManager.track('rich', 3000);
-              audioManager.playPowerUp(e.pos);
+              audioManager.playCoin(e.pos);
+              if (!this.isLowQuality && this.particles.length < 180) {
+                  for (let k = 0; k < 6; k++) {
+                      const a = (k / 6) * Math.PI * 2;
+                      this.particles.push({
+                          id: 'coin',
+                          type: EntityType.PARTICLE,
+                          pos: { x: e.pos.x, y: e.pos.y },
+                          vel: { x: Math.cos(a) * 2.1, y: Math.sin(a) * 2.1 - 0.8 },
+                          radius: k % 2 === 0 ? 2.4 : 1.3,
+                          health: 1, maxHealth: 1,
+                          color: k % 3 === 0 ? '#fff6d0' : '#f0c14a',
+                          damage: 0, active: true, ttl: 14,
+                      });
+                  }
+              }
             }
           }
         }
@@ -1889,6 +2004,9 @@ export class GameEngine {
                   p.pos.y = Math.random() * CANVAS_HEIGHT;
               }
           }
+      } else if (p.id === 'zap') {
+          p.ttl = (p.ttl || 0) - 1;
+          if ((p.ttl || 0) <= 0) continue;
       } else {
           p.pos.x += (p.vel.x + this.bloodFlow.x) * tick;
           p.pos.y += (p.vel.y + this.bloodFlow.y) * tick;
@@ -2498,6 +2616,65 @@ export class GameEngine {
       this.ctx.restore();
   }
 
+  private drawCoin(e: Entity) {
+      const spin = Math.cos(this.time / 240 + e.pos.x * 0.01);
+      const sx = Math.max(0.28, Math.abs(spin));
+      const bob = Math.sin(this.time / 280 + e.pos.y * 0.02) * 1.6;
+      const r = e.radius;
+      this.ctx.save();
+      this.ctx.translate(e.pos.x, e.pos.y + bob);
+      if (!this.isLowQuality) {
+          this.ctx.globalCompositeOperation = 'screen';
+          this.ctx.fillStyle = e.isElite ? 'rgba(255, 244, 210, 0.38)' : 'rgba(255, 196, 64, 0.26)';
+          this.ctx.beginPath();
+          this.ctx.ellipse(0, 2, r * 1.7, r * 0.72, 0, 0, Math.PI * 2);
+          this.ctx.fill();
+          this.ctx.globalCompositeOperation = 'source-over';
+      }
+      this.ctx.scale(sx, 1);
+      if (this.isLowQuality) {
+          this.ctx.fillStyle = e.isElite ? '#ffe7a8' : '#e2b23a';
+      } else {
+          const g = this.ctx.createRadialGradient(-r * 0.35, -r * 0.4, 1, 0, 0, r);
+          g.addColorStop(0, '#fff8d4');
+          g.addColorStop(0.42, e.isElite ? '#ffe39a' : '#f0c14a');
+          g.addColorStop(1, '#7a4e10');
+          this.ctx.fillStyle = g;
+      }
+      this.ctx.beginPath();
+      this.ctx.arc(0, 0, r, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.lineWidth = 1.5;
+      this.ctx.strokeStyle = '#fff3c4';
+      this.ctx.stroke();
+      this.ctx.beginPath();
+      this.ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
+      this.ctx.strokeStyle = 'rgba(92, 54, 12, 0.55)';
+      this.ctx.lineWidth = 1;
+      this.ctx.stroke();
+      if (sx > 0.62) {
+          this.ctx.strokeStyle = 'rgba(74, 40, 8, 0.85)';
+          this.ctx.lineWidth = 1.15;
+          this.ctx.beginPath();
+          this.ctx.moveTo(0, -r * 0.4);
+          this.ctx.bezierCurveTo(r * 0.3, -r * 0.08, -r * 0.3, r * 0.08, 0, r * 0.4);
+          this.ctx.moveTo(0, -r * 0.4);
+          this.ctx.bezierCurveTo(-r * 0.3, -r * 0.08, r * 0.3, r * 0.08, 0, r * 0.4);
+          this.ctx.stroke();
+      }
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+      this.ctx.beginPath();
+      this.ctx.ellipse(-r * 0.28, -r * 0.32, r * 0.22, r * 0.11, -0.6, 0, Math.PI * 2);
+      this.ctx.fill();
+      const glint = 0.35 + 0.65 * Math.max(0, Math.sin(this.time / 180 + e.pos.x * 0.02));
+      this.ctx.globalAlpha = glint;
+      this.ctx.fillStyle = '#fffdf4';
+      this.ctx.beginPath();
+      this.ctx.arc(r * 0.15, -r * 0.05, Math.max(0.8, r * 0.16), 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.restore();
+  }
+
   private drawOrganPickup(e: Entity) {
       const kind = e.value || 1;
       const base = e.angle && e.angle > 0 ? e.angle : e.radius;
@@ -2594,9 +2771,13 @@ export class GameEngine {
           this.ctx.lineWidth = 5;
           this.ctx.strokeStyle = 'rgba(48, 32, 8, 0.65)';
           this.ctx.fillStyle = '#fff4d0';
-          this.ctx.font = '800 20px "Chakra Petch", sans-serif';
-          this.ctx.strokeText(this.t('GLYCOGEN_WORD'), 0, 42);
-          this.ctx.fillText(this.t('GLYCOGEN_WORD'), 0, 42);
+          this.ctx.font = '800 22px "Chakra Petch", sans-serif';
+          this.ctx.strokeText(this.t('GLYCOGEN_WORD'), 0, 40);
+          this.ctx.fillText(this.t('GLYCOGEN_WORD'), 0, 40);
+          this.ctx.font = '700 15px "Chakra Petch", sans-serif';
+          this.ctx.fillStyle = '#ffe7a8';
+          this.ctx.strokeText(this.t('GLYCOGEN_HINT'), 0, 58);
+          this.ctx.fillText(this.t('GLYCOGEN_HINT'), 0, 58);
           this.ctx.restore();
           return;
       }
@@ -2816,6 +2997,26 @@ export class GameEngine {
       
       this.ctx.fillStyle = this.deathSurgeActive ? `rgba(255, 0, 0, 0.2)` : `rgba(0, 255, 255, 0.1)`;
       this.ctx.fill();
+
+      if (!this.deathSurgeActive && !this.isLowQuality) {
+          const px = this.player.pos.x;
+          const py = this.player.pos.y;
+          this.ctx.strokeStyle = 'rgba(236, 255, 255, 0.82)';
+          this.ctx.lineWidth = 1.6;
+          this.ctx.lineCap = 'round';
+          const bolts = 8;
+          for (let i = 0; i < bolts; i++) {
+              const a = (i / bolts) * Math.PI * 2 + this.time * 0.01;
+              const r0 = r * (0.78 + (i % 3) * 0.04);
+              const mx = px + Math.cos(a) * (r0 + 10) + Math.cos(a + 1.4) * 16;
+              const my = py + Math.sin(a) * (r0 + 10) + Math.sin(a + 0.6) * 16;
+              this.ctx.beginPath();
+              this.ctx.moveTo(px + Math.cos(a) * r0, py + Math.sin(a) * r0);
+              this.ctx.lineTo(mx, my);
+              this.ctx.lineTo(px + Math.cos(a + 0.08) * r * 1.04, py + Math.sin(a + 0.08) * r * 1.04);
+              this.ctx.stroke();
+          }
+      }
     }
 
     if (!this.isLowQuality) {
@@ -2869,6 +3070,23 @@ export class GameEngine {
           this.ctx.beginPath();
           this.ctx.ellipse(p.pos.x, p.pos.y, p.radius * 1.5, p.radius * 0.6, 0, 0, Math.PI*2);
           this.ctx.fill();
+      } else if (p.id === 'zap') {
+          const life = Math.max(0, (p.ttl || 0) / 10);
+          this.ctx.save();
+          this.ctx.globalCompositeOperation = 'screen';
+          this.ctx.lineCap = 'round';
+          this.ctx.globalAlpha = life * 0.35;
+          this.ctx.strokeStyle = '#e8fbff';
+          this.ctx.lineWidth = 5.5;
+          this.ctx.beginPath();
+          this.ctx.moveTo(p.pos.x, p.pos.y);
+          this.ctx.lineTo(p.pos.x + p.vel.x, p.pos.y + p.vel.y);
+          this.ctx.stroke();
+          this.ctx.globalAlpha = life;
+          this.ctx.strokeStyle = p.color;
+          this.ctx.lineWidth = 1.7;
+          this.ctx.stroke();
+          this.ctx.restore();
       } else if (p.id === 'system_glitch') {
           this.ctx.fillStyle = p.color;
           this.ctx.globalAlpha = p.ttl! / 15;
@@ -3108,29 +3326,7 @@ export class GameEngine {
             this.ctx.restore();
         }
         else if (e.type === EntityType.DNA_FRAGMENT) {
-            this.ctx.save();
-            this.ctx.translate(e.pos.x, e.pos.y);
-            this.ctx.globalCompositeOperation = 'screen';
-            this.ctx.fillStyle = e.isElite ? 'rgba(255, 255, 255, 0.6)' : 'rgba(255, 215, 0, 0.4)';
-            this.ctx.beginPath();
-            this.ctx.arc(0, 0, e.radius * 2.5, 0, Math.PI*2);
-            this.ctx.fill();
-            this.ctx.globalCompositeOperation = 'source-over';
-            const scaleX = Math.cos(this.time / 150);
-            this.ctx.scale(Math.abs(scaleX), 1);
-            this.ctx.fillStyle = e.isElite ? '#ffeeb0' : this.colors.DNA;
-            this.ctx.beginPath();
-            this.ctx.arc(0, 0, e.radius, 0, Math.PI*2);
-            this.ctx.fill();
-            this.ctx.strokeStyle = '#b8860b';
-            this.ctx.lineWidth = 1.5;
-            this.ctx.stroke();
-            this.ctx.beginPath();
-            this.ctx.arc(0, 0, e.radius * 0.6, 0, Math.PI*2);
-            this.ctx.strokeStyle = 'rgba(255,255,255,0.5)';
-            this.ctx.lineWidth = 1;
-            this.ctx.stroke();
-            this.ctx.restore();
+            this.drawCoin(e);
         }
     });
 
