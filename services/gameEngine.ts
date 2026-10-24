@@ -623,19 +623,29 @@ export class GameEngine {
 
           // O power-up voando cobre parte da progressão, então a biomassa cai um pouco.
           const dnaYield = 1.15;
-          this.entities.push({
-              id: `dna_${Date.now()}`,
-              type: EntityType.DNA_FRAGMENT,
-              pos: { ...target.pos },
-              vel: { x: (Math.random()-0.5)*8, y: (Math.random()-0.5)*8 },
-              radius: 6,
-              health: 1, maxHealth: 1,
-              color: this.colors.DNA,
-              damage: 0, active: true,
-              drag: 0.05,
-              value: Math.max(1, Math.ceil((target.value || 10) * Math.min(3, comboPower) * dnaYield)),
-              isElite: target.isElite
-          });
+          const total = Math.max(1, Math.ceil((target.value || 10) * Math.min(3, comboPower) * dnaYield));
+          const shards = Math.min(total, Math.min(6, Math.max(3, Math.ceil(total / 12))));
+          const base = Math.floor(total / shards);
+          let leftover = total - base * shards;
+          for (let i = 0; i < shards; i++) {
+              const ang = (i / shards) * Math.PI * 2 + Math.random() * 0.4;
+              const kick = 3.2 + Math.random() * 3.4;
+              const share = base + (leftover > 0 ? 1 : 0);
+              if (leftover > 0) leftover--;
+              this.entities.push({
+                  id: `dna_${Date.now()}_${i}`,
+                  type: EntityType.DNA_FRAGMENT,
+                  pos: { x: target.pos.x, y: target.pos.y },
+                  vel: { x: Math.cos(ang) * kick, y: Math.sin(ang) * kick },
+                  radius: 5,
+                  health: 1, maxHealth: 1,
+                  color: this.colors.DNA,
+                  damage: 0, active: true,
+                  drag: 0.05,
+                  value: Math.max(1, share),
+                  isElite: target.isElite
+              });
+          }
           
           return true;
       }
@@ -1014,9 +1024,16 @@ export class GameEngine {
       }
 
       if (m.play === 'cord') {
-          const spin = Math.sin(m.phase * 2.1);
-          e.vel.x += (-ny) * speed * 2.8 * spin + nx * speed * 0.45;
-          e.vel.y += nx * speed * 2.8 * spin + ny * speed * 0.45;
+          const spin = Math.sin(m.phase * 1.5);
+          e.vel.x += nx * speed * 1.35 + (-ny) * speed * 1.05 * spin;
+          e.vel.y += ny * speed * 1.35 + nx * speed * 1.05 * spin;
+          m.dashTimer -= dtSeconds;
+          if (m.dashTimer <= 0) {
+              e.vel.x += nx * 13;
+              e.vel.y += ny * 13;
+              m.dashTimer = 2.2;
+              if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.75);
+          }
           return;
       }
 
@@ -1330,7 +1347,7 @@ export class GameEngine {
                   this.serumClock -= dtSeconds;
                   if (this.serumClock <= 0) {
                       this.spawnSerum();
-                      this.serumClock = 118 + Math.random() * 40;
+                      this.serumClock = 168 + Math.random() * 50;
                   }
               }
           }
@@ -1477,7 +1494,7 @@ export class GameEngine {
       }
 
       this.regenTimer += safeDt;
-      if (this.regenTimer > 2000 && stats.regen > 0) {
+      if (this.regenTimer > 3400 && stats.regen > 0) {
         this.player.health = Math.min(this.player.health + stats.regen, this.player.maxHealth);
         this.regenTimer = 0;
       }
@@ -1599,13 +1616,13 @@ export class GameEngine {
                 e.shootTimer -= dtSeconds;
                 if (e.shootTimer <= 0) {
                     const angle = Math.atan2(this.player.pos.y - e.pos.y, this.player.pos.x - e.pos.x);
-                    const speed = 7;
+                    const speed = 8.2;
                     this.entities.push({
                         id: `eproj_${Date.now()}`, type: EntityType.ENEMY_PROJECTILE,
                         pos: { ...e.pos },
                         vel: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
                         radius: 12, health: 1, maxHealth: 1, color: this.colors.ENEMY_PROJECTILE,
-                        damage: Math.max(3, e.damage * 0.2), active: true, drag: 0
+                        damage: Math.max(6, e.damage * 0.36), active: true, drag: 0
                     });
                     
                     e.shootTimer = 3.5; 
@@ -1881,6 +1898,7 @@ export class GameEngine {
         this.acidCue = 0;
     }
     
+    this.nudgeFoes();
     this.organ.end(dtSeconds, organHooks);
 
     this.shakeIntensity *= 0.9;
@@ -1892,6 +1910,32 @@ export class GameEngine {
       return pos.x < -400 || pos.x > CANVAS_WIDTH + 400 || pos.y < -400 || pos.y > CANVAS_HEIGHT + 400;
   }
   
+  private nudgeFoes() {
+      const list = this.entities;
+      for (let i = 0; i < list.length; i++) {
+          const a = list[i];
+          if (!a.active || !this.isEnemy(a.type)) continue;
+          for (let j = i + 1; j < list.length; j++) {
+              const b = list[j];
+              if (!b.active || !this.isEnemy(b.type)) continue;
+              let dx = b.pos.x - a.pos.x;
+              let dy = b.pos.y - a.pos.y;
+              const min = Math.max(18, Math.min(a.radius, b.radius) * 0.42);
+              const d2 = dx * dx + dy * dy;
+              if (d2 >= min * min) continue;
+              if (d2 < 0.04) { dx = 1; dy = 0; }
+              const d = Math.sqrt(dx * dx + dy * dy) || 1;
+              const push = (min - Math.min(d, min)) * 0.45;
+              const nx = dx / d;
+              const ny = dy / d;
+              a.pos.x -= nx * push;
+              a.pos.y -= ny * push;
+              b.pos.x += nx * push;
+              b.pos.y += ny * push;
+          }
+      }
+  }
+
   private isEnemy(t: EntityType) {
     return t === EntityType.BACTERIA || t === EntityType.VIRUS || t === EntityType.PARASITE || t === EntityType.FUNGI;
   }

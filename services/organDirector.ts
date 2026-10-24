@@ -689,7 +689,7 @@ export class OrganDirector {
         if (this.systoleT > 0) this.systoleT -= dt;
         if (this.glycogenT > 0 && hooks.player.active) {
             this.glycogenT -= dt;
-            hooks.heal(hooks.player.maxHealth * 0.055 * dt);
+            hooks.heal(hooks.player.maxHealth * 0.018 * dt);
         }
         if (this.banner) {
             this.banner.ttl -= dt;
@@ -1002,7 +1002,7 @@ export class OrganDirector {
         if (this.local >= 1) {
             this.glycogenClock -= dt;
             if (this.glycogenClock <= 0) {
-                this.glycogenClock = (22 - this.local * 0.4) / pace;
+                this.glycogenClock = (36 - this.local * 0.3) / pace;
                 this.spawnPickup(PICK_GLYCOGEN, '#ffe08a');
             }
         }
@@ -1073,7 +1073,9 @@ export class OrganDirector {
         }
 
         this.traces = this.traces.filter(tr => {
+            const before = tr.age;
             tr.age += dt;
+            if (before < 0 && tr.age >= 0) audioManager.ecgPass({ x: CANVAS_WIDTH * 0.5, y: tr.y });
             tr.x0 = CANVAS_WIDTH - (tr.age / 1.25) * (CANVAS_WIDTH + tr.span);
             return tr.x0 > -tr.span - 40;
         });
@@ -1088,7 +1090,6 @@ export class OrganDirector {
                 this.ecgCue = false;
                 this.ecgClock = Math.max(10, (19 - this.local * 0.9) / pace);
                 const y = 170 + Math.random() * (CANVAS_HEIGHT - 340);
-                audioManager.ecgPass({ x: CANVAS_WIDTH * 0.5, y });
                 const shape = this.beatN % 4;
                 const spans = [0.56, 0.74, 0.64, 0.84];
                 this.traces.push({ y, x0: CANVAS_WIDTH + 20, age: -1.25, span: CANVAS_WIDTH * spans[shape], shape, hit: new Set(), playerHit: false });
@@ -1540,7 +1541,7 @@ export class OrganDirector {
                 this.shield = 0.5;
                 hooks.popup(hooks.player.pos, hooks.t('MSG_FLUORIDE'), '#e7fff8', 24);
             } else if (e.value === PICK_GLYCOGEN) {
-                this.glycogenT = 2.8;
+                this.glycogenT = 1.5;
                 hooks.popup(hooks.player.pos, hooks.t('MSG_GLYCOGEN'), '#ffe08a', 24);
             } else if (e.value === PICK_OXYGEN) {
                 this.oxygenT = 4;
@@ -2235,7 +2236,7 @@ export class OrganDirector {
     private drawTrace(ctx: CanvasRenderingContext2D, trace: Trace, low: boolean) {
         const warned = trace.age < 0;
         ctx.save();
-        ctx.fillStyle = warned ? 'rgba(255, 64, 84, 0.1)' : 'rgba(255, 48, 68, 0.06)';
+        ctx.fillStyle = warned ? 'rgba(255, 176, 64, 0.07)' : 'rgba(255, 48, 68, 0.06)';
         ctx.fillRect(0, trace.y - 86, CANVAS_WIDTH, 172);
         ctx.strokeStyle = 'rgba(255, 186, 196, 0.09)';
         ctx.lineWidth = 1;
@@ -2266,25 +2267,21 @@ export class OrganDirector {
 
         const clock = (this.hooks?.time || 0) / 1000;
         if (warned) {
-            const preview: Vector2[] = [];
-            const n = low ? 36 : 80;
-            const span = CANVAS_WIDTH - 80;
-            const sweep = (clock * 0.42) % 1;
-            const head = 40 + sweep * span;
-            for (let i = 0; i <= n; i++) {
-                const u = i / n;
-                const phase = (u * 0.55 + clock * 0.7) % 1;
-                preview.push({ x: 40 + u * span, y: trace.y - pqrst(phase, trace.shape) * 0.9 });
-            }
-            const drawn = preview.filter(p => p.x <= head);
-            stroke(drawn, 12, 'rgba(255, 70, 96, 0.28)');
-            stroke(drawn, 2.4, 'rgba(255, 236, 240, 0.92)');
-            ctx.strokeStyle = 'rgba(255, 90, 110, 0.9)';
-            ctx.lineWidth = 3;
+            const blink = 0.35 + 0.65 * Math.abs(Math.sin(clock * 5));
+            ctx.setLineDash([10, 14]);
+            ctx.strokeStyle = `rgba(255, 210, 150, ${0.35 * blink})`;
+            ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(head, trace.y - 72);
-            ctx.lineTo(head, trace.y + 72);
+            ctx.moveTo(48, trace.y);
+            ctx.lineTo(CANVAS_WIDTH - 48, trace.y);
             ctx.stroke();
+            ctx.setLineDash([]);
+            const gate = 80 + ((clock * 220) % (CANVAS_WIDTH - 160));
+            ctx.strokeStyle = `rgba(255, 196, 90, ${0.85 * blink})`;
+            ctx.lineWidth = 2;
+            ctx.strokeRect(gate - 18, trace.y - 22, 36, 44);
+            ctx.fillStyle = `rgba(255, 186, 70, ${0.9 * blink})`;
+            ctx.fillRect(gate - 2, trace.y - 16, 4, 32);
         } else {
             const raw = low ? this.tracePoints(trace).filter((_, i) => i % 2 === 0) : this.tracePoints(trace);
             const pts = raw;

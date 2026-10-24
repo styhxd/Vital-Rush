@@ -47,7 +47,8 @@ export function rollSerumOffers(upgrades: Upgrade[]): string[] {
     const count = pool.length <= 2 ? pool.length : (Math.random() < 0.3 ? 3 : 2);
     const weight = (u: Upgrade) => {
         const rarity = u.rarity === 'LEGENDARY' ? 0.28 : u.rarity === 'EPIC' ? 0.55 : u.rarity === 'RARE' ? 1 : 1.12;
-        return rarity * (1.35 - (u.level / u.maxLevel) * 0.45);
+        const heal = u.id === 'membrane' || u.id === 'lifesteal' ? 0.32 : 1;
+        return rarity * heal * (1.35 - (u.level / u.maxLevel) * 0.45);
     };
     const bag = [...pool];
     const picked: string[] = [];

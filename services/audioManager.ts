@@ -619,20 +619,20 @@ export class AudioManager {
       over.frequency.setValueAtTime(2000, t);
       g.gain.setValueAtTime(0.0001, t);
       g.gain.exponentialRampToValueAtTime(0.16, t + 0.04);
-      g.gain.setValueAtTime(0.16, t + 1.15);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.45);
+      g.gain.setValueAtTime(0.16, t + 1.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 1.25);
       g2.gain.setValueAtTime(0.0001, t);
       g2.gain.exponentialRampToValueAtTime(0.03, t + 0.04);
-      g2.gain.setValueAtTime(0.03, t + 1.15);
-      g2.gain.exponentialRampToValueAtTime(0.0001, t + 1.45);
+      g2.gain.setValueAtTime(0.03, t + 1.02);
+      g2.gain.exponentialRampToValueAtTime(0.0001, t + 1.25);
       osc.connect(g);
       over.connect(g2);
       g.connect(dest);
       g2.connect(dest);
       osc.start(t);
       over.start(t);
-      osc.stop(t + 1.5);
-      over.stop(t + 1.5);
+      osc.stop(t + 1.28);
+      over.stop(t + 1.28);
   }
 
   public playBiteWarn(at?: { x: number; y: number } | null) {
@@ -836,6 +836,16 @@ export class AudioManager {
       this.tone(t + 0.48, 783.99, 1.25, 'triangle', 0.09, 1900, this.musicGain);
       this.puff(0.36, 1500, 0.14, t + 0.42);
       this.tone(t + 0.95, 1568, 0.85, 'sine', 0.06, 2400, this.musicGain);
+  }
+  public playCampaign() {
+      if (!this.ctx || !this.musicGain) return;
+      const t = this.ctx.currentTime;
+      const line = [392, 494, 587, 659, 784, 988, 1175, 1568];
+      line.forEach((freq, i) => this.tone(t + i * 0.18, freq, 0.62, 'triangle', 0.11, 2200, this.musicGain!));
+      const chord = [523.25, 659.25, 784, 1046.5];
+      chord.forEach((freq, i) => this.tone(t + 1.7, freq, 5.6, i % 2 ? 'sine' : 'triangle', 0.07, 1600, this.musicGain!));
+      this.tone(t + 1.7, 130.8, 5.4, 'sine', 0.1, 420, this.musicGain);
+      this.puff(0.5, 900, 0.16, t + 1.6);
   }
   public playWaveClear() {
       if (!this.ctx || !this.musicGain) return;

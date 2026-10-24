@@ -216,7 +216,7 @@ export const BOSSES: BossSpec[] = [
     },
     {
         id: 'lung>heart', from: 'lung', to: 'heart', shape: 'cords', play: 'cord',
-        color: '#e7d2a8', accent: '#8a7040', hp: 1.4, speed: 0.24, radius: 116,
+        color: '#e7d2a8', accent: '#8a7040', hp: 1.4, speed: 0.42, radius: 116,
         short: text('M. TUBERCULOSIS', 'M. TUBERCULOSIS', 'M. TUBERCULOSIS'),
         disease: text('Pericardite', 'Pericarditis', 'Pericarditis'),
         intro: text('Os cordões do pulmão encostam no pericárdio e tomam o coração.', 'The cords from the lung reach the pericardium and take the heart.', 'Los cordones del pulmón llegan al pericardio y toman el corazón.'),

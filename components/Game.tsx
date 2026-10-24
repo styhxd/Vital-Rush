@@ -298,7 +298,7 @@ export const Game: React.FC = () => {
   const vignetteRef = useRef<HTMLDivElement>(null);
   const marginFrameRef = useRef<HTMLDivElement>(null);
   const heartRefs = useRef<Array<SVGSVGElement | null>>([]);
-  const [outcomeBeat, setOutcomeBeat] = useState<null | 'win' | 'lose' | 'organ'>(null);
+  const [outcomeBeat, setOutcomeBeat] = useState<null | 'win' | 'lose' | 'organ' | 'campaign'>(null);
   const [outcomeLeaving, setOutcomeLeaving] = useState(false);
   const [passage, setPassage] = useState(false);
   const passageRef = useRef(false);
@@ -643,14 +643,16 @@ export const Game: React.FC = () => {
       setGameState(GameState.WAVE_CLEARED);
       audioManager.stopMusic();
       const organHop = engineRef.current?.organ.willLeave(engineRef.current.currentWaveIndex) ?? false;
-      if (organHop) audioManager.playTrophy();
+      const campaign = engineRef.current?.currentWaveIndex === 29;
+      if (campaign) audioManager.playCampaign();
+      else if (organHop) audioManager.playTrophy();
       else audioManager.playWaveClear();
-      setOutcomeBeat(organHop ? 'organ' : 'win');
+      setOutcomeBeat(campaign ? 'campaign' : organHop ? 'organ' : 'win');
       setOutcomeLeaving(false);
       if (outcomeTimer.current) window.clearTimeout(outcomeTimer.current);
       if (outcomeLeaveTimer.current) window.clearTimeout(outcomeLeaveTimer.current);
-      const hold = organHop ? 5200 : 2100;
-      const leave = organHop ? 1100 : 700;
+      const hold = campaign ? 8600 : organHop ? 5200 : 2100;
+      const leave = campaign ? 1400 : organHop ? 1100 : 700;
       outcomeLeaveTimer.current = window.setTimeout(() => setOutcomeLeaving(true), hold);
       outcomeTimer.current = window.setTimeout(() => {
           setOutcomeBeat(null);
@@ -1440,6 +1442,35 @@ export const Game: React.FC = () => {
             filter: drop-shadow(0 0 18px rgba(255, 210, 120, 0.9));
             animation: outcome-pop 0.7s cubic-bezier(.2, 1.45, .35, 1) both;
         }
+        .outcome-campaign { background: radial-gradient(circle at 50% 42%, rgba(255, 214, 120, 0.38), rgba(40, 8, 4, 0.2) 36%, rgba(0, 0, 0, 0.78) 72%); }
+        .outcome-leave-finale { animation: outcome-leave 1.4s ease forwards; }
+        .finale-rig { width: min(34vh, 240px); height: min(34vh, 240px); perspective: 900px; }
+        .finale-coin {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            animation: cup-spin 3.8s linear infinite;
+        }
+        .finale-face {
+            position: absolute;
+            inset: 0;
+            backface-visibility: hidden;
+            filter: drop-shadow(0 18px 0 rgba(90, 40, 0, 0.45)) drop-shadow(0 0 22px rgba(255, 210, 110, 0.85));
+        }
+        .finale-face.back { transform: rotateY(180deg); }
+        .finale-rays {
+            position: absolute;
+            width: min(92vh, 860px);
+            height: min(92vh, 860px);
+            border-radius: 50%;
+            background: repeating-conic-gradient(from 0deg, rgba(255, 220, 140, 0.16) 0 8deg, transparent 8deg 18deg);
+            animation: cup-spin 14s linear infinite;
+            mask-image: radial-gradient(circle, #000 0 42%, transparent 70%);
+        }
+        @keyframes cup-spin { to { transform: rotateY(360deg); } }
+        .finale-rays { animation-name: finale-spin; }
+        @keyframes finale-spin { to { transform: rotate(360deg); } }
         ${mutationCardStyles}
       `}</style>
 
@@ -1686,11 +1717,12 @@ export const Game: React.FC = () => {
       )}
       
       {outcomeBeat && (
-        <div className={`outcome-beat ${outcomeBeat === 'lose' ? 'outcome-lose' : 'outcome-win'}${outcomeLeaving ? (outcomeBeat === 'organ' ? ' outcome-leave-slow' : ' outcome-leave') : ''}`}>
+        <div className={`outcome-beat ${outcomeBeat === 'lose' ? 'outcome-lose' : outcomeBeat === 'campaign' ? 'outcome-campaign' : 'outcome-win'}${outcomeLeaving ? (outcomeBeat === 'campaign' ? ' outcome-leave-finale' : outcomeBeat === 'organ' ? ' outcome-leave-slow' : ' outcome-leave') : ''}`}>
           <div className="outcome-flash" />
           <div className="outcome-ring" />
+          {outcomeBeat === 'campaign' && <div className="finale-rays" />}
           {outcomeBeat === 'organ' && <div className="trophy-rays" />}
-          {outcomeBeat !== 'lose' && Array.from({ length: outcomeBeat === 'organ' ? 28 : 18 }).map((_, i) => (
+          {outcomeBeat !== 'lose' && Array.from({ length: outcomeBeat === 'campaign' ? 42 : outcomeBeat === 'organ' ? 28 : 18 }).map((_, i) => (
             <span
               key={i}
               className="outcome-spark"
@@ -1702,7 +1734,22 @@ export const Game: React.FC = () => {
             />
           ))}
           <div className="outcome-stack">
-            {outcomeBeat === 'organ' && (
+            {(outcomeBeat === 'organ' || outcomeBeat === 'campaign') && (
+              outcomeBeat === 'campaign' ? (
+                <div className="finale-rig">
+                  <div className="finale-coin">
+                    {['front', 'back'].map(face => (
+                      <svg key={face} className={`finale-face ${face}`} viewBox="0 0 120 120" aria-hidden>
+                        <circle cx="60" cy="60" r="54" fill="#3a2208" stroke="#ffe7a8" strokeWidth="4" />
+                        <path d="M36 34h48v22c0 18-10 28-24 28S36 74 36 56V34z" fill="#ffe7a8" />
+                        <path d="M36 40H22c0 16 8 22 16 22M84 40h14c0 16-8 22-16 22" fill="none" stroke="#ffe7a8" strokeWidth="6" strokeLinejoin="round" />
+                        <path d="M50 84h20v8H50zM40 96h40v8H40z" fill="#ffe7a8" />
+                        <circle cx="60" cy="48" r="8" fill="#fff8e4" />
+                      </svg>
+                    ))}
+                  </div>
+                </div>
+              ) : (
               <svg className="trophy-mark" viewBox="0 0 120 120" aria-hidden>
                 <circle cx="60" cy="60" r="50" fill="none" stroke="#ffe7a8" strokeWidth="3" />
                 <circle cx="60" cy="60" r="40" fill="none" stroke="#fff4cc" strokeWidth="1" opacity="0.7" />
@@ -1711,11 +1758,13 @@ export const Game: React.FC = () => {
                 <path d="M52 82h16v8H52zM42 94h36v7H42z" fill="#ffe7a8" />
                 <circle cx="60" cy="48" r="7" fill="#fff8e4" />
               </svg>
+              )
             )}
             <div className="outcome-copy">
-              <div className="outcome-kicker">{outcomeBeat === 'lose' ? t('GAME_OVER') : outcomeBeat === 'organ' ? t('MSG_BOSS_DOWN') : t('WAVE_WIN')}</div>
-              <div className="outcome-wave">{outcomeBeat === 'organ' ? t(organNameKey(uiData.organId)) : `${t('WAVE')} ${uiData.wave}`}</div>
+              <div className="outcome-kicker">{outcomeBeat === 'lose' ? t('GAME_OVER') : outcomeBeat === 'campaign' ? t('CAMPAIGN_WIN') : outcomeBeat === 'organ' ? t('MSG_BOSS_DOWN') : t('WAVE_WIN')}</div>
+              <div className="outcome-wave">{outcomeBeat === 'organ' ? t(organNameKey(uiData.organId)) : outcomeBeat === 'campaign' ? `${t('WAVE')} 30` : `${t('WAVE')} ${uiData.wave}`}</div>
               {outcomeBeat === 'win' && <div className="outcome-sub">{t('WAVE_WIN_SUB')}</div>}
+              {outcomeBeat === 'campaign' && <div className="outcome-sub">{t('CAMPAIGN_WIN_SUB')}</div>}
               {outcomeBeat === 'organ' && <div className="outcome-sub">{t('ORGAN_CLEAR')}</div>}
               {outcomeBeat === 'organ' && <div className="outcome-sub">{t('ORGAN_CLEAR_SUB')}</div>}
             </div>
