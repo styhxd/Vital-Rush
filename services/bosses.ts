@@ -319,9 +319,13 @@ export function mutationFrom(spec: BossSpec): BossMutation {
         phase: 0,
         split: false,
         open: false,
+        attack: 0,
     };
 }
 
+// Idle stays inside the published silhouette. Fusiform rods writhe on their own,
+// coccal chains flex, filaments sway, and the trypomastigote keeps its C
+// while the flagellum undulates. An attack only leans, scales, and glows.
 export function drawBossShape(
     ctx: CanvasRenderingContext2D,
     shape: BossShape,
@@ -332,11 +336,18 @@ export function drawBossShape(
     flash = false,
     open = false,
     split = false,
+    attack = 0,
 ) {
     const ink = flash ? '#ffffff' : color;
     const line = flash ? '#ffffff' : '#1a0c0c';
+    const stir = Math.max(0, Math.min(1, attack));
     ctx.save();
-    ctx.translate(0, Math.sin(time / 480) * r * 0.05);
+    ctx.translate(Math.sin(time / 80) * r * 0.035 * stir, Math.sin(time / 480) * r * 0.05);
+    if (stir > 0.04) {
+        ctx.scale(1 + stir * 0.06, 1 - stir * 0.03);
+        ctx.shadowColor = accent;
+        ctx.shadowBlur = 8 + stir * 16;
+    }
     ctx.fillStyle = ink;
     ctx.strokeStyle = line;
     ctx.lineWidth = Math.max(3, r * 0.045);
@@ -357,10 +368,12 @@ export function drawBossShape(
     };
 
     if (shape === 'spindle') {
-        ctx.rotate(Math.sin(time / 700) * 0.4);
         for (let i = -1; i <= 1; i++) {
+            const writhe = Math.sin(time / 240 + i * 2.1);
             ctx.save();
-            ctx.rotate(i * 0.55);
+            ctx.rotate(i * 0.55 + writhe * 0.32);
+            ctx.translate(writhe * r * 0.08, Math.cos(time / 280 + i) * r * 0.06);
+            ctx.scale(1, 0.94 + Math.abs(writhe) * 0.08);
             ctx.beginPath();
             ctx.ellipse(0, 0, r * 0.22, r * 0.92, 0, 0, Math.PI * 2);
             ctx.fill();
@@ -370,9 +383,9 @@ export function drawBossShape(
     } else if (shape === 'chain') {
         const n = 8;
         for (let i = 0; i < n; i++) {
-            const a = -1.1 + (i / (n - 1)) * 2.2 + Math.sin(time / 500) * 0.15;
+            const a = -1.1 + (i / (n - 1)) * 2.2 + Math.sin(time / 420 + i * 0.35) * 0.22;
             const x = Math.sin(a) * r * 0.78;
-            const y = (i - (n - 1) / 2) * r * 0.22;
+            const y = (i - (n - 1) / 2) * r * 0.22 + Math.sin(time / 210 + i * 0.85) * r * 0.08;
             ctx.beginPath();
             ctx.arc(x, y, r * 0.16, 0, Math.PI * 2);
             ctx.fill();
@@ -383,9 +396,11 @@ export function drawBossShape(
         ctx.lineWidth = Math.max(4, r * 0.06);
         for (let i = 0; i < 6; i++) {
             const a = (i / 6) * Math.PI * 2 + time / 900;
+            const reach = 0.78 + 0.17 * Math.sin(time / 320 + i);
+            const bow = Math.sin(time / 240 + i * 1.3) * r * 0.12;
             ctx.beginPath();
             ctx.moveTo(0, 0);
-            ctx.quadraticCurveTo(Math.cos(a) * r * 0.4, Math.sin(a + 1) * r * 0.4, Math.cos(a) * r * 0.95, Math.sin(a) * r * 0.95);
+            ctx.quadraticCurveTo(Math.cos(a + 0.4) * r * 0.4 + bow, Math.sin(a + 1) * r * 0.4, Math.cos(a) * r * reach, Math.sin(a) * r * reach);
             ctx.stroke();
         }
         ctx.fillStyle = accent;
@@ -431,7 +446,7 @@ export function drawBossShape(
             ctx.stroke();
         }
     } else if (shape === 'trypo') {
-        ctx.rotate(Math.sin(time / 300) * 0.3);
+        ctx.rotate(Math.sin(time / 280) * (0.34 + stir * 0.4));
         ctx.lineWidth = Math.max(8, r * 0.16);
         ctx.strokeStyle = ink;
         ctx.beginPath();
@@ -443,9 +458,10 @@ export function drawBossShape(
         ctx.fill();
         ctx.strokeStyle = accent;
         ctx.lineWidth = Math.max(2, r * 0.035);
+        const flick = r * 0.12 * (1 + stir * 2.2);
         ctx.beginPath();
         ctx.moveTo(r * 0.5, -r * 0.35);
-        for (let i = 0; i < 6; i++) ctx.lineTo(r * 0.55 + i * r * 0.08, -r * 0.35 + Math.sin(time / 120 + i) * r * 0.12);
+        for (let i = 0; i < 6; i++) ctx.lineTo(r * 0.55 + i * r * 0.08, -r * 0.35 + Math.sin(time / 90 + i * 0.9) * flick);
         ctx.stroke();
     } else if (shape === 'amoeba') {
         blob(14, 0.22, r * 0.78, time / 600);
@@ -468,9 +484,10 @@ export function drawBossShape(
         ctx.globalAlpha = 1;
         ctx.fillStyle = ink;
         ctx.strokeStyle = line;
-        for (const tilt of [-0.5, 0.35]) {
+        for (const [tilt, k] of [[-0.5, 0], [0.35, 1]] as const) {
             ctx.save();
-            ctx.rotate(tilt);
+            ctx.rotate(tilt + Math.sin(time / 280 + k * 2) * 0.16);
+            ctx.translate(Math.sin(time / 340 + k) * r * 0.04, 0);
             ctx.beginPath();
             ctx.roundRect(-r * 0.16, -r * 0.42, r * 0.32, r * 0.84, r * 0.16);
             ctx.fill();
@@ -481,7 +498,7 @@ export function drawBossShape(
         for (let i = 0; i < 5; i++) {
             ctx.save();
             ctx.rotate((i / 5) * Math.PI + time / 900);
-            ctx.translate(r * 0.28, 0);
+            ctx.translate(r * 0.28 + Math.sin(time / 260 + i) * r * 0.05, Math.cos(time / 300 + i) * r * 0.04);
             ctx.beginPath();
             ctx.roundRect(-r * 0.1, -r * 0.28, r * 0.2, r * 0.56, r * 0.1);
             ctx.fill();
@@ -520,9 +537,10 @@ export function drawBossShape(
         ctx.stroke();
     } else if (shape === 'schisto') {
         ctx.rotate(Math.sin(time / 350) * 0.35);
+        const curl = Math.sin(time / 280) * r * 0.14;
         ctx.beginPath();
         ctx.moveTo(0, -r * 0.8);
-        ctx.bezierCurveTo(r * 0.7, -r * 0.2, -r * 0.7, r * 0.2, 0, r * 0.55);
+        ctx.bezierCurveTo(r * 0.7 + curl, -r * 0.2, -r * 0.7 - curl, r * 0.2, 0, r * 0.55);
         ctx.lineWidth = Math.max(10, r * 0.2);
         ctx.strokeStyle = ink;
         ctx.stroke();
@@ -543,11 +561,12 @@ export function drawBossShape(
         ctx.strokeStyle = ink;
         ctx.lineWidth = Math.max(4, r * 0.07);
         for (let i = -2; i <= 2; i++) {
+            const bend = Math.sin(time / 260 + i * 0.9) * r * 0.09;
             ctx.beginPath();
             ctx.moveTo(-r * 0.15 + i * r * 0.14, -r * 0.85);
             ctx.bezierCurveTo(
-                r * 0.4 + i * r * 0.1, -r * 0.2,
-                -r * 0.4 + i * r * 0.1, r * 0.2,
+                r * 0.4 + i * r * 0.1 + bend, -r * 0.2,
+                -r * 0.4 + i * r * 0.1 - bend, r * 0.2,
                 r * 0.1 + i * r * 0.14, r * 0.85,
             );
             ctx.stroke();
@@ -605,10 +624,11 @@ export function drawBossShape(
         ctx.strokeStyle = flash ? '#fff' : '#f2e2c8';
         ctx.lineWidth = Math.max(2, r * 0.04);
         ctx.beginPath();
+        const twitch = Math.sin(time / 160) * s * 0.18;
         ctx.moveTo((open ? r * 0.2 : 0) - s * 0.2, -s * 0.1);
-        ctx.lineTo((open ? r * 0.2 : 0) - s * 0.8, -s * 0.7);
+        ctx.lineTo((open ? r * 0.2 : 0) - s * 0.8, -s * 0.7 + twitch);
         ctx.moveTo((open ? r * 0.2 : 0) + s * 0.2, -s * 0.1);
-        ctx.lineTo((open ? r * 0.2 : 0) + s * 0.7, -s * 0.75);
+        ctx.lineTo((open ? r * 0.2 : 0) + s * 0.7, -s * 0.75 - twitch);
         ctx.stroke();
     } else if (shape === 'crescent') {
         ctx.lineWidth = Math.max(8, r * 0.14);

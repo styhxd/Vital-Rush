@@ -30,6 +30,8 @@ export const dossierStyles = `
 }
 .dossier-panel.is-wide { width: min(1080px, 100%); }
 .dossier-veins { position: absolute; inset: -8%; opacity: 0.45; pointer-events: none; }
+.dossier-veins .vein-drift,
+.dossier-veins .vein-drift-b { animation: none; will-change: auto; }
 .dossier-head {
     position: relative;
     z-index: 1;

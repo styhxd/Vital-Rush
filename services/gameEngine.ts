@@ -489,6 +489,7 @@ export class GameEngine {
   }
 
   private bossShot(e: Entity, angle: number, speed: number, radius: number, damage: number) {
+      if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.9);
       this.entities.push({
           id: `bproj_${this.time}_${Math.random()}`,
           type: EntityType.ENEMY_PROJECTILE,
@@ -500,6 +501,7 @@ export class GameEngine {
   }
 
   private bossPool(e: Entity, radius: number, ttl: number) {
+      if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.9);
       this.entities.push({
           id: `acid_${this.time}_${Math.random()}`,
           type: EntityType.ACID_POOL,
@@ -561,7 +563,7 @@ export class GameEngine {
           
           if (target.type === EntityType.BOSS) {
               this.sessionStats.bossesKilled++;
-              this.spawnText(target.pos, this.t('MSG_BOSS_DOWN'), '#f00', 50);
+              // Boss-down stays on the organ card. A canvas popup here flashed and died before the chart.
               achievementManager.track('boss_1', 1);
               achievementManager.track('boss_10', 1);
               achievementManager.track('boss_50', 1);
@@ -948,6 +950,7 @@ export class GameEngine {
   private updateBoss(e: Entity, dtSeconds: number, _stats: PlayerStats) {
       if (!e.mutation) return;
       const m = e.mutation;
+      if (m.attack > 0) m.attack = Math.max(0, m.attack - dtSeconds);
       m.phase += dtSeconds;
       const dx = this.player.pos.x - e.pos.x;
       const dy = this.player.pos.y - e.pos.y;
@@ -972,6 +975,7 @@ export class GameEngine {
       if (m.play === 'cyst' && !m.open && e.health < e.maxHealth * 0.45) {
           m.open = true;
           m.baseSpeed *= 2.4;
+          if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.9);
           audioManager.playBossDash(e.pos);
       }
 
@@ -1021,7 +1025,8 @@ export class GameEngine {
               e.vel.y = ny * 28;
               this.bossPool(e, 110, 4.5);
               m.dashTimer = 3.4;
-              audioManager.playBossDash(e.pos);
+              if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.9);
+          audioManager.playBossDash(e.pos);
           }
           return;
       }
@@ -1054,7 +1059,8 @@ export class GameEngine {
               e.vel.y = ny * 32;
               for (let i = -2; i <= 2; i++) this.bossShot(e, aim + i * 0.18, 8, 13, shot);
               m.dashTimer = 3.6;
-              audioManager.playBossDash(e.pos);
+              if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.9);
+          audioManager.playBossDash(e.pos);
           }
       }
 
@@ -1099,7 +1105,8 @@ export class GameEngine {
               e.vel.x = nx * 26;
               e.vel.y = ny * 26;
               m.dashTimer = 2.2;
-              audioManager.playBossDash(e.pos);
+              if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.9);
+          audioManager.playBossDash(e.pos);
           }
       }
   }
@@ -3062,6 +3069,7 @@ export class GameEngine {
                 !!(e.hitFlash && e.hitFlash > 0),
                 e.mutation.open,
                 e.mutation.split,
+                e.mutation.attack,
             );
             drawn = true;
         } else if (e.type === EntityType.BACTERIA) {

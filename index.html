@@ -122,7 +122,7 @@
         left: 0;
         height: 140%;
         background-repeat: repeat;
-        will-change: transform;
+        will-change: auto;
       }
 
       .vein-drift {
@@ -164,18 +164,18 @@
         text-shadow: 0 0 15px rgba(255, 0, 0, 0.7);
       }
       @keyframes screen-in {
-        from { opacity: 0; transform: translate3d(0, 28px, 0); }
-        to { opacity: 1; transform: translate3d(0, 0, 0); }
+        from { opacity: 0; }
+        to { opacity: 1; }
       }
       @keyframes screen-out {
-        from { opacity: 1; transform: translate3d(0, 0, 0); }
-        to { opacity: 0; transform: translate3d(0, 18px, 0); }
+        from { opacity: 1; }
+        to { opacity: 0; }
       }
       .screen-in {
-        animation: screen-in 0.48s cubic-bezier(0.16, 1, 0.3, 1) both;
+        animation: screen-in 0.5s ease both;
       }
       .screen-out {
-        animation: screen-out 0.34s cubic-bezier(0.4, 0, 1, 1) both;
+        animation: screen-out 0.42s ease both;
         pointer-events: none;
       }
       .cyan-glow {

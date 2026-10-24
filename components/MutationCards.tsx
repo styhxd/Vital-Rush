@@ -362,6 +362,11 @@ export const mutationCardStyles = `
     opacity: 0.55;
     pointer-events: none;
 }
+.lab-veins .vein-drift,
+.lab-veins .vein-drift-b {
+    animation: none;
+    will-change: auto;
+}
 .lab-head {
     position: relative;
     z-index: 2;
@@ -533,7 +538,6 @@ export const mutationCardStyles = `
     border-radius: 8px;
     outline: none;
     user-select: none;
-    transform: translateZ(0);
     box-shadow: 0 7px 0 rgba(0,0,0,0.45);
     transition: transform 0.08s ease, box-shadow 0.08s ease;
     touch-action: manipulation;
@@ -749,9 +753,8 @@ export const mutationCardStyles = `
 }
 .lab-sheen {
     inset: 0;
-    background: linear-gradient(105deg, transparent 36%, rgba(255,255,255,0.28) 50%, transparent 64%);
+    background: linear-gradient(105deg, transparent 36%, rgba(255,255,255,0.22) 50%, transparent 64%);
     transform: translateX(-130%);
-    mix-blend-mode: screen;
 }
 .lab-card.is-hot:hover .lab-sheen { animation: lab-sheen 0.7s ease; }
 .lab-scan {
@@ -759,15 +762,13 @@ export const mutationCardStyles = `
     right: 0;
     top: 0;
     height: 22%;
-    background: linear-gradient(180deg, transparent, rgba(190, 120, 255, 0.22), transparent);
-    mix-blend-mode: screen;
-    animation: lab-scan 3.4s linear infinite;
+    background: linear-gradient(180deg, transparent, rgba(190, 120, 255, 0.16), transparent);
+    opacity: 0.8;
 }
 .lab-glint {
-    inset: -20% -40%;
-    background: linear-gradient(100deg, transparent 40%, rgba(255, 220, 120, 0.28) 50%, transparent 60%);
-    mix-blend-mode: screen;
-    animation: lab-sheen 3.6s ease-in-out infinite;
+    inset: 0;
+    background: linear-gradient(100deg, transparent 42%, rgba(255, 220, 120, 0.16) 50%, transparent 58%);
+    opacity: 0.85;
 }
 .lab-rim {
     inset: 0;
@@ -815,12 +816,8 @@ export const mutationCardStyles = `
 }
 .lab-card.is-poor .lab-snow {
     z-index: 2;
-    opacity: 0.82;
-    mix-blend-mode: screen;
-    background-image:
-        repeating-linear-gradient(0deg, rgba(255, 120, 110, 0.2) 0 1px, transparent 1px 4px),
-        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 1  0 0 0 0 0.24  0 0 0 0 0.2  1.15 0 0 0 -0.45'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-    background-size: 100% 4px, 160px 160px;
+    opacity: 0.28;
+    background: repeating-linear-gradient(0deg, rgba(255, 120, 110, 0.16) 0 1px, transparent 1px 5px);
 }
 .lab-card.is-poor .lab-art {
     z-index: 3;
@@ -842,16 +839,6 @@ export const mutationCardStyles = `
     z-index: 3;
     pointer-events: none;
     opacity: 0;
-    background:
-        repeating-linear-gradient(0deg, rgba(255,255,255,0.16) 0 1px, transparent 1px 4px),
-        repeating-linear-gradient(90deg, rgba(0,0,0,0.18) 0 2px, transparent 2px 5px);
-    mix-blend-mode: overlay;
-    animation: lab-snow 0.14s steps(4) infinite;
-}
-@keyframes lab-snow {
-    0% { background-position: 0 0, 0 0; }
-    50% { background-position: 0 2px, 52px -36px; }
-    100% { background-position: 0 -1px, -24px 28px; }
 }
 .lab-card.is-max {
     cursor: default;

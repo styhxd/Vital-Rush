@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-const EXIT_MS = 340;
+const EXIT_MS = 460;
 
 export function useScreenPresence(show: boolean) {
     const [alive, setAlive] = useState(show);

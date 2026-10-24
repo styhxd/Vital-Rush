@@ -37,6 +37,7 @@ export interface BossMutation {
     phase: number;
     split: boolean;
     open: boolean;
+    attack: number;
 }
 
 export class BossArchitect {
@@ -74,6 +75,7 @@ export class BossArchitect {
             phase: 0,
             split: false,
             open: false,
+            attack: 0,
         };
     }
 }

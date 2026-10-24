@@ -720,6 +720,42 @@ export class AudioManager {
       this.tone(t + 0.06, 780, 0.1, 'sine', 0.05, 2000, this.sfxGain);
   }
 
+  public playFieldDemo() {
+      if (!this.ctx || !this.sfxGain) return;
+      const ctx = this.ctx;
+      const dest = this.sfxGain;
+      const t0 = ctx.currentTime;
+      const mono = this.settings.mono;
+      const voice = (start: number, dur: number, freq: number, pan: number) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, start);
+          gain.gain.setValueAtTime(0.0001, start);
+          gain.gain.exponentialRampToValueAtTime(0.2, start + 0.04);
+          gain.gain.setValueAtTime(0.16, start + Math.max(0.08, dur - 0.18));
+          gain.gain.exponentialRampToValueAtTime(0.0001, start + dur);
+          osc.connect(gain);
+          let out: AudioNode = gain;
+          if (!mono) {
+              const panner = ctx.createStereoPanner();
+              panner.pan.setValueAtTime(pan, start);
+              gain.connect(panner);
+              out = panner;
+          }
+          out.connect(dest);
+          osc.start(start);
+          osc.stop(start + dur + 0.03);
+      };
+      if (mono) {
+          voice(t0, 1.85, 196, 0);
+          voice(t0, 1.85, 784, 0);
+          return;
+      }
+      voice(t0, 0.9, 196, -1);
+      voice(t0 + 0.85, 1.0, 784, 1);
+  }
+
   public lungPush(amount: number) {
       if (!this.ctx) return;
       this.lungNudge = amount;

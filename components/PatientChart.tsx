@@ -50,11 +50,11 @@ const chartStyles = `
 }
 .chart-abandon:hover { opacity: 1; }
 @keyframes chart-arrive {
-    from { opacity: 0; transform: translate3d(0, 36px, 0) scale(0.985); }
-    to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 .chart-arrive {
-    animation: chart-arrive 0.72s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: chart-arrive 0.85s ease both;
 }
 @media (min-width: 1024px) and (min-height: 700px) {
     .chart-sheet { width: min(48rem, calc(100vw - 6rem)); }

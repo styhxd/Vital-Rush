@@ -647,7 +647,8 @@ export const Game: React.FC = () => {
       setOutcomeLeaving(false);
       if (outcomeTimer.current) window.clearTimeout(outcomeTimer.current);
       if (outcomeLeaveTimer.current) window.clearTimeout(outcomeLeaveTimer.current);
-      const hold = organHop ? 3200 : 2100;
+      const hold = organHop ? 5200 : 2100;
+      const leave = organHop ? 1100 : 700;
       outcomeLeaveTimer.current = window.setTimeout(() => setOutcomeLeaving(true), hold);
       outcomeTimer.current = window.setTimeout(() => {
           setOutcomeBeat(null);
@@ -659,7 +660,7 @@ export const Game: React.FC = () => {
               lastTimeRef.current = performance.now();
               setGameState(GameState.PLAYING);
           }
-      }, hold + 700);
+      }, hold + leave);
   }, []);
 
   const loop = useCallback((time: number) => {
@@ -1132,10 +1133,16 @@ export const Game: React.FC = () => {
       overflow: 'hidden'
   };
 
+  const fieldAsleep = gameState === GameState.MENU
+      || gameState === GameState.MANUAL
+      || gameState === GameState.ACHIEVEMENTS
+      || gameState === GameState.RANKING
+      || (gameState === GameState.SETTINGS && lastGameState === GameState.MENU);
+
   return (
     <div 
         ref={stageRef}
-        className={`select-none ${isPlatinum ? 'bg-[#0a0a1a]' : 'bg-[#0f0505]'} ${isLowPerfMode ? 'perf-mode-low' : ''}`} 
+        className={`select-none ${isPlatinum ? 'bg-[#0a0a1a]' : 'bg-[#0f0505]'} ${isLowPerfMode ? 'perf-mode-low' : ''} ${fieldAsleep ? 'field-asleep' : 'field-live'}`} 
         style={{...containerStyle, fontFamily: 'var(--font-tech)'}}
     >
       <div key={uiData.organId} className={`organ-margin is-${uiData.organId}`} aria-hidden />
@@ -1315,6 +1322,7 @@ export const Game: React.FC = () => {
             overflow: hidden;
         }
         .outcome-leave { animation: outcome-leave 0.7s ease forwards; }
+        .outcome-leave-slow { animation: outcome-leave 1.1s ease forwards; }
         .outcome-win { background: radial-gradient(circle at center, rgba(255, 226, 150, 0.42), rgba(0, 0, 0, 0.18) 46%, rgba(0, 0, 0, 0.62)); }
         .outcome-lose { background: radial-gradient(circle at center, rgba(160, 0, 20, 0.28), rgba(0, 0, 0, 0.78)); }
         .outcome-flash { position: absolute; inset: 0; background: #fff; animation: outcome-flash 0.5s ease-out forwards; }
@@ -1371,9 +1379,7 @@ export const Game: React.FC = () => {
         .organ-margin::before {
             content: "";
             position: absolute;
-            inset: -10%;
-            filter: blur(22px);
-            animation: margin-arrive 2.4s ease-out both, margin-breathe 8.5s ease-in-out 2.4s infinite;
+            inset: 0;
         }
         .organ-margin.is-molar::before {
             background:
@@ -1389,34 +1395,34 @@ export const Game: React.FC = () => {
             background:
                 radial-gradient(ellipse 32% 80% at 5% 50%, rgba(120, 16, 28, 0.55), transparent 70%),
                 radial-gradient(ellipse 32% 80% at 95% 50%, rgba(120, 16, 28, 0.55), transparent 70%);
-            animation: margin-arrive 2s ease-out both, heart-edge 1.15s ease-in-out 2s infinite;
         }
         .organ-margin.is-lung::before {
             background:
                 radial-gradient(ellipse 36% 84% at 7% 50%, rgba(232, 186, 196, 0.16), transparent 74%),
                 radial-gradient(ellipse 36% 84% at 93% 50%, rgba(232, 186, 196, 0.16), transparent 74%);
-            animation: margin-arrive 2.6s ease-out both, lung-edge 6.5s ease-in-out 2.6s infinite;
         }
         .organ-margin.is-brain::before {
             background:
                 radial-gradient(ellipse 28% 64% at 8% 30%, rgba(168, 130, 230, 0.2), transparent 70%),
                 radial-gradient(ellipse 24% 50% at 92% 70%, rgba(120, 210, 230, 0.12), transparent 72%);
-            animation: margin-arrive 2.2s ease-out both, brain-edge 3.4s ease-in-out 2.2s infinite;
         }
-        .organ-margin-frame { position: absolute; z-index: 0; pointer-events: none; }
-        .organ-margin-frame.is-molar { box-shadow: 0 0 48px 16px rgba(232, 214, 186, 0.07); }
-        .organ-margin-frame.is-liver { box-shadow: 0 0 52px 16px rgba(92, 28, 18, 0.22); }
-        .organ-margin-frame.is-heart { box-shadow: 0 0 52px 16px rgba(140, 20, 32, 0.2); }
-        .organ-margin-frame.is-lung { box-shadow: 0 0 48px 16px rgba(232, 186, 196, 0.08); }
-        .organ-margin-frame.is-brain { box-shadow: 0 0 48px 16px rgba(150, 120, 210, 0.12); }
-        @keyframes margin-arrive { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
-        @keyframes margin-breathe { 0%, 100% { opacity: 0.72; transform: scale(1); } 50% { opacity: 1; transform: scale(1.045); } }
-        @keyframes heart-edge { 0%, 100% { opacity: 0.45; } 16% { opacity: 1; } 34% { opacity: 0.5; } 48% { opacity: 0.92; } }
-        @keyframes lung-edge { 0%, 100% { opacity: 0.55; transform: scale(0.98); } 50% { opacity: 1; transform: scale(1.06); } }
-        @keyframes brain-edge { 0%, 100% { opacity: 0.55; } 40% { opacity: 0.95; } 62% { opacity: 0.4; } 80% { opacity: 0.85; } }
+        .organ-margin-frame { position: absolute; z-index: 0; pointer-events: none; box-shadow: inset 0 0 0 10px rgba(0, 0, 0, 0.28); }
+        .organ-margin-frame.is-molar { box-shadow: inset 0 0 0 10px rgba(232, 214, 186, 0.05); }
+        .organ-margin-frame.is-liver { box-shadow: inset 0 0 0 10px rgba(92, 28, 18, 0.28); }
+        .organ-margin-frame.is-heart { box-shadow: inset 0 0 0 10px rgba(140, 20, 32, 0.28); }
+        .organ-margin-frame.is-lung { box-shadow: inset 0 0 0 10px rgba(232, 186, 196, 0.06); }
+        .organ-margin-frame.is-brain { box-shadow: inset 0 0 0 10px rgba(150, 120, 210, 0.12); }
         .playfield { position: absolute; z-index: 1; display: block; }
         .playfield-vignette { right: auto; bottom: auto; z-index: 2; }
-        .perf-mode-low .organ-margin::before { animation: none; opacity: 0.7; filter: none; }
+        .field-asleep .organ-margin,
+        .field-asleep .organ-margin-frame,
+        .field-asleep .playfield,
+        .field-asleep .playfield-vignette { opacity: 0; }
+        .field-live .organ-margin,
+        .field-live .organ-margin-frame,
+        .field-live .playfield,
+        .field-live .playfield-vignette { animation: field-in 0.55s ease both; }
+        @keyframes field-in { from { opacity: 0; } to { opacity: 1; } }
         .perf-mode-low .organ-margin-frame { box-shadow: none; }
         .outcome-stack { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
         .trophy-rays {
@@ -1424,10 +1430,7 @@ export const Game: React.FC = () => {
             width: min(72vh, 620px);
             height: min(72vh, 620px);
             border-radius: 50%;
-            background: repeating-conic-gradient(from 0deg, rgba(255, 220, 140, 0) 0 10deg, rgba(255, 214, 120, 0.4) 10deg 14deg);
-            animation: trophy-spin 16s linear infinite;
-            -webkit-mask-image: radial-gradient(circle, #000 16%, transparent 68%);
-            mask-image: radial-gradient(circle, #000 16%, transparent 68%);
+            background: radial-gradient(circle, rgba(255, 214, 120, 0.28) 0%, rgba(255, 214, 120, 0.08) 42%, transparent 68%);
         }
         .trophy-mark {
             width: min(26vh, 168px);
@@ -1435,7 +1438,6 @@ export const Game: React.FC = () => {
             filter: drop-shadow(0 0 18px rgba(255, 210, 120, 0.9));
             animation: outcome-pop 0.7s cubic-bezier(.2, 1.45, .35, 1) both;
         }
-        @keyframes trophy-spin { to { transform: rotate(360deg); } }
         ${mutationCardStyles}
       `}</style>
 
@@ -1682,7 +1684,7 @@ export const Game: React.FC = () => {
       )}
       
       {outcomeBeat && (
-        <div className={`outcome-beat ${outcomeBeat === 'lose' ? 'outcome-lose' : 'outcome-win'}${outcomeLeaving ? ' outcome-leave' : ''}`}>
+        <div className={`outcome-beat ${outcomeBeat === 'lose' ? 'outcome-lose' : 'outcome-win'}${outcomeLeaving ? (outcomeBeat === 'organ' ? ' outcome-leave-slow' : ' outcome-leave') : ''}`}>
           <div className="outcome-flash" />
           <div className="outcome-ring" />
           {outcomeBeat === 'organ' && <div className="trophy-rays" />}
@@ -1709,9 +1711,10 @@ export const Game: React.FC = () => {
               </svg>
             )}
             <div className="outcome-copy">
-              <div className="outcome-kicker">{outcomeBeat === 'lose' ? t('GAME_OVER') : outcomeBeat === 'organ' ? t('ORGAN_CLEAR') : t('WAVE_WIN')}</div>
+              <div className="outcome-kicker">{outcomeBeat === 'lose' ? t('GAME_OVER') : outcomeBeat === 'organ' ? t('MSG_BOSS_DOWN') : t('WAVE_WIN')}</div>
               <div className="outcome-wave">{outcomeBeat === 'organ' ? t(organNameKey(uiData.organId)) : `${t('WAVE')} ${uiData.wave}`}</div>
               {outcomeBeat === 'win' && <div className="outcome-sub">{t('WAVE_WIN_SUB')}</div>}
+              {outcomeBeat === 'organ' && <div className="outcome-sub">{t('ORGAN_CLEAR')}</div>}
               {outcomeBeat === 'organ' && <div className="outcome-sub">{t('ORGAN_CLEAR_SUB')}</div>}
             </div>
           </div>
@@ -1790,6 +1793,7 @@ export const Game: React.FC = () => {
               const next = { ...audioSettings, mono: !audioSettings.mono };
               setAudioSettings(next);
               audioManager.settings = isMuted ? { ...next, master: 0 } : next;
+              if (!isMuted) audioManager.playFieldDemo();
           }}
           onClose={closeSettings}
       />

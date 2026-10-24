@@ -7,6 +7,12 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 
+/**
+ * Casca do Vital Rush. O jogo abre dos arquivos embutidos no APK, nunca de um site.
+ * Barras do sistema somem e só voltam num deslize da borda. A tela fica ligada.
+ * A vibração é a que o jogo já chama. O ícone é o Vital, do busto pra cima.
+ * Atualização automática do zip web só quando o Capgo estiver ligado de propósito.
+ */
 public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {

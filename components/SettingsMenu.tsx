@@ -60,6 +60,15 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                     opacity: 0 !important; 
                     transition: opacity 0.5s ease;
                 }
+                .settings-fit { display: flex; flex-direction: column; gap: 0.4rem; }
+                .settings-meters,
+                .settings-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; }
+                .settings-row .dossier-card { margin: 0; height: 100%; }
+                .settings-foot { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.55rem; align-items: end; }
+                .settings-fit .dossier-kicker { margin: 0 0 0.2rem; }
+                @media (max-width: 720px) {
+                    .settings-meters, .settings-row, .settings-foot { grid-template-columns: 1fr; }
+                }
             `;
             document.head.appendChild(style);
         }
@@ -175,40 +184,40 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
 
     return (
         <div className={`fixed inset-0 z-[110] ${motionClass(present.phase)}`}>
-            <Dossier title={t('SETTINGS')} onBack={onClose} backLabel={t('BACK')}>
-                <div className="dossier-split">
+            <Dossier title={t('SETTINGS')} onBack={onClose} backLabel={t('BACK')} wide>
+                <div className="settings-fit">
                     <section>
                     <h3 className="dossier-kicker">{t('AUDIO_PROTOCOLS')}</h3>
+                    <div className="settings-meters">
                     <Meter label={t('MASTER_OUTPUT')} value={audioSettings.master} onChange={(v) => onUpdateAudio('master', v)} />
                     <Meter label={t('MUSIC_STREAM')} value={audioSettings.music} onChange={(v) => onUpdateAudio('music', v)} />
                     <Meter label={t('SFX_FEEDBACK')} value={audioSettings.sfx} onChange={(v) => onUpdateAudio('sfx', v)} />
-                    <div className="dossier-card mb-2 mt-2">
-                        <div className="flex items-center justify-between gap-4">
+                    </div>
+                    </section>
+                    <section className="settings-row">
+                    <div className="dossier-card">
+                        <div className="flex items-center justify-between gap-3">
                             <div className="font-['Teko'] text-[16px] leading-none tracking-wide">{t('MONO_AUDIO')}</div>
                             <Switch on={audioSettings.mono} onClick={onToggleMono} />
                         </div>
                         <p className="mt-2 text-[#e7b0a4]">{t('MONO_HINT')}</p>
                     </div>
-                    </section>
-                    <section>
-                    <h3 className="dossier-kicker">{t('VISUAL_OPTICS')}</h3>
-                    <div className="dossier-card mb-2 flex items-center justify-between gap-4">
+                    <div className="dossier-card flex items-center justify-between gap-3">
                         <div>
                             <div className="font-['Teko'] text-[16px] leading-none tracking-wide">{t('RETRO_FILTER')}</div>
                             <p>{t('CRT_DESC')}</p>
                         </div>
                         <Switch on={crtEnabled} onClick={toggleCrt} />
                     </div>
-                    <div className="dossier-card mb-2">
-                        <div className="flex items-center justify-between gap-4">
+                    <div className="dossier-card">
+                        <div className="flex items-center justify-between gap-3">
                             <div className="font-['Teko'] text-[16px] leading-none tracking-wide">{t('HIGH_QUALITY')}</div>
                             <Switch on={leanGraphics} onClick={onToggleLean} />
                         </div>
                         <p className="mt-2 text-[#e7b0a4]">{t('HQ_WARNING')}</p>
                     </div>
                     </section>
-                </div>
-                <div className="dossier-foot">
+                <div className="settings-foot">
                     <div>
                         <h3 className="dossier-kicker">{t('LANG')}</h3>
                         <div className="grid grid-cols-3 gap-2">
@@ -244,6 +253,7 @@ export const SettingsMenu: React.FC<SettingsMenuProps> = ({
                     >
                         {resetStage === 1 ? t('CONFIRM_PURGE') : t('SYSTEM_PURGE')}
                     </button>
+                </div>
                 </div>
             </Dossier>
         </div>
