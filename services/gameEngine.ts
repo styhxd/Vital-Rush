@@ -1478,7 +1478,7 @@ export class GameEngine {
                       const flat = boss ? 16 : shock ? 54 : shove ? 26 : 16;
                       const kick = boss ? 1.4 : shock ? 0.35 : shove ? 3.2 : 0.3;
                       const cap = boss ? 1.8 : shock ? 0.7 : shove ? 3.2 : 0.8;
-                      e.stun = boss ? 0.45 : shock ? 1.25 : shove ? 0.9 : 0.75;
+                      e.stun = boss ? 0.22 : shock ? 0.55 : shove ? 0.4 : 0.32;
                       e.vel.x *= boss ? 0.4 : 0.1;
                       e.vel.y *= boss ? 0.4 : 0.1;
                       e.hitFlash = shock ? 16 : 8;
@@ -1916,7 +1916,7 @@ export class GameEngine {
 
             if (dist - step < this.player.radius + e.radius) {
               e.active = false;
-              const energyGain = e.isElite ? 20 : 5;
+              const energyGain = e.isElite ? 12 : 3;
               this.energy = Math.min(this.energy + energyGain, stats.maxEnergy);
               const val = (e.value || 1);
               this.biomass += val; 

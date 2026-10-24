@@ -529,8 +529,8 @@ export class AudioManager {
     if (!this.masterGain || !this.musicGain || !this.sfxGain || !this.ctx) return;
     const now = this.ctx.currentTime;
     const master = Math.max(0, Math.min(1, this.settings.master));
-    const music = Math.max(0, Math.min(1, this.settings.music)) * 1.35;
-    const sfx = Math.max(0, Math.min(1, this.settings.sfx)) * 0.58;
+    const music = Math.max(0, Math.min(1, this.settings.music)) * 1.6;
+    const sfx = Math.max(0, Math.min(1, this.settings.sfx)) * 1.15;
     this.masterGain.gain.cancelScheduledValues(now);
     this.musicGain.gain.cancelScheduledValues(now);
     this.sfxGain.gain.cancelScheduledValues(now);
@@ -539,7 +539,7 @@ export class AudioManager {
     this.sfxGain.gain.setValueAtTime(sfx, now);
   }
 
-  public playShoot() { this.playBuffer('shoot', 0.6, Math.random()*2, 60); }
+  public playShoot() { this.playBuffer('shoot', 0.85, Math.random()*2, 60); }
   public playDash() { this.playBuffer('shoot', 0.28, 8, 40); }
   public playBuy() {
       if (!this.ctx || !this.sfxGain) return;
@@ -547,8 +547,8 @@ export class AudioManager {
       this.tone(t, 740, 0.04, 'square', 0.045, 2800, this.sfxGain);
       this.tone(t + 0.028, 988, 0.055, 'sine', 0.04, 3200, this.sfxGain);
   }
-  public playHit(at?: { x: number; y: number } | null) { this.playBuffer('hit', 0.26, 0, 50, at); }
-  public playExplosion(at?: { x: number; y: number } | null) { this.playBuffer('expl', 0.8, 0, 100, at); }
+  public playHit(at?: { x: number; y: number } | null) { this.playBuffer('hit', 0.42, 0, 50, at); }
+  public playExplosion(at?: { x: number; y: number } | null) { this.playBuffer('expl', 0.48, 0, 100, at); }
   public playPowerUp(at?: { x: number; y: number } | null) { this.playBuffer('power', 0.5, 0, 80, at); }
   public playCoin(at?: { x: number; y: number } | null) {
       if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
@@ -557,13 +557,13 @@ export class AudioManager {
       this.lastPlayTime['coin'] = now;
       const dest = this.sfxOut(at, 0.16);
       const t = this.ctx.currentTime;
-      this.tone(t, 988, 0.045, 'sine', 0.016, 3200, dest);
-      this.tone(t + 0.055, 1318, 0.07, 'sine', 0.011, 3600, dest);
+      this.tone(t, 988, 0.045, 'sine', 0.05, 3200, dest);
+      this.tone(t + 0.055, 1318, 0.07, 'sine', 0.034, 3600, dest);
   }
   public playSurge(at?: { x: number; y: number } | null) { this.playBuffer('surge', 0.6, 0, 500, at); }
   
-  public playMineExplosionShot(at?: { x: number; y: number } | null) { this.playBuffer('mine_expl_heavy', 0.6, 0, 150, at); } 
-  public playMineExplosionDash(at?: { x: number; y: number } | null) { this.playBuffer('mine_expl_dash', 0.9, 0, 150, at); }
+  public playMineExplosionShot(at?: { x: number; y: number } | null) { this.playBuffer('mine_expl_heavy', 0.38, 0, 150, at); } 
+  public playMineExplosionDash(at?: { x: number; y: number } | null) { this.playBuffer('mine_expl_dash', 0.5, 0, 150, at); }
   
   public playBossDash(at?: { x: number; y: number } | null) { this.playBuffer('boss_dash', 0.7, 0, 300, at); }
   public playEnemyShoot(at?: { x: number; y: number } | null) { this.playBuffer('enemy_shoot', 0.4, Math.random()*2, 80, at); }
@@ -604,7 +604,7 @@ export class AudioManager {
       if (!this.ctx || this.organ !== 'heart' || this.currentTrack !== 'GAME' || this.lubAt < 0) return -1;
       const age = this.ctx.currentTime - this.lubAt;
       if (age < -0.03) return 0;
-      return Math.exp(-Math.max(0, age) * 11);
+      return Math.exp(-Math.max(0, age) * 3.2);
   }
 
   public ecgApproach() {
@@ -1188,9 +1188,9 @@ export class AudioManager {
 
       if (layers >= 1) {
           if (score.color === 'thump') {
-              if (beat % 4 === 0) {
-                  this.tone(time, 49, 0.4, 'sine', 0.16, 140, dest);
-                  this.tone(time, 98, 0.36, 'sine', 0.05, 240, dest);
+              if (beat === 0) {
+                  this.tone(time, 34, 0.62, 'sine', 0.22, 80, dest);
+                  this.tone(time + 0.1, 40, 0.48, 'sine', 0.13, 110, dest);
                   this.lubAt = time;
               }
           } else if (beat === 0 || beat === 8) {

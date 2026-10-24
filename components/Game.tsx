@@ -75,7 +75,8 @@ const IconSpeaker = ({ muted }: { muted: boolean }) => (
 
 const IconDNA = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 lg:h-6 lg:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+        <rect x="5" y="3.5" width="14" height="17" rx="2" strokeWidth={2} />
+        <path strokeLinecap="round" strokeWidth={2} d="M8 3.5h8v2.5H8zM8 11h8M8 15h5" />
     </svg>
 );
 
@@ -85,12 +86,11 @@ const TUTORIAL_MS = 5400;
 const PadMark = ({ kind }: { kind: 'dash' | 'pulse' }) => (
     kind === 'dash' ? (
         <svg viewBox="0 0 64 64" className="pad-ico" aria-hidden>
-            <g transform="rotate(-40 34 32)">
-                <circle cx="8" cy="32" r="2.1" fill="#7ef3ff" opacity="0.4" />
-                <circle cx="16" cy="32" r="2.7" fill="#9aefff" opacity="0.62" />
-                <circle cx="24" cy="32" r="3.2" fill="#dffbff" />
-                <ellipse cx="44" cy="32" rx="15" ry="5.4" fill="#7ef3ff" />
-                <ellipse cx="47" cy="32" rx="4.2" ry="1.9" fill="#fff" />
+            <g transform="rotate(-32 32 32)">
+                <ellipse cx="12" cy="32" rx="7" ry="2.4" fill="#7ef3ff" opacity="0.28" />
+                <ellipse cx="24" cy="32" rx="9" ry="3.1" fill="#9aefff" opacity="0.55" />
+                <ellipse cx="42" cy="32" rx="13" ry="5" fill="#7ef3ff" />
+                <ellipse cx="42" cy="32" rx="3.6" ry="1.7" fill="#fff" />
             </g>
         </svg>
     ) : (
@@ -281,6 +281,7 @@ export const Game: React.FC = () => {
   const [stats, setStats] = useState<PlayerStats>(INITIAL_STATS);
   const [upgrades, setUpgrades] = useState<Upgrade[]>(UPGRADES.map(u => ({...u}))); 
   
+  const shownBiomassRef = useRef(0);
   const [uiData, setUiData] = useState({ 
     health: 100, maxHealth: 100, score: 0, biomass: 0, 
     wave: 0, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100,
@@ -702,6 +703,11 @@ export const Game: React.FC = () => {
     }
 
     if (gameState !== GameState.PLAYING || isPaused || serumLockRef.current) {
+        const live = Math.round(engineRef.current.biomass);
+        if (live !== shownBiomassRef.current) {
+            shownBiomassRef.current = live;
+            setUiData(prev => ({ ...prev, biomass: live }));
+        }
         lastTimeRef.current = time;
         animationFrameRef.current = requestAnimationFrame(loop);
         return;
@@ -823,7 +829,7 @@ export const Game: React.FC = () => {
             health: Math.round(eng.player.health),
             maxHealth: Math.round(eng.player.maxHealth),
             score: Math.round(eng.score),
-            biomass: Math.round(eng.biomass),
+            biomass: (shownBiomassRef.current = Math.round(eng.biomass)),
             wave: eng.currentWaveIndex + 1,
             waveTime: eng.waveTimer,
             waveDuration: currentWaveConfig.duration,
@@ -970,7 +976,7 @@ export const Game: React.FC = () => {
           setUpgrades(nextUpgrades);
           setUiData(prev => ({
               ...prev,
-              biomass: Math.round(eng.biomass),
+              biomass: (shownBiomassRef.current = Math.round(eng.biomass)),
               health: Math.round(eng.player.health),
               maxHealth: Math.round(eng.player.maxHealth),
               maxEnergy: Math.round(newStats.maxEnergy),

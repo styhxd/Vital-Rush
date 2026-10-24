@@ -303,21 +303,21 @@ const FOE: Record<Language, Partial<Record<EntityType, string>>> = {
 const HAZARD: Record<Language, Record<string, string>> = {
     PT: {
         plaque: 'PLACA', saliva: 'SALIVA', bite: 'MORDIDA', enamel: 'ESMALTE',
-        bile: 'BILE', filter: 'COADOR', heal: 'AÇÚCAR',
+        bile: 'BILE', filter: 'CAPTA', heal: 'AÇÚCAR',
         beat: 'SÍSTOLE', ecg: 'ELETRO', ecg2: 'DOIS ELETROS', clot: 'COÁGULO',
         gust: 'LUFADA', cough: 'TOSSE', oxygen: 'OXIGÊNIO',
         synapse: 'SINAPSE', flash: 'CLARÃO', focus: 'FOCO', chain: 'CADEIA',
     },
     EN: {
         plaque: 'PLAQUE', saliva: 'SALIVA', bite: 'BITE', enamel: 'ENAMEL',
-        bile: 'BILE', filter: 'SIEVE', heal: 'SUGAR',
+        bile: 'BILE', filter: 'UPTAKE', heal: 'SUGAR',
         beat: 'SYSTOLE', ecg: 'ECG', ecg2: 'TWO ECGS', clot: 'CLOT',
         gust: 'GUST', cough: 'COUGH', oxygen: 'OXYGEN',
         synapse: 'SYNAPSE', flash: 'FLASH', focus: 'FOCUS', chain: 'CHAIN',
     },
     ES: {
         plaque: 'PLACA', saliva: 'SALIVA', bite: 'MORDIDA', enamel: 'ESMALTE',
-        bile: 'BILIS', filter: 'COLADOR', heal: 'AZÚCAR',
+        bile: 'BILIS', filter: 'CAPTA', heal: 'AZÚCAR',
         beat: 'SÍSTOLE', ecg: 'ELECTRO', ecg2: 'DOS ELECTROS', clot: 'COÁGULO',
         gust: 'RÁFAGA', cough: 'TOS', oxygen: 'OXÍGENO',
         synapse: 'SINAPSIS', flash: 'DESTELLO', focus: 'FOCO', chain: 'CADENA',

@@ -45,7 +45,7 @@ const COPY: Record<Language, Section[]> = {
             title: 'FÍGADO',
             cards: [
                 { kind: 'bile', title: 'BILE', body: 'Poça no chão. Não persegue. Quem fica dentro queima aos poucos.' },
-                { kind: 'filter', title: 'COADOR', body: 'Coador — puxa. O que está solto vai pro centro. Chegar no meio machuca.' },
+                { kind: 'filter', title: 'CAPTA', body: 'Capta — puxa. O fígado tira do sangue o que está solto e leva pro centro. Chegar no meio machuca.' },
                 { kind: 'heal', title: 'AÇÚCAR', body: 'Açúcar — cura. Gota dourada do fígado. A vida volta devagar, por uns segundos.' },
             ],
         },
@@ -105,7 +105,7 @@ const COPY: Record<Language, Section[]> = {
             title: 'LIVER',
             cards: [
                 { kind: 'bile', title: 'BILE', body: 'A puddle on the floor. It does not chase. Staying in it burns, a little at a time.' },
-                { kind: 'filter', title: 'SIEVE', body: 'Sieve — pulls. Loose things go to the center. Reaching the middle hurts.' },
+                { kind: 'filter', title: 'UPTAKE', body: 'Uptake — pulls. The liver takes what is loose in the blood and draws it to the center. Reaching the middle hurts.' },
                 { kind: 'heal', title: 'SUGAR', body: 'Sugar — heal. A gold drop from the liver. Health comes back slowly, for a few seconds.' },
             ],
         },
@@ -165,7 +165,7 @@ const COPY: Record<Language, Section[]> = {
             title: 'HÍGADO',
             cards: [
                 { kind: 'bile', title: 'BILIS', body: 'Charco en el suelo. No persigue. Quedarse dentro quema de a poco.' },
-                { kind: 'filter', title: 'COLADOR', body: 'Colador — jala. Lo suelto va al centro. Llegar al medio lastima.' },
+                { kind: 'filter', title: 'CAPTA', body: 'Capta — jala. El hígado saca de la sangre lo que está suelto y lo lleva al centro. Llegar al medio lastima.' },
                 { kind: 'heal', title: 'AZÚCAR', body: 'Azúcar — cura. Gota dorada del hígado. La vida vuelve despacio, por unos segundos.' },
             ],
         },

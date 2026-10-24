@@ -750,7 +750,7 @@ export class OrganDirector {
 
     drawBackdrop(ctx: CanvasRenderingContext2D, time: number, low: boolean) {
         if (this.id === 'heart' && this.pulse > 0.02) {
-            ctx.fillStyle = `rgba(140, 18, 28, ${0.11 * this.pulse})`;
+            ctx.fillStyle = `rgba(140, 18, 28, ${0.24 * this.pulse})`;
             ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         }
         if (low) return;
@@ -1057,7 +1057,7 @@ export class OrganDirector {
             }
             if (glow < 0.28) this.lubLatch = false;
         } else {
-            const period = Math.max(0.58, 0.9 - this.local * 0.045 - this.pastWall * 0.02);
+            const period = Math.max(1.7, 2.6 - this.local * 0.08 - this.pastWall * 0.03);
             this.heartBeat += dt;
             const phase = (this.heartBeat % period) / period;
             this.pulse = Math.exp(-phase * 14);

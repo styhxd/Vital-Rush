@@ -13,7 +13,7 @@ const BODY: Record<Language, Record<string, string>> = {
         bite: 'Primeiro a faixa acende e as mandíbulas se aproximam. Dá tempo de sair. O golpe, e o barulho, acontecem quando as duas paredes se encontram. Quem ficou no meio é esmagado. Quem saiu da faixa, não.',
         enamel: 'O esmalte é uma gota clara no molar. Pegar veste uma película: por alguns segundos, todo golpe que te acerta chega com metade da força. Acabou o tempo, acabou a película.',
         bile: 'A bile abre uma poça no chão do fígado e fica lá. Não persegue. Quem permanece dentro vai queimando, aos poucos. Saiu da poça, o dano para. O chão é o perigo.',
-        filter: 'No fígado está escrito coador — puxa. Ele acende e puxa o que está solto para o centro: você, bactéria, fungo, vírus, DNA. Quem chega espremido no meio leva dano. Saia antes.',
+        filter: 'No fígado está escrito capta — puxa. Ele acende e puxa o que está solto para o centro: você, bactéria, fungo, vírus, DNA. Quem chega espremido no meio leva dano. Saia antes.',
         heal: 'Na gota dourada está escrito açúcar — cura. É o que o fígado guarda. Pegar não enche a vida de uma vez. Por uns segundos o corpo vai se remendando, devagar. Passou o tempo, acabou.',
         beat: 'A cada batida o coração empurra a corrente para o lado e te dá um tranco curto de velocidade. Você anda um pouco mais rápido, e o que está solto vai junto. É o compasso da sala.',
         ecg: 'Uma linha de batimento atravessa uma faixa. Encostar nela machuca. Ela passa e vai embora. O erro é ficar no caminho.',

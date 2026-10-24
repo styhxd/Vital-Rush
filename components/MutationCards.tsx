@@ -115,10 +115,9 @@ const MutationCard: React.FC<CardProps> = ({
 
     return (
         <div className="lab-slot">
-        <div
-            role="button"
-            tabIndex={alive || mode === 'shop' ? 0 : -1}
-            aria-disabled={!alive && mode === 'shop'}
+        <button
+            type="button"
+            disabled={mode === 'shop' && (maxed || !canAfford)}
             aria-label={`${t(upgrade.nameKey)}. ${label}`}
             onClick={(event) => {
                 event.stopPropagation();
@@ -179,7 +178,7 @@ const MutationCard: React.FC<CardProps> = ({
                 </span>
             )}
             {pulsing?.kind === 'no' && <span className="lab-deny-flash" />}
-        </div>
+        </button>
         </div>
     );
 };
@@ -237,10 +236,9 @@ export const BioLab: React.FC<LabProps> = ({ upgrades, biomass, language, t, pul
             <header className="lab-head">
                 <div className="lab-brand">
                     <svg viewBox="0 0 40 40" aria-hidden>
-                        <path d="M14.5 2.5h11v3.2c0 1 .3 1.9.9 2.7L34.2 22c2.4 3.8.2 8.8-4.2 10.2-1.2.4-2.4.6-3.7.6H13.6c-5.4 0-9.2-5.4-6.8-10.2L13.4 8.4c.5-.9.8-1.8.8-2.7V2.5z" fill="#2a1c12" stroke="#140e0a" strokeWidth="2.6" strokeLinejoin="round" />
-                        <path d="M8.4 22.2h23.2l2.4 4.4c1.5 2.8-.1 6.4-3.4 7.4-1 .3-2.1.5-3.2.5H12.4c-4.4 0-7.5-4.4-5.6-8.2l1.6-4.1z" fill="#f2c014" />
-                        <path d="M11 23.2l2.6 4.6M17.2 23.2l2.6 4.6M23.4 23.2l2.6 4.6" stroke="#16120c" strokeWidth="2.4" strokeLinecap="round" />
-                        <rect x="16" y="1.2" width="8" height="4.4" rx="1.1" fill="#f4ecdc" stroke="#140e0a" strokeWidth="2.2" />
+                        <path d="M14.6 21.5 11.4 32.2c-.7 2.1.9 4.2 3.1 4.2h11c2.2 0 3.8-2.1 3.1-4.2L25.4 21.5z" fill="#c084fc" />
+                        <path d="M15.2 24.4c1.8 1.1 3.2.1 5-.1 1.6-.2 2.8.9 4.6.3M15.4 27.6c1.7-1 3.2 0 4.8.3 1.5.3 2.8-.8 4.4-.1" fill="none" stroke="#f6edff" strokeWidth="1.35" strokeLinecap="round" />
+                        <path d="M16.2 5h7.6M17.4 5v6.4L12.2 31.6c-.9 2.3.8 4.8 3.3 4.8h9c2.5 0 4.2-2.5 3.3-4.8L22.6 11.4V5" fill="none" stroke="#f7f2ff" strokeWidth="2.15" strokeLinejoin="round" strokeLinecap="round" />
                     </svg>
                     <span>{t('MUTATION')}</span>
                 </div>
@@ -572,13 +570,22 @@ export const mutationCardStyles = `
     width: 100%;
     height: 100%;
     overflow: hidden;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
     border-radius: 8px;
     outline: none;
     user-select: none;
     box-shadow: 0 7px 0 rgba(0,0,0,0.45);
     transition: transform 0.08s ease, box-shadow 0.08s ease;
     touch-action: manipulation;
+    cursor: pointer;
 }
+.lab-card:disabled { opacity: 1; cursor: default; }
 .lab-shell, .lab-art {
     position: absolute;
     display: block;
@@ -589,14 +596,15 @@ export const mutationCardStyles = `
     position: absolute;
     pointer-events: none;
 }
-.lab-wash { inset: 0; opacity: 0.72; }
+.lab-wash { inset: 0; opacity: 0.28; }
 .lab-art-glow {
-    right: 2%;
-    top: 18%;
-    width: 34%;
-    height: 52%;
-    background: radial-gradient(circle, var(--accent) 0%, transparent 72%);
-    opacity: calc(0.14 + var(--rank) * 0.32);
+    right: 6%;
+    top: 26%;
+    width: 24%;
+    height: 38%;
+    z-index: 1;
+    background: radial-gradient(circle, color-mix(in srgb, var(--accent) 70%, transparent) 0%, transparent 72%);
+    opacity: calc(0.12 + var(--rank) * 0.14);
 }
 .lab-art {
     right: 1.6%;
@@ -608,7 +616,7 @@ export const mutationCardStyles = `
     transform-origin: 72% 88%;
     filter: drop-shadow(0 6px 0 rgba(0,0,0,0.28));
     transition: transform 0.18s ease;
-    z-index: 1;
+    z-index: 2;
 }
 .lab-rarity {
     position: absolute;
@@ -845,7 +853,7 @@ export const mutationCardStyles = `
 @media (hover: hover) and (pointer: fine) {
     .lab-card.is-hot:hover,
     .lab-card.is-hot:focus-visible {
-        box-shadow: 0 10px 0 rgba(0,0,0,0.28), 0 0 0 1px var(--ink), 0 0 22px color-mix(in srgb, var(--accent) 35%, transparent);
+        box-shadow: 0 10px 0 rgba(0,0,0,0.28), 0 0 0 1px var(--ink);
         filter: brightness(1.05);
     }
     .lab-card.is-hot:hover .lab-art,
