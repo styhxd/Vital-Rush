@@ -28,7 +28,7 @@ const COPY: Record<Language, Section[]> = {
                 { kind: 'bacteria', title: 'BACTÉRIA', body: 'Entra pela direita, quase reto. Encosta e machuca. Não se divide.' },
                 { kind: 'virus', title: 'VÍRUS', body: 'Quase parado. De tempos em tempos solta um espinho na sua direção.' },
                 { kind: 'fungi', title: 'FUNGO', body: 'Rápido e frágil. Cruza a tela em zigue-zague.' },
-                { kind: 'parasite', title: 'PARASITA', body: 'Lento e enorme. Cada tiro perde um pedaço, e o contato dói.' },
+                { kind: 'parasite', title: 'PARASITA', body: 'Lento e resistente. O contato dói, e ele não some no primeiro tiro.' },
                 { kind: 'boss', title: 'CHEFE', body: 'Um por viagem. O nome e o truque estão na ficha de cada um, aqui embaixo.' },
             ],
         },
@@ -88,7 +88,7 @@ const COPY: Record<Language, Section[]> = {
                 { kind: 'bacteria', title: 'BACTERIA', body: 'Comes in from the right, almost straight. Touch hurts. It does not split.' },
                 { kind: 'virus', title: 'VIRUS', body: 'Almost still. Every few seconds it spits a spike toward you.' },
                 { kind: 'fungi', title: 'FUNGUS', body: 'Fast and fragile. It zig-zags across the screen.' },
-                { kind: 'parasite', title: 'PARASITE', body: 'Slow and huge. Each shot loses a piece, and contact hurts.' },
+                { kind: 'parasite', title: 'PARASITE', body: 'Slow and tough. Contact hurts, and one shot is not enough.' },
                 { kind: 'boss', title: 'BOSS', body: 'One per crossing. The name and the trick are on each card, below.' },
             ],
         },
@@ -148,7 +148,7 @@ const COPY: Record<Language, Section[]> = {
                 { kind: 'bacteria', title: 'BACTERIA', body: 'Entra por la derecha, casi recto. El contacto lastima. No se divide.' },
                 { kind: 'virus', title: 'VIRUS', body: 'Casi quieto. Cada pocos segundos suelta una púa hacia ti.' },
                 { kind: 'fungi', title: 'HONGO', body: 'Rápido y frágil. Cruza la pantalla en zigzag.' },
-                { kind: 'parasite', title: 'PARÁSITO', body: 'Lento y enorme. Cada tiro pierde un trozo, y el contacto duele.' },
+                { kind: 'parasite', title: 'PARÁSITO', body: 'Lento y resistente. El contacto duele, y no cae al primer tiro.' },
                 { kind: 'boss', title: 'JEFE', body: 'Uno por viaje. El nombre y el truco están en la ficha de cada uno, aquí abajo.' },
             ],
         },
@@ -274,8 +274,8 @@ const paint = (ctx: CanvasRenderingContext2D, kind: Kind, time: number, w: numbe
         ctx.restore();
     } else if (kind === 'parasite') {
         const p = Math.sin(time / 100) * 5;
-        ctx.fillStyle = '#ff3333';
-        ctx.strokeStyle = '#3a0808';
+        ctx.fillStyle = '#d98a3a';
+        ctx.strokeStyle = '#3a2410';
         ctx.lineWidth = 2;
         ctx.beginPath();
         ctx.arc(cx, cy, 28 + p, 0, Math.PI * 2);

@@ -22,7 +22,7 @@ export const COLORS_DEFAULT: ThemePalette = {
   PLAYER_CORE: '#00ffff',
   BACTERIA: '#77dd77',
   VIRUS: '#00ff00', // AGORA VERDE (Como na imagem)
-  PARASITE: '#ff3333',
+  PARASITE: '#d98a3a',
   FUNGI: '#bf00ff', // AGORA ROXO (Antigo Virus)
   ENEMY_PROJECTILE: '#bf00ff', // ROXO TÓXICO
   BOSS: '#880000', 
@@ -44,7 +44,7 @@ export const COLORS_PLATINUM: ThemePalette = {
   PLAYER_CORE: '#ffd700',
   BACTERIA: '#b39ddb', 
   VIRUS: '#c6ff00', // Verde Neon
-  PARASITE: '#f48fb1', 
+  PARASITE: '#e0a15a', 
   FUNGI: '#80deea',
   ENEMY_PROJECTILE: '#bf00ff', 
   BOSS: '#ffd700', 
@@ -224,7 +224,7 @@ export const TEXTS: TranslationMap = {
     STATUS_TERM: "STATUS: TERMINATED",
     INTEGRITY: "HEALTH",
     ADRENALINE: "ADRENALINE",
-    ADRENALINE_HINT: "LOW HEALTH. TIME HOLDS. USE IT.",
+    ADRENALINE_HINT: "You're low on health. So time feels slow... Use it to get away!",
     LOADOUT: "YOUR KIT",
     ACHIEVEMENTS: "ACHIEVEMENTS",
     ACH_LOCKED: "LOCKED",
@@ -527,7 +527,7 @@ export const TEXTS: TranslationMap = {
     STATUS_TERM: "STATUS: TERMINADO",
     INTEGRITY: "VIDA",
     ADRENALINE: "ADRENALINA",
-    ADRENALINE_HINT: "VIDA NO TALO. O TEMPO SEGURA. USA ISSO.",
+    ADRENALINE_HINT: "Você está com pouca vida. Por isso, o tempo parece que anda devagar... Aproveite para fugir!",
     LOADOUT: "SEU KIT",
     ACHIEVEMENTS: "CONQUISTAS",
     ACH_LOCKED: "BLOQUEADO",
@@ -830,7 +830,7 @@ export const TEXTS: TranslationMap = {
     STATUS_TERM: "ESTADO: TERMINADO",
     INTEGRITY: "VIDA",
     ADRENALINE: "ADRENALINA",
-    ADRENALINE_HINT: "VIDA AL LÍMITE. EL TIEMPO AGUANTA. ÚSALO.",
+    ADRENALINE_HINT: "Te queda poca vida. Por eso el tiempo parece ir lento... ¡Aprovecha para huir!",
     LOADOUT: "TU EQUIPO",
     ACHIEVEMENTS: "LOGROS",
     ACH_LOCKED: "BLOQUEADO",

@@ -341,7 +341,7 @@ export class GameEngine {
       } else if (type === EntityType.FUNGI) { 
           hp = 20; dmg = 15; radius = 25; color = this.colors.FUNGI; val = 15; speed = 2.2;
       } else if (type === EntityType.PARASITE) {
-          hp = 120; dmg = 25; radius = 55; color = this.colors.PARASITE; val = 30; speed = 0.25;
+          hp = 108; dmg = 25; radius = 42; color = this.colors.PARASITE; val = 30; speed = 0.25;
       } else if (type === EntityType.VIRUS) { 
           hp = 90; dmg = 15; radius = 28; 
           color = this.colors.VIRUS; val = 45; speed = 0.1; 
@@ -554,7 +554,7 @@ export class GameEngine {
 
       // ARMOR LOGIC PARA PARASITAS (Tanky bois)
       if (target.type === EntityType.PARASITE) {
-          finalDamage *= 0.8; // 20% redução de dano nativa
+          finalDamage *= 0.9;
       }
       
       if (finalDamage > 500) achievementManager.track('overkill', 1);
@@ -1385,10 +1385,29 @@ export class GameEngine {
           const shouldSpawnMines = this.waveTimer < config.duration || bossActive;
 
           if (shouldSpawnMines && Math.random() < 0.005) { 
-              const y = Math.random() * CANVAS_HEIGHT;
+              // O fluxo do sangue vai para a esquerda. Nascer colado nesse lado
+              // some na hora. A tela é mais larga que alta, então quem cruza
+              // na vertical anda mais devagar.
+              const vertical = Math.random() < 0.4;
+              let x: number;
+              let y: number;
+              let vx: number;
+              let vy: number;
+              if (vertical) {
+                  x = CANVAS_WIDTH * (0.3 + Math.random() * 0.58);
+                  const fromTop = Math.random() < 0.5;
+                  y = fromTop ? -24 : CANVAS_HEIGHT + 24;
+                  vy = (fromTop ? 1 : -1) * (0.16 + Math.random() * 0.08);
+                  vx = (Math.random() - 0.45) * 0.12;
+              } else {
+                  y = 70 + Math.random() * (CANVAS_HEIGHT - 140);
+                  x = CANVAS_WIDTH * (0.34 + Math.random() * 0.62);
+                  vx = (Math.random() < 0.62 ? -1 : 1) * (0.28 + Math.random() * 0.16);
+                  vy = (Math.random() - 0.5) * 0.1;
+              }
               this.entities.push({
                   id: `mine_${Date.now()}`, type: EntityType.BIO_MINE,
-                  pos: { x: CANVAS_WIDTH + 50, y }, vel: { x: -0.5, y: 0 },
+                  pos: { x, y }, vel: { x: vx, y: vy },
                   radius: 20, health: 10, maxHealth: 10, color: this.colors.BIO_MINE, damage: 150, active: true, drag: 0.1
               });
           }
@@ -1432,9 +1451,24 @@ export class GameEngine {
       
       if (this.isVacuuming) {
           this.vacuumingTimer += dtSeconds;
-          const dnaFragments = this.entities.filter(e => e.type === EntityType.DNA_FRAGMENT && e.active);
+          let dnaLeft = 0;
+          for (const e of this.entities) {
+              if (!e.active || e.type !== EntityType.DNA_FRAGMENT) continue;
+              if (this.vacuumingTimer > 2.2 && !this.player.active) {
+                  e.active = false;
+                  const val = e.value || 1;
+                  this.biomass += val;
+                  this.sessionStats.biomassCollected += val;
+                  continue;
+              }
+              dnaLeft++;
+              if (this.vacuumingTimer > 2.2) {
+                  e.pos.x = this.player.pos.x;
+                  e.pos.y = this.player.pos.y;
+              }
+          }
           
-          if (dnaFragments.length === 0 || this.vacuumingTimer > 5.0) {
+          if (dnaLeft === 0) {
               this.waveActive = false;
               this.isVacuuming = false;
               if (this.currentWaveIndex === 0 && this.sessionStats.damageTaken === 0) achievementManager.track('perfect_wave', 1);
@@ -1743,14 +1777,19 @@ export class GameEngine {
             }
         }
 
-        if (e.type !== EntityType.BOSS && e.type !== EntityType.PLAYER && this.isOutOfBoundsExtended(e.pos)) {
-            e.active = false;
-            continue;
-        }
-
-        if (e.type !== EntityType.ANTIBODY && e.type !== EntityType.ACID_POOL && e.type !== EntityType.ENEMY_PROJECTILE && e.type !== EntityType.BOSS) {
+        if (e.type === EntityType.BIO_MINE) {
+            e.vel.x *= 0.996;
+            e.vel.y *= 0.996;
+        } else if (e.type !== EntityType.ANTIBODY && e.type !== EntityType.ACID_POOL && e.type !== EntityType.ENEMY_PROJECTILE && e.type !== EntityType.BOSS) {
           e.vel.x *= 0.95;
           e.vel.y *= 0.95;
+        }
+
+        if (e.type !== EntityType.BOSS && e.type !== EntityType.PLAYER && this.isOutOfBoundsExtended(e.pos)) {
+            if (!(this.isVacuuming && e.type === EntityType.DNA_FRAGMENT)) {
+                e.active = false;
+                continue;
+            }
         }
       } else {
         e.pos.y -= 1 * tick;
@@ -1905,7 +1944,7 @@ export class GameEngine {
           const isVacuuming = this.isVacuuming;
           
           if (dist < stats.magnetRadius || this.surgeActive || isVacuuming) {
-            const speed = isVacuuming ? 80 : (this.surgeActive ? 50 : 28);
+            const speed = isVacuuming ? Math.max(140, dist * 0.55) : (this.surgeActive ? 50 : 28);
             // Sem o teto, o vácuo do fim da onda passa do corpo e a moeda
             // fica orbitando colada no personagem até ele se mexer.
             const step = Math.min(dist, speed * tick);
@@ -2039,12 +2078,15 @@ export class GameEngine {
               if (!b.active || !this.isEnemy(b.type)) continue;
               let dx = b.pos.x - a.pos.x;
               let dy = b.pos.y - a.pos.y;
-              const min = Math.max(18, Math.min(a.radius, b.radius) * 0.42);
+              const bothParasites = a.type === EntityType.PARASITE && b.type === EntityType.PARASITE;
+              const min = bothParasites
+                  ? (a.radius + b.radius) * 0.82
+                  : Math.max(18, Math.min(a.radius, b.radius) * 0.42);
               const d2 = dx * dx + dy * dy;
               if (d2 >= min * min) continue;
               if (d2 < 0.04) { dx = 1; dy = 0; }
               const d = Math.sqrt(dx * dx + dy * dy) || 1;
-              const push = (min - Math.min(d, min)) * 0.45;
+              const push = (min - Math.min(d, min)) * (bothParasites ? 0.55 : 0.45);
               const nx = dx / d;
               const ny = dy / d;
               a.pos.x -= nx * push;

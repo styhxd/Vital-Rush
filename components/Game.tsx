@@ -1298,7 +1298,7 @@ export const Game: React.FC = () => {
         }
         .adrenaline-call {
             margin-top: 8px;
-            width: min(18rem, 72vw);
+            width: min(24rem, 88vw);
             padding: 7px 9px 8px;
             border: 1px solid rgba(255, 214, 120, 0.75);
             background: rgba(28, 14, 6, 0.78);
@@ -1470,7 +1470,14 @@ export const Game: React.FC = () => {
         .field-live .playfield,
         .field-live .playfield-vignette { animation: field-in 0.55s ease both; }
         @keyframes field-in { from { opacity: 0; } to { opacity: 1; } }
-        .perf-mode-low .organ-margin-frame { box-shadow: none; }
+        .perf-mode-low .organ-margin { background: #000; }
+        .perf-mode-low .organ-margin::before { background: none; }
+        .perf-mode-low .organ-margin-frame,
+        .perf-mode-low .organ-margin-frame.is-molar,
+        .perf-mode-low .organ-margin-frame.is-liver,
+        .perf-mode-low .organ-margin-frame.is-heart,
+        .perf-mode-low .organ-margin-frame.is-lung,
+        .perf-mode-low .organ-margin-frame.is-brain { box-shadow: none; }
         .outcome-stack { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
         .trophy-rays {
             position: absolute;

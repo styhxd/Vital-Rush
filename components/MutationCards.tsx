@@ -801,9 +801,9 @@ export const mutationCardStyles = `
 }
 .lab-sheen {
     inset: 0;
-    background: linear-gradient(105deg, transparent 42%, rgba(255,255,255,0.16) 50%, transparent 58%);
+    background: linear-gradient(105deg, transparent 46%, rgba(255,255,255,0.07) 50%, transparent 54%);
     transform: translate3d(-140%, 0, 0);
-    opacity: 0.4;
+    opacity: 0.14;
 }
 .lab-scan {
     left: 0;
@@ -817,19 +817,19 @@ export const mutationCardStyles = `
 }
 .lab-card.is-legendary .lab-scan {
     height: 30%;
-    background: linear-gradient(180deg, transparent 0%, rgba(255, 214, 120, 0.18) 28%, rgba(255, 250, 226, 0.96) 50%, rgba(255, 176, 48, 0.22) 74%, transparent 100%);
+    background: linear-gradient(180deg, transparent 0%, rgba(255, 214, 120, 0.08) 28%, rgba(255, 250, 226, 0.22) 50%, rgba(255, 176, 48, 0.08) 74%, transparent 100%);
     animation-duration: 6.4s;
-    opacity: 1;
+    opacity: 0.4;
 }
 .lab-glint {
     top: -18%;
     bottom: -18%;
     left: 0;
     width: 18%;
-    background: linear-gradient(100deg, transparent 18%, rgba(255, 236, 170, 0.35) 38%, rgba(255, 255, 250, 0.98) 50%, rgba(255, 210, 90, 0.4) 62%, transparent 82%);
+    background: linear-gradient(100deg, transparent 18%, rgba(255, 236, 170, 0.1) 38%, rgba(255, 255, 250, 0.28) 50%, rgba(255, 210, 90, 0.12) 62%, transparent 82%);
     transform: translate3d(-240%, 0, 0);
-    animation: lab-glint 5.6s ease-in-out infinite;
-    opacity: 1;
+    animation: lab-glint 9s ease-in-out infinite;
+    opacity: 0.4;
 }
 .lab-rim {
     inset: 0;
@@ -863,7 +863,7 @@ export const mutationCardStyles = `
     animation: lab-sheen 13s ease-in-out infinite;
 }
 .lab-card.is-rare:not(.is-poor):not(.is-max) .lab-sheen {
-    background: linear-gradient(105deg, transparent 38%, color-mix(in srgb, var(--accent) 48%, white) 50%, transparent 62%);
+    background: linear-gradient(105deg, transparent 46%, color-mix(in srgb, var(--accent) 18%, white) 50%, transparent 54%);
     animation-duration: 9.5s;
     opacity: 0.7;
 }
