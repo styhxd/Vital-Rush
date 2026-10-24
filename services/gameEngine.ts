@@ -911,24 +911,6 @@ export class GameEngine {
           this.surgeZapAt = now;
           audioManager.playZap(e.pos);
       }
-      if (this.particles.length > (this.isLowQuality ? 40 : 200)) return;
-      const rings = this.isLowQuality ? 1 : 3;
-      for (let i = 0; i < rings; i++) {
-          const life = 12 + i * 4;
-          this.particles.push({
-              id: 'ring',
-              type: EntityType.PARTICLE,
-              pos: { x: e.pos.x, y: e.pos.y },
-              vel: { x: 0, y: 0 },
-              radius: e.radius * (0.55 + i * 0.28),
-              health: 1,
-              maxHealth: life,
-              color: i === 0 ? '#f7feff' : '#8ef6ff',
-              damage: 0,
-              active: true,
-              ttl: life,
-          });
-      }
   }
 
   public triggerDash(stats: PlayerStats) {
@@ -1492,19 +1474,15 @@ export class GameEngine {
                       const boss = e.type === EntityType.BOSS;
                       const shock = !boss && fate < 4;
                       const shove = !boss && fate >= 4 && fate < 8;
-                      const portion = boss ? 0.012 : shock ? 0.22 : shove ? 0.06 : 0.015;
-                      const flat = boss ? 8 : shock ? 36 : shove ? 12 : 5;
-                      const kick = boss ? 2.2 : shock ? 0.55 : shove ? 7.4 : 0.4;
-                      const cap = boss ? 2.4 : shock ? 0.9 : shove ? 7.4 : 1;
-                      if (shock || boss) {
-                          e.stun = boss ? 0.22 : 0.5;
-                          e.vel.x *= boss ? 0.35 : 0.08;
-                          e.vel.y *= boss ? 0.35 : 0.08;
-                          e.hitFlash = boss ? 10 : 16;
-                          this.sparkShock(e);
-                      } else {
-                          e.hitFlash = shove ? 7 : 3;
-                      }
+                      const portion = boss ? 0.02 : shock ? 0.28 : shove ? 0.12 : 0.06;
+                      const flat = boss ? 16 : shock ? 54 : shove ? 26 : 16;
+                      const kick = boss ? 1.4 : shock ? 0.35 : shove ? 3.2 : 0.3;
+                      const cap = boss ? 1.8 : shock ? 0.7 : shove ? 3.2 : 0.8;
+                      e.stun = boss ? 0.45 : shock ? 1.25 : shove ? 0.9 : 0.75;
+                      e.vel.x *= boss ? 0.4 : 0.1;
+                      e.vel.y *= boss ? 0.4 : 0.1;
+                      e.hitFlash = shock ? 16 : 8;
+                      this.sparkShock(e);
                       e.vel.x += (dx / dist) * kick;
                       e.vel.y += (dy / dist) * kick;
                       const mag = Math.hypot(e.vel.x, e.vel.y);
@@ -2610,19 +2588,15 @@ export class GameEngine {
       const spin = Math.cos(this.time / 280 + e.pos.x * 0.01);
       const sx = Math.max(0.16, Math.abs(spin));
       const bob = Math.sin(this.time / 260 + e.pos.y * 0.02) * 1.8;
-      const r = e.radius * 1.7;
+      const r = e.radius * 1.15;
       const x = e.pos.x;
       const y = e.pos.y + bob;
       const gold = e.isElite ? '#ffe08a' : '#ffd56a';
       this.ctx.save();
       this.ctx.fillStyle = gold;
-      this.ctx.globalAlpha = 0.2;
+      this.ctx.globalAlpha = 0.28;
       this.ctx.beginPath();
-      this.ctx.arc(x, y, r * 2.15, 0, Math.PI * 2);
-      this.ctx.fill();
-      this.ctx.globalAlpha = 0.45;
-      this.ctx.beginPath();
-      this.ctx.arc(x, y, r * 1.35, 0, Math.PI * 2);
+      this.ctx.arc(x, y, r * 1.7, 0, Math.PI * 2);
       this.ctx.fill();
       this.ctx.restore();
 
@@ -2657,9 +2631,26 @@ export class GameEngine {
           this.ctx.bezierCurveTo(-r * 0.32, -r * 0.06, r * 0.32, r * 0.06, 0, r * 0.4);
           this.ctx.stroke();
       }
-      this.ctx.fillStyle = 'rgba(255, 253, 240, 0.92)';
+      this.ctx.save();
+      this.ctx.rotate(this.time / 380 + e.pos.x * 0.01);
+      this.ctx.fillStyle = 'rgba(255, 255, 248, 0.92)';
       this.ctx.beginPath();
-      this.ctx.ellipse(-r * 0.26, -r * 0.3, r * 0.2, r * 0.09, -0.6, 0, Math.PI * 2);
+      this.ctx.ellipse(r * 0.08, 0, r * 0.1, r * 0.62, 0.35, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.restore();
+      const tw = 0.35 + 0.65 * Math.abs(Math.sin(this.time / 160 + e.pos.y * 0.02));
+      this.ctx.globalAlpha = tw;
+      this.ctx.fillStyle = '#fffef8';
+      this.ctx.beginPath();
+      this.ctx.moveTo(r * 0.42, -r * 0.55);
+      this.ctx.lineTo(r * 0.48, -r * 0.34);
+      this.ctx.lineTo(r * 0.68, -r * 0.28);
+      this.ctx.lineTo(r * 0.48, -r * 0.22);
+      this.ctx.lineTo(r * 0.42, 0);
+      this.ctx.lineTo(r * 0.36, -r * 0.22);
+      this.ctx.lineTo(r * 0.16, -r * 0.28);
+      this.ctx.lineTo(r * 0.36, -r * 0.34);
+      this.ctx.closePath();
       this.ctx.fill();
       this.ctx.restore();
   }
@@ -3394,18 +3385,28 @@ export class GameEngine {
         if (spin) this.ctx.rotate(-spin);
         if ((e.stun ?? 0) > 0) {
             this.ctx.save();
-            const breathe = 1 + Math.sin(this.time / 70) * 0.06;
-            this.ctx.strokeStyle = '#f7feff';
-            this.ctx.lineWidth = 3;
-            this.ctx.globalAlpha = 0.9;
+            const flick = Math.floor(this.time / 42) % 3;
+            this.ctx.lineCap = 'round';
+            this.ctx.lineJoin = 'round';
+            this.ctx.strokeStyle = '#f4feff';
+            this.ctx.lineWidth = 1.4;
+            this.ctx.globalAlpha = 0.85;
             this.ctx.beginPath();
-            this.ctx.arc(0, 0, e.radius * 1.25 * breathe, 0, Math.PI * 2);
+            this.ctx.arc(0, 0, e.radius * 1.2, 0, Math.PI * 2);
             this.ctx.stroke();
-            this.ctx.globalAlpha = 0.55;
-            this.ctx.lineWidth = 2;
-            this.ctx.beginPath();
-            this.ctx.arc(0, 0, e.radius * 1.7 * breathe, 0, Math.PI * 2);
-            this.ctx.stroke();
+            const bolts = this.isLowQuality ? 2 : 3;
+            for (let i = 0; i < bolts; i++) {
+                const a = i * 2.15 + flick * 0.55 + (e.radius % 5);
+                const reach = e.radius * (1.05 + (i === flick ? 0.28 : 0));
+                this.ctx.globalAlpha = i === flick ? 1 : 0.72;
+                this.ctx.strokeStyle = i === flick ? '#ffffff' : '#8ef6ff';
+                this.ctx.lineWidth = i === flick ? 2 : 1.3;
+                this.ctx.beginPath();
+                this.ctx.moveTo(Math.cos(a) * e.radius * 0.15, Math.sin(a) * e.radius * 0.15);
+                this.ctx.lineTo(Math.cos(a + 0.7) * e.radius * 0.62, Math.sin(a + 0.35) * e.radius * 0.48);
+                this.ctx.lineTo(Math.cos(a + 1.15) * reach, Math.sin(a + 1.05) * reach);
+                this.ctx.stroke();
+            }
             this.ctx.restore();
         }
         this.ctx.translate(-e.pos.x, -e.pos.y);
@@ -3422,7 +3423,7 @@ export class GameEngine {
 
     this.entities.forEach(e => {
       if (e.type === EntityType.TEXT_POPUP) {
-        this.ctx.font = `bold ${e.radius || 24}px monospace`;
+        this.ctx.font = `700 ${e.radius || 24}px "Chakra Petch", sans-serif`;
         this.ctx.fillStyle = e.color;
         this.ctx.strokeStyle = '#000';
         this.ctx.lineWidth = 2;

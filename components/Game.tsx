@@ -85,13 +85,13 @@ const TUTORIAL_MS = 5400;
 const PadMark = ({ kind }: { kind: 'dash' | 'pulse' }) => (
     kind === 'dash' ? (
         <svg viewBox="0 0 64 64" className="pad-ico" aria-hidden>
-            <path d="M47 15c-2 8-12 16-22 26-6 6-12 12-15 15 7-2 12-8 18-14 8-8 16-18 19-27z" fill="#7ef3ff" />
-            <path d="M44 18c-8 8-16 18-24 28" fill="none" stroke="#f7feff" strokeWidth="2" strokeLinecap="round" />
-            <circle cx="48" cy="14" r="3.4" fill="#f7feff" />
-            <circle cx="48" cy="14" r="1.5" fill="#fff" />
-            <circle cx="18" cy="50" r="1.3" fill="#fff" />
-            <circle cx="26" cy="44" r="1" fill="#d9f8ff" />
-            <circle cx="14" cy="56" r="0.9" fill="#9eefff" />
+            <g transform="rotate(-40 34 32)">
+                <circle cx="8" cy="32" r="2.1" fill="#7ef3ff" opacity="0.4" />
+                <circle cx="16" cy="32" r="2.7" fill="#9aefff" opacity="0.62" />
+                <circle cx="24" cy="32" r="3.2" fill="#dffbff" />
+                <ellipse cx="44" cy="32" rx="15" ry="5.4" fill="#7ef3ff" />
+                <ellipse cx="47" cy="32" rx="4.2" ry="1.9" fill="#fff" />
+            </g>
         </svg>
     ) : (
         <svg viewBox="0 0 64 64" className="pad-ico" aria-hidden>
@@ -1615,7 +1615,7 @@ export const Game: React.FC = () => {
       </div>
 
       {(gameState === GameState.PLAYING || gameState === GameState.WAVE_CLEARED || gameState === GameState.LOADOUT) && !passage && !showBossIntro && (
-        <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between hud-safe">
+        <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between hud-safe" style={{ fontFamily: '"Chakra Petch", sans-serif' }}>
            <div className="flex justify-between items-start">
              <div className="flex flex-col gap-1 lg:gap-3 w-28 lg:w-64">
                 <div className={uiData.adrenaline ? 'adrenaline-hp' : undefined}>
@@ -1674,11 +1674,11 @@ export const Game: React.FC = () => {
                  <div className="text-[10px] lg:text-sm font-bold tracking-[0.28em]" style={{ color: organAccent(uiData.organId) }}>{t(organNameKey(uiData.organId))}</div>
                  <div className="text-[11px] lg:text-xs text-white/50 tracking-widest">{Math.max(0, uiData.waveDuration - uiData.waveTime).toFixed(0)}s</div>
                  
-                 <div className={`mt-2 lg:mt-4 transition-all duration-200 ${uiData.combo > 1 ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}>
-                     <div className="text-3xl lg:text-4xl font-black italic text-yellow-400 text-glow" style={{textShadow: '0 0 20px orange'}}>
+                 <div className={`mt-2 lg:mt-4 text-center transition-all duration-200 ${uiData.combo > 1 ? 'opacity-100 scale-100' : 'opacity-0 scale-50'}`}>
+                     <div className="text-3xl lg:text-4xl font-bold not-italic leading-none text-yellow-400" style={{ fontFamily: 'Teko, sans-serif', textShadow: '0 0 16px rgba(255, 186, 64, 0.85)' }}>
                          {uiData.combo}x
                      </div>
-                     <div className="text-[9px] lg:text-xs font-bold text-yellow-600 tracking-[0.5em] text-center">{t('COMBO')}</div>
+                     <div className="text-[9px] lg:text-xs font-bold text-yellow-200/90 tracking-[0.18em]">{t('COMBO')}</div>
                      {uiData.combo > 1 && (
                          <div className={`mt-0.5 text-center text-[9px] lg:text-[11px] font-bold tracking-[0.16em] ${uiData.combo > COMBO_RAMP_KILLS ? 'text-rose-300' : 'text-amber-200/90'}`}>
                              {uiData.combo > COMBO_RAMP_KILLS ? t('COMBO_ADAPTED') : t('COMBO_POWER')} {comboDamageMultiplier(uiData.combo).toFixed(1)}x
@@ -1695,9 +1695,9 @@ export const Game: React.FC = () => {
                  </div>
                  <div className="text-right">
                     <div className="text-[9px] lg:text-xs text-white/50 tracking-widest">{t('SCORE')}</div>
-                    <div className="text-base lg:text-3xl font-bold font-mono text-white tracking-tighter cyan-glow">{uiData.score.toString().padStart(6, '0')}</div>
+                    <div className="text-base lg:text-3xl font-bold text-white tracking-tighter cyan-glow" style={{ fontVariantNumeric: 'tabular-nums' }}>{uiData.score.toString().padStart(6, '0')}</div>
                     <div className="text-[9px] lg:text-xs text-yellow-500 tracking-widest mt-0.5 lg:mt-1">{t('BIOMASS_AVAIL')}</div>
-                    <div className="text-base lg:text-xl font-bold font-mono text-yellow-400 tracking-tighter">{Math.round(uiData.biomass)}</div>
+                    <div className="text-base lg:text-xl font-bold text-yellow-400 tracking-tighter" style={{ fontVariantNumeric: 'tabular-nums' }}>{Math.round(uiData.biomass)}</div>
                  </div>
              </div>
            </div>
