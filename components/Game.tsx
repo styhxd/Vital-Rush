@@ -82,6 +82,28 @@ const IconDNA = () => (
 const TUTORIAL_MS = 5400;
 
 // Each control is readable in the middle, then slides into the slot it occupies.
+const PadMark = ({ kind }: { kind: 'dash' | 'pulse' }) => (
+    kind === 'dash' ? (
+        <svg viewBox="0 0 64 64" className="pad-ico" aria-hidden>
+            <path d="M47 15c-2 8-12 16-22 26-6 6-12 12-15 15 7-2 12-8 18-14 8-8 16-18 19-27z" fill="#7ef3ff" />
+            <path d="M44 18c-8 8-16 18-24 28" fill="none" stroke="#f7feff" strokeWidth="2" strokeLinecap="round" />
+            <circle cx="48" cy="14" r="3.4" fill="#f7feff" />
+            <circle cx="48" cy="14" r="1.5" fill="#fff" />
+            <circle cx="18" cy="50" r="1.3" fill="#fff" />
+            <circle cx="26" cy="44" r="1" fill="#d9f8ff" />
+            <circle cx="14" cy="56" r="0.9" fill="#9eefff" />
+        </svg>
+    ) : (
+        <svg viewBox="0 0 64 64" className="pad-ico" aria-hidden>
+            <circle cx="32" cy="32" r="24" fill="none" stroke="#5eefff" strokeWidth="2" opacity="0.55" />
+            <circle cx="32" cy="32" r="15.5" fill="none" stroke="#8ef6ff" strokeWidth="3.1" />
+            <circle cx="32" cy="32" r="15.5" fill="none" stroke="#ffffff" strokeWidth="1" />
+            <circle cx="32" cy="32" r="7.2" fill="none" stroke="#f7feff" strokeWidth="2.2" />
+            <circle cx="32" cy="32" r="2.6" fill="#fff" />
+        </svg>
+    )
+);
+
 const TutorialOverlay = ({ isMobile, t }: { isMobile: boolean; t: (key: string) => string }) => {
     const place = isMobile ? 'teach-mobile' : 'teach-desk';
     return (
@@ -102,22 +124,6 @@ const TutorialOverlay = ({ isMobile, t }: { isMobile: boolean; t: (key: string) 
                     font-weight: 800;
                 }
                 .teach-move .teach-token { width: 72px; height: 72px; }
-                .teach-dash .teach-token,
-                .teach-surge .teach-token {
-                    flex-direction: column;
-                    gap: 1px;
-                    overflow: hidden;
-                }
-                .teach-dash .teach-token { width: 56px; height: 56px; }
-                .teach-surge .teach-token { width: 64px; height: 64px; }
-                .teach-dash .teach-token svg,
-                .teach-surge .teach-token svg { width: 22px; height: 22px; }
-                .teach-token .teach-key {
-                    font-weight: 800;
-                    font-size: 8px;
-                    letter-spacing: 0.08em;
-                    line-height: 1;
-                }
                 .teach-caption {
                     position: absolute;
                     left: 50%;
@@ -167,11 +173,6 @@ const TutorialOverlay = ({ isMobile, t }: { isMobile: boolean; t: (key: string) 
                 .teach-desk.teach-surge { --x: calc(50vw + 240px); --y: 62vh; }
                 @media (min-width: 1024px) {
                     .teach-move .teach-token { width: 96px; height: 96px; }
-                    .teach-dash .teach-token { width: 64px; height: 64px; }
-                    .teach-surge .teach-token { width: 96px; height: 96px; }
-                    .teach-dash .teach-token svg,
-                    .teach-surge .teach-token svg { width: 28px; height: 28px; }
-                    .teach-token .teach-key { font-size: 10px; }
                     .teach-caption strong { font-size: 18px; }
                     .teach-mobile.teach-dash { --x: calc(100vw - 168px); --y: calc(100vh - 56px); }
                     .teach-mobile.teach-surge { --x: calc(100vw - 72px); --y: calc(100vh - 72px); }
@@ -210,12 +211,12 @@ const TutorialOverlay = ({ isMobile, t }: { isMobile: boolean; t: (key: string) 
             </div>
 
             <div className={`teach teach-dash ${place}`}>
-                <div className="teach-token border-2 border-white bg-cyan-300/80 text-slate-950 shadow-[0_0_22px_rgba(170,245,255,0.95)]">
-                    <svg viewBox="0 0 32 32" aria-hidden>
-                        <path d="M5 16h16M14 8l8 8-8 8" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M4 16h5" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" opacity="0.7" />
-                    </svg>
-                    <span className="teach-key">{isMobile ? t('DASH') : 'SHIFT'}</span>
+                <div className="pad-slot">
+                    <span className="pad-name">{isMobile ? t('DASH') : 'SHIFT'}</span>
+                    <div className="pad pad-dash is-hot">
+                        <PadMark kind="dash" />
+                        <span className="pad-shade" style={{ ['--p' as string]: 1 }} />
+                    </div>
                 </div>
                 <div className="teach-caption text-white">
                     <strong>{t('DASH')}</strong>
@@ -224,11 +225,12 @@ const TutorialOverlay = ({ isMobile, t }: { isMobile: boolean; t: (key: string) 
             </div>
 
             <div className={`teach teach-surge ${place}`}>
-                <div className="teach-token border-2 border-white bg-cyan-300/75 text-slate-950 shadow-[0_0_32px_rgba(120,250,255,0.95)]">
-                    <svg viewBox="0 0 32 32" aria-hidden>
-                        <path d="M18 3 L8 18 h7 l-2 11 12-16 h-7 z" fill="currentColor" />
-                    </svg>
-                    <span className="teach-key">{isMobile ? t('SURGE_READY') : 'SPACE'}</span>
+                <div className="pad-slot">
+                    <span className="pad-name">{isMobile ? t('SURGE_READY') : 'SPACE'}</span>
+                    <div className="pad pad-pulse is-hot">
+                        <PadMark kind="pulse" />
+                        <span className="pad-shade" style={{ ['--p' as string]: 1 }} />
+                    </div>
                 </div>
                 <div className="teach-caption text-cyan-100">
                     <strong>{t('SURGE_READY')}</strong>
@@ -1712,58 +1714,41 @@ export const Game: React.FC = () => {
                         bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))',
                     }}
                  >
-                     <button 
-                        onTouchStart={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            triggerDash();
-                        }}
-                        onClick={!isMobile ? triggerDash : undefined}
-                        disabled={!uiData.dashReady}
-                        className={`w-14 h-14 lg:w-16 lg:h-16 rounded-full border-2 flex flex-col items-center justify-center relative overflow-hidden transition-all duration-100 active:scale-95
-                            ${uiData.dashReady
-                                ? 'border-white bg-cyan-300/80 text-slate-950 shadow-[0_0_22px_rgba(170,245,255,0.95)]'
-                                : 'border-cyan-200/70 bg-black/70 text-cyan-50'}`}
-                     >
-                         <span
-                            className="absolute inset-0 rounded-full"
-                            style={{
-                                background: `conic-gradient(${uiData.dashReady ? 'rgba(255,255,255,0.55)' : 'rgba(186,246,255,0.9)'} ${uiData.dashProgress * 360}deg, transparent 0deg)`,
-                                opacity: uiData.dashReady ? 0.85 : 1,
+                     <div className="pad-slot">
+                         <span className="pad-name">{t('DASH')}</span>
+                         <button
+                            aria-label={t('DASH')}
+                            onTouchStart={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                triggerDash();
                             }}
-                         />
-                         <svg viewBox="0 0 32 32" className="relative w-6 h-6 lg:w-7 lg:h-7" aria-hidden>
-                             <path d="M5 16h16M14 8l8 8-8 8" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
-                             <path d="M4 16h5" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" opacity="0.7" />
-                         </svg>
-                         <span className="relative font-bold text-[8px] lg:text-[10px] leading-none mt-0.5">{t('DASH')}</span>
-                     </button>
+                            onClick={!isMobile ? triggerDash : undefined}
+                            disabled={!uiData.dashReady}
+                            className={`pad pad-dash ${uiData.dashReady ? 'is-hot' : ''}`}
+                         >
+                             <PadMark kind="dash" />
+                             <span className="pad-shade" style={{ ['--p' as string]: uiData.dashProgress }} />
+                         </button>
+                     </div>
 
-                     <button 
-                        onTouchStart={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            triggerUltimate();
-                        }}
-                        onClick={!isMobile ? triggerUltimate : undefined}
-                        disabled={uiData.energy < uiData.maxEnergy}
-                        className={`w-16 h-16 lg:w-24 lg:h-24 rounded-full border-2 lg:border-4 flex flex-col items-center justify-center relative overflow-hidden transition-all duration-100 active:scale-95
-                            ${uiData.energy >= uiData.maxEnergy 
-                                ? (isPlatinum ? 'border-amber-100 bg-amber-400/70 text-amber-950 shadow-[0_0_32px_rgba(255,210,80,0.95)]' : 'border-white bg-cyan-300/75 text-slate-950 shadow-[0_0_32px_rgba(120,250,255,0.95)]')
-                                : 'border-cyan-100/55 bg-black/72 text-cyan-50'}`}
-                     >
-                         <span
-                            className="absolute inset-0"
-                            style={{
-                                background: `conic-gradient(${uiData.energy >= uiData.maxEnergy ? 'rgba(210,255,255,0.28)' : 'rgba(120,220,255,0.45)'} ${(uiData.energy / Math.max(1, uiData.maxEnergy)) * 360}deg, transparent 0deg)`,
+                     <div className="pad-slot">
+                         <span className="pad-name">{t('SURGE_READY')}</span>
+                         <button
+                            aria-label={t('SURGE_READY')}
+                            onTouchStart={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                triggerUltimate();
                             }}
-                         />
-                         <div className={`absolute inset-1 rounded-full border border-dashed ${uiData.energy >= uiData.maxEnergy ? 'border-white/50 animate-spin-slow' : 'border-white/15'}`}></div>
-                         <svg viewBox="0 0 32 32" className="relative w-6 h-6 lg:w-9 lg:h-9" aria-hidden>
-                             <path d="M18 3 L8 18 h7 l-2 11 12-16 h-7 z" fill="currentColor" />
-                         </svg>
-                         <span className="relative font-bold text-[8px] lg:text-xs tracking-widest leading-none">{t('SURGE_READY')}</span>
-                     </button>
+                            onClick={!isMobile ? triggerUltimate : undefined}
+                            disabled={uiData.energy < uiData.maxEnergy}
+                            className={`pad pad-pulse ${uiData.energy >= uiData.maxEnergy ? 'is-hot' : ''} ${isPlatinum ? 'is-gold' : ''}`}
+                         >
+                             <PadMark kind="pulse" />
+                             <span className="pad-shade" style={{ ['--p' as string]: uiData.energy / Math.max(1, uiData.maxEnergy) }} />
+                         </button>
+                     </div>
                  </div>
              </div>
            )}

@@ -911,55 +911,22 @@ export class GameEngine {
           this.surgeZapAt = now;
           audioManager.playZap(e.pos);
       }
-      if (this.particles.length > (this.isLowQuality ? 36 : 190)) return;
-      const bolts = this.isLowQuality ? 1 : 3;
-      const segs = this.isLowQuality ? 3 : 6;
-      for (let b = 0; b < bolts; b++) {
-          const ang = Math.random() * Math.PI * 2;
-          let x = e.pos.x + Math.cos(ang) * (e.radius + 34);
-          let y = e.pos.y + Math.sin(ang) * (e.radius + 26);
-          for (let s = 0; s < segs; s++) {
-              const remain = segs - s;
-              const tx = e.pos.x + (x - e.pos.x) * ((remain - 1) / segs);
-              const ty = e.pos.y + (y - e.pos.y) * ((remain - 1) / segs);
-              const jx = (Math.random() - 0.5) * (s === segs - 1 ? 4 : 16);
-              const jy = (Math.random() - 0.5) * (s === segs - 1 ? 4 : 16);
-              const nx = tx + jx;
-              const ny = ty + jy;
-              this.particles.push({
-                  id: 'zap',
-                  type: EntityType.PARTICLE,
-                  pos: { x, y },
-                  vel: { x: nx - x, y: ny - y },
-                  radius: s === 0 ? 3.4 : 2.1,
-                  health: 1,
-                  maxHealth: 1,
-                  color: s % 2 === 0 ? '#f7feff' : '#8ef6ff',
-                  damage: 0,
-                  active: true,
-                  ttl: 8 + (s % 3),
-              });
-              x = nx;
-              y = ny;
-          }
-      }
-      if (this.particles.length > (this.isLowQuality ? 28 : 160)) return;
-      const sparks = this.isLowQuality ? 2 : 5;
-      for (let i = 0; i < sparks; i++) {
-          const a = Math.random() * Math.PI * 2;
-          const kick = 2.4 + Math.random() * 4.2;
+      if (this.particles.length > (this.isLowQuality ? 40 : 200)) return;
+      const rings = this.isLowQuality ? 1 : 3;
+      for (let i = 0; i < rings; i++) {
+          const life = 12 + i * 4;
           this.particles.push({
-              id: 'spark',
+              id: 'ring',
               type: EntityType.PARTICLE,
               pos: { x: e.pos.x, y: e.pos.y },
-              vel: { x: Math.cos(a) * kick, y: Math.sin(a) * kick },
-              radius: 2.4,
+              vel: { x: 0, y: 0 },
+              radius: e.radius * (0.55 + i * 0.28),
               health: 1,
-              maxHealth: 1,
-              color: i % 2 === 0 ? '#f7feff' : '#ffe38a',
+              maxHealth: life,
+              color: i === 0 ? '#f7feff' : '#8ef6ff',
               damage: 0,
               active: true,
-              ttl: 14,
+              ttl: life,
           });
       }
   }
@@ -2640,60 +2607,59 @@ export class GameEngine {
   }
 
   private drawCoin(e: Entity) {
-      const spin = Math.cos(this.time / 240 + e.pos.x * 0.01);
-      const sx = Math.max(0.28, Math.abs(spin));
-      const bob = Math.sin(this.time / 280 + e.pos.y * 0.02) * 1.6;
-      const r = e.radius;
+      const spin = Math.cos(this.time / 280 + e.pos.x * 0.01);
+      const sx = Math.max(0.16, Math.abs(spin));
+      const bob = Math.sin(this.time / 260 + e.pos.y * 0.02) * 1.8;
+      const r = e.radius * 1.7;
+      const x = e.pos.x;
+      const y = e.pos.y + bob;
+      const gold = e.isElite ? '#ffe08a' : '#ffd56a';
       this.ctx.save();
-      this.ctx.translate(e.pos.x, e.pos.y + bob);
-      if (!this.isLowQuality) {
-          this.ctx.globalCompositeOperation = 'screen';
-          this.ctx.fillStyle = e.isElite ? 'rgba(255, 244, 210, 0.38)' : 'rgba(255, 196, 64, 0.26)';
-          this.ctx.beginPath();
-          this.ctx.ellipse(0, 2, r * 1.7, r * 0.72, 0, 0, Math.PI * 2);
-          this.ctx.fill();
-          this.ctx.globalCompositeOperation = 'source-over';
-      }
+      this.ctx.fillStyle = gold;
+      this.ctx.globalAlpha = 0.2;
+      this.ctx.beginPath();
+      this.ctx.arc(x, y, r * 2.15, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.globalAlpha = 0.45;
+      this.ctx.beginPath();
+      this.ctx.arc(x, y, r * 1.35, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.restore();
+
+      this.ctx.save();
+      this.ctx.translate(x, y);
       this.ctx.scale(sx, 1);
-      if (this.isLowQuality) {
-          this.ctx.fillStyle = e.isElite ? '#ffe7a8' : '#e2b23a';
-      } else {
-          const g = this.ctx.createRadialGradient(-r * 0.35, -r * 0.4, 1, 0, 0, r);
-          g.addColorStop(0, '#fff8d4');
-          g.addColorStop(0.42, e.isElite ? '#ffe39a' : '#f0c14a');
-          g.addColorStop(1, '#7a4e10');
-          this.ctx.fillStyle = g;
-      }
+      const g = this.ctx.createRadialGradient(-r * 0.32, -r * 0.38, r * 0.05, 0, 0, r);
+      g.addColorStop(0, '#fffef4');
+      g.addColorStop(0.34, e.isElite ? '#ffe7a0' : '#ffd15a');
+      g.addColorStop(0.74, '#f0a018');
+      g.addColorStop(1, '#a85a08');
+      this.ctx.fillStyle = g;
       this.ctx.beginPath();
       this.ctx.arc(0, 0, r, 0, Math.PI * 2);
       this.ctx.fill();
-      this.ctx.lineWidth = 1.5;
-      this.ctx.strokeStyle = '#fff3c4';
+      this.ctx.strokeStyle = '#6a3808';
+      this.ctx.lineWidth = Math.max(1.5, r * 0.11);
       this.ctx.stroke();
+      this.ctx.strokeStyle = 'rgba(255, 250, 220, 0.95)';
+      this.ctx.lineWidth = Math.max(1, r * 0.065);
       this.ctx.beginPath();
-      this.ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
-      this.ctx.strokeStyle = 'rgba(92, 54, 12, 0.55)';
-      this.ctx.lineWidth = 1;
+      this.ctx.arc(0, 0, r * 0.74, 0, Math.PI * 2);
       this.ctx.stroke();
-      if (sx > 0.62) {
-          this.ctx.strokeStyle = 'rgba(74, 40, 8, 0.85)';
-          this.ctx.lineWidth = 1.15;
+      if (sx > 0.42) {
+          this.ctx.strokeStyle = '#5c320c';
+          this.ctx.lineWidth = Math.max(1.6, r * 0.13);
+          this.ctx.lineCap = 'round';
           this.ctx.beginPath();
           this.ctx.moveTo(0, -r * 0.4);
-          this.ctx.bezierCurveTo(r * 0.3, -r * 0.08, -r * 0.3, r * 0.08, 0, r * 0.4);
+          this.ctx.bezierCurveTo(r * 0.32, -r * 0.06, -r * 0.32, r * 0.06, 0, r * 0.4);
           this.ctx.moveTo(0, -r * 0.4);
-          this.ctx.bezierCurveTo(-r * 0.3, -r * 0.08, r * 0.3, r * 0.08, 0, r * 0.4);
+          this.ctx.bezierCurveTo(-r * 0.32, -r * 0.06, r * 0.32, r * 0.06, 0, r * 0.4);
           this.ctx.stroke();
       }
-      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.72)';
+      this.ctx.fillStyle = 'rgba(255, 253, 240, 0.92)';
       this.ctx.beginPath();
-      this.ctx.ellipse(-r * 0.28, -r * 0.32, r * 0.22, r * 0.11, -0.6, 0, Math.PI * 2);
-      this.ctx.fill();
-      const glint = 0.35 + 0.65 * Math.max(0, Math.sin(this.time / 180 + e.pos.x * 0.02));
-      this.ctx.globalAlpha = glint;
-      this.ctx.fillStyle = '#fffdf4';
-      this.ctx.beginPath();
-      this.ctx.arc(r * 0.15, -r * 0.05, Math.max(0.8, r * 0.16), 0, Math.PI * 2);
+      this.ctx.ellipse(-r * 0.26, -r * 0.3, r * 0.2, r * 0.09, -0.6, 0, Math.PI * 2);
       this.ctx.fill();
       this.ctx.restore();
   }
@@ -2989,57 +2955,28 @@ export class GameEngine {
     }
 
     if (this.surgeActive) {
-      const r = this.deathSurgeActive ? this.surgeRadius * (0.9 + Math.random()*0.2) : this.surgeRadius;
-      
-      // VISUAL UPGRADE: Inner ripple
-      this.ctx.beginPath();
-      this.ctx.arc(this.player.pos.x, this.player.pos.y, r * 0.6, 0, Math.PI * 2);
-      this.ctx.strokeStyle = this.deathSurgeActive ? 'rgba(255, 0, 0, 0.5)' : 'rgba(0, 255, 255, 0.5)';
-      this.ctx.lineWidth = 2;
-      this.ctx.stroke();
-
-      // VISUAL UPGRADE: Outer echo
-      this.ctx.beginPath();
-      this.ctx.arc(this.player.pos.x, this.player.pos.y, r * 1.1, 0, Math.PI * 2);
-      this.ctx.strokeStyle = this.deathSurgeActive ? 'rgba(255, 0, 0, 0.2)' : 'rgba(0, 255, 255, 0.2)';
-      this.ctx.lineWidth = 1;
-      this.ctx.stroke();
-
-      // Main Ring
-      this.ctx.beginPath();
-      this.ctx.arc(this.player.pos.x, this.player.pos.y, r, 0, Math.PI * 2);
-      
-      this.ctx.globalAlpha = 0.3;
-      this.ctx.lineWidth = this.deathSurgeActive ? 60 : 30;
-      this.ctx.strokeStyle = this.deathSurgeActive ? '#ff0000' : this.colors.SURGE;
-      this.ctx.stroke();
-      
-      this.ctx.globalAlpha = 1.0;
-      this.ctx.lineWidth = 5;
-      this.ctx.stroke();
-      
-      this.ctx.fillStyle = this.deathSurgeActive ? `rgba(255, 0, 0, 0.2)` : `rgba(0, 255, 255, 0.1)`;
-      this.ctx.fill();
-
-      if (!this.deathSurgeActive && !this.isLowQuality) {
-          const px = this.player.pos.x;
-          const py = this.player.pos.y;
-          this.ctx.strokeStyle = 'rgba(236, 255, 255, 0.82)';
-          this.ctx.lineWidth = 1.6;
-          this.ctx.lineCap = 'round';
-          const bolts = 8;
-          for (let i = 0; i < bolts; i++) {
-              const a = (i / bolts) * Math.PI * 2 + this.time * 0.01;
-              const r0 = r * (0.78 + (i % 3) * 0.04);
-              const mx = px + Math.cos(a) * (r0 + 10) + Math.cos(a + 1.4) * 16;
-              const my = py + Math.sin(a) * (r0 + 10) + Math.sin(a + 0.6) * 16;
-              this.ctx.beginPath();
-              this.ctx.moveTo(px + Math.cos(a) * r0, py + Math.sin(a) * r0);
-              this.ctx.lineTo(mx, my);
-              this.ctx.lineTo(px + Math.cos(a + 0.08) * r * 1.04, py + Math.sin(a + 0.08) * r * 1.04);
-              this.ctx.stroke();
-          }
+      const r = this.surgeRadius;
+      const px = this.player.pos.x;
+      const py = this.player.pos.y;
+      const hot = this.deathSurgeActive;
+      const bands = hot ? [1, 0.72, 0.46] : [1, 0.74, 0.5, 0.28];
+      this.ctx.save();
+      this.ctx.lineJoin = 'round';
+      for (let i = 0; i < bands.length; i++) {
+          const rr = Math.max(6, r * bands[i]);
+          const fade = 1 - i * 0.16;
+          this.ctx.beginPath();
+          this.ctx.arc(px, py, rr, 0, Math.PI * 2);
+          this.ctx.globalAlpha = (hot ? 0.28 : 0.2) * fade;
+          this.ctx.lineWidth = (hot ? 26 : 20) - i * 3;
+          this.ctx.strokeStyle = hot ? '#ff4d62' : '#5eefff';
+          this.ctx.stroke();
+          this.ctx.globalAlpha = 0.92 * fade;
+          this.ctx.lineWidth = Math.max(2.2, 4.6 - i * 0.7);
+          this.ctx.strokeStyle = hot ? '#ffe7ea' : '#f7feff';
+          this.ctx.stroke();
       }
+      this.ctx.restore();
     }
 
     if (!this.isLowQuality) {
@@ -3093,6 +3030,17 @@ export class GameEngine {
           this.ctx.beginPath();
           this.ctx.ellipse(p.pos.x, p.pos.y, p.radius * 1.5, p.radius * 0.6, 0, 0, Math.PI*2);
           this.ctx.fill();
+      } else if (p.id === 'ring') {
+          const life = Math.max(0, (p.ttl || 0) / Math.max(1, p.maxHealth || 14));
+          const grow = p.radius * (1 + (1 - life) * 1.35);
+          this.ctx.save();
+          this.ctx.globalAlpha = life;
+          this.ctx.strokeStyle = p.color;
+          this.ctx.lineWidth = 2.4 + life * 2.2;
+          this.ctx.beginPath();
+          this.ctx.arc(p.pos.x, p.pos.y, grow, 0, Math.PI * 2);
+          this.ctx.stroke();
+          this.ctx.restore();
       } else if (p.id === 'zap') {
           const life = Math.max(0, (p.ttl || 0) / 10);
           this.ctx.save();
@@ -3446,29 +3394,18 @@ export class GameEngine {
         if (spin) this.ctx.rotate(-spin);
         if ((e.stun ?? 0) > 0) {
             this.ctx.save();
-            this.ctx.globalCompositeOperation = 'screen';
-            this.ctx.lineCap = 'round';
-            this.ctx.lineJoin = 'round';
-            const flick = Math.floor(this.time / 45);
-            const bolts = this.isLowQuality ? 1 : 2;
-            for (let b = 0; b < bolts; b++) {
-                const a0 = (flick * 1.7 + b * 3.1) % (Math.PI * 2);
-                this.ctx.beginPath();
-                this.ctx.strokeStyle = b === 0 ? '#ffffff' : '#b8f6ff';
-                this.ctx.lineWidth = b === 0 ? 2.6 : 1.5;
-                this.ctx.globalAlpha = 0.92;
-                let px = Math.cos(a0) * e.radius * 1.5;
-                let py = Math.sin(a0) * e.radius * 1.2;
-                this.ctx.moveTo(px, py);
-                for (let s = 1; s <= 4; s++) {
-                    const toward = s / 4;
-                    const ang = a0 + Math.PI * toward + Math.sin(flick + s * 2 + b) * 0.55;
-                    px = Math.cos(ang) * e.radius * (1.5 - toward * 1.75);
-                    py = Math.sin(ang) * e.radius * (1.2 - toward * 1.4);
-                    this.ctx.lineTo(px, py);
-                }
-                this.ctx.stroke();
-            }
+            const breathe = 1 + Math.sin(this.time / 70) * 0.06;
+            this.ctx.strokeStyle = '#f7feff';
+            this.ctx.lineWidth = 3;
+            this.ctx.globalAlpha = 0.9;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, e.radius * 1.25 * breathe, 0, Math.PI * 2);
+            this.ctx.stroke();
+            this.ctx.globalAlpha = 0.55;
+            this.ctx.lineWidth = 2;
+            this.ctx.beginPath();
+            this.ctx.arc(0, 0, e.radius * 1.7 * breathe, 0, Math.PI * 2);
+            this.ctx.stroke();
             this.ctx.restore();
         }
         this.ctx.translate(-e.pos.x, -e.pos.y);

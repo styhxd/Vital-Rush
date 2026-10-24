@@ -17,3 +17,83 @@
     padding-left: calc(28px + env(safe-area-inset-left, 0px));
   }
 }
+
+.pad-slot { position: relative; display: flex; pointer-events: none; }
+.pad-slot .pad { pointer-events: auto; }
+.pad-name {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 5px);
+  transform: translateX(-50%);
+  z-index: 3;
+  font-family: 'Chakra Petch', sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  line-height: 1;
+  white-space: nowrap;
+  color: rgba(247, 251, 255, 0.92);
+  text-shadow: 0 1px 0 #041018, 0 0 6px rgba(0, 0, 0, 0.85);
+  pointer-events: none;
+}
+.pad {
+  position: relative;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.34);
+  background:
+    radial-gradient(circle at 50% 36%, rgba(255, 255, 255, 0.18), transparent 46%),
+    radial-gradient(circle at 50% 64%, rgba(10, 22, 32, 0.2), rgba(4, 10, 16, 0.82));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.55), 0 6px 14px rgba(0, 0, 0, 0.28);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: #f7fbff;
+  transition: transform 80ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+.pad:active { transform: scale(0.93); }
+.pad:disabled { opacity: 1; cursor: default; }
+.pad-dash { width: 70px; height: 70px; }
+.pad-pulse { width: 88px; height: 88px; }
+.pad-dash.is-hot {
+  border-color: #e7fbff;
+  box-shadow:
+    inset 0 0 14px rgba(140, 235, 255, 0.55),
+    0 0 18px rgba(94, 224, 255, 0.9);
+}
+.pad-pulse.is-hot {
+  border-color: #d9f8ff;
+  box-shadow:
+    inset 0 0 16px rgba(90, 220, 255, 0.5),
+    0 0 22px rgba(34, 211, 238, 0.95);
+}
+.pad-pulse.is-gold.is-hot {
+  border-color: #ffe7a8;
+  box-shadow:
+    inset 0 0 16px rgba(255, 214, 120, 0.55),
+    0 0 22px rgba(255, 196, 64, 0.95);
+}
+.pad-pulse.is-gold .pad-shade {
+  background: conic-gradient(from -90deg, #ffd56a calc(var(--p, 0) * 360deg), rgba(255, 255, 255, 0.16) 0);
+}
+.pad-ico {
+  width: 70%;
+  height: 70%;
+  position: relative;
+  z-index: 1;
+}
+.pad-shade {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  border-radius: inherit;
+  pointer-events: none;
+  background: conic-gradient(from -90deg, #7ef3ff calc(var(--p, 0) * 360deg), rgba(255, 255, 255, 0.16) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent 88%, #000 92%);
+  mask: radial-gradient(farthest-side, transparent 88%, #000 92%);
+}
+@media (min-width: 1024px) {
+  .pad-dash { width: 84px; height: 84px; }
+  .pad-pulse { width: 104px; height: 104px; }
+  .pad-name { font-size: 12px; }
+}
