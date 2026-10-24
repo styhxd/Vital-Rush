@@ -731,7 +731,8 @@ export class OrganDirector {
             }
         }
         this.slowInPlaque(hooks);
-        this.meltInBile(dt, hooks);
+        const bossUp = hooks.entities.some(e => e.active && e.type === EntityType.BOSS);
+        if (!bossUp) this.meltInBile(dt, hooks);
 
         if (this.bitePhase === 'snap' && !this.biteHit && this.biteT <= 0.86) {
             this.biteHit = true;
@@ -740,7 +741,7 @@ export class OrganDirector {
             buzz('thud');
             audioManager.playBite({ x: CANVAS_WIDTH / 2, y: this.biteY });
         }
-        if (this.filterPhase === 'on') this.resolveFilter(hooks);
+        if (!bossUp && this.filterPhase === 'on') this.resolveFilter(hooks);
         for (const trace of this.traces) this.resolveTrace(trace, hooks);
         for (const clot of this.clots) this.resolveClot(clot, hooks);
         if (this.lungPhase === 'blast') this.resolveCough(hooks);
@@ -1006,6 +1007,13 @@ export class OrganDirector {
             }
         }
         if (this.local < 2) return;
+        if (hooks.entities.some(e => e.active && e.type === EntityType.BOSS)) {
+            if (this.filterPhase !== 'idle') {
+                this.filterPhase = 'idle';
+                this.filterClock = 8;
+            }
+            return;
+        }
         if (this.filterPhase === 'idle') {
             this.filterClock -= dt;
             if (this.filterClock <= 0) {
@@ -1458,7 +1466,8 @@ export class OrganDirector {
         for (const e of hooks.entities) {
             if (!e.active || !this.isFoe(e.type)) continue;
             if (!this.insideAny(e.pos, e.radius * 0.35, pools)) continue;
-            if (tickEnemies) hooks.strike(e, e.type === EntityType.BOSS ? 10 : 26);
+            if (e.type === EntityType.BOSS) continue;
+            if (tickEnemies) hooks.strike(e, 26);
         }
         let playerIn = false;
         if (this.insideAny(hooks.player.pos, hooks.player.radius * 0.5, pools)) {

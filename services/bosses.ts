@@ -99,7 +99,7 @@ export const BOSSES: BossSpec[] = [
     },
     {
         id: 'liver>heart', from: 'liver', to: 'heart', shape: 'trypo', play: 'flagellum',
-        color: '#d7e07a', accent: '#6a7420', hp: 0.9, speed: 0.55, radius: 100,
+        color: '#d7e07a', accent: '#6a7420', hp: 0.9, speed: 0.34, radius: 100,
         short: text('T. CRUZI', 'T. CRUZI', 'T. CRUZI'),
         disease: text('Doença de Chagas', 'Chagas disease', 'Enfermedad de Chagas'),
         intro: text('O tripanossoma deixa o fígado e se instala no músculo do coração.', 'The trypanosome leaves the liver and settles in the heart muscle.', 'El tripanosoma deja el hígado y se instala en el músculo del corazón.'),

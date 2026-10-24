@@ -637,6 +637,8 @@ export const Game: React.FC = () => {
 
   const finishWave = useCallback(() => {
       if (intermissionRef.current) return;
+      const live = engineRef.current;
+      if (live && (live.lives <= 0 || !live.player.active)) return;
       intermissionRef.current = true;
       setGameState(GameState.WAVE_CLEARED);
       audioManager.stopMusic();

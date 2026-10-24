@@ -154,7 +154,8 @@ export class GameEngine {
   private bgR = 28;
   private bgG = 20;
   private bgB = 12;
-  private bgFill = '#1c140c'; 
+  private bgFill = '#1c140c';
+  private bgOrgan = ''; 
   private spawnTimer: number = 0;
   private regenTimer: number = 0;
   private screenShake: Vector2 = { x: 0, y: 0 };
@@ -212,6 +213,7 @@ export class GameEngine {
     this.bgR = parseInt(this.bgFill.slice(1, 3), 16);
     this.bgG = parseInt(this.bgFill.slice(3, 5), 16);
     this.bgB = parseInt(this.bgFill.slice(5, 7), 16);
+    this.bgOrgan = 'molar';
     
     this.player = this.createPlayer(initialStats);
     this.forceHighQuality = true;
@@ -486,6 +488,11 @@ export class GameEngine {
           spawn: () => {},
       });
       this.organ.placePlayer(this.player);
+      if (this.player.health <= 0 && this.lives > 0) {
+          this.player.health = this.player.maxHealth;
+          this.player.active = true;
+      }
+      this.approachBg(dt);
   }
 
   private bossShot(e: Entity, angle: number, speed: number, radius: number, damage: number) {
@@ -642,7 +649,7 @@ export class GameEngine {
       if (this.organ.shield > 0) amount *= (1 - this.organ.shield);
       if (stats.guard > 0) amount *= (1 - Math.min(0.45, stats.guard));
 
-      this.player.health -= amount;
+      this.player.health = Math.max(0, this.player.health - amount);
       this.sessionStats.damageTaken += amount;
       
       // Feedback: Screen Shake
@@ -654,9 +661,8 @@ export class GameEngine {
       this.comboCount = 0;
 
       // New Mechanics: Escape Feedback (Entity Collision only)
-      if (!isEnvironmental) {
-          // SURPRESA 1: DANO ADAPTATIVO (Inimigo evolui no contato)
-          if (sourceEntity && sourceEntity.active) {
+          if (!isEnvironmental) {
+          if (sourceEntity && sourceEntity.active && sourceEntity.type !== EntityType.BOSS) {
               sourceEntity.radius = Math.min(240, sourceEntity.radius * 1.1);
               sourceEntity.damage *= 1.1;
               this.spawnText(sourceEntity.pos, this.t('MSG_GREW'), sourceEntity.color, 15);
@@ -702,6 +708,7 @@ export class GameEngine {
           achievementManager.track('die_10', 1);
           
           if (this.lives === 0) {
+              this.player.health = 0;
               this.player.active = false;
               this.waveActive = false; 
               const pCount = this.isLowQuality ? 10 : 30;
@@ -727,7 +734,7 @@ export class GameEngine {
               
               this.screenShake = {x: 40, y: 40}; 
               this.shakeIntensity = 40;
-              
+
               const pCount = this.isLowQuality ? 10 : 40;
               for(let i=0; i<pCount; i++) {
                   const angle = Math.random() * Math.PI * 2;
@@ -754,6 +761,11 @@ export class GameEngine {
                   }
               });
           }
+      } else if (this.player.active) {
+          this.player.health = 0;
+          this.player.active = false;
+          this.waveActive = false;
+          onGameOver();
       }
   }
 
@@ -767,6 +779,8 @@ export class GameEngine {
   }
 
   public beginPassage(): boolean {
+      if (this.lives <= 0 || !this.player.active) return false;
+      if (this.player.health <= 0) this.player.health = this.player.maxHealth;
       if (this.currentWaveIndex < 0 || !this.organ.willLeave(this.currentWaveIndex)) return false;
       this.organ.openVoyage(this.currentWaveIndex + 1, (key) => this.t(key));
       if (!this.organ.charting()) return false;
@@ -933,8 +947,9 @@ export class GameEngine {
   }
   private killAllEnemies() {
       this.entities.forEach(e => {
+          if (e.type === EntityType.BOSS && e.health > 0) return;
           if (this.isEnemy(e.type) || e.type === EntityType.BOSS) {
-              e.health = -999; e.active = false; e.pos.x = -10000; 
+              e.health = 0; e.active = false; e.pos.x = -10000; 
               if (!this.isLowQuality) {
                   for(let i=0; i<3; i++) {
                       this.particles.push({
@@ -993,8 +1008,8 @@ export class GameEngine {
       }
 
       if (m.play === 'flagellum') {
-          e.vel.x += nx * speed * 1.5 + (-ny) * Math.sin(m.phase * 3.2) * speed * 2.4;
-          e.vel.y += ny * speed * 1.5 + nx * Math.sin(m.phase * 3.2) * speed * 2.4;
+          e.vel.x += nx * speed + (-ny) * Math.sin(m.phase * 2.4) * speed * 1.2;
+          e.vel.y += ny * speed + nx * Math.sin(m.phase * 2.4) * speed * 1.2;
           return;
       }
 
@@ -1404,7 +1419,11 @@ export class GameEngine {
         heal: (amount: number) => {
             this.player.health = Math.min(this.player.maxHealth, this.player.health + amount);
         },
-        strike: (e: Entity, amount: number) => { if (e.active) this.damageEnemy(e, amount, false, stats); },
+        strike: (e: Entity, amount: number) => {
+            if (!e.active) return;
+            const hit = e.type === EntityType.BOSS && amount >= e.health ? e.maxHealth * 0.06 : amount;
+            this.damageEnemy(e, hit, false, stats);
+        },
         shake: (n: number) => { this.shakeIntensity = Math.max(this.shakeIntensity, n); },
         popup: (pos: Vector2, text: string, color: string, size?: number) => this.spawnText(pos, text, color, size ?? 22),
         spawn: (e: Entity) => { this.entities.push(e); },
@@ -1752,7 +1771,7 @@ export class GameEngine {
               if (dMag < pSum * 0.8) {
                  if (this.invulnerabilityTimer <= 0 && !this.isDashing) {
                      if (stats.thorns > 0) this.damageEnemy(e, stats.thorns, false, stats);
-                     let damage = e.type === EntityType.BOSS ? 25 : (e.isElite ? 2.5 : 0.6);
+                     let damage = e.type === EntityType.BOSS ? 16 : (e.isElite ? 2.5 : 0.6);
                      damage *= this.difficultyMods.dmg;
                      if (e.type === EntityType.VIRUS) damage = Math.max(damage, e.damage * (e.isElite ? 0.62 : 0.55));
                      // Damage from enemy collision uses protection logic
@@ -2119,10 +2138,18 @@ export class GameEngine {
       const tr = parseInt(target.slice(1, 3), 16);
       const tg = parseInt(target.slice(3, 5), 16);
       const tb = parseInt(target.slice(5, 7), 16);
-      const k = 1 - Math.exp(-dtSeconds / 0.45);
-      this.bgR += (tr - this.bgR) * k;
-      this.bgG += (tg - this.bgG) * k;
-      this.bgB += (tb - this.bgB) * k;
+      const changed = this.bgOrgan !== this.organ.id;
+      this.bgOrgan = this.organ.id;
+      if (changed && this.organ.charting()) {
+          this.bgR = tr;
+          this.bgG = tg;
+          this.bgB = tb;
+      } else {
+          const k = 1 - Math.exp(-dtSeconds / 0.45);
+          this.bgR += (tr - this.bgR) * k;
+          this.bgG += (tg - this.bgG) * k;
+          this.bgB += (tb - this.bgB) * k;
+      }
       this.bgFill = `rgb(${this.bgR | 0},${this.bgG | 0},${this.bgB | 0})`;
   }
 

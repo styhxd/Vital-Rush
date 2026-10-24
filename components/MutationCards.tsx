@@ -759,14 +759,15 @@ export const mutationCardStyles = `
     left: 0;
     right: 0;
     top: 0;
-    height: 22%;
-    background: linear-gradient(180deg, transparent, rgba(190, 120, 255, 0.2), transparent);
-    animation: lab-scan 8s linear infinite;
+    height: 28%;
+    background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent) 72%, white), transparent);
+    animation: lab-scan 5.5s linear infinite;
+    opacity: 0.9;
 }
 .lab-glint {
     inset: -20% -40%;
-    background: linear-gradient(100deg, transparent 42%, rgba(255, 220, 120, 0.22) 50%, transparent 58%);
-    animation: lab-sheen 9s ease-in-out infinite;
+    background: linear-gradient(100deg, transparent 40%, rgba(255, 236, 170, 0.9) 50%, transparent 60%);
+    animation: lab-sheen 6.5s ease-in-out infinite;
 }
 .lab-rim {
     inset: 0;
@@ -795,8 +796,17 @@ export const mutationCardStyles = `
     }
     .lab-card.is-hot:hover .lab-art,
     .lab-card.is-hot:focus-visible .lab-art { transform: scale(1.04); }
-    .lab-card.is-hot:hover .lab-sheen { animation: lab-sheen 0.7s ease; }
 }
+.lab-card:not(.is-offer):not(.is-poor):not(.is-max) .lab-sheen {
+    background: linear-gradient(105deg, transparent 34%, color-mix(in srgb, var(--accent) 62%, white) 50%, transparent 66%);
+    animation: lab-sheen 9s ease-in-out infinite;
+    opacity: 0.72;
+}
+.lab-card.is-rare:not(.is-offer):not(.is-poor):not(.is-max) .lab-sheen { animation-duration: 6.4s; opacity: 0.84; }
+.lab-card.is-epic:not(.is-offer):not(.is-poor):not(.is-max) .lab-sheen { animation-duration: 4.8s; opacity: 0.92; }
+.lab-card.is-legendary:not(.is-offer):not(.is-poor):not(.is-max) .lab-sheen { animation-duration: 3.6s; opacity: 1; }
+.lab-slot:nth-child(3n) .lab-sheen { animation-delay: -3.2s; }
+.lab-slot:nth-child(3n + 1) .lab-sheen { animation-delay: -6.4s; }
 .lab-card.is-hot:active {
     transform: translateY(1px);
     box-shadow: 0 2px 0 rgba(0,0,0,0.5);
@@ -815,9 +825,11 @@ export const mutationCardStyles = `
     background: rgba(42, 8, 12, 0.62);
 }
 .lab-card.is-poor .lab-snow {
-    z-index: 2;
-    opacity: 0.28;
-    background: repeating-linear-gradient(0deg, rgba(255, 120, 110, 0.16) 0 1px, transparent 1px 5px);
+    z-index: 4;
+    opacity: 0.72;
+    background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAEh0lEQVR4nIWZi3HjMAxEWaeqY3VuQzfxhc7i4UHWjCexxA+wWGBBeV3Xte77fp3P+r3u+97n+/n7Mzb/5rzfz851uN6K67quHc/ec/JePvu5Hzbs88kBnPcZmEacSeHAzo1pFObsYZ+2bz4LgDftNYdXoLeJdBohEWsIfvue98JAgvSJfiJ/HEtPEz1F8kQkwrgsQjk3o0Qa/YLUqEoaJkWTxu/9SBUiSf59QxAojcaLoy2f0lFGmwygUS1ZIkGPUYsbxdikXHHszCUwXOdEmNTJ+e97cUOTcA0JWCpBIJVRHMaUdTPiRDYBsqqlqK+hMiRKWdqGqFgZLRtaEbBITuX25E+ZQPS4eBo9ocmySgoQmCl6qyb15n6f+RSyqcqYXkzCQxQzqiiLbS0rvVY6P//TwDSeoVbhCPpBcFriMWlF7IwNbb8y70GFmwNSWXRxthxTWbVkfGoxqE/v9TUpxFvWZ1Iuw0odoUF8ZmvmGHOy7BOIkLcbqDWhYcVggodTjFIx+skRjrc1S+8Tni4RmBy/iTjGt+Sl0dSY1A9WNAL52ddqtNFiqu9feMpkZoer9OL6qJDdWDZqGQFOplFCl6a+fGZlVRC3BvDFamWLFR2QMCdF1PGpU/2i+MWOIWK9QDROefmckvtJhApyeDaWYorgdK8ZCu9ZEVTq8wBitJgMYE7Z/1Nz2WiaG5M6ptBCGT1TZGIPES5RkMrTor5AQyLWKEBVhh5sbHLGtcOIfazSTWKaPVtxwJDJsAfqjyrNOfje8oTOWicAWpXKZ4CvNXOVRrVEJhjyGqVEBJXs86zVedjFM4cJRUPGhC42bBvYWCI2KbMhq7X/jCN/recxATKpF7TypPZ0GGpJCnC3APx/bx6wTc5Zz6meC1R74qqU4deNswH7nSm5ayiwAY2zUBJ125Aawj3ZZhh9RARd0LjwkuTLRdPYh1JZHAT37WVBi1R+byBk6OlE9jRs+OBIMYZIkp6M0lD7i8OmGW/HrcYGWlv439SQCmyRxJhG3TSOQpeIN2CsJzHe2RjylHzm84U8MJqRjnS05cr113e3N3EmKqQQeSmRaucGGj8pq+3D1sZqcKPN1GSlk1Rl04Wkiu21hgojOfeX/Ha2HZSwiBM3aBI/VDY54Wmfn3lJgEyriuf8cSMNp3BZZbFNiFxWLhoOodTeiO9Gi7FMwjRMjKLj2iJPa+c6JowLOdkKAhMlHeImdDZr/iT5UxtBYKacIS2bvZaczHajweRglMAmZFDZgrQ5xnXTAbOvdYhmmCEhBo8t+BLqSV9UXmLxeXHOOJzeTa9TpnsW/gcNsEOSUlgALkJW5NsSLSdSwHhmsN+7SKNmyNDK23ol4hb+qdlSJQSiZoRQpbULdCYayQZkEc0QF+3DJ4NYzljiAEjtIGU9OVhtK8sYXw2il+mteN/Uezq3spIQiIXKM0StRevtAPlpbwuw0Hgagzaw5ynnWpZSlk4VLTsYsRdi2VqRePw13pJ/Iel4sc3AmkVrxA5/tSKvUuwQ0t40WEXilYgTJCBsR85HDfq5/gF9/z/ChQP6rgAAAABJRU5ErkJggg==");
+    background-size: 48px 48px;
+    animation: lab-snow 0.36s steps(4) infinite;
 }
 .lab-card.is-poor .lab-art {
     z-index: 3;
@@ -842,19 +854,28 @@ export const mutationCardStyles = `
 }
 .lab-card.is-max {
     cursor: default;
-    box-shadow: 0 0 0 2px #f0c14a, 0 0 22px rgba(240, 193, 74, 0.55), 0 7px 0 rgba(70, 40, 0, 0.45);
+    background: #3a2a08;
+    box-shadow: 0 0 0 4px #ffe08a, 0 0 0 9px #6a4208, 0 7px 0 #2a1c04;
+    filter: saturate(0.55);
 }
+.lab-card.is-max .lab-art { filter: grayscale(0.85) brightness(0.72) contrast(1.05); }
+.lab-card.is-max .lab-wash { opacity: 1; background: linear-gradient(180deg, rgba(255, 214, 90, 0.55), rgba(80, 50, 0, 0.35) 70%) !important; }
+.lab-card.is-max .lab-sheen,
+.lab-card.is-max .lab-scan,
+.lab-card.is-max .lab-glint { animation: none; opacity: 0; }
+.lab-card.is-max .lab-name { color: #ffe7a8; }
 .lab-card.is-max .lab-evolve {
     z-index: 6;
     color: #3a2504;
-    background: linear-gradient(#fff1b8, #e2a01f);
+    background: linear-gradient(#fff6cc, #e2a01f);
     border-radius: 4px;
-    box-shadow: 0 0 16px rgba(255, 200, 60, 0.7);
+    box-shadow: 0 0 0 2px #fff1b8, 0 0 18px rgba(255, 200, 60, 0.9);
 }
 .lab-card.is-max .lab-rim {
-    box-shadow: inset 0 0 0 3px rgba(255, 214, 90, 0.95);
+    box-shadow: inset 0 0 0 6px #ffe08a;
     opacity: 1;
 }
+.lab-card.is-max .lab-meter b { background: #ffe08a; }
 .lab-card.is-offer .lab-evolve { animation: lab-invite 1.15s ease-in-out infinite; }
 .lab-card.is-forced {
     transform: translateY(-8px) scale(1.04);
@@ -1007,6 +1028,10 @@ export const mutationCardStyles = `
 @keyframes lab-sheen {
     from { transform: translateX(-130%); }
     to { transform: translateX(130%); }
+}
+@keyframes lab-snow {
+    from { background-position: 0 0; }
+    to { background-position: 96px -48px; }
 }
 @keyframes lab-scan {
     from { transform: translateY(-140%); }
