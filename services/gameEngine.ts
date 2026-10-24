@@ -18,6 +18,17 @@ import { buzz } from './haptics';
 import { achievementManager } from './achievementManager';
 import { bossFor, drawBossShape, mutationFrom } from './bosses';
 import { OrganDirector, cellBudget, cellColor, cellRises, organBg, rollCellStyle } from './organDirector';
+import { hopLine } from './casebook';
+
+const BOSS_GRACE = 1.15;
+
+export interface BossCard {
+  name: string;
+  disease: string;
+  line: string;
+  color: string;
+  shown: number;
+}
 const SIN_TABLE = new Float32Array(360);
 const COS_TABLE = new Float32Array(360);
 for (let i = 0; i < 360; i++) {
@@ -157,6 +168,8 @@ export class GameEngine {
   public adrenalineExhausted: boolean = false;
   
   public invulnerabilityTimer: number = 0;
+  public bossCard: BossCard | null = null;
+  private bossCardAge = 0;
   private hitStopTimer: number = 0;
   private acidContact: number = 0;
   private acidCue: number = 0;
@@ -388,6 +401,91 @@ export class GameEngine {
       });
 
       audioManager.playSurge({ x: CANVAS_WIDTH * 0.82, y: CANVAS_HEIGHT / 2 });
+      this.openBossCard(spec);
+  }
+
+  private openBossCard(spec: { short: Record<Language, string>; disease: Record<Language, string>; intro: Record<Language, string>; color: string; from: Parameters<typeof hopLine>[0]; to: Parameters<typeof hopLine>[1] }) {
+      const lang = this.language;
+      const line = `${spec.intro[lang]} ${hopLine(spec.from, spec.to, lang)}`.trim();
+      this.bossCard = {
+          name: spec.short[lang],
+          disease: spec.disease[lang],
+          line,
+          color: spec.color,
+          shown: 0,
+      };
+      this.bossCardAge = 0;
+      this.hitStopTimer = 0;
+      this.shakeIntensity = 0;
+      this.isDashing = false;
+      this.inputVector.x = 0;
+      this.inputVector.y = 0;
+      for (const e of this.entities) {
+          if (e.type === EntityType.ENEMY_PROJECTILE || e.type === EntityType.BIO_MINE) e.active = false;
+      }
+  }
+
+  public advanceBossCard(): boolean {
+      const card = this.bossCard;
+      if (!card) return false;
+      if (!Number.isFinite(card.shown) || card.shown < card.line.length) {
+          card.shown = card.line.length;
+          audioManager.playPage();
+          return true;
+      }
+      this.closeBossCard();
+      audioManager.playPage();
+      return true;
+  }
+
+  private closeBossCard() {
+      this.bossCard = null;
+      this.bossCardAge = 0;
+      this.invulnerabilityTimer = Math.max(this.invulnerabilityTimer, BOSS_GRACE);
+  }
+
+  private tickBossCard(dt: number) {
+      const card = this.bossCard;
+      if (!card) return;
+      if (!card.line) card.line = '';
+      if (!Number.isFinite(card.shown) || card.shown < 0) card.shown = 0;
+      if (card.shown > card.line.length) card.shown = card.line.length;
+      this.bossCardAge += dt;
+      if (card.shown < card.line.length) {
+          const next = Math.min(card.line.length, card.shown + dt * 34);
+          if (Math.floor(next / 3) !== Math.floor(card.shown / 3)) audioManager.playGlyph();
+          card.shown = next;
+      }
+      if (this.bossCardAge > 90) this.closeBossCard();
+  }
+
+  private tickPresentation(dtMs: number) {
+      const dt = Math.min(0.05, Math.max(0, dtMs / 1000));
+      this.hitStopTimer = 0;
+      this.shakeIntensity = 0;
+      this.isDashing = false;
+      this.inputVector.x = 0;
+      this.inputVector.y = 0;
+      this.time += dtMs;
+      if (this.bossCard) {
+          this.tickBossCard(dt);
+          return;
+      }
+      if (!this.organ.charting()) return;
+      this.organ.begin(dt, dt / 0.016, false, {
+          entities: this.entities,
+          player: this.player,
+          low: this.isLowQuality,
+          time: this.time,
+          t: (key: string) => this.t(key),
+          hurt: () => {},
+          heal: () => {},
+          strike: () => {},
+          shake: () => {},
+          popup: () => {},
+          spawn: () => {},
+      });
+      this.organ.placePlayer(this.player);
   }
 
   private bossShot(e: Entity, angle: number, speed: number, radius: number, damage: number) {
@@ -669,7 +767,18 @@ export class GameEngine {
   public beginPassage(): boolean {
       if (this.currentWaveIndex < 0 || !this.organ.willLeave(this.currentWaveIndex)) return false;
       this.organ.openVoyage(this.currentWaveIndex + 1, (key) => this.t(key));
-      return this.organ.charting();
+      if (!this.organ.charting()) return false;
+      this.hitStopTimer = 0;
+      this.shakeIntensity = 0;
+      this.isDashing = false;
+      this.surgeActive = false;
+      this.inputVector.x = 0;
+      this.inputVector.y = 0;
+      for (const e of this.entities) {
+          if (e.type !== EntityType.PLAYER) e.active = false;
+      }
+      this.particles = this.particles.filter(p => p.id === 'bg');
+      return true;
   }
 
   public startWave(waveIndex: number, delay: number = 0) {
@@ -1002,7 +1111,11 @@ export class GameEngine {
   }
 
   public update(dt: number, stats: PlayerStats, onWaveClear: () => void, onGameOver: () => void, onLifeLost: () => void, onBossSpawn?: () => void) {
-    if (dt > 32) dt = 32; 
+    if (dt > 32) dt = 32;
+    if (this.bossCard || this.organ.charting()) {
+        this.tickPresentation(dt);
+        return;
+    }
 
     this.isLowQuality = this.leanGraphics;
 
@@ -1173,6 +1286,8 @@ export class GameEngine {
               this.spawnBoss(config);
               this.bossSpawned = true;
               if (onBossSpawn) onBossSpawn();
+              this.tickPresentation(dt);
+              return;
           }
           
           const bossActive = this.entities.some(e => e.type === EntityType.BOSS && e.active);
@@ -2472,7 +2587,69 @@ export class GameEngine {
       this.ctx.restore();
   }
 
+  private drawVital() {
+      if (!this.player.active) return;
+      if (!this.isLowQuality) {
+          const boosted = this.isDashing || this.invulnerabilityTimer > 0;
+          const glowRadius = this.player.radius * (boosted ? 3 : 2.5);
+          this.ctx.globalCompositeOperation = 'screen';
+          this.drawGlow(
+              this.colors.PLAYER_CORE,
+              glowRadius,
+              boosted ? 0.8 : 0.6,
+              null,
+              boosted ? 0.067 : 0.08,
+              this.player.pos.x,
+              this.player.pos.y
+          );
+      }
+      this.ctx.globalCompositeOperation = 'source-over';
+      this.ctx.globalAlpha = 1.0;
+      const burning = this.acidContact > 0;
+      this.ctx.fillStyle = burning
+          ? (Math.floor(this.time / 70) % 2 === 0 ? '#e7d4ff' : '#ffffff')
+          : (this.isDashing || this.invulnerabilityTimer > 0 ? this.colors.PLAYER_CORE : this.colors.PLAYER);
+      if (this.invulnerabilityTimer > 0 && Math.floor(this.time / 100) % 2 === 0) {
+          this.ctx.globalAlpha = 0.5;
+      }
+      this.ctx.beginPath();
+      const wobbleX = Math.cos(this.time/150) * 3;
+      const wobbleY = Math.sin(this.time/150) * 3;
+      const rx = this.isDashing ? this.player.radius * 2.0 : this.player.radius+wobbleX;
+      const ry = this.isDashing ? this.player.radius * 0.5 : this.player.radius+wobbleY;
+      this.ctx.save();
+      this.ctx.translate(this.player.pos.x, this.player.pos.y);
+      if (this.isDashing) {
+          const angle = Math.atan2(this.player.vel.y, this.player.vel.x);
+          this.ctx.rotate(angle);
+      }
+      this.ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI*2);
+      this.ctx.fill();
+      this.ctx.restore();
+      this.ctx.fillStyle = this.colors.PLAYER_CORE;
+      this.ctx.beginPath();
+      this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius*0.4, 0, Math.PI*2);
+      this.ctx.fill();
+      if (burning) {
+          this.ctx.globalAlpha = 0.9;
+          this.ctx.strokeStyle = '#d7b4ff';
+          this.ctx.lineWidth = 4;
+          this.ctx.beginPath();
+          this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius + 12 + Math.sin(this.time / 55) * 4, 0, Math.PI * 2);
+          this.ctx.stroke();
+          this.ctx.globalAlpha = 0.16 + Math.sin(this.time / 50) * 0.06;
+          this.ctx.fillStyle = '#9a3ad4';
+          this.ctx.fillRect(0, 0, CANVAS_WIDTH, 36);
+          this.ctx.fillRect(0, CANVAS_HEIGHT - 36, CANVAS_WIDTH, 36);
+          this.ctx.fillRect(0, 0, 36, CANVAS_HEIGHT);
+          this.ctx.fillRect(CANVAS_WIDTH - 36, 0, 36, CANVAS_HEIGHT);
+      }
+      this.ctx.globalAlpha = 1.0;
+  }
+
   public draw() {
+    if (this.organ.charting()) this.organ.placePlayer(this.player);
+    const ride = this.organ.riding();
     this.ctx.fillStyle = this.bgFill;
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     this.organ.drawBackdrop(this.ctx, this.time, this.isLowQuality);
@@ -2942,64 +3119,7 @@ export class GameEngine {
       }
     });
 
-    if (this.player.active) {
-      if (!this.isLowQuality) {
-          const boosted = this.isDashing || this.invulnerabilityTimer > 0;
-          const glowRadius = this.player.radius * (boosted ? 3 : 2.5);
-          this.ctx.globalCompositeOperation = 'screen';
-          this.drawGlow(
-              this.colors.PLAYER_CORE,
-              glowRadius,
-              boosted ? 0.8 : 0.6,
-              null,
-              boosted ? 0.067 : 0.08,
-              this.player.pos.x,
-              this.player.pos.y
-          );
-      }
-      this.ctx.globalCompositeOperation = 'source-over';
-      this.ctx.globalAlpha = 1.0;
-      const burning = this.acidContact > 0;
-      this.ctx.fillStyle = burning
-          ? (Math.floor(this.time / 70) % 2 === 0 ? '#e7d4ff' : '#ffffff')
-          : (this.isDashing || this.invulnerabilityTimer > 0 ? this.colors.PLAYER_CORE : this.colors.PLAYER);
-      if (this.invulnerabilityTimer > 0 && Math.floor(this.time / 100) % 2 === 0) {
-          this.ctx.globalAlpha = 0.5;
-      }
-      this.ctx.beginPath();
-      const wobbleX = Math.cos(this.time/150) * 3;
-      const wobbleY = Math.sin(this.time/150) * 3;
-      const rx = this.isDashing ? this.player.radius * 2.0 : this.player.radius+wobbleX;
-      const ry = this.isDashing ? this.player.radius * 0.5 : this.player.radius+wobbleY;
-      this.ctx.save();
-      this.ctx.translate(this.player.pos.x, this.player.pos.y);
-      if (this.isDashing) {
-          const angle = Math.atan2(this.player.vel.y, this.player.vel.x);
-          this.ctx.rotate(angle);
-      }
-      this.ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI*2);
-      this.ctx.fill();
-      this.ctx.restore();
-      this.ctx.fillStyle = this.colors.PLAYER_CORE;
-      this.ctx.beginPath();
-      this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius*0.4, 0, Math.PI*2);
-      this.ctx.fill();
-      if (burning) {
-          this.ctx.globalAlpha = 0.9;
-          this.ctx.strokeStyle = '#d7b4ff';
-          this.ctx.lineWidth = 4;
-          this.ctx.beginPath();
-          this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius + 12 + Math.sin(this.time / 55) * 4, 0, Math.PI * 2);
-          this.ctx.stroke();
-          this.ctx.globalAlpha = 0.16 + Math.sin(this.time / 50) * 0.06;
-          this.ctx.fillStyle = '#9a3ad4';
-          this.ctx.fillRect(0, 0, CANVAS_WIDTH, 36);
-          this.ctx.fillRect(0, CANVAS_HEIGHT - 36, CANVAS_WIDTH, 36);
-          this.ctx.fillRect(0, 0, 36, CANVAS_HEIGHT);
-          this.ctx.fillRect(CANVAS_WIDTH - 36, 0, 36, CANVAS_HEIGHT);
-      }
-      this.ctx.globalAlpha = 1.0;
-    }
+    if (!ride) this.drawVital();
 
     this.entities.forEach(e => {
       if (e.type === EntityType.SERUM && e.active) this.drawSerum(e);
@@ -3020,5 +3140,6 @@ export class GameEngine {
 
     this.ctx.restore();
     this.organ.drawTransit(this.ctx);
+    if (ride) this.drawVital();
   }
 }

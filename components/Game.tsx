@@ -8,7 +8,7 @@ import { bossById } from '../services/bosses';
 import { achievementManager } from '../services/achievementManager';
 import { GameState, PlayerStats, Upgrade, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
 import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES, ADRENALINE_MAX_DURATION } from '../constants';
-import { CANON_ROUTE, hopLine, randomRoute } from '../services/casebook';
+import { CANON_ROUTE, randomRoute } from '../services/casebook';
 import { postRun } from '../services/board';
 import { Joystick } from './Joystick';
 import { PauseMenu } from './PauseMenu';
@@ -318,7 +318,8 @@ export const Game: React.FC = () => {
   // State para controlar o tutorial e eventos de Boss
   const [showTutorial, setShowTutorial] = useState(false);
   const [showBossIntro, setShowBossIntro] = useState(false);
-  const [bossCard, setBossCard] = useState<{ name: string; disease: string; line: string; color: string } | null>(null);
+  const [bossCard, setBossCard] = useState<{ name: string; disease: string; line: string; color: string; shown: number } | null>(null);
+  const bossHoldRef = useRef<number | null>(null);
   const [bossEntity, setBossEntity] = useState<{hp: number, max: number, name: string} | null>(null);
   const [labPulse, setLabPulse] = useState<{id: string, kind: 'ok' | 'no', token: number, cost: number} | null>(null);
   const [serum, setSerum] = useState<{ids: string[], endsAt: number} | null>(null);
@@ -426,6 +427,13 @@ export const Game: React.FC = () => {
       if ((gameState !== GameState.PLAYING && gameState !== GameState.WAVE_CLEARED) || isPaused) return;
       
       if (isDown) {
+        if (engineRef.current?.bossCard) {
+          if (e.code === 'Space' || e.code === 'Enter') {
+            e.preventDefault();
+            engineRef.current.advanceBossCard();
+          }
+          return;
+        }
         if (engineRef.current?.organ.charting()) {
           if (e.code === 'Space' || e.code === 'Enter') engineRef.current.organ.advanceTransit();
           return;
@@ -457,7 +465,15 @@ export const Game: React.FC = () => {
     window.addEventListener('keydown', (e) => handleKey(e, true));
     window.addEventListener('keyup', (e) => handleKey(e, false));
     const advanceChart = (e: Event) => {
-      if (engineRef.current?.organ.advanceTransit()) {
+      if (isPaused) return;
+      const eng = engineRef.current;
+      if (!eng) return;
+      if (eng.advanceBossCard()) {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+      if (eng.organ.advanceTransit()) {
         e.preventDefault();
         e.stopPropagation();
       }
@@ -470,23 +486,7 @@ export const Game: React.FC = () => {
     };
   }, [gameState, triggerUltimate, triggerDash, isPaused]);
 
-  const handleBossSpawn = useCallback(() => {
-      const boss = engineRef.current?.entities.find(e => e.type === EntityType.BOSS && e.active);
-      const spec = boss?.mutation?.id ? bossById(boss.mutation.id) : null;
-      if (spec) {
-          const from = spec.from;
-          const to = spec.to;
-          setBossCard({
-              name: spec.short[language],
-              disease: spec.disease[language],
-              line: `${spec.intro[language]} ${hopLine(from, to, language)}`,
-              color: spec.color,
-          });
-          setBossEntity({ hp: boss!.health, max: boss!.maxHealth, name: spec.short[language] });
-      }
-      setShowBossIntro(true);
-      window.setTimeout(() => setShowBossIntro(false), 3400);
-  }, [language]);
+  const handleBossSpawn = useCallback(() => {}, []);
 
   const deployToWave = useCallback(() => {
       if (engineRef.current) {
@@ -721,6 +721,24 @@ export const Game: React.FC = () => {
             },
             handleBossSpawn
           );
+      const card = engineRef.current.bossCard;
+      if (card) {
+          const shown = Math.floor(card.shown);
+          if (bossHoldRef.current !== shown) {
+              bossHoldRef.current = shown;
+              setShowBossIntro(true);
+              setBossCard({
+                  name: card.name,
+                  disease: card.disease,
+                  line: card.line,
+                  color: card.color,
+                  shown,
+              });
+          }
+      } else if (bossHoldRef.current !== null) {
+          bossHoldRef.current = null;
+          setShowBossIntro(false);
+      }
       if (passageRef.current && !engineRef.current.organ.charting()) {
           passageRef.current = false;
           setPassage(false);
@@ -757,7 +775,7 @@ export const Game: React.FC = () => {
           
           // Check for active boss for HP Bar
           const activeBoss = eng.entities.find(e => e.type === EntityType.BOSS && e.active);
-          if (activeBoss) {
+          if (activeBoss && !eng.bossCard) {
               const spec = activeBoss.mutation?.id ? bossById(activeBoss.mutation.id) : null;
               setBossEntity({
                   hp: activeBoss.health,
@@ -1462,23 +1480,29 @@ export const Game: React.FC = () => {
       )}
 
       {/* BOSS WARNING OVERLAY */}
-      {showBossIntro && (
-          <div className="absolute inset-0 z-[60] pointer-events-none flex flex-col items-center justify-center">
+      {showBossIntro && bossCard && !isPaused && (
+          <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center">
               <div
                   className="w-full py-6 md:py-16 flex flex-col items-center justify-center relative overflow-hidden border-y-4"
                   style={{
-                      background: 'rgba(8, 4, 6, 0.72)',
-                      borderColor: bossCard?.color || '#ff3355',
-                      boxShadow: `inset 0 0 80px ${bossCard?.color || '#ff3355'}33`,
+                      background: 'rgba(8, 4, 6, 0.88)',
+                      borderColor: bossCard.color || '#ff3355',
+                      boxShadow: `inset 0 0 80px ${bossCard.color || '#ff3355'}33`,
                   }}
               >
-                  <div className="text-[10px] lg:text-sm tracking-[0.55em] text-white/70 font-bold">{bossCard?.disease || t('BOSS_BANNER')}</div>
-                  <h1 className="text-3xl lg:text-8xl font-black tracking-[0.12em] text-center mt-2" style={{ color: bossCard?.color || '#ff3355', textShadow: `0 0 24px ${bossCard?.color || '#ff3355'}` }}>
-                      {bossCard?.name || t('BOSS_BANNER')}
+                  <div className="text-[10px] lg:text-sm tracking-[0.55em] text-white/70 font-bold">{bossCard.disease || t('BOSS_BANNER')}</div>
+                  <h1 className="text-3xl lg:text-8xl font-black tracking-[0.12em] text-center mt-2" style={{ color: bossCard.color || '#ff3355', textShadow: `0 0 24px ${bossCard.color || '#ff3355'}` }}>
+                      {bossCard.name || t('BOSS_BANNER')}
                   </h1>
                   <h2 className="text-xs lg:text-2xl text-white/90 font-mono tracking-wide mt-3 lg:mt-5 text-center max-w-[80%] leading-snug">
-                      {bossCard?.line || t('BOSS_SUB')}
+                      {bossCard.line.slice(0, bossCard.shown)}
+                      {bossCard.shown < bossCard.line.length ? '▌' : ''}
                   </h2>
+                  {bossCard.shown >= bossCard.line.length && (
+                      <div className="mt-4 text-[10px] lg:text-sm tracking-[0.45em] text-[#ffe7a8] font-bold animate-pulse">
+                          {language === 'PT' ? 'CLIQUE' : language === 'ES' ? 'PULSA' : 'CLICK'} ▼
+                      </div>
+                  )}
               </div>
           </div>
       )}
@@ -1518,7 +1542,7 @@ export const Game: React.FC = () => {
           )}
       </div>
 
-      {(gameState === GameState.PLAYING || gameState === GameState.WAVE_CLEARED || gameState === GameState.LOADOUT) && !passage && (
+      {(gameState === GameState.PLAYING || gameState === GameState.WAVE_CLEARED || gameState === GameState.LOADOUT) && !passage && !showBossIntro && (
         <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between hud-safe">
            <div className="flex justify-between items-start">
              <div className="flex flex-col gap-1 lg:gap-3 w-28 lg:w-64">
@@ -1956,7 +1980,7 @@ export const Game: React.FC = () => {
         />
       )}
 
-      {isMobile && !isPaused && !serum && !showTutorial && !passage && gameState === GameState.PLAYING && <Joystick onMove={handleJoystickMove} />}
+      {isMobile && !isPaused && !serum && !showTutorial && !passage && !showBossIntro && gameState === GameState.PLAYING && <Joystick onMove={handleJoystickMove} />}
       
       {/* NEW PAUSE MENU IMPLEMENTATION */}
       <PauseMenu 

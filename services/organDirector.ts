@@ -222,12 +222,16 @@ interface Voyage {
     y0: number;
     anchored: boolean;
     landed: boolean;
+    exitCleared: boolean;
+    watch: number;
 }
 
-const EXIT_S = 1.72;
-const BLACK_S = 0.46;
+const EXIT_S = 1.55;
+const BLACK_S = 0.42;
 const CROSS_S = 2.9;
-const ENTER_S = 1.22;
+const ENTER_S = 1.18;
+const ARRIVE_X = CANVAS_WIDTH * 0.22;
+const ARRIVE_Y = CANVAS_HEIGHT * 0.5;
 
 export class OrganDirector {
     id: OrganId = 'molar';
@@ -344,6 +348,7 @@ export class OrganDirector {
     advanceTransit(): boolean {
         const tr = this.voyage;
         if (!tr) return false;
+        this.repairVoyage(tr);
         if (tr.phase === 'exit' || tr.phase === 'black' || tr.phase === 'enter') return false;
         if (tr.phase === 'read') {
             if (tr.shown < tr.line.length) {
@@ -353,6 +358,7 @@ export class OrganDirector {
             }
             tr.phase = 'cross';
             tr.t = 0;
+            tr.watch = 0;
             audioManager.playPage();
             audioManager.playTransit(tr.to);
             return true;
@@ -364,10 +370,22 @@ export class OrganDirector {
         return false;
     }
 
+    voyagePhase(): Voyage['phase'] | null {
+        return this.voyage?.phase ?? null;
+    }
+
+    /** Saída e chegada desenham o Vital por cima do véu. */
+    riding(): boolean {
+        const phase = this.voyage?.phase;
+        return phase === 'exit' || phase === 'enter';
+    }
+
     placePlayer(player: Entity): boolean {
         const tr = this.voyage;
         if (!tr) return false;
-        if (!tr.anchored) return false;
+        this.repairVoyage(tr);
+        player.active = true;
+        if (!tr.anchored) this.stageDeparture(tr, player);
         if (tr.phase === 'exit') {
             const p = this.exitPoint(tr);
             player.pos.x = p.x;
@@ -385,35 +403,40 @@ export class OrganDirector {
             return true;
         }
         player.pos.x = -320;
-        player.pos.y = CANVAS_HEIGHT / 2;
+        player.pos.y = ARRIVE_Y;
         player.vel.x = 0;
         player.vel.y = 0;
         return true;
     }
 
     private armVoyage(from: OrganId, to: OrganId, translate: (key: string) => string) {
+        this.quietVisuals();
         this.voyage = {
             from,
             to,
             t: 0,
             phase: 'exit',
             shown: 0,
-            line: hopLine(from, to, this.lang),
+            line: hopLine(from, to, this.lang) || '',
             title: translate(THEME[to].name),
             fromTitle: translate(THEME[from].name),
-            x0: 0,
-            y0: CANVAS_HEIGHT / 2,
+            x0: CANVAS_WIDTH * 0.24,
+            y0: ARRIVE_Y,
             anchored: false,
             landed: false,
+            exitCleared: false,
+            watch: 0,
         };
         audioManager.playDepart();
     }
 
     private beginArrival() {
         const tr = this.voyage;
-        if (!tr || tr.phase === 'enter') return;
+        if (!tr) return;
+        if (tr.phase === 'enter' && tr.landed) return;
         tr.phase = 'enter';
         tr.t = 0;
+        tr.watch = 0;
         if (!tr.landed) {
             tr.landed = true;
             this.id = tr.to;
@@ -422,20 +445,169 @@ export class OrganDirector {
         }
     }
 
+    private stageDeparture(tr: Voyage, player: Entity) {
+        const rawX = Number.isFinite(player.pos.x) ? player.pos.x : CANVAS_WIDTH * 0.24;
+        const rawY = Number.isFinite(player.pos.y) ? player.pos.y : ARRIVE_Y;
+        tr.x0 = Math.min(Math.max(rawX, 64), CANVAS_WIDTH * 0.42);
+        tr.y0 = Math.min(Math.max(rawY, 80), CANVAS_HEIGHT - 80);
+        tr.anchored = true;
+    }
+
     private exitPoint(tr: Voyage): { x: number; y: number } {
-        const u = easeIn(Math.min(1, tr.t / EXIT_S));
+        const u = depart(Math.min(1, Math.max(0, tr.t / EXIT_S)));
+        const x0 = Number.isFinite(tr.x0) ? tr.x0 : CANVAS_WIDTH * 0.24;
+        const y0 = Number.isFinite(tr.y0) ? tr.y0 : ARRIVE_Y;
+        const startX = Math.min(Math.max(x0, 64), CANVAS_WIDTH * 0.42);
         return {
-            x: tr.x0 + (CANVAS_WIDTH + 160 - tr.x0) * u,
-            y: tr.y0 + (CANVAS_HEIGHT * 0.5 - tr.y0) * 0.22 * u,
+            x: startX + (CANVAS_WIDTH + 190 - startX) * u,
+            y: y0 + (ARRIVE_Y - y0) * 0.28 * u,
         };
     }
 
     private enterPoint(tr: Voyage): { x: number; y: number } {
-        const u = easeOut(Math.min(1, tr.t / ENTER_S));
+        const u = Math.max(0, Math.min(1, tr.t / ENTER_S));
+        const k = easeOut(u);
         return {
-            x: -90 + (CANVAS_WIDTH / 6 + 90) * u,
-            y: CANVAS_HEIGHT / 2 + Math.sin(u * Math.PI) * -36,
+            x: -180 + (ARRIVE_X + 180) * k,
+            y: ARRIVE_Y + Math.sin(k * Math.PI) * -22,
         };
+    }
+
+    private repairVoyage(tr: Voyage) {
+        const phases: Voyage['phase'][] = ['exit', 'black', 'read', 'cross', 'enter'];
+        if (!phases.includes(tr.phase)) {
+            tr.phase = tr.exitCleared ? (tr.landed ? 'enter' : 'read') : 'exit';
+            tr.t = 0;
+            tr.watch = 0;
+        }
+        if (!Number.isFinite(tr.t) || tr.t < 0) tr.t = 0;
+        if (!Number.isFinite(tr.watch) || tr.watch < 0) tr.watch = 0;
+        if (!tr.line) tr.line = '';
+        if (!Number.isFinite(tr.shown) || tr.shown < 0) tr.shown = 0;
+        if (tr.shown > tr.line.length) tr.shown = tr.line.length;
+        if (!Number.isFinite(tr.x0) || !Number.isFinite(tr.y0)) {
+            tr.x0 = CANVAS_WIDTH * 0.24;
+            tr.y0 = ARRIVE_Y;
+            tr.anchored = true;
+        }
+    }
+
+    private quietVisuals() {
+        this.whiteout = 0;
+        this.storm = 0;
+        this.wind.x = 0;
+        this.wind.y = 0;
+        this.pulse = 0;
+        this.bitePhase = 'idle';
+        this.filterPhase = 'idle';
+        this.lungPhase = 'idle';
+        this.traces = [];
+        this.clots = [];
+        this.bolts = [];
+        this.streaks = [];
+        this.streams = [];
+        this.coughPlayer = false;
+        this.coughBosses.clear();
+    }
+
+    private stepVoyage(dt: number, hooks: OrganHooks) {
+        const tr = this.voyage;
+        if (!tr) return;
+        this.repairVoyage(tr);
+        if (!tr.anchored) this.stageDeparture(tr, hooks.player);
+        const step = Math.min(0.05, Math.max(0, dt));
+        tr.t += step;
+        tr.watch += step;
+
+        if (tr.phase === 'exit') {
+            if (tr.watch > 4.2) {
+                tr.exitCleared = true;
+                tr.phase = 'black';
+                tr.t = 0;
+                tr.watch = 0;
+                return;
+            }
+            const cleared = this.exitPoint(tr).x >= CANVAS_WIDTH + 36;
+            if (tr.t >= EXIT_S && cleared) {
+                tr.exitCleared = true;
+                tr.phase = 'black';
+                tr.t = 0;
+                tr.watch = 0;
+            } else if (tr.t >= EXIT_S) {
+                tr.x0 = CANVAS_WIDTH * 0.2;
+                tr.y0 = ARRIVE_Y;
+                tr.anchored = true;
+                tr.t = 0.12;
+            }
+            return;
+        }
+
+        if (tr.phase === 'black' && (tr.t >= BLACK_S || tr.watch > 1.4)) {
+            tr.phase = 'read';
+            tr.t = 0;
+            tr.watch = 0;
+            return;
+        }
+
+        if (tr.phase === 'read') {
+            if (tr.line.length === 0 && tr.t > 0.15) {
+                tr.phase = 'cross';
+                tr.t = 0;
+                tr.watch = 0;
+                audioManager.playTransit(tr.to);
+                return;
+            }
+            if (tr.shown < tr.line.length) {
+                const nextShown = Math.min(tr.line.length, tr.shown + step * 34);
+                if (Math.floor(nextShown / 3) !== Math.floor(tr.shown / 3)) audioManager.playGlyph();
+                tr.shown = nextShown;
+            } else if (tr.watch > 90) {
+                tr.phase = 'cross';
+                tr.t = 0;
+                tr.watch = 0;
+                audioManager.playTransit(tr.to);
+            }
+            return;
+        }
+
+        if (tr.phase === 'cross' && (tr.t >= CROSS_S || tr.watch > CROSS_S + 1.2)) {
+            this.beginArrival();
+            if (this.voyage && this.voyage.phase !== 'enter') {
+                this.voyage.phase = 'enter';
+                this.voyage.t = 0;
+                this.voyage.watch = 0;
+            }
+            return;
+        }
+
+        if (tr.phase === 'enter') {
+            const here = this.enterPoint(tr);
+            const onScreen = here.x >= 64 && here.x <= CANVAS_WIDTH - 64;
+            if (tr.t >= ENTER_S && onScreen) {
+                this.finishVoyage(hooks.player);
+            } else if (tr.t >= ENTER_S) {
+                tr.t = 0;
+                if (tr.watch > ENTER_S + 1.6) this.finishVoyage(hooks.player);
+            } else if (tr.watch > ENTER_S + 2.4) {
+                this.finishVoyage(hooks.player);
+            }
+        }
+    }
+
+    private finishVoyage(player: Entity) {
+        const tr = this.voyage;
+        if (tr && !tr.landed) {
+            tr.landed = true;
+            this.id = tr.to;
+            audioManager.setScene(tr.to, 0, false);
+            audioManager.playArrive();
+        }
+        player.active = true;
+        player.pos.x = ARRIVE_X;
+        player.pos.y = ARRIVE_Y;
+        player.vel.x = 0;
+        player.vel.y = 0;
+        this.voyage = null;
     }
 
     onWave(waveIndex: number, translate: (key: string) => string): boolean {
@@ -526,29 +698,7 @@ export class OrganDirector {
         if (this.whiteout > 0) this.whiteout = Math.max(0, this.whiteout - dt);
         if (this.storm > 0) this.storm = Math.max(0, this.storm - dt * 1.35);
         if (this.voyage) {
-            const tr = this.voyage;
-            if (!tr.anchored) {
-                tr.x0 = hooks.player.pos.x;
-                tr.y0 = hooks.player.pos.y;
-                tr.anchored = true;
-            }
-            const step = Math.min(0.05, dt);
-            tr.t += step;
-            if (tr.phase === 'exit' && tr.t >= EXIT_S) {
-                tr.phase = 'black';
-                tr.t = 0;
-            } else if (tr.phase === 'black' && tr.t >= BLACK_S) {
-                tr.phase = 'read';
-                tr.t = 0;
-            } else if (tr.phase === 'read' && tr.shown < tr.line.length) {
-                const nextShown = Math.min(tr.line.length, tr.shown + step * 34);
-                if (Math.floor(nextShown / 3) !== Math.floor(tr.shown / 3)) audioManager.playGlyph();
-                tr.shown = nextShown;
-            } else if (tr.phase === 'cross' && tr.t >= CROSS_S) {
-                this.beginArrival();
-            } else if (tr.phase === 'enter' && tr.t >= ENTER_S) {
-                this.voyage = null;
-            }
+            this.stepVoyage(dt, hooks);
             return;
         }
 
@@ -2651,21 +2801,23 @@ export class OrganDirector {
         if (tr.phase === 'exit' && tr.anchored) {
             const u = Math.min(1, tr.t / EXIT_S);
             const here = this.exitPoint(tr);
-            ctx.globalAlpha = 0.35 * u;
+            ctx.globalAlpha = 0.4;
             ctx.strokeStyle = from.accent;
             ctx.lineWidth = 3;
             for (let i = 0; i < 7; i++) {
                 const y = here.y - 70 + i * 24;
-                const span = 80 + u * 420;
+                const span = 90 + u * 460;
                 ctx.beginPath();
                 ctx.moveTo(here.x - span, y);
                 ctx.lineTo(here.x - 36, y);
                 ctx.stroke();
             }
-            const veil = u < 0.72 ? 0 : (u - 0.72) / 0.28;
-            ctx.globalAlpha = veil;
-            ctx.fillStyle = '#000';
-            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            const past = here.x - (CANVAS_WIDTH - 24);
+            if (past > 0) {
+                ctx.globalAlpha = Math.min(1, past / 170);
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            }
             ctx.restore();
             return;
         }
@@ -2705,9 +2857,13 @@ export class OrganDirector {
             }
         }
         if (tr.phase === 'enter') {
-            const a = Math.max(0, 1 - tr.t / 0.42);
-            ctx.fillStyle = `rgba(0,0,0,${a})`;
-            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            const here = this.enterPoint(tr);
+            const reveal = Math.max(0, Math.min(1, here.x / 240));
+            const a = 1 - reveal;
+            if (a > 0.02) {
+                ctx.fillStyle = `rgba(0,0,0,${a})`;
+                ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            }
         }
         ctx.restore();
     }
@@ -2752,6 +2908,11 @@ export class OrganDirector {
 function easeIn(t: number): number {
     const u = Math.max(0, Math.min(1, t));
     return u * u;
+}
+
+function depart(t: number): number {
+    const u = Math.max(0, Math.min(1, t));
+    return 1 - Math.pow(1 - u, 2.15);
 }
 
 function easeOut(t: number): number {
