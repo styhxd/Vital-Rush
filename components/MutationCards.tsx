@@ -131,11 +131,11 @@ const MutationCard: React.FC<CardProps> = ({
             }}
         >
             <img className="lab-shell" src={CARD_BG} alt="" draggable={false} />
+            <span className="lab-shade" />
+            <span className="lab-snow" />
             <span className="lab-wash" style={{ background: wash }} />
             <span className="lab-art-glow" />
             <img className="lab-art" src={art.src} alt="" draggable={false} />
-            <span className="lab-shade" />
-            <span className="lab-snow" />
 
             <div className="lab-rarity">{t(RARITY_KEY[upgrade.rarity])}</div>
             <div className="lab-level">
@@ -822,14 +822,17 @@ export const mutationCardStyles = `
 .lab-card.is-poor .lab-shade {
     z-index: 1;
     opacity: 1;
-    background: rgba(42, 8, 12, 0.62);
+    background: rgba(132, 24, 28, 0.4);
 }
 .lab-card.is-poor .lab-snow {
-    z-index: 4;
-    opacity: 0.72;
-    background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAEh0lEQVR4nIWZi3HjMAxEWaeqY3VuQzfxhc7i4UHWjCexxA+wWGBBeV3Xte77fp3P+r3u+97n+/n7Mzb/5rzfz851uN6K67quHc/ec/JePvu5Hzbs88kBnPcZmEacSeHAzo1pFObsYZ+2bz4LgDftNYdXoLeJdBohEWsIfvue98JAgvSJfiJ/HEtPEz1F8kQkwrgsQjk3o0Qa/YLUqEoaJkWTxu/9SBUiSf59QxAojcaLoy2f0lFGmwygUS1ZIkGPUYsbxdikXHHszCUwXOdEmNTJ+e97cUOTcA0JWCpBIJVRHMaUdTPiRDYBsqqlqK+hMiRKWdqGqFgZLRtaEbBITuX25E+ZQPS4eBo9ocmySgoQmCl6qyb15n6f+RSyqcqYXkzCQxQzqiiLbS0rvVY6P//TwDSeoVbhCPpBcFriMWlF7IwNbb8y70GFmwNSWXRxthxTWbVkfGoxqE/v9TUpxFvWZ1Iuw0odoUF8ZmvmGHOy7BOIkLcbqDWhYcVggodTjFIx+skRjrc1S+8Tni4RmBy/iTjGt+Sl0dSY1A9WNAL52ddqtNFiqu9feMpkZoer9OL6qJDdWDZqGQFOplFCl6a+fGZlVRC3BvDFamWLFR2QMCdF1PGpU/2i+MWOIWK9QDROefmckvtJhApyeDaWYorgdK8ZCu9ZEVTq8wBitJgMYE7Z/1Nz2WiaG5M6ptBCGT1TZGIPES5RkMrTor5AQyLWKEBVhh5sbHLGtcOIfazSTWKaPVtxwJDJsAfqjyrNOfje8oTOWicAWpXKZ4CvNXOVRrVEJhjyGqVEBJXs86zVedjFM4cJRUPGhC42bBvYWCI2KbMhq7X/jCN/recxATKpF7TypPZ0GGpJCnC3APx/bx6wTc5Zz6meC1R74qqU4deNswH7nSm5ayiwAY2zUBJ125Aawj3ZZhh9RARd0LjwkuTLRdPYh1JZHAT37WVBi1R+byBk6OlE9jRs+OBIMYZIkp6M0lD7i8OmGW/HrcYGWlv439SQCmyRxJhG3TSOQpeIN2CsJzHe2RjylHzm84U8MJqRjnS05cr113e3N3EmKqQQeSmRaucGGj8pq+3D1sZqcKPN1GSlk1Rl04Wkiu21hgojOfeX/Ha2HZSwiBM3aBI/VDY54Wmfn3lJgEyriuf8cSMNp3BZZbFNiFxWLhoOodTeiO9Gi7FMwjRMjKLj2iJPa+c6JowLOdkKAhMlHeImdDZr/iT5UxtBYKacIS2bvZaczHajweRglMAmZFDZgrQ5xnXTAbOvdYhmmCEhBo8t+BLqSV9UXmLxeXHOOJzeTa9TpnsW/gcNsEOSUlgALkJW5NsSLSdSwHhmsN+7SKNmyNDK23ol4hb+qdlSJQSiZoRQpbULdCYayQZkEc0QF+3DJ4NYzljiAEjtIGU9OVhtK8sYXw2il+mteN/Uezq3spIQiIXKM0StRevtAPlpbwuw0Hgagzaw5ynnWpZSlk4VLTsYsRdi2VqRePw13pJ/Iel4sc3AmkVrxA5/tSKvUuwQ0t40WEXilYgTJCBsR85HDfq5/gF9/z/ChQP6rgAAAABJRU5ErkJggg==");
-    background-size: 48px 48px;
-    animation: lab-snow 0.36s steps(4) infinite;
+    z-index: 2;
+    opacity: 0.55;
+    mix-blend-mode: screen;
+    background-image:
+        repeating-linear-gradient(0deg, rgba(255, 64, 56, 0.14) 0 1px, transparent 1px 6px),
+        url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.42' numOctaves='1' stitchTiles='stitch'/><feColorMatrix type='matrix' values='0 0 0 0 1  0 0 0 0 0.1  0 0 0 0 0.08  0.5 0 0 0 -0.2'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    background-size: 100% 6px, 180px 180px;
+    animation: lab-snow 1.4s steps(2) infinite;
 }
 .lab-card.is-poor .lab-art {
     z-index: 3;
@@ -848,7 +851,7 @@ export const mutationCardStyles = `
 .lab-snow {
     position: absolute;
     inset: 0;
-    z-index: 3;
+    z-index: 1;
     pointer-events: none;
     opacity: 0;
 }
@@ -1030,8 +1033,8 @@ export const mutationCardStyles = `
     to { transform: translateX(130%); }
 }
 @keyframes lab-snow {
-    from { background-position: 0 0; }
-    to { background-position: 96px -48px; }
+    from { background-position: 0 0, 0 0; }
+    to { background-position: 0 4px, 0 0; }
 }
 @keyframes lab-scan {
     from { transform: translateY(-140%); }
