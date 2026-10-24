@@ -912,8 +912,8 @@ export class GameEngine {
           audioManager.playZap(e.pos);
       }
       if (this.particles.length > (this.isLowQuality ? 36 : 190)) return;
-      const bolts = this.isLowQuality ? 1 : 2;
-      const segs = this.isLowQuality ? 3 : 5;
+      const bolts = this.isLowQuality ? 1 : 3;
+      const segs = this.isLowQuality ? 3 : 6;
       for (let b = 0; b < bolts; b++) {
           const ang = Math.random() * Math.PI * 2;
           let x = e.pos.x + Math.cos(ang) * (e.radius + 34);
@@ -942,6 +942,25 @@ export class GameEngine {
               x = nx;
               y = ny;
           }
+      }
+      if (this.particles.length > (this.isLowQuality ? 28 : 160)) return;
+      const sparks = this.isLowQuality ? 2 : 5;
+      for (let i = 0; i < sparks; i++) {
+          const a = Math.random() * Math.PI * 2;
+          const kick = 2.4 + Math.random() * 4.2;
+          this.particles.push({
+              id: 'spark',
+              type: EntityType.PARTICLE,
+              pos: { x: e.pos.x, y: e.pos.y },
+              vel: { x: Math.cos(a) * kick, y: Math.sin(a) * kick },
+              radius: 2.4,
+              health: 1,
+              maxHealth: 1,
+              color: i % 2 === 0 ? '#f7feff' : '#ffe38a',
+              damage: 0,
+              active: true,
+              ttl: 14,
+          });
       }
   }
 
@@ -1506,29 +1525,27 @@ export class GameEngine {
                       const boss = e.type === EntityType.BOSS;
                       const shock = !boss && fate < 4;
                       const shove = !boss && fate >= 4 && fate < 8;
-                      const portion = shock ? 0.14 : shove ? 0.02 : 0.008;
-                      const flat = shock ? 22 : shove ? 4 : 2;
-                      const kick = shock ? 0.45 : shove ? 3.4 : 0.15;
-                      if (shock) {
-                          e.vel.x *= 0.2;
-                          e.vel.y *= 0.2;
-                          e.hitFlash = 12;
+                      const portion = boss ? 0.012 : shock ? 0.22 : shove ? 0.06 : 0.015;
+                      const flat = boss ? 8 : shock ? 36 : shove ? 12 : 5;
+                      const kick = boss ? 2.2 : shock ? 0.55 : shove ? 7.4 : 0.4;
+                      const cap = boss ? 2.4 : shock ? 0.9 : shove ? 7.4 : 1;
+                      if (shock || boss) {
+                          e.stun = boss ? 0.22 : 0.5;
+                          e.vel.x *= boss ? 0.35 : 0.08;
+                          e.vel.y *= boss ? 0.35 : 0.08;
+                          e.hitFlash = boss ? 10 : 16;
                           this.sparkShock(e);
                       } else {
-                          e.hitFlash = shove ? 4 : 2;
+                          e.hitFlash = shove ? 7 : 3;
                       }
                       e.vel.x += (dx / dist) * kick;
                       e.vel.y += (dy / dist) * kick;
-                      const cap = shock ? 1.1 : shove ? 3.4 : 0.7;
                       const mag = Math.hypot(e.vel.x, e.vel.y);
                       if (mag > cap) {
                           e.vel.x *= cap / mag;
                           e.vel.y *= cap / mag;
                       }
                       this.holdOnScreen(e);
-                      const pad = e.radius + 64;
-                      e.pos.x = Math.min(CANVAS_WIDTH - pad, Math.max(pad, e.pos.x));
-                      e.pos.y = Math.min(CANVAS_HEIGHT - pad, Math.max(pad, e.pos.y));
                       if (this.damageEnemy(e, flat + e.maxHealth * portion, false, stats)) {
                           this.sessionStats.surgeKills++;
                           achievementManager.track('surge_kill_100', 1);
@@ -1707,6 +1724,12 @@ export class GameEngine {
       }
 
       if (e.hitFlash && e.hitFlash > 0) e.hitFlash--;
+      if (e.stun && e.stun > 0) {
+          e.stun = Math.max(0, e.stun - dtSeconds);
+          e.hitFlash = Math.max(e.hitFlash || 0, 3);
+          e.pos.x += Math.sin(this.time * 0.09 + e.pos.y) * 0.7;
+          e.pos.y += Math.cos(this.time * 0.11 + e.pos.x) * 0.5;
+      }
 
       if (e.type !== EntityType.TEXT_POPUP) {
         const drag = e.drag ?? 0.5;
@@ -1728,7 +1751,7 @@ export class GameEngine {
         }
 
         if (e.type === EntityType.BOSS) {
-            this.updateBoss(e, dtSeconds, stats); 
+            if ((e.stun ?? 0) <= 0) this.updateBoss(e, dtSeconds, stats); 
             e.vel.x *= 0.95; 
             e.vel.y *= 0.95; 
             const margin = e.radius + 10;
@@ -1736,7 +1759,7 @@ export class GameEngine {
             e.pos.y = Math.max(margin, Math.min(CANVAS_HEIGHT - margin, e.pos.y));
         }
 
-        if (e.type === EntityType.VIRUS && this.player.active && e.pos.x < CANVAS_WIDTH + 100) {
+        if (e.type === EntityType.VIRUS && this.player.active && (e.stun ?? 0) <= 0 && e.pos.x < CANVAS_WIDTH + 100) {
             if (e.shootTimer !== undefined) {
                 e.shootTimer -= dtSeconds;
                 if (e.shootTimer <= 0) {
@@ -1909,14 +1932,14 @@ export class GameEngine {
                 if (e.isElite) speed *= 0.72;
                 if (e.type === EntityType.FUNGI) speed = 0.16; 
 
-                if (e.type !== EntityType.BOSS) {
+                if (e.type !== EntityType.BOSS && (e.stun ?? 0) <= 0) {
                     e.vel.x += (dx / dMag) * speed * tick;
                     e.vel.y += (dy / dMag) * speed * tick;
                 }
               }
 
               const pSum = e.radius + this.player.radius;
-              if (dMag < pSum * 0.8) {
+              if (dMag < pSum * 0.8 && (e.stun ?? 0) <= 0) {
                  if (this.invulnerabilityTimer <= 0 && !this.isDashing) {
                      if (stats.thorns > 0) this.damageEnemy(e, stats.thorns, false, stats);
                      let damage = e.isElite ? 2.5 : 0.6;
@@ -3421,6 +3444,33 @@ export class GameEngine {
             this.ctx.stroke();
         }
         if (spin) this.ctx.rotate(-spin);
+        if ((e.stun ?? 0) > 0) {
+            this.ctx.save();
+            this.ctx.globalCompositeOperation = 'screen';
+            this.ctx.lineCap = 'round';
+            this.ctx.lineJoin = 'round';
+            const flick = Math.floor(this.time / 45);
+            const bolts = this.isLowQuality ? 1 : 2;
+            for (let b = 0; b < bolts; b++) {
+                const a0 = (flick * 1.7 + b * 3.1) % (Math.PI * 2);
+                this.ctx.beginPath();
+                this.ctx.strokeStyle = b === 0 ? '#ffffff' : '#b8f6ff';
+                this.ctx.lineWidth = b === 0 ? 2.6 : 1.5;
+                this.ctx.globalAlpha = 0.92;
+                let px = Math.cos(a0) * e.radius * 1.5;
+                let py = Math.sin(a0) * e.radius * 1.2;
+                this.ctx.moveTo(px, py);
+                for (let s = 1; s <= 4; s++) {
+                    const toward = s / 4;
+                    const ang = a0 + Math.PI * toward + Math.sin(flick + s * 2 + b) * 0.55;
+                    px = Math.cos(ang) * e.radius * (1.5 - toward * 1.75);
+                    py = Math.sin(ang) * e.radius * (1.2 - toward * 1.4);
+                    this.ctx.lineTo(px, py);
+                }
+                this.ctx.stroke();
+            }
+            this.ctx.restore();
+        }
         this.ctx.translate(-e.pos.x, -e.pos.y);
         this.ctx.globalAlpha = 1;
         this.ctx.globalCompositeOperation = 'source-over';

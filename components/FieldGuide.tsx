@@ -76,7 +76,7 @@ const COPY: Record<Language, Section[]> = {
             title: 'O QUE VOCÊ FAZ',
             cards: [
                 { kind: 'dash', title: 'DESVIO', body: 'Um tranco curto. Nesse piscar o dano não entra. Depois tem espera.' },
-                { kind: 'surge', title: 'PULSO', body: 'Choque numa parte, empurra outra, e tem quem resiste. O DNA volta.' },
+                { kind: 'surge', title: 'PULSO', body: 'O choque trava uns. Outros saem empurrados. O DNA volta.' },
             ],
         },
     ],
@@ -136,7 +136,7 @@ const COPY: Record<Language, Section[]> = {
             title: 'WHAT YOU DO',
             cards: [
                 { kind: 'dash', title: 'DASH', body: 'A short jerk. In that blink damage does not get in. Then you wait.' },
-                { kind: 'surge', title: 'PULSE', body: 'Shocks some, shoves others, and a few resist. DNA comes back.' },
+                { kind: 'surge', title: 'PULSE', body: 'The shock locks some. Others get shoved. DNA comes back.' },
             ],
         },
     ],
@@ -196,7 +196,7 @@ const COPY: Record<Language, Section[]> = {
             title: 'LO QUE HACES',
             cards: [
                 { kind: 'dash', title: 'ESQUIVE', body: 'Un tirón corto. En ese parpadeo el daño no entra. Después hay espera.' },
-                { kind: 'surge', title: 'PULSO', body: 'Choque en una parte, empuja otra, y hay quien resiste. El ADN vuelve.' },
+                { kind: 'surge', title: 'PULSO', body: 'El choque traba a unos. Otros salen empujados. El ADN vuelve.' },
             ],
         },
     ],

@@ -24,7 +24,7 @@ const BODY: Record<Language, Record<string, string>> = {
         synapse: 'Um raio liga dois pontos e machuca quem está na linha, você ou inimigo. O raio branco estoura a tela no mesmo golpe. Passa rápido, e dói.',
         focus: 'A gota violeta sobe a chance de crítico por alguns segundos. O tiro comum continua igual. O que muda é a frequência com que ele acha o ponto fraco. Acabou o tempo, a mira extra vai embora.',
         dash: 'O desvio é um tranco curto na direção em que você está indo. Nesse piscar, o dano não entra. A janela é pequena. Depois tem espera até poder de novo.',
-        surge: 'O pulso gasta a energia e solta uma onda. Uma parte dos inimigos leva um choque, com faísca. Outra parte é empurrada, mas continua na tela. Tem quem resiste e quase não sai do lugar. O DNA solto volta pra você. Chefe aguenta o tranco.',
+        surge: 'O pulso gasta a energia e solta uma onda. Quem leva o choque trava um instante, com faísca. Outra parte é empurrada e continua na tela. Tem quem resiste. O DNA solto volta pra você. Chefe aguenta o tranco.',
     },
     EN: {
         vital: 'You pilot the pale body. The lit core is your health: while it pulses, the round goes on. If health drops too far, time holds for a moment. That slack ends, and the pace comes back.',
@@ -49,7 +49,7 @@ const BODY: Record<Language, Record<string, string>> = {
         synapse: 'A bolt joins two points and hurts whoever is on the line, you or an enemy. The white bolt does more: it flashes the whole screen white on the same hit. It is not only light. It is damage, and it passes fast.',
         focus: 'The violet drop raises the chance of a critical for a few seconds. An ordinary shot stays the same. What changes is how often it finds the weak spot. When the time ends, the extra aim leaves.',
         dash: 'The dash is a short jerk in the direction you are already going. In that blink, damage does not get in. The window is small. Then you wait before you can do it again.',
-        surge: 'The pulse spends your energy and sends a wave. Some enemies take a shock, sparks and all. Some get shoved and stay on screen. A few resist and barely move. Loose DNA comes back to you. A boss rides it out.',
+        surge: 'The pulse spends your energy and sends a wave. Whoever takes the shock locks up for a moment, sparks and all. Some get shoved and stay on screen. A few resist. Loose DNA comes back to you. A boss rides it out.',
     },
     ES: {
         vital: 'Pilotas el cuerpo claro. El núcleo encendido es la vida: mientras late, la partida sigue. Si la vida baja demasiado, el tiempo se detiene un instante. Ese respiro se acaba y el ritmo vuelve.',
@@ -74,7 +74,7 @@ const BODY: Record<Language, Record<string, string>> = {
         synapse: 'Un rayo une dos puntos y lastima a quien está en la línea, tú o un enemigo. El rayo blanco hace más: revienta la pantalla de blanco en el mismo golpe. No es solo luz. Es daño, y pasa rápido.',
         focus: 'La gota violeta sube la chance de crítico por unos segundos. El tiro común sigue igual. Lo que cambia es cuántas veces encuentra el punto débil. Se acabó el tiempo y la mira extra se va.',
         dash: 'El esquive es un tirón corto en la dirección en que ya vas. En ese parpadeo el daño no entra. La ventana es chica. Después hay que esperar para hacerlo otra vez.',
-        surge: 'El pulso gasta la energía y suelta una onda. Una parte de los enemigos recibe un choque, con chispas. Otra es empujada y sigue en pantalla. Hay quien resiste y casi no se mueve. El ADN suelto vuelve a ti. El jefe aguanta el tirón.',
+        surge: 'El pulso gasta la energía y suelta una onda. Quien recibe el choque se traba un instante, con chispas. Otra parte sale empujada y sigue en pantalla. Hay quien resiste. El ADN suelto vuelve a ti. El jefe aguanta el tirón.',
     },
 };
 

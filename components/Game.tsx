@@ -102,8 +102,22 @@ const TutorialOverlay = ({ isMobile, t }: { isMobile: boolean; t: (key: string) 
                     font-weight: 800;
                 }
                 .teach-move .teach-token { width: 72px; height: 72px; }
+                .teach-dash .teach-token,
+                .teach-surge .teach-token {
+                    flex-direction: column;
+                    gap: 1px;
+                    overflow: hidden;
+                }
                 .teach-dash .teach-token { width: 56px; height: 56px; }
                 .teach-surge .teach-token { width: 64px; height: 64px; }
+                .teach-dash .teach-token svg,
+                .teach-surge .teach-token svg { width: 22px; height: 22px; }
+                .teach-token .teach-key {
+                    font-weight: 800;
+                    font-size: 8px;
+                    letter-spacing: 0.08em;
+                    line-height: 1;
+                }
                 .teach-caption {
                     position: absolute;
                     left: 50%;
@@ -155,6 +169,9 @@ const TutorialOverlay = ({ isMobile, t }: { isMobile: boolean; t: (key: string) 
                     .teach-move .teach-token { width: 96px; height: 96px; }
                     .teach-dash .teach-token { width: 64px; height: 64px; }
                     .teach-surge .teach-token { width: 96px; height: 96px; }
+                    .teach-dash .teach-token svg,
+                    .teach-surge .teach-token svg { width: 28px; height: 28px; }
+                    .teach-token .teach-key { font-size: 10px; }
                     .teach-caption strong { font-size: 18px; }
                     .teach-mobile.teach-dash { --x: calc(100vw - 168px); --y: calc(100vh - 56px); }
                     .teach-mobile.teach-surge { --x: calc(100vw - 72px); --y: calc(100vh - 72px); }
@@ -193,8 +210,12 @@ const TutorialOverlay = ({ isMobile, t }: { isMobile: boolean; t: (key: string) 
             </div>
 
             <div className={`teach teach-dash ${place}`}>
-                <div className="teach-token border-2 border-white bg-white/15 text-[10px] tracking-widest text-white shadow-[0_0_24px_rgba(255,255,255,0.35)]">
-                    {isMobile ? t('DASH') : 'SHIFT'}
+                <div className="teach-token border-2 border-white bg-cyan-300/80 text-slate-950 shadow-[0_0_22px_rgba(170,245,255,0.95)]">
+                    <svg viewBox="0 0 32 32" aria-hidden>
+                        <path d="M5 16h16M14 8l8 8-8 8" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M4 16h5" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" opacity="0.7" />
+                    </svg>
+                    <span className="teach-key">{isMobile ? t('DASH') : 'SHIFT'}</span>
                 </div>
                 <div className="teach-caption text-white">
                     <strong>{t('DASH')}</strong>
@@ -203,8 +224,11 @@ const TutorialOverlay = ({ isMobile, t }: { isMobile: boolean; t: (key: string) 
             </div>
 
             <div className={`teach teach-surge ${place}`}>
-                <div className="teach-token border-2 border-cyan-300 bg-cyan-900/40 text-[9px] tracking-widest text-cyan-100 shadow-[0_0_24px_rgba(34,211,238,0.28)]">
-                    {isMobile ? t('SURGE_READY') : 'SPACE'}
+                <div className="teach-token border-2 border-white bg-cyan-300/75 text-slate-950 shadow-[0_0_32px_rgba(120,250,255,0.95)]">
+                    <svg viewBox="0 0 32 32" aria-hidden>
+                        <path d="M18 3 L8 18 h7 l-2 11 12-16 h-7 z" fill="currentColor" />
+                    </svg>
+                    <span className="teach-key">{isMobile ? t('SURGE_READY') : 'SPACE'}</span>
                 </div>
                 <div className="teach-caption text-cyan-100">
                     <strong>{t('SURGE_READY')}</strong>

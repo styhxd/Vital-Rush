@@ -133,6 +133,7 @@ export interface Entity {
   value?: number;  // Quanto vale em pontos/biomassa
   isElite?: boolean; // Se brilha e tem mais vida
   hitFlash?: number; // Frames restantes piscando branco
+  stun?: number; // Segundos parado depois do choque do pulso
   orbitOffset?: number; // Para orbitais girarem bonitinho
   shootTimer?: number; // Para inimigos que atiram
   mutation?: BossMutation; // NEW: Procedural Boss Data

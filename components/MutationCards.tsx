@@ -197,6 +197,7 @@ type LabProps = {
 export const BioLab: React.FC<LabProps> = ({ upgrades, biomass, language, t, pulse, onBuy, onClose }) => {
     const [tick, setTick] = useState(false);
     const [showHint, setShowHint] = useState(false);
+    const [rail, setRail] = useState({ show: false, thumb: 0.3, top: 0 });
     const scrollerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -209,8 +210,13 @@ export const BioLab: React.FC<LabProps> = ({ upgrades, biomass, language, t, pul
         const el = scrollerRef.current;
         if (!el) return;
         const sync = () => {
-            const more = el.scrollHeight - el.clientHeight - el.scrollTop > 8;
+            const overflow = el.scrollHeight - el.clientHeight;
+            const more = overflow - el.scrollTop > 8;
             setShowHint(more && el.scrollTop < 24);
+            const show = overflow > 8;
+            const thumb = show ? Math.max(0.18, el.clientHeight / el.scrollHeight) : 1;
+            const top = show ? (el.scrollTop / overflow) * (1 - thumb) : 0;
+            setRail({ show, thumb, top });
         };
         sync();
         const obs = new ResizeObserver(sync);
@@ -230,9 +236,11 @@ export const BioLab: React.FC<LabProps> = ({ upgrades, biomass, language, t, pul
             </div>
             <header className="lab-head">
                 <div className="lab-brand">
-                    <svg viewBox="0 0 32 32" aria-hidden>
-                        <path d="M16 3 l6 3.2 v7.2 l-6 3.2 -6-3.2 V6.2z" fill="none" stroke="#e2a01f" strokeWidth="1.6" />
-                        <path d="M16 9.2 v6.2 M13.2 12.3 h5.6" stroke="#fff6d8" strokeWidth="1.6" strokeLinecap="square" />
+                    <svg viewBox="0 0 40 40" aria-hidden>
+                        <path d="M14.5 2.5h11v3.2c0 1 .3 1.9.9 2.7L34.2 22c2.4 3.8.2 8.8-4.2 10.2-1.2.4-2.4.6-3.7.6H13.6c-5.4 0-9.2-5.4-6.8-10.2L13.4 8.4c.5-.9.8-1.8.8-2.7V2.5z" fill="#2a1c12" stroke="#140e0a" strokeWidth="2.6" strokeLinejoin="round" />
+                        <path d="M8.4 22.2h23.2l2.4 4.4c1.5 2.8-.1 6.4-3.4 7.4-1 .3-2.1.5-3.2.5H12.4c-4.4 0-7.5-4.4-5.6-8.2l1.6-4.1z" fill="#f2c014" />
+                        <path d="M11 23.2l2.6 4.6M17.2 23.2l2.6 4.6M23.4 23.2l2.6 4.6" stroke="#16120c" strokeWidth="2.4" strokeLinecap="round" />
+                        <rect x="16" y="1.2" width="8" height="4.4" rx="1.1" fill="#f4ecdc" stroke="#140e0a" strokeWidth="2.2" />
                     </svg>
                     <span>{t('MUTATION')}</span>
                 </div>
@@ -261,6 +269,11 @@ export const BioLab: React.FC<LabProps> = ({ upgrades, biomass, language, t, pul
                         );
                     })}
                 </div>
+                {rail.show && (
+                    <div className="lab-rail" aria-hidden>
+                        <i style={{ height: `${rail.thumb * 100}%`, top: `${rail.top * 100}%` }} />
+                    </div>
+                )}
             </div>
             <div className={`lab-more ${showHint ? '' : 'is-hidden'}`}>
                 <i />
@@ -397,14 +410,13 @@ export const mutationCardStyles = `
     gap: 0.45rem;
     min-width: 0;
 }
-.lab-brand svg { width: 28px; height: 28px; flex: none; }
+.lab-brand svg { width: 40px; height: 40px; flex: none; display: block; }
 .lab-brand span {
     color: #fff6e4;
     font-family: 'Teko', sans-serif;
     font-size: clamp(26px, 2.6vw, 40px);
     letter-spacing: 0.06em;
     line-height: 0.85;
-    transform: translateY(0.08em);
     text-shadow: 0 2px 0 rgba(0,0,0,0.55);
 }
 .lab-readout {
@@ -477,14 +489,29 @@ export const mutationCardStyles = `
     align-content: start;
     justify-items: stretch;
     cursor: auto;
-    scrollbar-width: thin;
-    scrollbar-color: #e2a01f rgba(255,255,255,0.06);
+    scrollbar-width: none;
+    padding-right: 28px;
 }
-.lab-grid::-webkit-scrollbar { width: 10px; }
-.lab-grid::-webkit-scrollbar-track { background: rgba(255,255,255,0.04); border-radius: 8px; }
-.lab-grid::-webkit-scrollbar-thumb {
-    background: repeating-linear-gradient(-52deg, #24180d 0 4px, #e2a01f 4px 8px);
-    border-radius: 8px;
+.lab-grid::-webkit-scrollbar { width: 0; height: 0; }
+.lab-rail {
+    position: absolute;
+    z-index: 4;
+    top: 10px;
+    right: 8px;
+    bottom: 10px;
+    width: 16px;
+    border-radius: 3px;
+    pointer-events: none;
+    background: #2a241c;
+    box-shadow: inset 0 0 0 2px #14110e, 0 0 0 1px #c9a24a;
+}
+.lab-rail i {
+    position: absolute;
+    left: 2px;
+    right: 2px;
+    border-radius: 2px;
+    background: repeating-linear-gradient(-45deg, #14110c 0 6px, #f2c014 6px 12px);
+    box-shadow: inset 0 0 0 1.5px #12100c;
 }
 .lab-more {
     position: relative;
@@ -1107,7 +1134,7 @@ export const mutationCardStyles = `
 }
 @media (max-height: 520px) {
     .lab-head { margin: 0.28rem 2% 0.15rem; padding: 0.18rem 0.65rem; }
-    .lab-brand svg { width: 22px; height: 22px; }
+    .lab-brand svg { width: 32px; height: 32px; }
     .lab-brand span { font-size: 20px; }
     .lab-readout strong { font-size: 26px; }
     .lab-back { margin: 0.15rem auto 0.3rem; font-size: 18px; }
