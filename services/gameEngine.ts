@@ -91,6 +91,9 @@ function bossHaste(waveIndex: number): number {
 const GRID_CELL_SIZE = 150;
 const GRID_COLS = Math.ceil(CANVAS_WIDTH / GRID_CELL_SIZE);
 const GRID_ROWS = Math.ceil(CANVAS_HEIGHT / GRID_CELL_SIZE);
+const MINE_FLOW = 0.7;
+const MINE_WIND = 0.18;
+const MINE_COAST = 0.986;
 
 function hexToRgba(hex: string, alpha: number): string {
     if (hex.startsWith('#')) {
@@ -388,6 +391,39 @@ export class GameEngine {
           drag: type === EntityType.VIRUS ? 0.2 : 0.1, 
           hitFlash: 0,
           shootTimer
+      });
+  }
+
+  private spawnMine() {
+      const roll = Math.random();
+      const side = roll < 1 / 3 ? 'left' : roll < 2 / 3 ? 'top' : 'bottom';
+      const off = 28 + Math.random() * 36;
+      const toss = 8.2 + Math.random() * 2.6;
+      const driftX = this.bloodFlow.x * 0.9 * MINE_FLOW + this.organ.wind.x * MINE_WIND;
+      const headwind = Math.max(0, -driftX);
+      let x = 0;
+      let y = 0;
+      let vx = 0;
+      let vy = 0;
+      if (side === 'left') {
+          x = -off;
+          y = CANVAS_HEIGHT * (0.14 + Math.random() * 0.72);
+          vx = toss + headwind * 3.4;
+          vy = (Math.random() - 0.5) * 1.7;
+      } else {
+          const along = 0.1 + Math.random() * 0.74;
+          x = CANVAS_WIDTH * along;
+          y = side === 'top' ? -off : CANVAS_HEIGHT + off;
+          const drop = toss * (0.9 + Math.random() * 0.22);
+          vy = side === 'top' ? drop : -drop;
+          vx = along < 0.24
+              ? headwind * 2.6 + toss * 0.24
+              : (Math.random() - 0.45) * toss * 0.2;
+      }
+      this.entities.push({
+          id: `mine_${Date.now()}_${Math.random()}`, type: EntityType.BIO_MINE,
+          pos: { x, y }, vel: { x: vx, y: vy },
+          radius: 20, health: 10, maxHealth: 10, color: this.colors.BIO_MINE, damage: 150, active: true, drag: 0.1
       });
   }
   
@@ -1384,35 +1420,7 @@ export class GameEngine {
           const bossActive = this.entities.some(e => e.type === EntityType.BOSS && e.active);
           const shouldSpawnMines = this.waveTimer < config.duration || bossActive;
 
-          if (shouldSpawnMines && Math.random() < 0.005) {
-              const fromLeft = Math.random() < 0.5;
-              const fromTop = Math.random() < 0.5;
-              const alongSide = Math.random() < 0.5;
-              const near = 36 + Math.random() * 220;
-              const off = 30 + Math.random() * 28;
-              const power = 0.7 + Math.random() * 0.95;
-              const flowPull = Math.abs(this.bloodFlow.x) * 0.9;
-              let x: number;
-              let y: number;
-              let vx: number;
-              let vy: number;
-              if (alongSide) {
-                  x = fromLeft ? -off : CANVAS_WIDTH + off;
-                  y = fromTop ? near : CANVAS_HEIGHT - near;
-                  vx = fromLeft ? flowPull + power : -power;
-                  vy = (fromTop ? 1 : -1) * power * 0.22 * (0.55 + Math.random());
-              } else {
-                  y = fromTop ? -off : CANVAS_HEIGHT + off;
-                  x = fromLeft ? near : CANVAS_WIDTH - near;
-                  vy = (fromTop ? 1 : -1) * power * 0.46;
-                  vx = fromLeft ? flowPull + power * 0.18 : -power * (0.15 + Math.random() * 0.25);
-              }
-              this.entities.push({
-                  id: `mine_${Date.now()}`, type: EntityType.BIO_MINE,
-                  pos: { x, y }, vel: { x: vx, y: vy },
-                  radius: 20, health: 10, maxHealth: 10, color: this.colors.BIO_MINE, damage: 150, active: true, drag: 0.1
-              });
-          }
+          if (shouldSpawnMines && Math.random() < 0.005) this.spawnMine();
 
           if (this.allowSerum && this.waveStartDelay <= 0 && !this.isVacuuming && this.waveTimer > 1) {
               const serumLive = this.entities.some(e => e.type === EntityType.SERUM && e.active);
@@ -1715,9 +1723,12 @@ export class GameEngine {
       if (e.type !== EntityType.TEXT_POPUP) {
         const drag = e.drag ?? 0.5;
         const isMagnetized = e.type === EntityType.DNA_FRAGMENT && (this.surgeActive || this.isVacuuming);
-        const flowInfluence = (e.type === EntityType.ANTIBODY || e.type === EntityType.ACID_POOL || e.type === EntityType.ENEMY_PROJECTILE || isMagnetized) ? 0 : (e.type === EntityType.BOSS ? 0.1 : 1);
+        const flowInfluence = e.type === EntityType.BIO_MINE
+          ? MINE_FLOW
+          : (e.type === EntityType.ANTIBODY || e.type === EntityType.ACID_POOL || e.type === EntityType.ENEMY_PROJECTILE || isMagnetized) ? 0 : (e.type === EntityType.BOSS ? 0.1 : 1);
         let windScale = 1;
         if (e.type === EntityType.BOSS) windScale = 0.18;
+        else if (e.type === EntityType.BIO_MINE) windScale = MINE_WIND;
         else if (e.type === EntityType.ACID_POOL) windScale = e.id.startsWith('bile_') ? 0.45 : 0;
         else if (e.type === EntityType.ANTIBODY || e.type === EntityType.ENEMY_PROJECTILE) windScale = 0.8;
         else if (e.type === EntityType.ORGAN_PICKUP) windScale = 1.15;
@@ -1780,8 +1791,8 @@ export class GameEngine {
         }
 
         if (e.type === EntityType.BIO_MINE) {
-            e.vel.x *= 0.996;
-            e.vel.y *= 0.996;
+            e.vel.x *= MINE_COAST;
+            e.vel.y *= MINE_COAST;
         } else if (e.type !== EntityType.ANTIBODY && e.type !== EntityType.ACID_POOL && e.type !== EntityType.ENEMY_PROJECTILE && e.type !== EntityType.BOSS) {
           e.vel.x *= 0.95;
           e.vel.y *= 0.95;

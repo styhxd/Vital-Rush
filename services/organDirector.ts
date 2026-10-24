@@ -2068,29 +2068,49 @@ export class OrganDirector {
 
         const word = 'SALIVA';
         if (samples.length > 8) {
-            const size = Math.max(14, Math.min(24, s.half * 0.42));
-            ctx.fillStyle = 'rgba(255, 252, 248, 0.62)';
-            ctx.font = `500 ${size}px "Chakra Petch", sans-serif`;
+            const last = samples.length - 1;
+            const fromHead = new Array<number>(samples.length);
+            fromHead[last] = 0;
+            for (let k = last - 1; k >= 0; k--) {
+                fromHead[k] = fromHead[k + 1] + Math.hypot(samples[k].x - samples[k + 1].x, samples[k].y - samples[k + 1].y);
+            }
+            const gap = Math.max(22, Math.min(34, s.half * 0.62));
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            if (!low) {
-                ctx.shadowColor = 'rgba(255, 255, 255, 0.28)';
-                ctx.shadowBlur = 3;
-            }
-            const last = word.length - 1;
+            ctx.lineJoin = 'round';
             for (let i = 0; i < word.length; i++) {
-                const along = 0.05 + (i / last) * 0.9;
-                const p = samples[Math.min(samples.length - 1, Math.floor(along * (samples.length - 1)))];
-                const bank = -0.82 + (i / last) * 1.64;
-                const wobble = Math.sin(time * 0.55 + i * 1.15) * 0.1;
-                const limp = Math.sin(time * 0.7 + i * 0.85) * 0.42;
+                const want = i * gap;
+                let i0 = last - 1;
+                for (let k = last - 1; k >= 0; k--) {
+                    i0 = k;
+                    if (fromHead[k] >= want) break;
+                }
+                const next = Math.min(last, i0 + 1);
+                const span = Math.max(0.001, fromHead[i0] - fromHead[next]);
+                const f = Math.max(0, Math.min(1, (fromHead[i0] - want) / span));
+                const p = samples[i0];
+                const q = samples[next];
+                const w = p.w + (q.w - p.w) * f;
+                if (w < 12) continue;
+                const nx = p.nx + (q.nx - p.nx) * f;
+                const ny = p.ny + (q.ny - p.ny) * f;
+                const bob = Math.sin(time * 0.85 + i * 0.7) * 0.04;
+                const size = Math.max(18, Math.min(28, w * 1.15));
+                let ang = Math.atan2(q.y - p.y, q.x - p.x);
+                if (ang > Math.PI / 2) ang -= Math.PI;
+                else if (ang < -Math.PI / 2) ang += Math.PI;
+                ang += Math.sin(time * 0.55 + i) * 0.03;
                 ctx.save();
-                ctx.translate(p.x + p.nx * p.w * (bank + wobble), p.y + p.ny * p.w * (bank + wobble));
-                ctx.rotate(limp);
+                ctx.translate(p.x + (q.x - p.x) * f + nx * w * bob, p.y + (q.y - p.y) * f + ny * w * bob);
+                ctx.rotate(ang);
+                ctx.font = `700 ${size}px "Chakra Petch", sans-serif`;
+                ctx.lineWidth = Math.max(3.2, size * 0.2);
+                ctx.strokeStyle = 'rgba(8, 22, 32, 0.9)';
+                ctx.fillStyle = 'rgba(255, 252, 246, 0.96)';
+                ctx.strokeText(word[i], 0, 0);
                 ctx.fillText(word[i], 0, 0);
                 ctx.restore();
             }
-            ctx.shadowBlur = 0;
         }
         ctx.restore();
 

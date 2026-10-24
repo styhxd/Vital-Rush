@@ -60,6 +60,7 @@ export class AudioManager {
   
   // Controle de Throttling
   private lastPlayTime: Record<string, number> = {};
+  private coinRun = 0;
   
   // Sequenciador Musical Procedural
   private isPlaying: boolean = false;
@@ -553,12 +554,17 @@ export class AudioManager {
   public playCoin(at?: { x: number; y: number } | null) {
       if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
       const now = performance.now();
-      if (now - (this.lastPlayTime['coin'] || 0) < 46) return;
+      const prev = this.lastPlayTime['coin'] || 0;
+      if (now - prev < 32) return;
+      this.coinRun = now - prev < 220 ? (this.coinRun + 1) % 6 : 0;
       this.lastPlayTime['coin'] = now;
-      const dest = this.sfxOut(at, 0.16);
+      const dest = this.sfxOut(at, 0.14);
       const t = this.ctx.currentTime;
-      this.tone(t, 988, 0.045, 'sine', 0.05, 3200, dest);
-      this.tone(t + 0.055, 1318, 0.07, 'sine', 0.034, 3600, dest);
+      const scale = [1318.5, 1568, 1760, 2093, 2349.3, 2637];
+      const f = scale[this.coinRun];
+      this.tone(t, f, 0.048, 'sine', 0.04, 5600, dest);
+      this.tone(t, f * 2.76, 0.022, 'sine', 0.01, 7400, dest);
+      this.tone(t + 0.012, f * 1.498, 0.034, 'triangle', 0.013, 5000, dest);
   }
   public playSurge(at?: { x: number; y: number } | null) { this.playBuffer('surge', 0.6, 0, 500, at); }
   
@@ -1182,6 +1188,7 @@ export class AudioManager {
       const chord = score.chords[bar];
       this.chordDegree = chord;
       const dest = this.musicGain;
+      const bed = 2.55;
       const cut = score.color === 'murk' ? 520 : score.color === 'spark' ? 3200 : score.color === 'glass' ? 2400 : score.color === 'air' ? 1600 : 1400;
       const wave: OscillatorType = score.color === 'murk' || score.color === 'spark' ? 'sawtooth' : 'triangle';
       const every = menu ? 4 : this.drumEvery;
@@ -1189,19 +1196,19 @@ export class AudioManager {
       if (layers >= 1) {
           if (score.color === 'thump') {
               if (beat === 0) {
-                  this.tone(time, 34, 0.62, 'sine', 0.22, 80, dest);
-                  this.tone(time + 0.1, 40, 0.48, 'sine', 0.13, 110, dest);
+                  this.tone(time, 34, 0.62, 'sine', 0.22 * bed, 80, dest);
+                  this.tone(time + 0.1, 40, 0.48, 'sine', 0.13 * bed, 110, dest);
                   this.lubAt = time;
               }
           } else if (beat === 0 || beat === 8) {
-              this.tone(time, score.root / 2, 0.38, 'triangle', 0.16, 260, dest);
+              this.tone(time, score.root / 2, 0.38, 'triangle', 0.16 * bed, 260, dest);
           }
       }
 
       if (layers >= 2) {
           const offs = [0, -99, -99, 4, -99, 0, -99, 7, 0, -99, 4, -99, 2, -99, 0, -99];
           const off = offs[beat];
-          if (off > -50) this.tone(time, this.hz(score, chord + off, -1), 0.22, wave, 0.16, Math.min(cut, 700), dest);
+          if (off > -50) this.tone(time, this.hz(score, chord + off, -1), 0.22, wave, 0.16 * bed, Math.min(cut, 700), dest);
       }
 
       if (layers >= 3) {
@@ -1211,23 +1218,23 @@ export class AudioManager {
           else if (every >= 4) { play = beat % 4 === 2; vol = 0.06; }
           else if (every >= 2) { play = beat % 2 === 0; vol = 0.042; }
           else { play = beat % 2 === 1; vol = 0.028; }
-          if (play) this.colorHit(score, chord, beat, time, vol, dest);
+          if (play) this.colorHit(score, chord, beat, time, vol * bed, dest);
       }
 
       if (layers >= 4 && (beat === 0 || beat === 10)) {
-          [0, 2, 4].forEach((add) => this.tone(time, this.hz(score, chord + add, 0), 0.85, wave, 0.045, cut, dest));
+          [0, 2, 4].forEach((add) => this.tone(time, this.hz(score, chord + add, 0), 0.85, wave, 0.045 * bed, cut, dest));
       }
 
       if (layers >= 5 && beat % 2 === 0) {
           const lead = LEAD[key];
           const degree = lead[(Math.floor(step / 2)) % lead.length];
-          if (degree >= 0) this.tone(time, this.hz(score, degree, 1), 0.2, score.color === 'spark' ? 'square' : 'triangle', 0.07, cut, dest);
+          if (degree >= 0) this.tone(time, this.hz(score, degree, 1), 0.2, score.color === 'spark' ? 'square' : 'triangle', 0.07 * bed, cut, dest);
       }
 
       if (layers >= 6 && beat % 4 === 2) {
           const lead = LEAD[key];
           const degree = lead[(Math.floor(step / 2) + 3) % lead.length];
-          if (degree >= 0) this.tone(time, this.hz(score, degree + 4, 1), 0.28, 'sine', 0.05, cut, dest);
+          if (degree >= 0) this.tone(time, this.hz(score, degree + 4, 1), 0.28, 'sine', 0.05 * bed, cut, dest);
       }
   }
 

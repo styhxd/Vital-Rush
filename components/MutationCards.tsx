@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Upgrade, Language, Difficulty } from '../types';
+import { upgradeBlurb } from '../constants';
 
 const CARD_BG = new URL('../src/assets/cards/card-bg.webp', import.meta.url).href;
 
@@ -88,7 +89,7 @@ type CardProps = {
 };
 
 const MutationCard: React.FC<CardProps> = ({
-    upgrade, t, mode, canAfford, cost, hotkey, forced, pulse, guard, onPress
+    upgrade, language, t, mode, canAfford, cost, hotkey, forced, pulse, guard, onPress
 }) => {
     const maxed = upgrade.level >= upgrade.maxLevel;
     const alive = mode === 'offer' || (!maxed && canAfford);
@@ -159,7 +160,7 @@ const MutationCard: React.FC<CardProps> = ({
 
             <div className="lab-copy">
                 <div className="lab-name">{t(upgrade.nameKey)}</div>
-                <div className="lab-desc">{t(upgrade.descKey)}</div>
+                <div className="lab-desc">{upgradeBlurb(upgrade.id, upgrade.level, language)}</div>
             </div>
 
             <div className={`lab-evolve ${maxed ? 'is-maxed' : ''}`}>{label}</div>

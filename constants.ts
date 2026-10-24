@@ -384,11 +384,11 @@ export const TEXTS: TranslationMap = {
     UP_ENZYME_NAME: "HYPER ENZYMES",
     UP_ENZYME_DESC: "+8% damage",
     UP_MULTISHOT_NAME: "ADAPTIVE SPLIT",
-    UP_MULTISHOT_DESC: "+1 projectile. The volley hits 18% harder if the shots land",
+    UP_MULTISHOT_DESC: "+1 shot. If they all land, the damage goes up 18%",
     UP_ENERGY_NAME: "MITOCHONDRIAL STIMULATION",
     UP_ENERGY_DESC: "Pulse and dodge recharge 8% faster",
     UP_GIGA_NAME: "CYTOKINE STORM",
-    UP_GIGA_DESC: "+1 projectile and the volley hits 20% harder",
+    UP_GIGA_DESC: "+1 shot. The whole set hits 20% harder",
     UP_ORBITAL_NAME: "ANTIBODIES",
     UP_ORBITAL_DESC: "An antibody orbits you and strikes for 90% of a shot",
     UP_DASH_NAME: "PLASMA TRAIL",
@@ -687,11 +687,11 @@ export const TEXTS: TranslationMap = {
     UP_ENZYME_NAME: "HIPER ENZIMAS",
     UP_ENZYME_DESC: "+8% de dano",
     UP_MULTISHOT_NAME: "DIVISÃO ADAPTATIVA",
-    UP_MULTISHOT_DESC: "+1 projétil. A salva acerta 18% mais forte se os tiros pegarem",
+    UP_MULTISHOT_DESC: "+1 tiro. Se todos acertarem, o dano sobe 18%",
     UP_ENERGY_NAME: "ESTIMULAÇÃO MITOCÔNDRIA",
     UP_ENERGY_DESC: "Recarga do pulso e do desvio 8% mais rápida",
     UP_GIGA_NAME: "TEMPESTADE DE CITOCINAS",
-    UP_GIGA_DESC: "+1 projétil e a salva acerta 20% mais forte",
+    UP_GIGA_DESC: "+1 tiro. O conjunto acerta 20% mais forte",
     UP_ORBITAL_NAME: "ANTICORPOS",
     UP_ORBITAL_DESC: "Um anticorpo gira ao seu redor e golpeia por 90% de um tiro",
     UP_DASH_NAME: "RASTRO DE PLASMA",
@@ -990,11 +990,11 @@ export const TEXTS: TranslationMap = {
     UP_ENZYME_NAME: "HIPER ENZIMAS",
     UP_ENZYME_DESC: "+8% de daño",
     UP_MULTISHOT_NAME: "DIVISIÓN ADAPTATIVA",
-    UP_MULTISHOT_DESC: "+1 proyectil. La salva pega un 18% más fuerte si los tiros aciertan",
+    UP_MULTISHOT_DESC: "+1 tiro. Si todos aciertan, el daño sube un 18%",
     UP_ENERGY_NAME: "ESTIMULACIÓN MITOCONDRIAL",
     UP_ENERGY_DESC: "El pulso y el esquive recargan un 8% más rápido",
     UP_GIGA_NAME: "TORMENTA DE CITOCINAS",
-    UP_GIGA_DESC: "+1 proyectil y la salva pega un 20% más fuerte",
+    UP_GIGA_DESC: "+1 tiro. El conjunto pega un 20% más fuerte",
     UP_ORBITAL_NAME: "ANTICUERPOS",
     UP_ORBITAL_DESC: "Un anticuerpo gira a tu alrededor y golpea por el 90% de un tiro",
     UP_DASH_NAME: "RASTRO DE PLASMA",
@@ -1118,6 +1118,93 @@ const volley = (s: PlayerStats, harder: number) => {
   const total = s.damage * s.bulletCount * harder;
   return { ...s, bulletCount: count, damage: total / count };
 };
+
+const cardRank = (level: number) => Math.max(1, level);
+
+const cardNum = (n: number, lang: Language) => {
+  const text = n.toFixed(2);
+  return lang === 'EN' ? text : text.replace('.', ',');
+};
+
+/** Texto do card no nível que o jogador já tem. Nível 1 mostra o bônus de um passo; o 2 soma os dois. */
+export function upgradeBlurb(id: string, level: number, lang: Language): string {
+  const r = cardRank(level);
+  const shots = r === 1
+    ? (lang === 'EN' ? 'shot' : 'tiro')
+    : (lang === 'EN' ? 'shots' : 'tiros');
+  if (id === 'mitosis') {
+    if (lang === 'EN') return `Fire speed ${7 * r}% faster`;
+    if (lang === 'ES') return `Disparo un ${7 * r}% más rápido`;
+    return `Disparo ${7 * r}% mais rápido`;
+  }
+  if (id === 'enzyme') {
+    if (lang === 'EN') return `+${8 * r}% damage`;
+    if (lang === 'ES') return `+${8 * r}% de daño`;
+    return `+${8 * r}% de dano`;
+  }
+  if (id === 'membrane') {
+    if (lang === 'EN') return `+${8 * r}% max HP. ${r} back every 11s. The shield cuts ${4 * r}% of a hit`;
+    if (lang === 'ES') return `+${8 * r}% de vida. Vuelve ${r} cada 11s. El escudo aguanta un ${4 * r}% del golpe`;
+    return `+${8 * r}% de vida. Volta ${r} a cada 11s. O escudo segura ${4 * r}% do dano`;
+  }
+  if (id === 'multishot') {
+    if (lang === 'EN') return `+${r} ${shots}. If they all land, the damage goes up ${18 * r}%`;
+    if (lang === 'ES') return `+${r} ${shots}. Si todos aciertan, el daño sube un ${18 * r}%`;
+    return `+${r} ${shots}. Se todos acertarem, o dano sobe ${18 * r}%`;
+  }
+  if (id === 'orbitals') {
+    if (lang === 'EN') {
+      return r === 1
+        ? 'An antibody orbits you and strikes for 90% of a shot'
+        : `${r} antibodies orbit you and strike for 90% of a shot`;
+    }
+    if (lang === 'ES') {
+      return r === 1
+        ? 'Un anticuerpo gira a tu alrededor y golpea por el 90% de un tiro'
+        : `${r} anticuerpos giran a tu alrededor y golpean por el 90% de un tiro`;
+    }
+    return r === 1
+      ? 'Um anticorpo gira ao seu redor e golpeia por 90% de um tiro'
+      : `${r} anticorpos giram ao seu redor e golpeiam por 90% de um tiro`;
+  }
+  if (id === 'crit') {
+    const mult = cardNum(0.2 * r, lang);
+    if (lang === 'EN') return `+${5 * r}% crit chance, +${mult}x crit damage`;
+    if (lang === 'ES') return `+${5 * r}% de probabilidad crítica, +${mult}x de daño crítico`;
+    return `+${5 * r}% de chance crítica, +${mult}x de dano crítico`;
+  }
+  if (id === 'dash_dmg') {
+    if (lang === 'EN') return `Dodge deals ${18 * r} damage to each enemy you pass through`;
+    if (lang === 'ES') return `El esquive causa ${18 * r} de daño a cada enemigo que atraviesas`;
+    return `O desvio causa ${18 * r} de dano a cada inimigo que você atravessa`;
+  }
+  if (id === 'thorns') {
+    if (lang === 'EN') return `Touching an enemy deals ${8 * r} damage back`;
+    if (lang === 'ES') return `Tocar a un enemigo devuelve ${8 * r} de daño`;
+    return `Encostar num inimigo devolve ${8 * r} de dano`;
+  }
+  if (id === 'lifesteal') {
+    if (lang === 'EN') return `A critical kill gives ${r} back. It waits a second before the next`;
+    if (lang === 'ES') return `Una baja crítica devuelve ${r}. Espera un segundo para repetir`;
+    return `Abate crítico devolve ${r}. Espera um segundo pra repetir`;
+  }
+  if (id === 'magnet') {
+    if (lang === 'EN') return `+${10 * r}% magnet range and pulse radius`;
+    if (lang === 'ES') return `+${10 * r}% de alcance del imán y del pulso`;
+    return `+${10 * r}% de alcance do ímã e do pulso`;
+  }
+  if (id === 'energy_core') {
+    if (lang === 'EN') return `Pulse and dodge recharge ${8 * r}% faster`;
+    if (lang === 'ES') return `El pulso y el esquive recargan un ${8 * r}% más rápido`;
+    return `Recarga do pulso e do desvio ${8 * r}% mais rápida`;
+  }
+  if (id === 'giga_blast') {
+    if (lang === 'EN') return `+${r} ${shots}. The whole set hits ${20 * r}% harder`;
+    if (lang === 'ES') return `+${r} ${shots}. El conjunto pega un ${20 * r}% más fuerte`;
+    return `+${r} ${shots}. O conjunto acerta ${20 * r}% mais forte`;
+  }
+  return '';
+}
 
 export const UPGRADES: Upgrade[] = [
   {
