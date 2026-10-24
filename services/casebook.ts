@@ -124,6 +124,11 @@ function pathOf(route: OrganId[] | undefined): OrganId[] {
     return CANON_ROUTE;
 }
 
+export function isCanonRoute(route: OrganId[] | undefined): boolean {
+    if (!route || route.length !== CANON_ROUTE.length) return false;
+    return CANON_ROUTE.every((organ, index) => route[index] === organ);
+}
+
 export function hopLine(from: OrganId, to: OrganId, lang: Language): string {
     return HOP[lang][`${from}>${to}`] || HOP.EN[`${from}>${to}`] || '';
 }

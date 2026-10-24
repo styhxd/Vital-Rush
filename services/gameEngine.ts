@@ -16,7 +16,7 @@ import { COLORS_PLATINUM, CANVAS_WIDTH, CANVAS_HEIGHT, WAVES, DIFFICULTY_MODIFIE
 import { audioManager, type DrumHit } from './audioManager';
 import { buzz } from './haptics';
 import { achievementManager } from './achievementManager';
-import { BossArchitect, BossTrait } from './bossArchitect';
+import { bossFor, drawBossShape, mutationFrom } from './bosses';
 import { OrganDirector, cellBudget, cellColor, cellRises, organBg, rollCellStyle } from './organDirector';
 const SIN_TABLE = new Float32Array(360);
 const COS_TABLE = new Float32Array(360);
@@ -362,33 +362,55 @@ export class GameEngine {
       });
   }
   
-  public spawnBoss(config: WaveConfig) {
-      const mutation = BossArchitect.mutate();
+  public spawnBoss(_config: WaveConfig) {
+      const spec = bossFor(this.organ.id, this.organ.nextOrgan(this.currentWaveIndex));
+      const mutation = mutationFrom(spec);
       const pastTheWall = wavesPastTheWall(this.currentWaveIndex);
       const pressure = campaignPressure(this.currentWaveIndex);
-      let hp = 1200 * this.difficultyMods.hp * (1 + pressure * 2.6) * Math.pow(1.05, pastTheWall);
-      if (mutation.traits.includes(BossTrait.JUGGERNAUT)) hp *= 1.8;
-
+      const hp = 1200 * spec.hp * this.difficultyMods.hp * (1 + pressure * 2.6) * Math.pow(1.05, pastTheWall);
       const dmg = 28 * this.difficultyMods.dmg * (1 + pressure * 0.7) * Math.pow(1.03, pastTheWall);
-      
+
       this.entities.push({
-          id: `boss_${Date.now()}`,
+          id: `boss_${spec.id}_${Date.now()}`,
           type: EntityType.BOSS,
           pos: { x: CANVAS_WIDTH + 200, y: CANVAS_HEIGHT / 2 },
           vel: { x: -0.5, y: 0 },
-          radius: 120,
+          radius: spec.radius,
           health: hp, maxHealth: hp,
-          color: mutation.color,
+          color: spec.color,
           damage: dmg,
           active: true,
           value: 1000 * this.difficultyMods.score,
           hitFlash: 0,
           drag: 0.1,
           isElite: true,
-          mutation: mutation
+          mutation
       });
-      
-      audioManager.playSurge({ x: CANVAS_WIDTH * 0.82, y: CANVAS_HEIGHT / 2 }); 
+
+      audioManager.playSurge({ x: CANVAS_WIDTH * 0.82, y: CANVAS_HEIGHT / 2 });
+  }
+
+  private bossShot(e: Entity, angle: number, speed: number, radius: number, damage: number) {
+      this.entities.push({
+          id: `bproj_${this.time}_${Math.random()}`,
+          type: EntityType.ENEMY_PROJECTILE,
+          pos: { ...e.pos },
+          vel: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
+          radius, health: 1, maxHealth: 1,
+          color: e.color, damage, active: true, drag: 0
+      });
+  }
+
+  private bossPool(e: Entity, radius: number, ttl: number) {
+      this.entities.push({
+          id: `acid_${this.time}_${Math.random()}`,
+          type: EntityType.ACID_POOL,
+          pos: { ...e.pos },
+          vel: { x: 0, y: 0 },
+          radius, health: 1, maxHealth: 1,
+          color: e.mutation?.accent || e.color,
+          damage: 0, active: true, ttl, value: ttl
+      });
   }
 
   public damageEnemy(target: Entity, amount: number, canCrit: boolean, stats: PlayerStats): boolean {
@@ -814,58 +836,161 @@ export class GameEngine {
       });
   }
 
-  private updateBoss(e: Entity, dtSeconds: number, stats: PlayerStats) {
+  private updateBoss(e: Entity, dtSeconds: number, _stats: PlayerStats) {
       if (!e.mutation) return;
       const m = e.mutation;
+      m.phase += dtSeconds;
       const dx = this.player.pos.x - e.pos.x;
       const dy = this.player.pos.y - e.pos.y;
-      const dMag = Math.sqrt(dx*dx + dy*dy);
-      
-      if (dMag > 0) {
-          const speed = m.baseSpeed * this.difficultyMods.speed;
-          e.vel.x += (dx / dMag) * speed;
-          e.vel.y += (dy / dMag) * speed;
+      const dMag = Math.max(1, Math.hypot(dx, dy));
+      const nx = dx / dMag;
+      const ny = dy / dMag;
+      const speed = m.baseSpeed * this.difficultyMods.speed;
+      const aim = Math.atan2(dy, dx);
+      const shot = Math.max(8, e.damage * 0.32);
+      const chase = (mul = 1) => {
+          e.vel.x += nx * speed * mul;
+          e.vel.y += ny * speed * mul;
+      };
+
+      if (m.play === 'bud' && !m.split && e.health < e.maxHealth * 0.5) {
+          m.split = true;
+          e.radius *= 0.78;
+          m.baseSpeed *= 1.65;
+          for (let i = 0; i < 8; i++) this.bossShot(e, (i / 8) * Math.PI * 2, 7, 12, shot * 0.7);
+          audioManager.playEnemyShoot(e.pos);
+      }
+      if (m.play === 'cyst' && !m.open && e.health < e.maxHealth * 0.45) {
+          m.open = true;
+          m.baseSpeed *= 2.4;
+          audioManager.playBossDash(e.pos);
       }
 
-      if (m.traits.includes(BossTrait.SPRINTER)) {
+      if (m.play === 'coil') {
+          const orbit = 150 + Math.sin(m.phase * 0.85) * 110;
+          const ang = m.phase * 1.35;
+          const tx = this.player.pos.x + Math.cos(ang) * orbit;
+          const ty = this.player.pos.y + Math.sin(ang) * orbit;
+          const ox = tx - e.pos.x;
+          const oy = ty - e.pos.y;
+          const od = Math.max(1, Math.hypot(ox, oy));
+          e.vel.x += (ox / od) * speed * 2.2;
+          e.vel.y += (oy / od) * speed * 2.2;
+          return;
+      }
+
+      if (m.play === 'flagellum') {
+          e.vel.x += nx * speed * 1.5 + (-ny) * Math.sin(m.phase * 3.2) * speed * 2.4;
+          e.vel.y += ny * speed * 1.5 + nx * Math.sin(m.phase * 3.2) * speed * 2.4;
+          return;
+      }
+
+      if (m.play === 'cord') {
+          const spin = Math.sin(m.phase * 2.1);
+          e.vel.x += (-ny) * speed * 2.8 * spin + nx * speed * 0.45;
+          e.vel.y += nx * speed * 2.8 * spin + ny * speed * 0.45;
+          return;
+      }
+
+      if (m.play === 'crescent') {
+          chase(0.45);
           m.dashTimer -= dtSeconds;
           if (m.dashTimer <= 0) {
-              const dashMag = 35; 
-              e.vel.x = (dx / dMag) * dashMag;
-              e.vel.y = (dy / dMag) * dashMag;
-              m.dashTimer = 4.0;
-              // VARIETY: SOUND CALL FOR BOSS DASH
+              const side = m.phase % 2 > 1 ? 1 : -1;
+              e.vel.x = nx * 16 + (-ny) * 10 * side;
+              e.vel.y = ny * 16 + nx * 10 * side;
+              m.dashTimer = 1.35;
+          }
+          return;
+      }
+
+      if (m.play === 'pseudopod') {
+          m.dashTimer -= dtSeconds;
+          if (m.dashTimer > 0.45) chase(0.15);
+          if (m.dashTimer <= 0) {
+              e.vel.x = nx * 28;
+              e.vel.y = ny * 28;
+              this.bossPool(e, 110, 4.5);
+              m.dashTimer = 3.4;
+              audioManager.playBossDash(e.pos);
+          }
+          return;
+      }
+
+      if (m.play === 'reactivate') {
+          m.shootTimer -= dtSeconds;
+          if (m.shootTimer > 0.7) chase(0.2);
+          if (m.shootTimer <= 0) {
+              for (let i = 0; i < 12; i++) this.bossShot(e, (i / 12) * Math.PI * 2, 6.5, 13, shot * 0.8);
+              m.shootTimer = 3.1;
+              audioManager.playEnemyShoot(e.pos);
+          }
+          return;
+      }
+
+      chase(m.play === 'adhere' ? 1.7 : m.play === 'capsid' ? 1.45 : m.play === 'capsule' ? 0.65 : 1);
+
+      if (m.play === 'abscess' || m.play === 'filament') {
+          m.acidTimer -= dtSeconds;
+          if (m.acidTimer <= 0) {
+              this.bossPool(e, m.play === 'filament' ? 54 : 86, m.play === 'filament' ? 4 : 5.5);
+              m.acidTimer = m.play === 'filament' ? 2.5 : 2.15;
+          }
+      }
+
+      if (m.play === 'embolus') {
+          m.dashTimer -= dtSeconds;
+          if (m.dashTimer <= 0) {
+              e.vel.x = nx * 32;
+              e.vel.y = ny * 32;
+              for (let i = -2; i <= 2; i++) this.bossShot(e, aim + i * 0.18, 8, 13, shot);
+              m.dashTimer = 3.6;
               audioManager.playBossDash(e.pos);
           }
       }
 
-      if (m.traits.includes(BossTrait.TOXIC)) {
-          m.acidTimer -= dtSeconds;
-          if (m.acidTimer <= 0) {
-              this.entities.push({
-                  id: `acid_${Date.now()}`, type: EntityType.ACID_POOL,
-                  pos: { ...e.pos }, vel: { x: 0, y: 0 }, radius: 80,
-                  health: 1, maxHealth: 1, color: this.colors.ACID_POOL, damage: 0, active: true, ttl: 6, value: 6
-              });
-              m.acidTimer = 2.0;
+      if (m.play === 'cluster') {
+          m.shootTimer -= dtSeconds;
+          if (m.shootTimer <= 0) {
+              for (let i = -3; i <= 3; i++) this.bossShot(e, aim + i * 0.22, 7.2, 12, shot * 0.85);
+              m.shootTimer = 2.35;
+              audioManager.playEnemyShoot(e.pos);
           }
       }
 
-      if (m.traits.includes(BossTrait.GUNNER)) {
+      if (m.play === 'capsid') {
           m.shootTimer -= dtSeconds;
           if (m.shootTimer <= 0) {
-              const angle = Math.atan2(dy, dx);
-              const count = 3;
-              for(let i=0; i<count; i++) {
-                  const a = angle - 0.2 + (i * 0.2);
-                  this.entities.push({
-                      id: `bproj_${Date.now()}_${i}`, type: EntityType.ENEMY_PROJECTILE,
-                      pos: { ...e.pos }, vel: { x: Math.cos(a)*8, y: Math.sin(a)*8 },
-                      radius: 15, health: 1, maxHealth: 1, color: e.color, damage: 20, active: true
-                  });
-              }
-              m.shootTimer = 2.5;
+              this.bossShot(e, aim, 9, 10, shot * 0.7);
+              m.shootTimer = 0.85;
+          }
+      }
+
+      if (m.play === 'capsule') {
+          m.shootTimer -= dtSeconds;
+          if (m.shootTimer <= 0) {
+              for (let i = 0; i < 8; i++) this.bossShot(e, (i / 8) * Math.PI * 2 + m.phase, 4.2, 14, shot * 0.65);
+              m.shootTimer = 4.6;
               audioManager.playEnemyShoot(e.pos);
+          }
+      }
+
+      if (m.play === 'adhere') {
+          m.dashTimer -= dtSeconds;
+          if (m.dashTimer <= 0 && dMag > 180) {
+              e.vel.x = nx * 18;
+              e.vel.y = ny * 18;
+              m.dashTimer = 2.4;
+          }
+      }
+
+      if (m.play === 'cyst' && m.open) {
+          m.dashTimer -= dtSeconds;
+          if (m.dashTimer <= 0) {
+              e.vel.x = nx * 26;
+              e.vel.y = ny * 26;
+              m.dashTimer = 2.2;
+              audioManager.playBossDash(e.pos);
           }
       }
   }
@@ -2747,22 +2872,21 @@ export class GameEngine {
         this.ctx.fillStyle = (e.hitFlash && e.hitFlash > 0) ? '#ffffff' : e.color;
         this.ctx.strokeStyle = '#220000';
         this.ctx.lineWidth = 2;
+        let drawn = false;
         this.ctx.beginPath();
-        if (e.type === EntityType.BOSS) {
-            const pulses = Math.sin(this.time / 200) * 10;
-            this.ctx.arc(0, 0, e.radius + pulses, 0, Math.PI*2);
-            this.ctx.fillStyle = '#000';
-            this.ctx.fill();
-            this.ctx.stroke();
-            this.ctx.fillStyle = (e.hitFlash && e.hitFlash > 0) ? '#ffffff' : e.color;
-            this.ctx.beginPath();
-            this.ctx.arc(0, 0, e.radius * 0.6, 0, Math.PI*2);
-            if (e.mutation && e.mutation.traits.includes(BossTrait.SPRINTER) && Math.abs(e.vel.x) > 5) {
-                 this.ctx.globalAlpha = 0.3;
-                 this.ctx.fillStyle = e.color;
-                 this.ctx.fill();
-                 this.ctx.globalAlpha = 1.0;
-            }
+        if (e.type === EntityType.BOSS && e.mutation) {
+            drawBossShape(
+                this.ctx,
+                e.mutation.shape,
+                e.color,
+                e.mutation.accent,
+                e.radius,
+                this.time,
+                !!(e.hitFlash && e.hitFlash > 0),
+                e.mutation.open,
+                e.mutation.split,
+            );
+            drawn = true;
         } else if (e.type === EntityType.BACTERIA) {
           spin = this.time / 500;
           this.ctx.rotate(spin);
@@ -2807,8 +2931,10 @@ export class GameEngine {
            const pulses = Math.sin(this.time/100) * 5;
            this.ctx.arc(0, 0, e.radius + pulses, 0, Math.PI*2);
         }
-        this.ctx.fill();
-        this.ctx.stroke();
+        if (!drawn) {
+            this.ctx.fill();
+            this.ctx.stroke();
+        }
         if (spin) this.ctx.rotate(-spin);
         this.ctx.translate(-e.pos.x, -e.pos.y);
         this.ctx.globalAlpha = 1;

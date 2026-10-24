@@ -7,7 +7,7 @@ const BODY: Record<Language, Record<string, string>> = {
         virus: 'O vírus quase não anda. Fica no fundo e, de alguns em alguns segundos, cospe um espinho na sua direção. Perto de você o espinho curva um pouco. Ele aguenta tiro e quase não recua.',
         fungi: 'O fungo é leve e rápido, com pouca vida. O contato dói, e o caminho não é reto: sobe e desce em zigue-zague. Acerta cedo. Se ele chegou perto, já passou.',
         parasite: 'O parasita atravessa devagar e ocupa espaço. A vida é alta, e cada tiro perde um pedaço antes de entrar. Não é pressa. É o tempo que ele rouba enquanto você gasta munição. O contato dói muito.',
-        boss: 'Na última onda de cada órgão aparece um só. É uma massa grande, com cor própria, e o truque muda de chefe para chefe: corre, cospe, larga ácido, ou simplesmente aguenta mais. Derruba esse e a sala seguinte abre.',
+        boss: 'Na última onda de cada órgão aparece o organismo que abre a sala seguinte. São vinte, um para cada viagem. O nome, o caminho e o truque estão na ficha de cada chefe.',
         plaque: 'Placa é mancha parada no molar. Pisar nela come a vida aos poucos e deixa o passo pesado. Não atira. Só espera. Quando a saliva passa por cima, a mancha se desfaz.',
         saliva: 'A saliva cruza o molar em fita. Onde ela passa, a placa se dissolve. Se você está no fio, ela te leva junto e, por um instante, o dano que chega fica mais fraco. Não é parede. É um empurro com uma película.',
         bite: 'Primeiro a faixa acende e as mandíbulas se aproximam. Dá tempo de sair. O golpe, e o barulho, acontecem quando as duas paredes se encontram. Quem ficou no meio é esmagado. Quem saiu da faixa, não.',
@@ -32,7 +32,7 @@ const BODY: Record<Language, Record<string, string>> = {
         virus: 'A virus barely moves. It hangs back and, every few seconds, spits a spike toward you. Close in, the spike bends a little. It soaks shots and barely gets pushed.',
         fungi: 'Fungus is light and fast, with little health. Contact hurts, and the path is not straight: it rises and falls in a zig-zag. Hit it early. If it got close, it already went by.',
         parasite: 'A parasite crosses slowly and takes up space. Its health is high, and every shot loses a piece before it lands. It is not hurry. It is the time it steals while you spend ammunition. Contact hurts a lot.',
-        boss: 'On the last wave of each organ, one shows up. A large mass, its own color, and the trick changes from boss to boss: it sprints, it spits, it drops acid, or it simply takes more. Drop that one and the next room opens.',
+        boss: 'On the last wave of each organ, the organism that opens the next room shows up. There are twenty, one for each crossing. The name, the road, and the trick are on each boss card.',
         plaque: 'Plaque is a stain that sits on the molar. Standing on it eats health bit by bit and makes your step heavy. It does not shoot. It waits. When saliva passes over it, the stain comes apart.',
         saliva: 'Saliva crosses the molar as a ribbon. Where it passes, plaque dissolves. If you are on the ribbon, it carries you and, for a moment, incoming damage arrives weaker. It is not a wall. It is a push with a film.',
         bite: 'First the band lights and the jaws close in. There is time to leave. The hit, and the sound, happen when the two walls meet. Whoever stayed in the middle is crushed. Whoever left the band is not.',
@@ -57,7 +57,7 @@ const BODY: Record<Language, Record<string, string>> = {
         virus: 'El virus casi no camina. Se queda atrás y, cada pocos segundos, escupe una púa hacia ti. De cerca, la púa se curva un poco. Aguanta tiros y casi no retrocede.',
         fungi: 'El hongo es liviano y rápido, con poca vida. El contacto duele, y el camino no es recto: sube y baja en zigzag. Pégale pronto. Si llegó cerca, ya pasó.',
         parasite: 'El parásito cruza despacio y ocupa sitio. La vida es alta, y cada tiro pierde un trozo antes de entrar. No es prisa. Es el tiempo que roba mientras gastas munición. El contacto duele mucho.',
-        boss: 'En la última onda de cada órgano aparece uno solo. Es una masa grande, con color propio, y el truco cambia de jefe a jefe: corre, escupe, suelta ácido, o simplemente aguanta más. Derriba a ese y se abre la sala siguiente.',
+        boss: 'En la última onda de cada órgano aparece el organismo que abre la sala siguiente. Son veinte, uno por cada viaje. El nombre, el camino y el truco están en la ficha de cada jefe.',
         plaque: 'La placa es una mancha quieta en el molar. Pisarla come vida de a poco y pone pesado el paso. No dispara. Espera. Cuando la saliva pasa por encima, la mancha se deshace.',
         saliva: 'La saliva cruza el molar en cinta. Donde pasa, la placa se disuelve. Si estás en el hilo, te lleva y, por un instante, el daño que llega es más débil. No es una pared. Es un empujón con una película.',
         bite: 'Primero la franja se enciende y las mandíbulas se acercan. Hay tiempo de salir. El golpe, y el ruido, ocurren cuando las dos paredes se encuentran. Quien se quedó en el medio es aplastado. Quien salió de la franja, no.',
@@ -157,9 +157,9 @@ export function hopNote(from: OrganId, to: OrganId, lang: Language): string {
 }
 
 export function crossingTitle(lang: Language): string {
-    if (lang === 'PT') return 'DE UM ÓRGÃO AO OUTRO';
-    if (lang === 'ES') return 'DE UN ÓRGANO AL OTRO';
-    return 'FROM ONE ORGAN TO THE NEXT';
+    if (lang === 'PT') return 'CADA CHEFE, UMA VIAGEM';
+    if (lang === 'ES') return 'CADA JEFE, UN VIAJE';
+    return 'EACH BOSS IS A CROSSING';
 }
 
 export function tapHint(lang: Language): string {

@@ -325,6 +325,10 @@ export class OrganDirector {
         return organForWave(waveIndex, this.route) !== organForWave(waveIndex + 1, this.route);
     }
 
+    nextOrgan(waveIndex: number): OrganId {
+        return organForWave(waveIndex + 1, this.route);
+    }
+
     /** Cutscene entre órgãos, antes da ficha. O id visual só muda na chegada. */
     openVoyage(nextWave: number, translate: (key: string) => string) {
         const to = organForWave(nextWave, this.route);

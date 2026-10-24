@@ -12,13 +12,31 @@ export enum BossTrait {
     JUGGERNAUT = 'JUGGERNAUT' // Lento mas com HP imenso
 }
 
+export type BossPlay =
+    | 'abscess' | 'embolus' | 'filament' | 'cluster' | 'bud'
+    | 'flagellum' | 'pseudopod' | 'capsule' | 'adhere' | 'capsid'
+    | 'cord' | 'reactivate' | 'cyst' | 'crescent' | 'coil';
+
+export type BossShape =
+    | 'spindle' | 'chain' | 'filament' | 'cluster' | 'yeast'
+    | 'trypo' | 'amoeba' | 'capsuleRod' | 'shortRod' | 'capsid'
+    | 'rod' | 'grapes' | 'broadBud' | 'schisto' | 'cords'
+    | 'halo' | 'envelope' | 'cyst' | 'crescent' | 'coil';
+
 export interface BossMutation {
     traits: BossTrait[];
     color: string;
+    accent: string;
     dashTimer: number;
     shootTimer: number;
     acidTimer: number;
     baseSpeed: number;
+    id: string;
+    play: BossPlay;
+    shape: BossShape;
+    phase: number;
+    split: boolean;
+    open: boolean;
 }
 
 export class BossArchitect {
@@ -45,10 +63,17 @@ export class BossArchitect {
         return {
             traits,
             color: this.TRAIT_COLORS[primaryTrait],
+            accent: '#ffffff',
             dashTimer: primaryTrait === BossTrait.SPRINTER ? 3.0 : 0,
             shootTimer: primaryTrait === BossTrait.GUNNER ? 2.0 : 0,
             acidTimer: primaryTrait === BossTrait.TOXIC ? 1.5 : 0,
-            baseSpeed: primaryTrait === BossTrait.JUGGERNAUT ? 0.2 : 0.4
+            baseSpeed: primaryTrait === BossTrait.JUGGERNAUT ? 0.2 : 0.4,
+            id: '',
+            play: 'abscess',
+            shape: 'spindle',
+            phase: 0,
+            split: false,
+            open: false,
         };
     }
 }

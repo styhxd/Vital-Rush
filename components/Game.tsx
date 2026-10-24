@@ -4,10 +4,11 @@ import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from
 import { GameEngine, comboDamageMultiplier, COMBO_RAMP_KILLS } from '../services/gameEngine';
 import { organAccent, organNameKey, organVeinStyle, type OrganId } from '../services/organDirector';
 import { audioManager } from '../services/audioManager';
+import { bossById } from '../services/bosses';
 import { achievementManager } from '../services/achievementManager';
 import { GameState, PlayerStats, Upgrade, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
 import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES, ADRENALINE_MAX_DURATION } from '../constants';
-import { CANON_ROUTE, randomRoute } from '../services/casebook';
+import { CANON_ROUTE, hopLine, randomRoute } from '../services/casebook';
 import { postRun } from '../services/board';
 import { Joystick } from './Joystick';
 import { PauseMenu } from './PauseMenu';
@@ -317,6 +318,7 @@ export const Game: React.FC = () => {
   // State para controlar o tutorial e eventos de Boss
   const [showTutorial, setShowTutorial] = useState(false);
   const [showBossIntro, setShowBossIntro] = useState(false);
+  const [bossCard, setBossCard] = useState<{ name: string; disease: string; line: string; color: string } | null>(null);
   const [bossEntity, setBossEntity] = useState<{hp: number, max: number, name: string} | null>(null);
   const [labPulse, setLabPulse] = useState<{id: string, kind: 'ok' | 'no', token: number, cost: number} | null>(null);
   const [serum, setSerum] = useState<{ids: string[], endsAt: number} | null>(null);
@@ -469,9 +471,22 @@ export const Game: React.FC = () => {
   }, [gameState, triggerUltimate, triggerDash, isPaused]);
 
   const handleBossSpawn = useCallback(() => {
+      const boss = engineRef.current?.entities.find(e => e.type === EntityType.BOSS && e.active);
+      const spec = boss?.mutation?.id ? bossById(boss.mutation.id) : null;
+      if (spec) {
+          const from = spec.from;
+          const to = spec.to;
+          setBossCard({
+              name: spec.short[language],
+              disease: spec.disease[language],
+              line: `${spec.intro[language]} ${hopLine(from, to, language)}`,
+              color: spec.color,
+          });
+          setBossEntity({ hp: boss!.health, max: boss!.maxHealth, name: spec.short[language] });
+      }
       setShowBossIntro(true);
-      setTimeout(() => setShowBossIntro(false), 3000);
-  }, []);
+      window.setTimeout(() => setShowBossIntro(false), 3400);
+  }, [language]);
 
   const deployToWave = useCallback(() => {
       if (engineRef.current) {
@@ -632,7 +647,7 @@ export const Game: React.FC = () => {
       setOutcomeLeaving(false);
       if (outcomeTimer.current) window.clearTimeout(outcomeTimer.current);
       if (outcomeLeaveTimer.current) window.clearTimeout(outcomeLeaveTimer.current);
-      const hold = organHop ? 3200 : 2600;
+      const hold = organHop ? 3200 : 2100;
       outcomeLeaveTimer.current = window.setTimeout(() => setOutcomeLeaving(true), hold);
       outcomeTimer.current = window.setTimeout(() => {
           setOutcomeBeat(null);
@@ -743,7 +758,12 @@ export const Game: React.FC = () => {
           // Check for active boss for HP Bar
           const activeBoss = eng.entities.find(e => e.type === EntityType.BOSS && e.active);
           if (activeBoss) {
-              setBossEntity({ hp: activeBoss.health, max: activeBoss.maxHealth, name: "ANOMALY // BOSS" });
+              const spec = activeBoss.mutation?.id ? bossById(activeBoss.mutation.id) : null;
+              setBossEntity({
+                  hp: activeBoss.health,
+                  max: activeBoss.maxHealth,
+                  name: spec ? spec.short[language] : 'BOSS',
+              });
           } else {
               setBossEntity(null);
           }
@@ -771,7 +791,7 @@ export const Game: React.FC = () => {
     }
     
     animationFrameRef.current = requestAnimationFrame(loop);
-  }, [gameState, stats, isPaused, isLowPerfMode, handleBossSpawn, difficulty, rememberRun, finishWave]);
+  }, [gameState, stats, isPaused, isLowPerfMode, handleBossSpawn, difficulty, rememberRun, finishWave, language]);
 
   useEffect(() => {
     lastTimeRef.current = performance.now();
@@ -1100,8 +1120,8 @@ export const Game: React.FC = () => {
         className={`select-none ${isPlatinum ? 'bg-[#0a0a1a]' : 'bg-[#0f0505]'} ${isLowPerfMode ? 'perf-mode-low' : ''}`} 
         style={{...containerStyle, fontFamily: 'var(--font-tech)'}}
     >
-      <div className="organ-margin" aria-hidden />
-      <div ref={marginFrameRef} className="organ-margin-frame" aria-hidden />
+      <div key={uiData.organId} className={`organ-margin is-${uiData.organId}`} aria-hidden />
+      <div ref={marginFrameRef} className={`organ-margin-frame is-${uiData.organId}`} aria-hidden />
       <canvas ref={canvasRef} className="playfield" />
       
       {/* CSS Injection for Dynamic Keyframes */}
@@ -1329,15 +1349,56 @@ export const Game: React.FC = () => {
         @keyframes outcome-ring { 0% { transform: scale(0.15); opacity: 1; } 100% { transform: scale(2.8); opacity: 0; } }
         @keyframes outcome-pop { 0% { transform: scale(0.35); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
         @keyframes outcome-spark { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-220px) scale(0.3); opacity: 0; } }
-        .organ-margin { position: absolute; inset: 0; z-index: 0; background: #050403; pointer-events: none; }
-        .organ-margin-frame {
+        .organ-margin { position: absolute; inset: 0; z-index: 0; background: #070605; overflow: hidden; pointer-events: none; }
+        .organ-margin::before {
+            content: "";
             position: absolute;
-            z-index: 0;
-            pointer-events: none;
-            box-shadow: 0 0 56px 18px rgba(255, 236, 214, 0.05);
+            inset: -10%;
+            filter: blur(22px);
+            animation: margin-arrive 2.4s ease-out both, margin-breathe 8.5s ease-in-out 2.4s infinite;
         }
+        .organ-margin.is-molar::before {
+            background:
+                radial-gradient(ellipse 34% 78% at 6% 50%, rgba(236, 224, 198, 0.2), transparent 72%),
+                radial-gradient(ellipse 34% 78% at 94% 50%, rgba(236, 224, 198, 0.2), transparent 72%);
+        }
+        .organ-margin.is-liver::before {
+            background:
+                radial-gradient(ellipse 30% 70% at 4% 42%, rgba(92, 24, 18, 0.55), transparent 70%),
+                radial-gradient(ellipse 26% 60% at 96% 58%, rgba(168, 176, 64, 0.16), transparent 72%);
+        }
+        .organ-margin.is-heart::before {
+            background:
+                radial-gradient(ellipse 32% 80% at 5% 50%, rgba(120, 16, 28, 0.55), transparent 70%),
+                radial-gradient(ellipse 32% 80% at 95% 50%, rgba(120, 16, 28, 0.55), transparent 70%);
+            animation: margin-arrive 2s ease-out both, heart-edge 1.15s ease-in-out 2s infinite;
+        }
+        .organ-margin.is-lung::before {
+            background:
+                radial-gradient(ellipse 36% 84% at 7% 50%, rgba(232, 186, 196, 0.16), transparent 74%),
+                radial-gradient(ellipse 36% 84% at 93% 50%, rgba(232, 186, 196, 0.16), transparent 74%);
+            animation: margin-arrive 2.6s ease-out both, lung-edge 6.5s ease-in-out 2.6s infinite;
+        }
+        .organ-margin.is-brain::before {
+            background:
+                radial-gradient(ellipse 28% 64% at 8% 30%, rgba(168, 130, 230, 0.2), transparent 70%),
+                radial-gradient(ellipse 24% 50% at 92% 70%, rgba(120, 210, 230, 0.12), transparent 72%);
+            animation: margin-arrive 2.2s ease-out both, brain-edge 3.4s ease-in-out 2.2s infinite;
+        }
+        .organ-margin-frame { position: absolute; z-index: 0; pointer-events: none; }
+        .organ-margin-frame.is-molar { box-shadow: 0 0 48px 16px rgba(232, 214, 186, 0.07); }
+        .organ-margin-frame.is-liver { box-shadow: 0 0 52px 16px rgba(92, 28, 18, 0.22); }
+        .organ-margin-frame.is-heart { box-shadow: 0 0 52px 16px rgba(140, 20, 32, 0.2); }
+        .organ-margin-frame.is-lung { box-shadow: 0 0 48px 16px rgba(232, 186, 196, 0.08); }
+        .organ-margin-frame.is-brain { box-shadow: 0 0 48px 16px rgba(150, 120, 210, 0.12); }
+        @keyframes margin-arrive { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        @keyframes margin-breathe { 0%, 100% { opacity: 0.72; transform: scale(1); } 50% { opacity: 1; transform: scale(1.045); } }
+        @keyframes heart-edge { 0%, 100% { opacity: 0.45; } 16% { opacity: 1; } 34% { opacity: 0.5; } 48% { opacity: 0.92; } }
+        @keyframes lung-edge { 0%, 100% { opacity: 0.55; transform: scale(0.98); } 50% { opacity: 1; transform: scale(1.06); } }
+        @keyframes brain-edge { 0%, 100% { opacity: 0.55; } 40% { opacity: 0.95; } 62% { opacity: 0.4; } 80% { opacity: 0.85; } }
         .playfield { position: absolute; z-index: 1; display: block; }
         .playfield-vignette { right: auto; bottom: auto; z-index: 2; }
+        .perf-mode-low .organ-margin::before { animation: none; opacity: 0.7; filter: none; }
         .perf-mode-low .organ-margin-frame { box-shadow: none; }
         .outcome-stack { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
         .trophy-rays {
@@ -1402,16 +1463,22 @@ export const Game: React.FC = () => {
 
       {/* BOSS WARNING OVERLAY */}
       {showBossIntro && (
-          <div className="absolute inset-0 z-[60] pointer-events-none flex flex-col items-center justify-center anim-pulse-red">
-              <div className="w-full bg-red-600/25 border-y-8 border-red-600 py-6 md:py-20 flex flex-col items-center justify-center relative overflow-hidden">
-                  <h1 className="text-3xl lg:text-9xl font-black text-red-500 tracking-[0.2em] anim-glitch drop-shadow-[0_0_20px_red] text-center">
-                      {t('BOSS_BANNER')}
+          <div className="absolute inset-0 z-[60] pointer-events-none flex flex-col items-center justify-center">
+              <div
+                  className="w-full py-6 md:py-16 flex flex-col items-center justify-center relative overflow-hidden border-y-4"
+                  style={{
+                      background: 'rgba(8, 4, 6, 0.72)',
+                      borderColor: bossCard?.color || '#ff3355',
+                      boxShadow: `inset 0 0 80px ${bossCard?.color || '#ff3355'}33`,
+                  }}
+              >
+                  <div className="text-[10px] lg:text-sm tracking-[0.55em] text-white/70 font-bold">{bossCard?.disease || t('BOSS_BANNER')}</div>
+                  <h1 className="text-3xl lg:text-8xl font-black tracking-[0.12em] text-center mt-2" style={{ color: bossCard?.color || '#ff3355', textShadow: `0 0 24px ${bossCard?.color || '#ff3355'}` }}>
+                      {bossCard?.name || t('BOSS_BANNER')}
                   </h1>
-                  <h2 className="text-sm lg:text-4xl text-white font-mono tracking-widest mt-2 lg:mt-4 blink text-center">
-                      {t('BOSS_SUB')}
+                  <h2 className="text-xs lg:text-2xl text-white/90 font-mono tracking-wide mt-3 lg:mt-5 text-center max-w-[80%] leading-snug">
+                      {bossCard?.line || t('BOSS_SUB')}
                   </h2>
-                  <div className="w-[200%] h-2 bg-red-500 absolute top-0 animate-[flow_2s_linear_infinite]"></div>
-                  <div className="w-[200%] h-2 bg-red-500 absolute bottom-0 animate-[flow_2s_linear_infinite_reverse]"></div>
               </div>
           </div>
       )}
@@ -1420,7 +1487,7 @@ export const Game: React.FC = () => {
       {bossEntity && !showBossIntro && (
           <div className="absolute top-14 lg:top-36 left-1/2 -translate-x-1/2 z-30 w-[60%] lg:w-[50%] flex flex-col items-center pointer-events-none anim-tutorial-fade" style={{animationDuration: '0.5s'}}>
               <div className="flex justify-between w-full text-red-500 font-bold font-mono text-[8px] lg:text-xs mb-1 tracking-[0.3em]">
-                  <span className="anim-glitch">{t('BOSS_TAG')}</span>
+                  <span className="anim-glitch">{bossEntity.name}</span>
                   <span>{Math.round(bossEntity.hp)}/{Math.round(bossEntity.max)}</span>
               </div>
               <div className="w-full h-2 lg:h-6 bg-black/80 border-2 border-red-900 relative skew-x-[-20deg] overflow-hidden">

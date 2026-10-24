@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 
 import { Language, OrganId } from '../types';
 import { hopLine, organPlainName } from '../services/casebook';
-import { bodyNote, closeLabel, crossingTitle, hopNote, sheetKicker, tapHint } from '../services/atlas';
+import { bossFor, drawBossShape, type BossSpec } from '../services/bosses';
+import { bodyNote, closeLabel, crossingTitle, sheetKicker, tapHint } from '../services/atlas';
 import { Dossier } from './Dossier';
 
 type Kind =
@@ -28,7 +29,7 @@ const COPY: Record<Language, Section[]> = {
                 { kind: 'virus', title: 'VÍRUS', body: 'Quase parado. De tempos em tempos solta um espinho na sua direção.' },
                 { kind: 'fungi', title: 'FUNGO', body: 'Rápido e frágil. Cruza a tela em zigue-zague.' },
                 { kind: 'parasite', title: 'PARASITA', body: 'Lento e enorme. Cada tiro perde um pedaço, e o contato dói.' },
-                { kind: 'boss', title: 'CHEFE', body: 'Um só, na última onda do órgão. O truque muda: corre, cospe, ácido ou couro grosso.' },
+                { kind: 'boss', title: 'CHEFE', body: 'Um por viagem. O nome e o truque estão na ficha de cada um, aqui embaixo.' },
             ],
         },
         {
@@ -88,7 +89,7 @@ const COPY: Record<Language, Section[]> = {
                 { kind: 'virus', title: 'VIRUS', body: 'Almost still. Every few seconds it spits a spike toward you.' },
                 { kind: 'fungi', title: 'FUNGUS', body: 'Fast and fragile. It zig-zags across the screen.' },
                 { kind: 'parasite', title: 'PARASITE', body: 'Slow and huge. Each shot loses a piece, and contact hurts.' },
-                { kind: 'boss', title: 'BOSS', body: 'One, on the organ’s last wave. The trick changes: sprint, spit, acid, or a thick hide.' },
+                { kind: 'boss', title: 'BOSS', body: 'One per crossing. The name and the trick are on each card, below.' },
             ],
         },
         {
@@ -148,7 +149,7 @@ const COPY: Record<Language, Section[]> = {
                 { kind: 'virus', title: 'VIRUS', body: 'Casi quieto. Cada pocos segundos suelta una púa hacia ti.' },
                 { kind: 'fungi', title: 'HONGO', body: 'Rápido y frágil. Cruza la pantalla en zigzag.' },
                 { kind: 'parasite', title: 'PARÁSITO', body: 'Lento y enorme. Cada tiro pierde un trozo, y el contacto duele.' },
-                { kind: 'boss', title: 'JEFE', body: 'Uno solo, en la última onda del órgano. El truco cambia: corre, escupe, ácido o cuero grueso.' },
+                { kind: 'boss', title: 'JEFE', body: 'Uno por viaje. El nombre y el truco están en la ficha de cada uno, aquí abajo.' },
             ],
         },
         {
@@ -683,6 +684,7 @@ const styles = `
     outline: none;
 }
 .guide-card.is-hop { grid-template-columns: 92px minmax(0, 1fr); min-height: 72px; }
+.guide-boss { display: block; width: 92px; height: 72px; background: #14080c; }
 .guide-stage {
     display: block;
     width: 168px;
@@ -799,6 +801,23 @@ const styles = `
 }
 `;
 
+function BossMark({ spec }: { spec: BossSpec }) {
+    const ref = useRef<HTMLCanvasElement>(null);
+    useEffect(() => {
+        const canvas = ref.current;
+        const ctx = canvas?.getContext('2d');
+        if (!canvas || !ctx) return;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#14080c';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.save();
+        ctx.translate(canvas.width / 2, canvas.height / 2);
+        drawBossShape(ctx, spec.shape, spec.color, spec.accent, 24, 900);
+        ctx.restore();
+    }, [spec]);
+    return <canvas ref={ref} width={96} height={72} className="guide-boss" />;
+}
+
 function loud(name: string, lang: Language): string {
     const locale = lang === 'PT' ? 'pt' : lang === 'ES' ? 'es' : 'en';
     return name.toLocaleUpperCase(locale);
@@ -871,7 +890,8 @@ export const FieldGuide: React.FC<{
                 <h4 className="dossier-kicker">{crossingTitle(language)}</h4>
                 <div className="guide-grid">
                     {ORGANS.flatMap((from) => ORGANS.filter((to) => to !== from).map((to) => {
-                        const titleHop = `${loud(organPlainName(from, language), language)} → ${loud(organPlainName(to, language), language)}`;
+                        const spec = bossFor(from, to);
+                        const route = `${loud(organPlainName(from, language), language)} → ${loud(organPlainName(to, language), language)}`;
                         const line = hopLine(from, to, language);
                         return (
                             <button
@@ -879,19 +899,16 @@ export const FieldGuide: React.FC<{
                                 type="button"
                                 className="guide-card is-hop"
                                 onClick={() => setOpen({
-                                    title: titleHop,
-                                    line,
-                                    bio: hopNote(from, to, language) || line,
-                                    swatch: [INK[from], INK[to]],
+                                    title: spec.short[language],
+                                    line: `${spec.disease[language]}. ${route}. ${line}`,
+                                    bio: `${spec.lesson[language]} ${spec.trick[language]}`,
+                                    swatch: [spec.color, spec.accent],
                                 })}
                             >
-                                <span className="guide-hop" style={{ background: `linear-gradient(100deg, ${INK[from]}, ${INK[to]})` }}>
-                                    <i style={{ background: INK[from] }} />
-                                    <i style={{ background: INK[to] }} />
-                                </span>
+                                <BossMark spec={spec} />
                                 <div className="guide-copy">
-                                    <h3>{titleHop}</h3>
-                                    <p>{line}</p>
+                                    <h3>{spec.short[language]}</h3>
+                                    <p>{spec.disease[language]}</p>
                                 </div>
                             </button>
                         );

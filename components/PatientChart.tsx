@@ -1,6 +1,6 @@
 import React from 'react';
 import { Difficulty, Language, PatientProfile } from '../types';
-import { symptomText } from '../services/casebook';
+import { isCanonRoute, symptomText } from '../services/casebook';
 import { TEXTS } from '../constants';
 
 const BACKGROUND = new URL('../src/assets/background.jpg', import.meta.url).href;
@@ -64,18 +64,28 @@ const chartStyles = `
 }
 `;
 
+const officialMark = (language: Language) => {
+    if (language === 'PT') return { seal: 'ROTA OFICIAL', line: 'molar · fígado · coração · pulmão · cérebro', note: 'A via que a história vai contar.' };
+    if (language === 'ES') return { seal: 'RUTA OFICIAL', line: 'molar · hígado · corazón · pulmón · cerebro', note: 'La vía que la historia va a contar.' };
+    return { seal: 'OFFICIAL ROUTE', line: 'molar · liver · heart · lung · brain', note: 'The road the story will follow.' };
+};
+
 const ChartPaper = ({
-    title, stamp, stampColor, isPlatinum, motion = 'in', arrive = 'snap', children
+    title, stamp, stampColor, isPlatinum, official = false, officialSeal, motion = 'in', arrive = 'snap', children
 }: {
     title: string;
     stamp: string;
     stampColor?: string;
     isPlatinum: boolean;
+    official?: boolean;
+    officialSeal?: string;
     motion?: 'in' | 'out';
     arrive?: 'snap' | 'soft';
     children: React.ReactNode;
 }) => {
-    const { ink, band } = inkOf(isPlatinum);
+    const base = inkOf(isPlatinum);
+    const ink = official ? '#6a4512' : base.ink;
+    const band = official ? '#b8860b' : base.band;
     const motionClass = motion === 'out' ? 'screen-out' : arrive === 'soft' ? 'chart-arrive' : 'screen-in';
     return (
         <div className={`absolute inset-0 z-50 flex items-center justify-center p-3 lg:p-8 overflow-hidden ${motionClass}`}>
@@ -86,8 +96,11 @@ const ChartPaper = ({
             <article
                 className="chart-sheet relative shadow-[0_18px_50px_rgba(0,0,0,0.55)]"
                 style={{
-                    background: 'linear-gradient(180deg, #f8f1e3 0%, #f3e6d0 100%)',
-                    color: '#2b1614'
+                    background: official
+                        ? 'linear-gradient(165deg, #fff8e6 0%, #f6e2a8 42%, #e8c56a 100%)'
+                        : 'linear-gradient(180deg, #f8f1e3 0%, #f3e6d0 100%)',
+                    color: official ? '#3a2a10' : '#2b1614',
+                    boxShadow: official ? '0 18px 50px rgba(0,0,0,0.55), inset 0 0 0 1px rgba(184,134,11,0.45)' : undefined,
                 }}
             >
                 <div className="absolute left-0 top-0 bottom-0 w-7 lg:w-11" style={{ background: band }}>
@@ -104,6 +117,14 @@ const ChartPaper = ({
                                     <span className="absolute top-1/2 left-0 right-0 h-[3px] -translate-y-1/2" style={{ background: band }} />
                                 </span>
                                 <span className="text-[9px] lg:text-xs tracking-[0.28em] font-bold" style={{ color: ink }}>VITAL RUSH</span>
+                                {official && officialSeal && (
+                                    <span
+                                        className="border px-1.5 py-px text-[8px] lg:text-[10px] tracking-[0.28em] font-bold"
+                                        style={{ borderColor: band, color: '#5c3b08', background: 'linear-gradient(180deg, #fff6d0, #e8c56a)' }}
+                                    >
+                                        {officialSeal}
+                                    </span>
+                                )}
                             </div>
                             <h2 className="chart-title mt-0.5 leading-none" style={{ fontFamily: 'Georgia, "Palatino Linotype", serif' }}>
                                 {title}
@@ -178,11 +199,19 @@ export const PatientChart: React.FC<PatientChartProps> = ({
     patient, language, difficulty, isPlatinum, onPlay, onLab, onBack, motion
 }) => {
     const t = (key: string) => TEXTS[language][key] || key;
-    const { ink, band } = inkOf(isPlatinum);
+    const official = isCanonRoute(patient.route);
+    const { ink, band } = official ? { ink: '#6a4512', band: '#b8860b' } : inkOf(isPlatinum);
+    const mark = officialMark(language);
 
     return (
-        <ChartPaper title={t('CHART_TITLE')} stamp={t('CHART_STAMP')} isPlatinum={isPlatinum} motion={motion}>
+        <ChartPaper title={t('CHART_TITLE')} stamp={t('CHART_STAMP')} isPlatinum={isPlatinum} official={official} officialSeal={mark.seal} motion={motion}>
             <PatientLine patient={patient} language={language} ink={ink} />
+            {official && (
+                <div className="mt-1">
+                    <div className="text-[9px] lg:text-xs tracking-[0.18em] font-semibold" style={{ color: band }}>{mark.line}</div>
+                    <div className="mt-0.5 text-[9px] lg:text-[11px] italic" style={{ color: ink }}>{mark.note}</div>
+                </div>
+            )}
 
             <div className="chart-fields mt-2 lg:mt-5 grid grid-cols-3 gap-2 lg:gap-3">
                 <div className="col-span-3">
@@ -238,9 +267,11 @@ export const OutcomeChart: React.FC<OutcomeChartProps> = ({
     variant, patient, language, isPlatinum, wave, biomass, score, onPrimary, onSecondary, onAbandon, motion
 }) => {
     const t = (key: string) => TEXTS[language][key] || key;
-    const { ink, band } = inkOf(isPlatinum);
+    const official = isCanonRoute(patient?.route);
+    const { ink, band } = official ? { ink: '#6a4512', band: '#b8860b' } : inkOf(isPlatinum);
     const cleared = variant === 'cleared';
     const stampColor = cleared ? '#166534' : ink;
+    const mark = officialMark(language);
 
     return (
         <ChartPaper
@@ -248,10 +279,18 @@ export const OutcomeChart: React.FC<OutcomeChartProps> = ({
             stamp={cleared ? t('CHART_STAMP_OK') : t('CHART_STAMP_LOST')}
             stampColor={stampColor}
             isPlatinum={isPlatinum}
+            official={official}
+            officialSeal={official ? mark.seal : undefined}
             motion={motion}
             arrive={cleared ? 'soft' : 'snap'}
         >
             {patient && <PatientLine patient={patient} language={language} ink={ink} />}
+            {official && (
+                <div className="mt-1">
+                    <div className="text-[9px] lg:text-xs tracking-[0.18em] font-semibold" style={{ color: band }}>{mark.line}</div>
+                    <div className="mt-0.5 text-[9px] lg:text-[11px] italic" style={{ color: ink }}>{mark.note}</div>
+                </div>
+            )}
 
             <div className="chart-fields mt-2 lg:mt-5 grid grid-cols-2 gap-2 lg:gap-3">
                 {cleared ? (

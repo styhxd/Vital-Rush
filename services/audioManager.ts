@@ -79,6 +79,7 @@ export class AudioManager {
   private reverbSend: GainNode | null = null;
   private fireMs = 450;
   private drumEvery = 4;
+  private chordDegree = 0;
   private lockedEvery = 0;
   private grid: { t: number; sixteenth: number }[] = [];
   private fallbackNext = 0;
@@ -960,47 +961,67 @@ export class AudioManager {
       return curve;
   }
 
+  /** Chord tone in the bass octave, so the shot sits in the organ's key. */
+  private drumHz(add: number): number {
+      const key = this.currentTrack === 'MENU' ? 'menu' : this.organ;
+      let hz = this.hz(SCORES[key], this.chordDegree + add, -1);
+      if (hz < 36) hz *= 2;
+      if (hz > 96) hz /= 2;
+      return hz;
+  }
+
   private play808(time: number, startHz: number, endHz: number, dur: number, peak: number, dest: AudioNode) {
       if (!this.ctx) return;
       const osc = this.ctx.createOscillator();
+      const body = this.ctx.createOscillator();
       const shape = this.ctx.createWaveShaper();
       const tone = this.ctx.createBiquadFilter();
       const g = this.ctx.createGain();
       shape.curve = this.driveCurve() as Float32Array<ArrayBuffer>;
       shape.oversample = '2x';
       osc.type = 'sine';
-      const start = Math.max(46, startHz);
-      const end = Math.max(28, Math.min(endHz, start - 1));
+      body.type = 'sine';
+      const end = Math.max(34, endHz);
+      const start = Math.max(end * 1.15, startHz);
       osc.frequency.setValueAtTime(start, time);
-      osc.frequency.exponentialRampToValueAtTime(end, time + Math.min(0.055, dur * 0.32));
+      osc.frequency.exponentialRampToValueAtTime(end, time + Math.min(0.05, dur * 0.34));
+      body.frequency.setValueAtTime(end * 2, time);
       tone.type = 'lowpass';
-      tone.frequency.setValueAtTime(240, time);
-      tone.Q.value = 0.45;
+      tone.frequency.setValueAtTime(360, time);
+      tone.Q.value = 0.5;
       g.gain.setValueAtTime(0.0001, time);
       g.gain.exponentialRampToValueAtTime(Math.max(0.001, peak), time + 0.003);
       g.gain.exponentialRampToValueAtTime(0.0001, time + Math.max(0.04, dur));
+      const octave = this.ctx.createGain();
+      octave.gain.setValueAtTime(0.5, time);
       osc.connect(shape);
+      body.connect(octave);
+      octave.connect(shape);
       shape.connect(tone);
       tone.connect(g);
       g.connect(dest);
+      if (dest === this.musicGain && this.sfxGain) g.connect(this.sfxGain);
       osc.start(time);
+      body.start(time);
       osc.stop(time + dur + 0.03);
+      body.stop(time + dur + 0.03);
   }
 
   public playDrum(kind: DrumHit) {
       if (!this.ctx || !this.musicGain || this.ctx.state !== 'running') return;
       const t = this.ctx.currentTime;
       const dest = this.musicGain;
+      const root = this.drumHz(0);
       if (kind === 'kick') {
-          this.play808(t, 156, 41, 0.48, 0.72, dest);
-          this.play808(t, 78, 41, 0.4, 0.22, dest);
+          this.play808(t, root * 2.7, root, 0.46, 0.96, dest);
       } else if (kind === 'snare') {
-          this.play808(t, 180, 96, 0.12, 0.14, dest);
-          this.puff(0.07, 360, 0.05, t, dest);
-      } else if (kind === 'hat') {
-          this.play808(t, 108, 64, 0.045, 0.045, dest);
+          const fifth = this.drumHz(4);
+          this.play808(t, fifth * 1.9, fifth, 0.15, 0.58, dest);
+      } else if (kind === 'tom') {
+          const third = this.drumHz(2);
+          this.play808(t, third * 1.6, third, 0.12, 0.5, dest);
       } else {
-          this.play808(t, 124, 54, 0.16, 0.16, dest);
+          this.play808(t, root * 1.7, root, 0.1, 0.5, dest);
       }
   }
 
@@ -1068,6 +1089,7 @@ export class AudioManager {
       const beat = step % 16;
       const bar = Math.floor(step / 16) % 4;
       const chord = score.chords[bar];
+      this.chordDegree = chord;
       const dest = this.musicGain;
       const cut = score.color === 'murk' ? 520 : score.color === 'spark' ? 3200 : score.color === 'glass' ? 2400 : score.color === 'air' ? 1600 : 1400;
       const wave: OscillatorType = score.color === 'murk' || score.color === 'spark' ? 'sawtooth' : 'triangle';
