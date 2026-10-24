@@ -1586,7 +1586,7 @@ export class GameEngine {
                         pos: { ...e.pos },
                         vel: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
                         radius: 12, health: 1, maxHealth: 1, color: this.colors.ENEMY_PROJECTILE,
-                        damage: Math.max(4, e.damage * 0.28), active: true, drag: 0
+                        damage: Math.max(3, e.damage * 0.2), active: true, drag: 0
                     });
                     
                     e.shootTimer = 3.5; 

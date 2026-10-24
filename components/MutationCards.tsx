@@ -527,11 +527,11 @@ export const mutationCardStyles = `
     position: relative;
     width: 100%;
     aspect-ratio: 1100 / 496;
+    container-type: inline-size;
 }
 .lab-card {
     position: absolute;
     inset: 0;
-    container-type: inline-size;
     width: 100%;
     height: 100%;
     overflow: hidden;
@@ -552,15 +552,14 @@ export const mutationCardStyles = `
     position: absolute;
     pointer-events: none;
 }
-.lab-wash { inset: 0; mix-blend-mode: soft-light; opacity: 0.95; }
+.lab-wash { inset: 0; opacity: 0.72; }
 .lab-art-glow {
-    right: 4%;
-    top: 26%;
-    width: 26%;
-    height: 38%;
-    background: radial-gradient(circle, var(--accent), transparent 68%);
-    opacity: calc(0.16 + var(--rank) * 0.5);
-    filter: blur(8px);
+    right: 2%;
+    top: 18%;
+    width: 34%;
+    height: 52%;
+    background: radial-gradient(circle, var(--accent) 0%, transparent 72%);
+    opacity: calc(0.14 + var(--rank) * 0.32);
 }
 .lab-art {
     right: 1.6%;
@@ -756,19 +755,18 @@ export const mutationCardStyles = `
     background: linear-gradient(105deg, transparent 36%, rgba(255,255,255,0.22) 50%, transparent 64%);
     transform: translateX(-130%);
 }
-.lab-card.is-hot:hover .lab-sheen { animation: lab-sheen 0.7s ease; }
 .lab-scan {
     left: 0;
     right: 0;
     top: 0;
     height: 22%;
-    background: linear-gradient(180deg, transparent, rgba(190, 120, 255, 0.16), transparent);
-    opacity: 0.8;
+    background: linear-gradient(180deg, transparent, rgba(190, 120, 255, 0.2), transparent);
+    animation: lab-scan 8s linear infinite;
 }
 .lab-glint {
-    inset: 0;
-    background: linear-gradient(100deg, transparent 42%, rgba(255, 220, 120, 0.16) 50%, transparent 58%);
-    opacity: 0.85;
+    inset: -20% -40%;
+    background: linear-gradient(100deg, transparent 42%, rgba(255, 220, 120, 0.22) 50%, transparent 58%);
+    animation: lab-sheen 9s ease-in-out infinite;
 }
 .lab-rim {
     inset: 0;
@@ -789,13 +787,16 @@ export const mutationCardStyles = `
     color: #ffe7a8;
     text-shadow: 0 1px 0 #1a1008, 0 0 10px rgba(255, 196, 70, 0.85);
 }
-.lab-card.is-hot:hover,
-.lab-card.is-hot:focus-visible {
-    transform: translateY(-3px);
-    box-shadow: 0 10px 0 rgba(0,0,0,0.35), 0 0 0 1px var(--ink);
+@media (hover: hover) and (pointer: fine) {
+    .lab-card.is-hot:hover,
+    .lab-card.is-hot:focus-visible {
+        transform: translateY(-3px);
+        box-shadow: 0 10px 0 rgba(0,0,0,0.35), 0 0 0 1px var(--ink);
+    }
+    .lab-card.is-hot:hover .lab-art,
+    .lab-card.is-hot:focus-visible .lab-art { transform: scale(1.04); }
+    .lab-card.is-hot:hover .lab-sheen { animation: lab-sheen 0.7s ease; }
 }
-.lab-card.is-hot:hover .lab-art,
-.lab-card.is-hot:focus-visible .lab-art { transform: scale(1.04); }
 .lab-card.is-hot:active {
     transform: translateY(1px);
     box-shadow: 0 2px 0 rgba(0,0,0,0.5);
@@ -811,8 +812,7 @@ export const mutationCardStyles = `
 .lab-card.is-poor .lab-shade {
     z-index: 1;
     opacity: 1;
-    background: rgba(168, 24, 32, 0.58);
-    mix-blend-mode: multiply;
+    background: rgba(42, 8, 12, 0.62);
 }
 .lab-card.is-poor .lab-snow {
     z-index: 2;
@@ -865,7 +865,7 @@ export const mutationCardStyles = `
     inset: 0;
     animation: lab-flash 0.22s ease forwards;
 }
-.lab-flash { background: radial-gradient(circle at 50% 62%, rgba(255, 225, 140, 0.55), transparent 62%); mix-blend-mode: screen; }
+.lab-flash { background: radial-gradient(circle at 50% 62%, rgba(255, 225, 140, 0.4), transparent 62%); }
 .lab-deny-flash { background: rgba(255, 36, 48, 0.2); }
 .lab-burst {
     left: 22%;
