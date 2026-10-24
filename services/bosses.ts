@@ -138,7 +138,7 @@ export const BOSSES: BossSpec[] = [
     },
     {
         id: 'heart>molar', from: 'heart', to: 'molar', shape: 'shortRod', play: 'adhere',
-        color: '#d9a441', accent: '#6e4a12', hp: 1.05, speed: 0.62, radius: 92,
+        color: '#d9a441', accent: '#6e4a12', hp: 1.05, speed: 0.36, radius: 92,
         short: text('A. ACTINOMYCETEMCOMITANS', 'A. ACTINOMYCETEMCOMITANS', 'A. ACTINOMYCETEMCOMITANS'),
         disease: text('Volta à gengiva', 'Back to the gum', 'Vuelta a la encía'),
         intro: text('O bastão da válvula volta para o bolso do dente, de onde saiu.', 'The rod from the valve goes back to the tooth pocket it came from.', 'El bastón de la válvula vuelve al bolsillo del diente, de donde salió.'),
@@ -151,7 +151,7 @@ export const BOSSES: BossSpec[] = [
     },
     {
         id: 'heart>liver', from: 'heart', to: 'liver', shape: 'capsid', play: 'capsid',
-        color: '#9fd7ff', accent: '#d6ecff', hp: 0.72, speed: 0.7, radius: 78,
+        color: '#9fd7ff', accent: '#d6ecff', hp: 0.72, speed: 0.36, radius: 78,
         short: text('COXSACKIE B', 'COXSACKIE B', 'COXSACKIE B'),
         disease: text('Miocardite e hepatite', 'Myocarditis and hepatitis', 'Miocarditis y hepatitis'),
         intro: text('O vírus do músculo cardíaco segue no sangue e inflama o fígado.', 'The virus of the heart muscle stays in the blood and inflames the liver.', 'El virus del músculo cardíaco sigue en la sangre e inflama el hígado.'),
@@ -203,7 +203,7 @@ export const BOSSES: BossSpec[] = [
     },
     {
         id: 'lung>liver', from: 'lung', to: 'liver', shape: 'schisto', play: 'flagellum',
-        color: '#c98b6a', accent: '#6a3030', hp: 0.95, speed: 0.5, radius: 114,
+        color: '#c98b6a', accent: '#6a3030', hp: 0.95, speed: 0.34, radius: 114,
         short: text('S. MANSONI', 'S. MANSONI', 'S. MANSONI'),
         disease: text('Esquistossomose', 'Schistosomiasis', 'Esquistosomiasis'),
         intro: text('O verme jovem atravessa o pulmão a caminho do fígado.', 'The young worm crosses the lung on the way to the liver.', 'El gusano joven cruza el pulmón camino del hígado.'),
@@ -216,7 +216,7 @@ export const BOSSES: BossSpec[] = [
     },
     {
         id: 'lung>heart', from: 'lung', to: 'heart', shape: 'cords', play: 'cord',
-        color: '#e7d2a8', accent: '#8a7040', hp: 1.4, speed: 0.42, radius: 116,
+        color: '#e7d2a8', accent: '#8a7040', hp: 1.4, speed: 0.36, radius: 116,
         short: text('M. TUBERCULOSIS', 'M. TUBERCULOSIS', 'M. TUBERCULOSIS'),
         disease: text('Pericardite', 'Pericarditis', 'Pericarditis'),
         intro: text('Os cordões do pulmão encostam no pericárdio e tomam o coração.', 'The cords from the lung reach the pericardium and take the heart.', 'Los cordones del pulmón llegan al pericardio y toman el corazón.'),
@@ -268,7 +268,7 @@ export const BOSSES: BossSpec[] = [
     },
     {
         id: 'brain>heart', from: 'brain', to: 'heart', shape: 'crescent', play: 'crescent',
-        color: '#b7e0ff', accent: '#4a7ea8', hp: 0.85, speed: 0.58, radius: 90,
+        color: '#b7e0ff', accent: '#4a7ea8', hp: 0.85, speed: 0.4, radius: 90,
         short: text('T. GONDII', 'T. GONDII', 'T. GONDII'),
         disease: text('Toxoplasmose', 'Toxoplasmosis', 'Toxoplasmosis'),
         intro: text('O crescente sai do cisto no cérebro e invade o músculo do coração.', 'The crescent leaves the cyst in the brain and invades the heart muscle.', 'El creciente sale del quiste en el cerebro e invade el músculo del corazón.'),
@@ -281,7 +281,7 @@ export const BOSSES: BossSpec[] = [
     },
     {
         id: 'brain>lung', from: 'brain', to: 'lung', shape: 'coil', play: 'coil',
-        color: '#e0b48a', accent: '#8a5a32', hp: 1.1, speed: 0.42, radius: 108,
+        color: '#e0b48a', accent: '#8a5a32', hp: 1.1, speed: 0.36, radius: 108,
         short: text('A. CANTONENSIS', 'A. CANTONENSIS', 'A. CANTONENSIS'),
         disease: text('Angiostrongilíase', 'Angiostrongyliasis', 'Angiostrongiliasis'),
         intro: text('A larva se perde no cérebro. O endereço verdadeiro dela é o pulmão do rato.', 'The larva gets lost in the brain. Its real address is the rat’s lung.', 'La larva se pierde en el cerebro. Su dirección verdadera es el pulmón de la rata.'),
@@ -309,8 +309,8 @@ export function mutationFrom(spec: BossSpec): BossMutation {
         traits: [],
         color: spec.color,
         accent: spec.accent,
-        dashTimer: spec.play === 'pseudopod' ? 2.4 : spec.play === 'embolus' ? 3.2 : 1.6,
-        shootTimer: spec.play === 'capsid' ? 0.9 : spec.play === 'reactivate' ? 2.6 : 2.1,
+        dashTimer: spec.play === 'pseudopod' ? 2.6 : spec.play === 'embolus' ? 3.6 : spec.play === 'adhere' ? 2.4 : 1.8,
+        shootTimer: spec.play === 'capsid' ? 1.55 : spec.play === 'reactivate' ? 2.8 : 2.2,
         acidTimer: 1.8,
         baseSpeed: spec.speed,
         id: spec.id,

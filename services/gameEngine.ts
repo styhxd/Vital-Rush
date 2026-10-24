@@ -78,6 +78,18 @@ function campaignPressure(waveIndex: number): number {
     return Math.pow(t, 1.15);
 }
 
+// O mesmo chefe anda e ataca mais conforme a onda sobe. Onda 1 fica em 86% do passo escrito; a 30, em 118%.
+function bossPace(waveIndex: number): number {
+    const pressure = campaignPressure(waveIndex);
+    return 0.86 + pressure * 0.32 + Math.min(0.1, wavesPastTheWall(waveIndex) * 0.008);
+}
+
+// Acima de 1 o chefe espera mais entre golpes. Onda 1 é 14% mais lenta; a 30, 8% mais rápida.
+function bossHaste(waveIndex: number): number {
+    const pressure = campaignPressure(waveIndex);
+    return 1.14 - pressure * 0.22 - Math.min(0.06, wavesPastTheWall(waveIndex) * 0.005);
+}
+
 const GRID_CELL_SIZE = 150;
 const GRID_COLS = Math.ceil(CANVAS_WIDTH / GRID_CELL_SIZE);
 const GRID_ROWS = Math.ceil(CANVAS_HEIGHT / GRID_CELL_SIZE);
@@ -173,6 +185,7 @@ export class GameEngine {
   private bossCardAge = 0;
   private hitStopTimer: number = 0;
   private acidContact: number = 0;
+  private acidBite: number = 0;
   private acidCue: number = 0;
   private acidDrip: number = 0;
   private bgGap: number = 0.6;
@@ -380,6 +393,10 @@ export class GameEngine {
   public spawnBoss(_config: WaveConfig) {
       const spec = bossFor(this.organ.id, this.organ.nextOrgan(this.currentWaveIndex));
       const mutation = mutationFrom(spec);
+      const haste = bossHaste(this.currentWaveIndex);
+      mutation.dashTimer *= haste;
+      mutation.shootTimer *= haste;
+      mutation.acidTimer *= haste;
       const pastTheWall = wavesPastTheWall(this.currentWaveIndex);
       const pressure = campaignPressure(this.currentWaveIndex);
       const hp = 1200 * spec.hp * this.difficultyMods.hp * (1 + pressure * 2.6) * Math.pow(1.05, pastTheWall);
@@ -497,11 +514,12 @@ export class GameEngine {
 
   private bossShot(e: Entity, angle: number, speed: number, radius: number, damage: number) {
       if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.9);
+      const shotSpeed = speed * bossPace(this.currentWaveIndex) * 0.92;
       this.entities.push({
           id: `bproj_${this.time}_${Math.random()}`,
           type: EntityType.ENEMY_PROJECTILE,
           pos: { ...e.pos },
-          vel: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
+          vel: { x: Math.cos(angle) * shotSpeed, y: Math.sin(angle) * shotSpeed },
           radius, health: 1, maxHealth: 1,
           color: e.color, damage, active: true, drag: 0
       });
@@ -629,7 +647,7 @@ export class GameEngine {
           let leftover = total - base * shards;
           for (let i = 0; i < shards; i++) {
               const ang = (i / shards) * Math.PI * 2 + Math.random() * 0.4;
-              const kick = 3.2 + Math.random() * 3.4;
+              const kick = 1.7 + Math.random() * 1.35;
               const share = base + (leftover > 0 ? 1 : 0);
               if (leftover > 0) leftover--;
               this.entities.push({
@@ -893,9 +911,9 @@ export class GameEngine {
                   type: EntityType.ORBITAL,
                   pos: { ...this.player.pos },
                   vel: { x: 0, y: 0 },
-                  radius: 8,
+                  radius: 14,
                   health: 1, maxHealth: 1, color: this.colors.ORBITAL,
-                  damage: stats.damage * 0.75, 
+                  damage: stats.damage * 0.9, 
                   active: true,
                   orbitOffset: (i / stats.orbitals) * 360 
               });
@@ -909,7 +927,7 @@ export class GameEngine {
               const angleIdx = ((this.time / 10 * speed) + (e.orbitOffset || 0));
               e.pos.x = this.player.pos.x + getCos(angleIdx) * radius;
               e.pos.y = this.player.pos.y + getSin(angleIdx) * radius;
-              e.damage = stats.damage * 0.75;
+              e.damage = stats.damage * 0.9;
               if (e.shootTimer && e.shootTimer > 0) e.shootTimer = Math.max(0, e.shootTimer - dtSeconds);
           }
       }
@@ -982,83 +1000,88 @@ export class GameEngine {
       const dMag = Math.max(1, Math.hypot(dx, dy));
       const nx = dx / dMag;
       const ny = dy / dMag;
-      const speed = m.baseSpeed * this.difficultyMods.speed;
+      const pace = bossPace(this.currentWaveIndex);
+      const haste = bossHaste(this.currentWaveIndex);
+      const speed = m.baseSpeed * this.difficultyMods.speed * pace;
       const aim = Math.atan2(dy, dx);
-      const shot = Math.max(8, e.damage * 0.32);
+      const shot = Math.max(5, e.damage * 0.22);
       const chase = (mul = 1) => {
           e.vel.x += nx * speed * mul;
           e.vel.y += ny * speed * mul;
+      };
+      const lunge = (power: number, side = 0, sidePower = 0) => {
+          e.vel.x = (nx * power + (-ny) * side * sidePower) * pace;
+          e.vel.y = (ny * power + nx * side * sidePower) * pace;
       };
 
       if (m.play === 'bud' && !m.split && e.health < e.maxHealth * 0.5) {
           m.split = true;
           e.radius *= 0.78;
-          m.baseSpeed *= 1.65;
+          m.baseSpeed *= 1.3;
           for (let i = 0; i < 8; i++) this.bossShot(e, (i / 8) * Math.PI * 2, 7, 12, shot * 0.7);
           audioManager.playEnemyShoot(e.pos);
       }
       if (m.play === 'cyst' && !m.open && e.health < e.maxHealth * 0.45) {
           m.open = true;
-          m.baseSpeed *= 2.4;
+          m.baseSpeed *= 1.5;
           if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.9);
           audioManager.playBossDash(e.pos);
       }
 
       if (m.play === 'coil') {
-          const orbit = 150 + Math.sin(m.phase * 0.85) * 110;
-          const ang = m.phase * 1.35;
+          const orbit = 170 + Math.sin(m.phase * 0.7) * 90;
+          const ang = m.phase * 1.05;
           const tx = this.player.pos.x + Math.cos(ang) * orbit;
           const ty = this.player.pos.y + Math.sin(ang) * orbit;
           const ox = tx - e.pos.x;
           const oy = ty - e.pos.y;
           const od = Math.max(1, Math.hypot(ox, oy));
-          e.vel.x += (ox / od) * speed * 2.2;
-          e.vel.y += (oy / od) * speed * 2.2;
+          e.vel.x += (ox / od) * speed * 1.25;
+          e.vel.y += (oy / od) * speed * 1.25;
           return;
       }
 
       if (m.play === 'flagellum') {
-          e.vel.x += nx * speed + (-ny) * Math.sin(m.phase * 2.4) * speed * 1.2;
-          e.vel.y += ny * speed + nx * Math.sin(m.phase * 2.4) * speed * 1.2;
+          const sway = Math.sin(m.phase * 2.1);
+          e.vel.x += nx * speed + (-ny) * sway * speed * 0.7;
+          e.vel.y += ny * speed + nx * sway * speed * 0.7;
           return;
       }
 
       if (m.play === 'cord') {
-          const spin = Math.sin(m.phase * 1.5);
-          e.vel.x += nx * speed * 1.35 + (-ny) * speed * 1.05 * spin;
-          e.vel.y += ny * speed * 1.35 + nx * speed * 1.05 * spin;
+          const spin = Math.sin(m.phase * 1.2);
+          e.vel.x += nx * speed * 1.05 + (-ny) * speed * 0.8 * spin;
+          e.vel.y += ny * speed * 1.05 + nx * speed * 0.8 * spin;
           m.dashTimer -= dtSeconds;
           if (m.dashTimer <= 0) {
-              e.vel.x += nx * 13;
-              e.vel.y += ny * 13;
-              m.dashTimer = 2.2;
+              e.vel.x += nx * 6 * pace;
+              e.vel.y += ny * 6 * pace;
+              m.dashTimer = 3.1 * haste;
               if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.75);
           }
           return;
       }
 
       if (m.play === 'crescent') {
-          chase(0.45);
+          chase(0.28);
           m.dashTimer -= dtSeconds;
           if (m.dashTimer <= 0) {
               const side = m.phase % 2 > 1 ? 1 : -1;
-              e.vel.x = nx * 16 + (-ny) * 10 * side;
-              e.vel.y = ny * 16 + nx * 10 * side;
-              m.dashTimer = 1.35;
+              lunge(8, side, 4);
+              m.dashTimer = 2.05 * haste;
           }
           return;
       }
 
       if (m.play === 'pseudopod') {
           m.dashTimer -= dtSeconds;
-          if (m.dashTimer > 0.45) chase(0.15);
+          if (m.dashTimer > 0.55) chase(0.15);
           if (m.dashTimer <= 0) {
-              e.vel.x = nx * 28;
-              e.vel.y = ny * 28;
-              this.bossPool(e, 110, 4.5);
-              m.dashTimer = 3.4;
+              lunge(12);
+              this.bossPool(e, 78, 4);
+              m.dashTimer = 3.8 * haste;
               if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.9);
-          audioManager.playBossDash(e.pos);
+              audioManager.playBossDash(e.pos);
           }
           return;
       }
@@ -1067,40 +1090,39 @@ export class GameEngine {
           m.shootTimer -= dtSeconds;
           if (m.shootTimer > 0.7) chase(0.2);
           if (m.shootTimer <= 0) {
-              for (let i = 0; i < 12; i++) this.bossShot(e, (i / 12) * Math.PI * 2, 6.5, 13, shot * 0.8);
-              m.shootTimer = 3.1;
+              for (let i = 0; i < 8; i++) this.bossShot(e, (i / 8) * Math.PI * 2, 5.6, 12, shot * 0.6);
+              m.shootTimer = 3.8 * haste;
               audioManager.playEnemyShoot(e.pos);
           }
           return;
       }
 
-      chase(m.play === 'adhere' ? 1.7 : m.play === 'capsid' ? 1.45 : m.play === 'capsule' ? 0.65 : 1);
+      chase(m.play === 'adhere' ? 1.05 : m.play === 'capsid' ? 1 : m.play === 'capsule' ? 0.65 : 1);
 
       if (m.play === 'abscess' || m.play === 'filament') {
           m.acidTimer -= dtSeconds;
           if (m.acidTimer <= 0) {
-              this.bossPool(e, m.play === 'filament' ? 54 : 86, m.play === 'filament' ? 4 : 5.5);
-              m.acidTimer = m.play === 'filament' ? 2.5 : 2.15;
+              this.bossPool(e, m.play === 'filament' ? 46 : 72, m.play === 'filament' ? 3.6 : 5);
+              m.acidTimer = (m.play === 'filament' ? 3.05 : 2.55) * haste;
           }
       }
 
       if (m.play === 'embolus') {
           m.dashTimer -= dtSeconds;
           if (m.dashTimer <= 0) {
-              e.vel.x = nx * 32;
-              e.vel.y = ny * 32;
-              for (let i = -2; i <= 2; i++) this.bossShot(e, aim + i * 0.18, 8, 13, shot);
-              m.dashTimer = 3.6;
+              lunge(11);
+              for (let i = -2; i <= 2; i++) this.bossShot(e, aim + i * 0.24, 6.6, 11, shot * 0.8);
+              m.dashTimer = 4.4 * haste;
               if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.9);
-          audioManager.playBossDash(e.pos);
+              audioManager.playBossDash(e.pos);
           }
       }
 
       if (m.play === 'cluster') {
           m.shootTimer -= dtSeconds;
           if (m.shootTimer <= 0) {
-              for (let i = -3; i <= 3; i++) this.bossShot(e, aim + i * 0.22, 7.2, 12, shot * 0.85);
-              m.shootTimer = 2.35;
+              for (let i = -2; i <= 2; i++) this.bossShot(e, aim + i * 0.26, 6.2, 11, shot * 0.68);
+              m.shootTimer = 3.05 * haste;
               audioManager.playEnemyShoot(e.pos);
           }
       }
@@ -1108,37 +1130,35 @@ export class GameEngine {
       if (m.play === 'capsid') {
           m.shootTimer -= dtSeconds;
           if (m.shootTimer <= 0) {
-              this.bossShot(e, aim, 9, 10, shot * 0.7);
-              m.shootTimer = 0.85;
+              this.bossShot(e, aim, 7.4, 10, shot * 0.6);
+              m.shootTimer = 1.55 * haste;
           }
       }
 
       if (m.play === 'capsule') {
           m.shootTimer -= dtSeconds;
           if (m.shootTimer <= 0) {
-              for (let i = 0; i < 8; i++) this.bossShot(e, (i / 8) * Math.PI * 2 + m.phase, 4.2, 14, shot * 0.65);
-              m.shootTimer = 4.6;
+              for (let i = 0; i < 8; i++) this.bossShot(e, (i / 8) * Math.PI * 2 + m.phase, 3.6, 12, shot * 0.55);
+              m.shootTimer = 5.2 * haste;
               audioManager.playEnemyShoot(e.pos);
           }
       }
 
       if (m.play === 'adhere') {
           m.dashTimer -= dtSeconds;
-          if (m.dashTimer <= 0 && dMag > 180) {
-              e.vel.x = nx * 18;
-              e.vel.y = ny * 18;
-              m.dashTimer = 2.4;
+          if (m.dashTimer <= 0 && dMag > 240) {
+              lunge(9);
+              m.dashTimer = 3.4 * haste;
           }
       }
 
       if (m.play === 'cyst' && m.open) {
           m.dashTimer -= dtSeconds;
           if (m.dashTimer <= 0) {
-              e.vel.x = nx * 26;
-              e.vel.y = ny * 26;
-              m.dashTimer = 2.2;
+              lunge(11);
+              m.dashTimer = 2.8 * haste;
               if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.9);
-          audioManager.playBossDash(e.pos);
+              audioManager.playBossDash(e.pos);
           }
       }
   }
@@ -1534,9 +1554,14 @@ export class GameEngine {
                   hit = distSq(this.player.pos, e.pos) < (hitR + pad) ** 2;
               }
               if (hit) {
-                  this.damagePlayer(0.5 * tick, e.pos, onGameOver, onLifeLost, stats, true);
                   this.acidContact = 0.45;
-                  this.acidDrip += 0.5 * tick;
+                  if (this.acidBite <= 0) {
+                      const pressure = campaignPressure(this.currentWaveIndex);
+                      const bite = (3.5 + pressure * 5.5) * (this.difficultyMods.dmg / 1.65);
+                      this.damagePlayer(bite, e.pos, onGameOver, onLifeLost, stats, true);
+                      this.acidBite = 0.4;
+                      this.acidDrip += bite;
+                  }
                   this.acidCue -= dtSeconds;
                   if (this.acidCue <= 0) {
                       this.acidCue = 0.42;
@@ -1637,10 +1662,16 @@ export class GameEngine {
             const dx = this.player.pos.x - e.pos.x;
             const dy = this.player.pos.y - e.pos.y;
             const dist = Math.sqrt(dx*dx + dy*dy);
-            if (dist > 0 && dist < 400) { // Só curva se estiver perto
-                const homingForce = 0.2;
-                e.vel.x += (dx/dist) * homingForce;
-                e.vel.y += (dy/dist) * homingForce;
+            if (dist > 0 && dist < 320) {
+                const before = Math.hypot(e.vel.x, e.vel.y);
+                const steer = 0.055;
+                e.vel.x += (dx / dist) * steer;
+                e.vel.y += (dy / dist) * steer;
+                const next = Math.hypot(e.vel.x, e.vel.y);
+                if (before > 0.01 && next > before) {
+                    e.vel.x *= before / next;
+                    e.vel.y *= before / next;
+                }
             }
         }
 
@@ -1737,7 +1768,7 @@ export class GameEngine {
              if (Math.abs(e.pos.x - other.pos.x) < rSum && Math.abs(e.pos.y - other.pos.y) < rSum) {
                  if (distSq(e.pos, other.pos) < rSum * rSum) {
                    if (e.type === EntityType.ANTIBODY) e.active = false;
-                   if (e.type === EntityType.ORBITAL) e.shootTimer = 0.72;
+                   if (e.type === EntityType.ORBITAL) e.shootTimer = 0.5;
                    
                    const comboPower = comboDamageMultiplier(this.comboCount);
                    this.damageEnemy(other, e.damage * (e.type === EntityType.ORBITAL ? 1 : comboPower), e.type === EntityType.ANTIBODY, stats);
@@ -1788,8 +1819,9 @@ export class GameEngine {
               if (dMag < pSum * 0.8) {
                  if (this.invulnerabilityTimer <= 0 && !this.isDashing) {
                      if (stats.thorns > 0) this.damageEnemy(e, stats.thorns, false, stats);
-                     let damage = e.type === EntityType.BOSS ? 16 : (e.isElite ? 2.5 : 0.6);
+                     let damage = e.isElite ? 2.5 : 0.6;
                      damage *= this.difficultyMods.dmg;
+                     if (e.type === EntityType.BOSS) damage = Math.max(3, e.damage * 0.11);
                      if (e.type === EntityType.VIRUS) damage = Math.max(damage, e.damage * (e.isElite ? 0.62 : 0.55));
                      // Damage from enemy collision uses protection logic
                      this.damagePlayer(damage, e.pos, onGameOver, onLifeLost, stats, false, e);
@@ -1893,6 +1925,7 @@ export class GameEngine {
         }
     }
     if (this.acidContact > 0) this.acidContact -= dt / 1000;
+    if (this.acidBite > 0) this.acidBite -= dt / 1000;
     else {
         this.acidDrip = 0;
         this.acidCue = 0;

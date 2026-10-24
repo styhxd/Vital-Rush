@@ -160,7 +160,7 @@ const MutationCard: React.FC<CardProps> = ({
             {hotkey && <div className="lab-key">{hotkey}</div>}
 
             <span className="lab-sheen" />
-            {upgrade.rarity === 'EPIC' && <span className="lab-scan" />}
+            {(upgrade.rarity === 'EPIC' || upgrade.rarity === 'LEGENDARY') && <span className="lab-scan" />}
             {upgrade.rarity === 'LEGENDARY' && <span className="lab-glint" />}
             <span className="lab-rim" />
 
@@ -751,24 +751,41 @@ export const mutationCardStyles = `
     line-height: 1;
     box-shadow: 0 0 10px var(--accent);
 }
+.lab-sheen, .lab-scan, .lab-glint {
+    z-index: 2;
+    will-change: transform;
+}
 .lab-sheen {
     inset: 0;
-    background: linear-gradient(105deg, transparent 36%, rgba(255,255,255,0.22) 50%, transparent 64%);
-    transform: translateX(-130%);
+    background: linear-gradient(105deg, transparent 42%, rgba(255,255,255,0.16) 50%, transparent 58%);
+    transform: translate3d(-140%, 0, 0);
+    opacity: 0.4;
 }
 .lab-scan {
     left: 0;
     right: 0;
     top: 0;
-    height: 28%;
-    background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent) 72%, white), transparent);
-    animation: lab-scan 5.5s linear infinite;
-    opacity: 0.9;
+    height: 22%;
+    background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--accent) 62%, white), transparent);
+    transform: translate3d(0, -140%, 0);
+    animation: lab-scan 7.2s linear infinite;
+    opacity: 0.72;
+}
+.lab-card.is-legendary .lab-scan {
+    height: 30%;
+    background: linear-gradient(180deg, transparent 0%, rgba(255, 214, 120, 0.18) 28%, rgba(255, 250, 226, 0.96) 50%, rgba(255, 176, 48, 0.22) 74%, transparent 100%);
+    animation-duration: 6.4s;
+    opacity: 1;
 }
 .lab-glint {
-    inset: -20% -40%;
-    background: linear-gradient(100deg, transparent 40%, rgba(255, 236, 170, 0.9) 50%, transparent 60%);
-    animation: lab-sheen 6.5s ease-in-out infinite;
+    top: -18%;
+    bottom: -18%;
+    left: 0;
+    width: 18%;
+    background: linear-gradient(100deg, transparent 18%, rgba(255, 236, 170, 0.35) 38%, rgba(255, 255, 250, 0.98) 50%, rgba(255, 210, 90, 0.4) 62%, transparent 82%);
+    transform: translate3d(-240%, 0, 0);
+    animation: lab-glint 5.6s ease-in-out infinite;
+    opacity: 1;
 }
 .lab-rim {
     inset: 0;
@@ -798,16 +815,31 @@ export const mutationCardStyles = `
     .lab-card.is-hot:hover .lab-art,
     .lab-card.is-hot:focus-visible .lab-art { transform: scale(1.04); }
 }
-.lab-card:not(.is-offer):not(.is-poor):not(.is-max) .lab-sheen {
-    background: linear-gradient(105deg, transparent 34%, color-mix(in srgb, var(--accent) 62%, white) 50%, transparent 66%);
-    animation: lab-sheen 9s ease-in-out infinite;
-    opacity: 0.72;
+.lab-card:not(.is-poor):not(.is-max) .lab-sheen {
+    animation: lab-sheen 13s ease-in-out infinite;
 }
-.lab-card.is-rare:not(.is-offer):not(.is-poor):not(.is-max) .lab-sheen { animation-duration: 6.4s; opacity: 0.84; }
-.lab-card.is-epic:not(.is-offer):not(.is-poor):not(.is-max) .lab-sheen { animation-duration: 4.8s; opacity: 0.92; }
-.lab-card.is-legendary:not(.is-offer):not(.is-poor):not(.is-max) .lab-sheen { animation-duration: 3.6s; opacity: 1; }
-.lab-slot:nth-child(3n) .lab-sheen { animation-delay: -3.2s; }
-.lab-slot:nth-child(3n + 1) .lab-sheen { animation-delay: -6.4s; }
+.lab-card.is-rare:not(.is-poor):not(.is-max) .lab-sheen {
+    background: linear-gradient(105deg, transparent 38%, color-mix(in srgb, var(--accent) 48%, white) 50%, transparent 62%);
+    animation-duration: 9.5s;
+    opacity: 0.7;
+}
+.lab-card.is-epic:not(.is-poor):not(.is-max) .lab-sheen {
+    background: linear-gradient(105deg, transparent 36%, color-mix(in srgb, var(--accent) 58%, white) 50%, transparent 64%);
+    animation-duration: 8.2s;
+    opacity: 0.55;
+}
+.lab-card.is-legendary:not(.is-poor):not(.is-max) .lab-sheen {
+    background: linear-gradient(105deg, transparent 30%, rgba(255, 214, 120, 0.2) 42%, rgba(255, 252, 236, 0.92) 50%, rgba(255, 186, 48, 0.28) 58%, transparent 70%);
+    animation-duration: 6.8s;
+    opacity: 0.95;
+}
+.lab-slot:nth-child(3n) .lab-sheen,
+.serum-slot:nth-child(2) .lab-sheen { animation-delay: -4s; }
+.lab-slot:nth-child(3n + 1) .lab-sheen,
+.serum-slot:nth-child(3) .lab-sheen { animation-delay: -7.5s; }
+.lab-slot:nth-child(odd) .lab-scan,
+.serum-slot:nth-child(2) .lab-scan { animation-delay: -2.4s; }
+.lab-slot:nth-child(3n) .lab-glint { animation-delay: -3s; }
 .lab-card.is-hot:active {
     transform: translateY(1px);
     box-shadow: 0 2px 0 rgba(0,0,0,0.5);
@@ -1030,16 +1062,21 @@ export const mutationCardStyles = `
     to { transform: scale(1); }
 }
 @keyframes lab-sheen {
-    from { transform: translateX(-130%); }
-    to { transform: translateX(130%); }
+    from { transform: translate3d(-140%, 0, 0); }
+    to { transform: translate3d(140%, 0, 0); }
 }
 @keyframes lab-snow {
     from { background-position: 0 0, 0 0; }
     to { background-position: 0 4px, 0 0; }
 }
 @keyframes lab-scan {
-    from { transform: translateY(-140%); }
-    to { transform: translateY(460%); }
+    from { transform: translate3d(0, -140%, 0); }
+    to { transform: translate3d(0, 460%, 0); }
+}
+@keyframes lab-glint {
+    0% { transform: translate3d(-240%, 0, 0); }
+    38% { transform: translate3d(620%, 0, 0); }
+    100% { transform: translate3d(620%, 0, 0); }
 }
 @keyframes lab-invite {
     0%, 100% { transform: scale(1); }
@@ -1073,6 +1110,6 @@ export const mutationCardStyles = `
     .serum-mark svg { width: 30px; height: 30px; }
 }
 @media (prefers-reduced-motion: reduce) {
-    .lab-scan, .lab-glint, .lab-more, .lab-card.is-offer .lab-evolve, .lab-snow { animation: none; }
+    .lab-sheen, .lab-scan, .lab-glint, .lab-more, .lab-card.is-offer .lab-evolve, .lab-snow { animation: none; }
 }
 `;
