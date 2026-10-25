@@ -296,6 +296,7 @@ export class OrganDirector {
     private gustN = 0;
     private lungPhase: 'idle' | 'telegraph' | 'gust' | 'inhale' | 'blast' = 'idle';
     private lungT = 0;
+    private readonly coughWarn = 1.55;
     private gust: Vector2 = { x: -8, y: 0 };
     private bandY = 540;
     private bandHalf = 380;
@@ -1243,7 +1244,7 @@ export class OrganDirector {
         this.gustN++;
         if (this.gustN % 3 === 0 && this.local >= 3) {
             this.lungPhase = 'inhale';
-            this.lungT = 1.05;
+            this.lungT = this.coughWarn;
             this.bandHalf = CANVAS_HEIGHT * 0.35;
             const room = CANVAS_HEIGHT - this.bandHalf * 2;
             this.bandY = this.bandHalf + Math.random() * Math.max(1, room);
@@ -2536,14 +2537,14 @@ export class OrganDirector {
 
     private drawCoughBand(ctx: CanvasRenderingContext2D, low: boolean) {
         const blasting = this.lungPhase === 'blast';
-        const warn = blasting ? 1 : Math.max(0, Math.min(1, 1 - this.lungT / 1.05));
+        const warn = blasting ? 1 : Math.max(0, Math.min(1, 1 - this.lungT / this.coughWarn));
         const time = this.hooks?.time ?? 0;
         const beat = 0.5 + 0.5 * Math.sin(time / (blasting ? 32 : 170 - warn * 125));
         const y0 = this.bandY - this.bandHalf;
         const h = this.bandHalf * 2;
         const fade = blasting ? Math.max(0, this.lungT) / 0.72 : 1;
         ctx.save();
-        const edge = blasting ? 0.55 : 0.12 + warn * 0.38 + beat * (0.08 + warn * 0.22);
+        const edge = blasting ? 0.55 : 0.24 + warn * 0.32 + beat * (0.08 + warn * 0.18);
         const mid = blasting ? 0.16 + fade * 0.28 : 0.04 + warn * 0.1;
         const wash = ctx.createLinearGradient(0, y0, 0, y0 + h);
         wash.addColorStop(0, `rgba(255, 70, 100, ${edge})`);

@@ -49,11 +49,16 @@ export class AudioManager {
   private ctx: AudioContext | null = null;
   private masterGain: GainNode | null = null;
   private musicGain: GainNode | null = null;
+  private musicBed: GainNode | null = null;
   private sfxGain: GainNode | null = null;
   private compressor: DynamicsCompressorNode | null = null;
   
-  // EFEITO DE QUASE-MORTE (Low Pass Filter)
+  // Véu de pouca vida. Abafa o brilho, não a música.
   private musicFilter: BiquadFilterNode | null = null;
+  private lastDuck = -1;
+  private nextGlitch = 0;
+  private glitchUntil = 0;
+  private moodLow = false;
 
   // O BANCO DE SONS (Memória Pura)
   private buffers: Record<string, AudioBuffer> = {};
@@ -120,10 +125,13 @@ export class AudioManager {
     this.musicGain = this.ctx.createGain();
     this.sfxGain = this.ctx.createGain();
 
+    this.musicBed = this.ctx.createGain();
+    this.musicBed.gain.value = 1;
+
     this.musicFilter = this.ctx.createBiquadFilter();
     this.musicFilter.type = 'lowpass';
     this.musicFilter.frequency.value = 22000; 
-    this.musicFilter.Q.value = 1;
+    this.musicFilter.Q.value = 0.7;
 
     this.compressor = this.ctx.createDynamicsCompressor();
     this.compressor.threshold.value = -16;
@@ -132,7 +140,8 @@ export class AudioManager {
     this.compressor.attack.value = 0.02;
     this.compressor.release.value = 0.32;
     
-    this.musicGain.connect(this.musicFilter);
+    this.musicGain.connect(this.musicBed);
+    this.musicBed.connect(this.musicFilter);
     this.musicFilter.connect(this.compressor);
     
     this.sfxGain.connect(this.compressor);
@@ -175,16 +184,54 @@ export class AudioManager {
 
   private lastFilterFreq = -1;
 
-  public setGameState(wave: number, healthRatio: number) {
-      if (this.musicFilter && this.ctx) {
-          let targetFreq = 22000;
-          if (healthRatio < 0.3) {
-              targetFreq = 200 + (healthRatio / 0.3) * 600;
-          }
-          if (Math.abs(targetFreq - this.lastFilterFreq) < 25) return;
-          this.lastFilterFreq = targetFreq;
-          this.musicFilter.frequency.setTargetAtTime(targetFreq, this.ctx.currentTime, 0.5);
+  public setGameState(wave: number, healthRatio: number, adrenaline = false) {
+      if (!this.musicFilter || !this.musicBed || !this.ctx) return;
+      const now = this.ctx.currentTime;
+      const low = healthRatio < 0.3;
+      const hurt = low ? 1 - Math.max(0, healthRatio) / 0.3 : 0;
+      let cutoff = 20000;
+      if (low) {
+          const center = 7800 - hurt * 4700;
+          const wobble = Math.sin(now * 2.2) * (80 + hurt * 220);
+          cutoff = Math.max(2400, center + wobble);
       }
+      if (now >= this.glitchUntil) {
+          if (!low) {
+              if (this.lastFilterFreq !== 20000) {
+                  this.lastFilterFreq = 20000;
+                  this.musicFilter.frequency.setTargetAtTime(20000, now, 0.6);
+                  this.musicFilter.Q.setTargetAtTime(0.7, now, 0.45);
+              }
+          } else {
+              this.lastFilterFreq = cutoff;
+              this.musicFilter.frequency.setTargetAtTime(cutoff, now, 0.22);
+              this.musicFilter.Q.setTargetAtTime(0.8 + hurt * 0.5, now, 0.35);
+          }
+      }
+
+      const duck = adrenaline ? 0.74 : 1;
+      if (Math.abs(duck - this.lastDuck) > 0.02) {
+          this.lastDuck = duck;
+          this.musicBed.gain.setTargetAtTime(duck, now, adrenaline ? 0.45 : 0.6);
+      }
+
+      if (low && !this.moodLow) this.nextGlitch = now + 1.2;
+      this.moodLow = low;
+      if (!low || now < this.nextGlitch) return;
+
+      this.nextGlitch = now + 2.2 + Math.random() * 1.6;
+      this.glitchUntil = now + 0.2;
+      const dip = adrenaline ? 0.6 : 0.9;
+      this.musicBed.gain.cancelScheduledValues(now);
+      this.musicBed.gain.setValueAtTime(Math.max(0.05, this.musicBed.gain.value), now);
+      this.musicBed.gain.linearRampToValueAtTime(dip, now + 0.03);
+      this.musicBed.gain.linearRampToValueAtTime(duck, now + 0.11);
+      this.lastDuck = duck;
+      const choked = Math.max(1500, cutoff * 0.62);
+      this.musicFilter.frequency.cancelScheduledValues(now);
+      this.musicFilter.frequency.setValueAtTime(Math.max(40, cutoff), now);
+      this.musicFilter.frequency.linearRampToValueAtTime(choked, now + 0.04);
+      this.musicFilter.frequency.linearRampToValueAtTime(Math.max(40, cutoff), now + 0.18);
   }
 
   private async bakeSounds() {
@@ -555,16 +602,30 @@ export class AudioManager {
       if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
       const now = performance.now();
       const prev = this.lastPlayTime['coin'] || 0;
-      if (now - prev < 32) return;
-      this.coinRun = now - prev < 220 ? (this.coinRun + 1) % 6 : 0;
+      if (now - prev < 28) return;
+      this.coinRun = now - prev < 240 ? (this.coinRun + 1) % 8 : 0;
       this.lastPlayTime['coin'] = now;
       const dest = this.sfxOut(at, 0.14);
       const t = this.ctx.currentTime;
-      const scale = [1318.5, 1568, 1760, 2093, 2349.3, 2637];
+      const scale = [1174.7, 1318.5, 1568, 1760, 2093, 2349.3, 2637, 3136];
       const f = scale[this.coinRun];
       this.tone(t, f, 0.048, 'sine', 0.04, 5600, dest);
       this.tone(t, f * 2.76, 0.022, 'sine', 0.01, 7400, dest);
       this.tone(t + 0.012, f * 1.498, 0.034, 'triangle', 0.013, 5000, dest);
+  }
+  public playShiny(at?: { x: number; y: number } | null) {
+      if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+      const dest = this.sfxOut(at, 0.46);
+      const t = this.ctx.currentTime;
+      [784, 988, 1318.5].forEach((f, i) => this.tone(t + i * 0.07, f, 0.16, 'sine', 0.045, 4600, dest));
+      this.tone(t + 0.2, 1568, 0.22, 'triangle', 0.028, 5200, dest);
+  }
+  public playSlip(at?: { x: number; y: number } | null) {
+      if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+      const dest = this.sfxOut(at, 0.28);
+      const t = this.ctx.currentTime;
+      this.tone(t, 740, 0.1, 'sine', 0.028, 2400, dest);
+      this.tone(t + 0.07, 494, 0.18, 'triangle', 0.022, 1600, dest);
   }
   public playSurge(at?: { x: number; y: number } | null) { this.playBuffer('surge', 0.6, 0, 500, at); }
   
@@ -575,7 +636,7 @@ export class AudioManager {
   public playEnemyShoot(at?: { x: number; y: number } | null) { this.playBuffer('enemy_shoot', 0.4, Math.random()*2, 80, at); }
 
   private buildReverb() {
-      if (!this.ctx || !this.musicGain || !this.compressor || this.reverbSend) return;
+      if (!this.ctx || !this.musicFilter || !this.compressor || this.reverbSend) return;
       const rate = this.ctx.sampleRate;
       const len = Math.floor(rate * 1.7);
       const impulse = this.ctx.createBuffer(2, len, rate);
@@ -590,7 +651,7 @@ export class AudioManager {
       conv.buffer = impulse;
       this.reverbSend = this.ctx.createGain();
       this.reverbSend.gain.value = 0.14;
-      this.musicGain.connect(this.reverbSend);
+      this.musicFilter.connect(this.reverbSend);
       this.reverbSend.connect(conv);
       conv.connect(this.compressor);
   }

@@ -38,6 +38,7 @@ export interface BossMutation {
     split: boolean;
     open: boolean;
     attack: number;
+    enraged: boolean;
 }
 
 export class BossArchitect {
@@ -76,6 +77,7 @@ export class BossArchitect {
             split: false,
             open: false,
             attack: 0,
+            enraged: false,
         };
     }
 }

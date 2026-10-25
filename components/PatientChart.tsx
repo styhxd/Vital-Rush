@@ -38,6 +38,40 @@ const chartStyles = `
     box-shadow: 0 5px 0 #0c4a2b;
 }
 .chart-go:hover { filter: brightness(1.06); }
+.chart-lab {
+    position: relative;
+    isolation: isolate;
+    background: linear-gradient(180deg, rgba(255, 250, 236, 0.96), rgba(255, 228, 170, 0.72));
+    box-shadow: inset 0 0 14px rgba(255, 196, 90, 0.45), 0 0 0 1px rgba(176, 112, 32, 0.28);
+    animation: chart-lab-breathe 2.2s ease-in-out infinite;
+}
+.chart-lab-label { position: relative; z-index: 2; }
+.chart-lab-sheen {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 1;
+}
+.chart-lab-sheen::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(112deg, transparent 30%, rgba(255, 228, 150, 0.2) 42%, rgba(255, 255, 255, 0.9) 50%, rgba(255, 214, 120, 0.34) 58%, transparent 70%);
+    transform: translateX(-135%);
+    animation: chart-lab-sheen 2.7s ease-in-out infinite;
+}
+@keyframes chart-lab-breathe {
+    0%, 100% { box-shadow: inset 0 0 14px rgba(255, 196, 90, 0.4), 0 0 0 1px rgba(176, 112, 32, 0.28); filter: brightness(1); }
+    50% { box-shadow: inset 0 0 22px rgba(255, 186, 70, 0.85), 0 0 0 1px rgba(176, 112, 32, 0.45); filter: brightness(1.06); }
+}
+@keyframes chart-lab-sheen {
+    0%, 36% { transform: translateX(-135%); }
+    70%, 100% { transform: translateX(135%); }
+}
+@media (prefers-reduced-motion: reduce) {
+    .chart-lab, .chart-lab-sheen::after { animation: none; }
+}
 .chart-abandon {
     margin-top: 0.45rem;
     display: block;
@@ -224,10 +258,11 @@ export const PatientChart: React.FC<PatientChartProps> = ({
             <div className="chart-actions mt-2 lg:mt-6 flex flex-row gap-2 lg:gap-3">
                 <button
                     onClick={onLab}
-                    className="flex-1 py-2 lg:py-4 border-2 font-bold tracking-[0.16em] text-[10px] lg:text-sm uppercase transition-colors hover:bg-black/5"
+                    className="chart-lab flex-1 py-2 lg:py-4 border-2 font-bold tracking-[0.16em] text-[10px] lg:text-sm uppercase transition-colors hover:bg-black/5"
                     style={{ borderColor: ink, color: ink }}
                 >
-                    {t('CHART_LAB')}
+                    <span className="chart-lab-sheen" aria-hidden="true" />
+                    <span className="chart-lab-label">{t('CHART_LAB')}</span>
                 </button>
                 <button
                     onClick={onPlay}
@@ -316,10 +351,11 @@ export const OutcomeChart: React.FC<OutcomeChartProps> = ({
                 {cleared && onSecondary && (
                     <button
                         onClick={onSecondary}
-                        className="flex-1 py-2 lg:py-4 border-2 font-bold tracking-[0.16em] text-[10px] lg:text-sm uppercase transition-colors hover:bg-black/5"
+                        className="chart-lab flex-1 py-2 lg:py-4 border-2 font-bold tracking-[0.16em] text-[10px] lg:text-sm uppercase transition-colors hover:bg-black/5"
                         style={{ borderColor: ink, color: ink }}
                     >
-                        {t('MUTATION')}
+                        <span className="chart-lab-sheen" aria-hidden="true" />
+                        <span className="chart-lab-label">{t('MUTATION')}</span>
                     </button>
                 )}
                 <button

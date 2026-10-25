@@ -91,8 +91,8 @@ function bossHaste(waveIndex: number): number {
 const GRID_CELL_SIZE = 150;
 const GRID_COLS = Math.ceil(CANVAS_WIDTH / GRID_CELL_SIZE);
 const GRID_ROWS = Math.ceil(CANVAS_HEIGHT / GRID_CELL_SIZE);
-const MINE_FLOW = 0.7;
-const MINE_WIND = 0.18;
+const MINE_FLOW = 0.32;
+const MINE_WIND = 0.22;
 const MINE_COAST = 0.986;
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -157,6 +157,9 @@ export class GameEngine {
   public waveTimer: number = 0;
   public waveActive: boolean = false;
   public bossSpawned: boolean = false;
+  private shinyOrgan = -1;
+  private shinySpawned = false;
+  private shinyWave = 1;
   
   // NOVO: Controle de atraso inicial da onda (para tutoriais)
   public waveStartDelay: number = 0;
@@ -394,37 +397,164 @@ export class GameEngine {
       });
   }
 
+  private screenSpread(): number {
+      const a = Math.random();
+      const b = Math.random();
+      const edge = Math.abs(a - 0.5) >= Math.abs(b - 0.5) ? a : b;
+      return Math.random() < 0.7 ? edge : Math.random();
+  }
+
   private spawnMine() {
+      const padX = 150;
+      const padY = 120;
+      const tx = padX + this.screenSpread() * (CANVAS_WIDTH - padX * 2);
+      const ty = padY + this.screenSpread() * (CANVAS_HEIGHT - padY * 2);
       const roll = Math.random();
-      const side = roll < 1 / 3 ? 'left' : roll < 2 / 3 ? 'top' : 'bottom';
-      const off = 28 + Math.random() * 36;
-      const toss = 8.2 + Math.random() * 2.6;
-      const driftX = this.bloodFlow.x * 0.9 * MINE_FLOW + this.organ.wind.x * MINE_WIND;
-      const headwind = Math.max(0, -driftX);
       let x = 0;
       let y = 0;
-      let vx = 0;
-      let vy = 0;
-      if (side === 'left') {
-          x = -off;
-          y = CANVAS_HEIGHT * (0.14 + Math.random() * 0.72);
-          vx = toss + headwind * 3.4;
-          vy = (Math.random() - 0.5) * 1.7;
+      if (roll < 0.4) {
+          x = tx < CANVAS_WIDTH * 0.5 ? CANVAS_WIDTH + 52 : -52;
+          y = Math.max(36, Math.min(CANVAS_HEIGHT - 36, ty + (Math.random() - 0.5) * 240));
+      } else if (roll < 0.74) {
+          y = ty < CANVAS_HEIGHT * 0.5 ? CANVAS_HEIGHT + 52 : -52;
+          x = Math.max(36, Math.min(CANVAS_WIDTH - 36, tx + (Math.random() - 0.5) * 280));
+      } else if (Math.random() < 0.5) {
+          x = Math.random() < 0.5 ? -46 : CANVAS_WIDTH + 46;
+          y = Math.max(36, Math.min(CANVAS_HEIGHT - 36, ty));
       } else {
-          const along = 0.1 + Math.random() * 0.74;
-          x = CANVAS_WIDTH * along;
-          y = side === 'top' ? -off : CANVAS_HEIGHT + off;
-          const drop = toss * (0.9 + Math.random() * 0.22);
-          vy = side === 'top' ? drop : -drop;
-          vx = along < 0.24
-              ? headwind * 2.6 + toss * 0.24
-              : (Math.random() - 0.45) * toss * 0.2;
+          y = Math.random() < 0.5 ? -46 : CANVAS_HEIGHT + 46;
+          x = Math.max(36, Math.min(CANVAS_WIDTH - 36, tx));
       }
+      const reach = 1 / (1 - MINE_COAST);
+      let vx = (tx - x) / reach;
+      let vy = (ty - y) / reach;
+      const mag = Math.hypot(vx, vy) || 1;
+      const cap = 27;
+      if (mag > cap) {
+          vx *= cap / mag;
+          vy *= cap / mag;
+      }
+      vx += (Math.random() - 0.5) * 0.55;
+      vy += (Math.random() - 0.5) * 0.55;
       this.entities.push({
           id: `mine_${Date.now()}_${Math.random()}`, type: EntityType.BIO_MINE,
           pos: { x, y }, vel: { x: vx, y: vy },
           radius: 20, health: 10, maxHealth: 10, color: this.colors.BIO_MINE, damage: 150, active: true, drag: 0.1
       });
+  }
+
+  private spillCoins(pos: Vector2, total: number, want: number, elite: boolean, energyBudget: number) {
+      const room = this.maxEntities - this.entities.length - 16;
+      const shards = Math.max(1, Math.min(want, total, Math.max(1, room)));
+      const base = Math.floor(total / shards);
+      let leftover = total - base * shards;
+      const energy = Math.max(0, energyBudget) / shards;
+      for (let i = 0; i < shards; i++) {
+          const ang = (i / shards) * Math.PI * 2 + Math.random() * 0.4;
+          const kick = 2.05 + Math.random() * (shards > 20 ? 3.1 : 2.2);
+          const share = base + (leftover > 0 ? 1 : 0);
+          if (leftover > 0) leftover--;
+          this.entities.push({
+              id: `dna_${this.time}_${i}_${Math.random()}`,
+              type: EntityType.DNA_FRAGMENT,
+              pos: { x: pos.x, y: pos.y },
+              vel: { x: Math.cos(ang) * kick, y: Math.sin(ang) * kick },
+              radius: shards > 20 ? 5.1 : 6.15,
+              health: 1, maxHealth: 1,
+              color: this.colors.DNA,
+              damage: energy, active: true,
+              drag: 0.05,
+              value: Math.max(1, share),
+              isElite: elite,
+          });
+      }
+  }
+
+  private maybeSpawnShiny() {
+      if (this.shinySpawned || this.currentWaveIndex !== this.shinyWave) return;
+      if (this.waveTimer < 6.5) return;
+      if (this.waveTimer < 15 && Math.random() >= 0.012) return;
+      if (this.entities.length > this.maxEntities - 40) return;
+      this.shinySpawned = true;
+      this.spawnShiny();
+  }
+
+  private spawnShiny() {
+      const config = this.configFor(this.currentWaveIndex);
+      const type = config.enemyTypes[Math.floor(Math.random() * config.enemyTypes.length)] ?? EntityType.BACTERIA;
+      const pressure = campaignPressure(this.currentWaveIndex);
+      const hp = 26 * (0.85 + (this.difficultyMods.hp ?? 1) * 0.22) * (1 + pressure * 0.45);
+      const jackpot = Math.round(460 * (this.difficultyMods.score ?? 1) * (1 + pressure * 0.5));
+      const y = 140 + Math.random() * (CANVAS_HEIGHT - 280);
+      this.entities.push({
+          id: `shiny_${Date.now()}_${Math.random()}`,
+          type,
+          pos: { x: CANVAS_WIDTH - 220, y },
+          vel: { x: -2.4, y: (Math.random() - 0.5) * 2.2 },
+          radius: 24,
+          health: hp, maxHealth: hp,
+          color: '#ffe27a',
+          damage: 6,
+          active: true,
+          value: jackpot,
+          isElite: false,
+          drag: 0.1,
+          hitFlash: 0,
+          ttl: 8.6,
+      });
+      this.spawnText({ x: CANVAS_WIDTH - 220, y: y - 36 }, this.t('SHINY'), '#ffe08a', 30);
+      audioManager.playShiny({ x: CANVAS_WIDTH - 220, y });
+  }
+
+  private tickShiny(e: Entity, dtSeconds: number) {
+      if (!e.active || e.health <= 0) return;
+      e.ttl = (e.ttl ?? 8) - dtSeconds;
+      const desperate = (e.ttl ?? 0) < 1.55;
+      const hue = (this.time / (desperate ? 3.2 : 8)) % 360;
+      e.color = `hsl(${Math.floor(hue)}, 90%, ${desperate ? 68 : 62}%)`;
+      const dx = e.pos.x - this.player.pos.x;
+      const dy = e.pos.y - this.player.pos.y;
+      const dist = Math.max(1, Math.hypot(dx, dy));
+      const weave = Math.sin(this.time * 0.006 + e.pos.y * 0.01);
+      const push = desperate ? 1.45 : 0.64;
+      e.vel.x += ((dx / dist) * push + (-dy / dist) * weave * 0.9);
+      e.vel.y += ((dy / dist) * push + (dx / dist) * weave * 0.9);
+      if (!desperate) {
+          const m = 78;
+          if (e.pos.x < m) { e.pos.x = m; e.vel.x = Math.abs(e.vel.x) + 1.2; }
+          if (e.pos.x > CANVAS_WIDTH - m) { e.pos.x = CANVAS_WIDTH - m; e.vel.x = -Math.abs(e.vel.x) - 1.2; }
+          if (e.pos.y < m) { e.pos.y = m; e.vel.y = Math.abs(e.vel.y) + 1.2; }
+          if (e.pos.y > CANVAS_HEIGHT - m) { e.pos.y = CANVAS_HEIGHT - m; e.vel.y = -Math.abs(e.vel.y) - 1.2; }
+          return;
+      }
+      const outside = e.pos.x < 24 || e.pos.x > CANVAS_WIDTH - 24 || e.pos.y < 24 || e.pos.y > CANVAS_HEIGHT - 24;
+      if ((e.ttl ?? 0) <= 0 || outside) {
+          e.active = false;
+          this.spawnText(e.pos, this.t('SHINY_LOST'), '#ffb4c4', 26);
+          audioManager.playSlip(e.pos);
+      }
+  }
+
+  private drawShinyGlint(radius: number) {
+      const n = this.isLowQuality ? 3 : 5;
+      const hue = (this.time / 8) % 360;
+      this.ctx.save();
+      this.ctx.globalCompositeOperation = 'screen';
+      this.ctx.strokeStyle = `hsla(${hue}, 95%, 78%, 0.9)`;
+      this.ctx.lineWidth = 2;
+      this.ctx.beginPath();
+      this.ctx.arc(0, 0, radius * 1.32, 0, Math.PI * 2);
+      this.ctx.stroke();
+      this.ctx.fillStyle = '#fff8d8';
+      for (let i = 0; i < n; i++) {
+          const a = this.time / 260 + (i / n) * Math.PI * 2;
+          const x = Math.cos(a) * radius * 1.05;
+          const y = Math.sin(a) * radius * 0.72;
+          this.ctx.beginPath();
+          this.ctx.arc(x, y, i % 2 ? 2.2 : 3.1, 0, Math.PI * 2);
+          this.ctx.fill();
+      }
+      this.ctx.restore();
   }
   
   public spawnBoss(_config: WaveConfig) {
@@ -677,30 +807,20 @@ export class GameEngine {
 
           audioManager.playExplosion(target.pos);
 
-          // O power-up voando cobre parte da progressão, então a biomassa cai um pouco.
-          const dnaYield = 1.15;
-          const total = Math.max(1, Math.ceil((target.value || 10) * Math.min(3, comboPower) * dnaYield));
-          const shards = Math.min(total, Math.min(6, Math.max(3, Math.ceil(total / 12))));
-          const base = Math.floor(total / shards);
-          let leftover = total - base * shards;
-          for (let i = 0; i < shards; i++) {
-              const ang = (i / shards) * Math.PI * 2 + Math.random() * 0.4;
-              const kick = 1.7 + Math.random() * 1.35;
-              const share = base + (leftover > 0 ? 1 : 0);
-              if (leftover > 0) leftover--;
-              this.entities.push({
-                  id: `dna_${Date.now()}_${i}`,
-                  type: EntityType.DNA_FRAGMENT,
-                  pos: { x: target.pos.x, y: target.pos.y },
-                  vel: { x: Math.cos(ang) * kick, y: Math.sin(ang) * kick },
-                  radius: 7,
-                  health: 1, maxHealth: 1,
-                  color: this.colors.DNA,
-                  damage: 0, active: true,
-                  drag: 0.05,
-                  value: Math.max(1, share),
-                  isElite: target.isElite
-              });
+          // O total de biomassa não muda. Mudam as moedas que se vê: mais peças, cada uma valendo menos.
+          const shiny = target.id.startsWith('shiny_');
+          if (shiny) {
+              const jackpot = Math.max(1, Math.floor(target.value || 1));
+              this.spillCoins(target.pos, jackpot, 30, true, 36);
+              audioManager.playPowerUp(target.pos);
+              this.spawnText(target.pos, this.t('SHINY'), '#ffe08a', 34);
+          } else {
+              const dnaYield = 1.15;
+              const total = Math.max(1, Math.ceil((target.value || 10) * Math.min(3, comboPower) * dnaYield));
+              const oldShards = Math.min(total, Math.min(6, Math.max(3, Math.ceil(total / 12))));
+              const want = Math.min(18, Math.max(oldShards, Math.round(4 + Math.sqrt(total) * 1.05)));
+              const energyBudget = oldShards * (target.isElite ? 12 : 3);
+              this.spillCoins(target.pos, total, want, !!target.isElite, energyBudget);
           }
           
           return true;
@@ -728,7 +848,7 @@ export class GameEngine {
 
       // New Mechanics: Escape Feedback (Entity Collision only)
           if (!isEnvironmental) {
-          if (sourceEntity && sourceEntity.active && sourceEntity.type !== EntityType.BOSS) {
+          if (sourceEntity && sourceEntity.active && sourceEntity.type !== EntityType.BOSS && !sourceEntity.id.startsWith('shiny_')) {
               sourceEntity.radius = Math.min(240, sourceEntity.radius * 1.1);
               sourceEntity.damage *= 1.1;
               this.spawnText(sourceEntity.pos, this.t('MSG_GREW'), sourceEntity.color, 15);
@@ -874,7 +994,13 @@ export class GameEngine {
     this.isVacuuming = false;  
     this.vacuumingTimer = 0;
     const waveNum = waveIndex + 1;
-    audioManager.setGameState(waveNum, 1.0);
+    audioManager.setGameState(waveNum, 1.0, false);
+    const organIx = Math.floor(waveIndex / 6);
+    if (organIx !== this.shinyOrgan) {
+        this.shinyOrgan = organIx;
+        this.shinySpawned = false;
+        this.shinyWave = organIx * 6 + Math.floor(Math.random() * 4);
+    }
     const config = this.configFor(waveIndex);
     this.bloodFlow.x = config.flowSpeed;
     const changed = this.organ.onWave(waveIndex, (key) => this.t(key));
@@ -1058,6 +1184,37 @@ export class GameEngine {
       });
   }
 
+  private markEnrage(e: Entity, shot: number) {
+      const m = e.mutation;
+      if (!m || m.enraged || e.health <= 0 || e.health >= e.maxHealth * 0.5) return;
+      m.enraged = true;
+      m.attack = Math.max(m.attack, 1.2);
+      if (m.play === 'bud' && !m.split) {
+          m.split = true;
+          e.radius *= 0.78;
+          m.baseSpeed *= 1.3;
+          m.shootTimer = 1.35;
+          for (let i = 0; i < 8; i++) this.bossShot(e, (i / 8) * Math.PI * 2, 7, 12, shot * 0.7);
+          audioManager.playEnemyShoot(e.pos);
+          return;
+      }
+      if (m.play === 'cyst' && !m.open) {
+          m.open = true;
+          m.baseSpeed *= 1.5;
+          m.dashTimer = 0.55;
+          audioManager.playBossDash(e.pos);
+          return;
+      }
+      m.baseSpeed *= 1.08;
+      audioManager.playBossDash(e.pos);
+      if (m.play === 'abscess' || m.play === 'filament') m.acidTimer = 0;
+      else if (m.play === 'cluster' || m.play === 'capsid' || m.play === 'capsule' || m.play === 'reactivate' || m.play === 'coil') m.shootTimer = 0.18;
+      else if (m.play === 'cord') {
+          m.dashTimer = 0.12;
+          m.shootTimer = 0.22;
+      } else m.dashTimer = 0.12;
+  }
+
   private updateBoss(e: Entity, dtSeconds: number, _stats: PlayerStats) {
       if (!e.mutation) return;
       const m = e.mutation;
@@ -1070,9 +1227,11 @@ export class GameEngine {
       const ny = dy / dMag;
       const pace = bossPace(this.currentWaveIndex);
       const haste = bossHaste(this.currentWaveIndex);
-      const speed = m.baseSpeed * this.difficultyMods.speed * pace;
       const aim = Math.atan2(dy, dx);
       const shot = Math.max(5, e.damage * 0.22);
+      this.markEnrage(e, shot);
+      const hot = m.enraged;
+      const speed = m.baseSpeed * this.difficultyMods.speed * pace;
       const chase = (mul = 1) => {
           e.vel.x += nx * speed * mul;
           e.vel.y += ny * speed * mul;
@@ -1082,73 +1241,96 @@ export class GameEngine {
           e.vel.y = (ny * power + nx * side * sidePower) * pace;
       };
 
-      if (m.play === 'bud' && !m.split && e.health < e.maxHealth * 0.5) {
-          m.split = true;
-          e.radius *= 0.78;
-          m.baseSpeed *= 1.3;
-          for (let i = 0; i < 8; i++) this.bossShot(e, (i / 8) * Math.PI * 2, 7, 12, shot * 0.7);
-          audioManager.playEnemyShoot(e.pos);
-      }
-      if (m.play === 'cyst' && !m.open && e.health < e.maxHealth * 0.45) {
-          m.open = true;
-          m.baseSpeed *= 1.5;
-          if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.9);
-          audioManager.playBossDash(e.pos);
-      }
-
       if (m.play === 'coil') {
-          const orbit = 170 + Math.sin(m.phase * 0.7) * 90;
-          const ang = m.phase * 1.05;
+          const tight = hot ? 0.7 : 1;
+          const orbit = (150 + Math.sin(m.phase * (hot ? 1.15 : 0.7)) * (hot ? 48 : 90)) * tight;
+          const ang = m.phase * (hot ? 1.42 : 1.05);
           const tx = this.player.pos.x + Math.cos(ang) * orbit;
           const ty = this.player.pos.y + Math.sin(ang) * orbit;
           const ox = tx - e.pos.x;
           const oy = ty - e.pos.y;
           const od = Math.max(1, Math.hypot(ox, oy));
-          e.vel.x += (ox / od) * speed * 1.25;
-          e.vel.y += (oy / od) * speed * 1.25;
+          e.vel.x += (ox / od) * speed * (hot ? 1.45 : 1.25);
+          e.vel.y += (oy / od) * speed * (hot ? 1.45 : 1.25);
+          if (hot) {
+              m.shootTimer -= dtSeconds;
+              if (m.shootTimer <= 0) {
+                  for (let i = 0; i < 6; i++) this.bossShot(e, (i / 6) * Math.PI * 2 + m.phase, 3.4, 11, shot * 0.42);
+                  m.shootTimer = 3.6 * haste;
+                  audioManager.playEnemyShoot(e.pos);
+              }
+          }
           return;
       }
 
       if (m.play === 'flagellum') {
-          const sway = Math.sin(m.phase * 2.1);
-          e.vel.x += nx * speed + (-ny) * sway * speed * 0.7;
-          e.vel.y += ny * speed + nx * sway * speed * 0.7;
+          const sway = Math.sin(m.phase * (hot ? 3.3 : 2.15));
+          const swim = hot ? 1.22 : 1;
+          e.vel.x += nx * speed * swim + (-ny) * sway * speed * (hot ? 0.95 : 0.75);
+          e.vel.y += ny * speed * swim + nx * sway * speed * (hot ? 0.95 : 0.75);
+          m.dashTimer -= dtSeconds;
+          if (m.dashTimer <= 0) {
+              const side = sway >= 0 ? 1 : -1;
+              lunge(hot ? 13 : 10, side, hot ? 7 : 5.2);
+              this.bossShot(e, aim + side * 0.85, hot ? 6.5 : 5.5, 12, shot * 0.55);
+              if (hot) this.bossShot(e, aim - side * 0.85, 6.5, 12, shot * 0.5);
+              m.dashTimer = (hot ? 1.65 : 2.65) * haste;
+              m.attack = Math.max(m.attack, 0.7);
+              audioManager.playBossDash(e.pos);
+          }
           return;
       }
 
       if (m.play === 'cord') {
-          const spin = Math.sin(m.phase * 1.2);
-          e.vel.x += nx * speed * 1.05 + (-ny) * speed * 0.8 * spin;
-          e.vel.y += ny * speed * 1.05 + nx * speed * 0.8 * spin;
+          const spin = Math.sin(m.phase * (hot ? 1.85 : 1.2));
+          e.vel.x += nx * speed * 1.05 + (-ny) * speed * (hot ? 1.05 : 0.8) * spin;
+          e.vel.y += ny * speed * 1.05 + nx * speed * (hot ? 1.05 : 0.8) * spin;
           m.dashTimer -= dtSeconds;
           if (m.dashTimer <= 0) {
-              e.vel.x += nx * 6 * pace;
-              e.vel.y += ny * 6 * pace;
-              m.dashTimer = 3.1 * haste;
-              if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.75);
+              const kick = hot ? 8.2 : 6;
+              e.vel.x += nx * kick * pace;
+              e.vel.y += ny * kick * pace;
+              m.dashTimer = (hot ? 2.35 : 3.1) * haste;
+              m.attack = Math.max(m.attack, 0.75);
+          }
+          if (hot && m.shootTimer < 30) {
+              m.shootTimer -= dtSeconds;
+              if (m.shootTimer <= 0) {
+                  for (let i = 0; i < 6; i++) this.bossShot(e, (i / 6) * Math.PI * 2 + m.phase, 3.2, 11, shot * 0.4);
+                  m.shootTimer = 100;
+                  audioManager.playEnemyShoot(e.pos);
+              }
           }
           return;
       }
 
       if (m.play === 'crescent') {
-          chase(0.28);
+          chase(hot ? 1.12 : 0.7);
           m.dashTimer -= dtSeconds;
           if (m.dashTimer <= 0) {
               const side = m.phase % 2 > 1 ? 1 : -1;
-              lunge(8, side, 4);
-              m.dashTimer = 2.05 * haste;
+              lunge(hot ? 15 : 12, side, hot ? 8 : 6);
+              const fan = hot ? 5 : 3;
+              const spread = hot ? 0.2 : 0.15;
+              for (let i = 0; i < fan; i++) {
+                  const a = aim + (i - (fan - 1) / 2) * spread;
+                  this.bossShot(e, a, hot ? 7.1 : 6.1, 11, shot * (hot ? 0.58 : 0.48));
+              }
+              m.dashTimer = (hot ? 1.22 : 1.72) * haste;
+              m.attack = Math.max(m.attack, 0.85);
+              audioManager.playBossDash(e.pos);
           }
           return;
       }
 
       if (m.play === 'pseudopod') {
           m.dashTimer -= dtSeconds;
-          if (m.dashTimer > 0.55) chase(0.15);
+          if (m.dashTimer > (hot ? 0.36 : 0.55)) chase(0.15);
           if (m.dashTimer <= 0) {
-              lunge(12);
-              this.bossPool(e, 78, 4);
-              m.dashTimer = 3.8 * haste;
-              if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.9);
+              lunge(hot ? 14 : 12);
+              this.bossPool(e, hot ? 86 : 78, hot ? 4.3 : 4);
+              m.dashTimer = (hot ? 2.65 : 3.8) * haste;
+              m.attack = Math.max(m.attack, 0.9);
               audioManager.playBossDash(e.pos);
           }
           return;
@@ -1156,32 +1338,61 @@ export class GameEngine {
 
       if (m.play === 'reactivate') {
           m.shootTimer -= dtSeconds;
-          if (m.shootTimer > 0.7) chase(0.2);
+          if (m.shootTimer > (hot ? 0.42 : 0.7)) chase(hot ? 0.52 : 0.2);
           if (m.shootTimer <= 0) {
-              for (let i = 0; i < 8; i++) this.bossShot(e, (i / 8) * Math.PI * 2, 5.6, 12, shot * 0.6);
-              m.shootTimer = 3.8 * haste;
+              const n = hot ? 10 : 8;
+              const bite = shot * (hot ? 0.5 : 0.6);
+              for (let i = 0; i < n; i++) this.bossShot(e, (i / n) * Math.PI * 2, hot ? 6.3 : 5.6, 12, bite);
+              m.shootTimer = (hot ? 2.65 : 3.8) * haste;
               audioManager.playEnemyShoot(e.pos);
           }
           return;
       }
 
-      chase(m.play === 'adhere' ? 1.05 : m.play === 'capsid' ? 1 : m.play === 'capsule' ? 0.65 : 1);
+      const chaseMul = m.play === 'adhere' ? (hot ? 1.28 : 1.05)
+          : m.play === 'capsid' ? 1
+          : m.play === 'capsule' ? (hot ? 0.95 : 0.65)
+          : m.play === 'bud' ? (hot ? 1.18 : 1)
+          : 1;
+      chase(chaseMul);
+      if (hot && m.play === 'capsid') {
+          const sway = Math.sin(m.phase * 3);
+          e.vel.x += -ny * speed * 0.55 * sway;
+          e.vel.y += nx * speed * 0.55 * sway;
+      }
+
+      if (m.play === 'bud' && hot) {
+          m.shootTimer -= dtSeconds;
+          if (m.shootTimer <= 0) {
+              this.bossShot(e, aim, 8, 14, shot * 0.72);
+              m.shootTimer = 2.45 * haste;
+              audioManager.playEnemyShoot(e.pos);
+          }
+      }
 
       if (m.play === 'abscess' || m.play === 'filament') {
+          if (hot && m.play === 'filament') {
+              e.vel.x += -ny * speed * 0.85;
+              e.vel.y += nx * speed * 0.85;
+          }
           m.acidTimer -= dtSeconds;
           if (m.acidTimer <= 0) {
-              this.bossPool(e, m.play === 'filament' ? 46 : 72, m.play === 'filament' ? 3.6 : 5);
-              m.acidTimer = (m.play === 'filament' ? 3.05 : 2.55) * haste;
+              const grain = m.play === 'filament';
+              this.bossPool(e, (grain ? 46 : 72) * (hot ? 1.12 : 1), grain ? 3.6 : 5);
+              if (hot && !grain) lunge(7);
+              m.acidTimer = (grain ? 3.05 : 2.55) * (hot ? 0.64 : 1) * haste;
           }
       }
 
       if (m.play === 'embolus') {
           m.dashTimer -= dtSeconds;
           if (m.dashTimer <= 0) {
-              lunge(11);
-              for (let i = -2; i <= 2; i++) this.bossShot(e, aim + i * 0.24, 6.6, 11, shot * 0.8);
-              m.dashTimer = 4.4 * haste;
-              if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.9);
+              lunge(hot ? 13 : 11);
+              const n = hot ? 3 : 2;
+              const bite = shot * (hot ? 0.7 : 0.8);
+              for (let i = -n; i <= n; i++) this.bossShot(e, aim + i * (hot ? 0.2 : 0.24), hot ? 7.1 : 6.6, 11, bite);
+              m.dashTimer = (hot ? 3.15 : 4.4) * haste;
+              m.attack = Math.max(m.attack, 0.9);
               audioManager.playBossDash(e.pos);
           }
       }
@@ -1189,8 +1400,9 @@ export class GameEngine {
       if (m.play === 'cluster') {
           m.shootTimer -= dtSeconds;
           if (m.shootTimer <= 0) {
-              for (let i = -2; i <= 2; i++) this.bossShot(e, aim + i * 0.26, 6.2, 11, shot * 0.68);
-              m.shootTimer = 3.05 * haste;
+              const n = hot ? 3 : 2;
+              for (let i = -n; i <= n; i++) this.bossShot(e, aim + i * (hot ? 0.18 : 0.26), hot ? 6.8 : 6.2, 11, shot * 0.62);
+              m.shootTimer = (hot ? 2.4 : 3.05) * haste;
               audioManager.playEnemyShoot(e.pos);
           }
       }
@@ -1199,33 +1411,41 @@ export class GameEngine {
           m.shootTimer -= dtSeconds;
           if (m.shootTimer <= 0) {
               this.bossShot(e, aim, 7.4, 10, shot * 0.6);
-              m.shootTimer = 1.55 * haste;
+              if (hot) this.bossShot(e, aim + (m.phase % 2 > 1 ? 0.18 : -0.18), 6.5, 10, shot * 0.42);
+              m.shootTimer = (hot ? 1.22 : 1.55) * haste;
           }
       }
 
       if (m.play === 'capsule') {
           m.shootTimer -= dtSeconds;
           if (m.shootTimer <= 0) {
-              for (let i = 0; i < 8; i++) this.bossShot(e, (i / 8) * Math.PI * 2 + m.phase, 3.6, 12, shot * 0.55);
-              m.shootTimer = 5.2 * haste;
+              const kick = hot ? 4.6 : 3.6;
+              for (let i = 0; i < 8; i++) this.bossShot(e, (i / 8) * Math.PI * 2 + m.phase, kick, 12, shot * 0.55);
+              m.shootTimer = (hot ? 3.45 : 5.2) * haste;
               audioManager.playEnemyShoot(e.pos);
           }
       }
 
       if (m.play === 'adhere') {
           m.dashTimer -= dtSeconds;
-          if (m.dashTimer <= 0 && dMag > 240) {
-              lunge(9);
-              m.dashTimer = 3.4 * haste;
+          if (m.dashTimer <= 0 && dMag > (hot ? 150 : 240)) {
+              lunge(hot ? 11 : 9);
+              if (hot) {
+                  for (let i = -1; i <= 1; i++) this.bossShot(e, aim + Math.PI + i * 0.32, 4.1, 11, shot * 0.42);
+              }
+              m.dashTimer = (hot ? 2.25 : 3.4) * haste;
           }
       }
 
       if (m.play === 'cyst' && m.open) {
           m.dashTimer -= dtSeconds;
           if (m.dashTimer <= 0) {
-              lunge(11);
-              m.dashTimer = 2.8 * haste;
-              if (e.mutation) e.mutation.attack = Math.max(e.mutation.attack, 0.9);
+              lunge(hot ? 13 : 11);
+              if (hot) {
+                  for (let i = -1; i <= 1; i++) this.bossShot(e, aim + i * 0.28, 6, 11, shot * 0.48);
+              }
+              m.dashTimer = (hot ? 2.15 : 2.8) * haste;
+              m.attack = Math.max(m.attack, 0.9);
               audioManager.playBossDash(e.pos);
           }
       }
@@ -1268,7 +1488,9 @@ export class GameEngine {
     
     if (this.player.active) {
         const healthRatio = Math.max(0, this.player.health / this.player.maxHealth);
-        audioManager.setGameState(this.currentWaveIndex + 1, healthRatio);
+        audioManager.setGameState(this.currentWaveIndex + 1, healthRatio, this.adrenalineActive);
+    } else {
+        audioManager.setGameState(this.currentWaveIndex + 1, 1, false);
     }
 
     const safeDt = dt * timeScale;
@@ -1409,6 +1631,7 @@ export class GameEngine {
                 this.spawnEnemy(config);
                 this.spawnTimer = 0;
               }
+              this.maybeSpawnShiny();
           } else if (config.hasBoss && !this.bossSpawned) {
               this.spawnBoss(config);
               this.bossSpawned = true;
@@ -1417,10 +1640,15 @@ export class GameEngine {
               return;
           }
           
-          const bossActive = this.entities.some(e => e.type === EntityType.BOSS && e.active);
-          const shouldSpawnMines = this.waveTimer < config.duration || bossActive;
-
-          if (shouldSpawnMines && Math.random() < 0.005) this.spawnMine();
+          if (!this.isVacuuming) {
+              let liveMines = 0;
+              for (const ent of this.entities) {
+                  if (ent.active && ent.type === EntityType.BIO_MINE) liveMines++;
+              }
+              const inTime = this.waveTimer < config.duration;
+              const chance = inTime ? 0.00215 : 0.00048;
+              if (liveMines < 2 && Math.random() < chance) this.spawnMine();
+          }
 
           if (this.allowSerum && this.waveStartDelay <= 0 && !this.isVacuuming && this.waveTimer > 1) {
               const serumLive = this.entities.some(e => e.type === EntityType.SERUM && e.active);
@@ -1738,7 +1966,7 @@ export class GameEngine {
         e.pos.y += (e.vel.y + (this.bloodFlow.y * (1 - drag) * flowInfluence) + this.organ.wind.y * windScale) * tick;
         
         // VARIETY INJECTION: ZIG-ZAG FUNGI
-        if (e.type === EntityType.FUNGI && this.player.active) {
+        if (e.type === EntityType.FUNGI && this.player.active && !e.id.startsWith('shiny_')) {
             e.vel.y += Math.sin(this.time * 0.005 + e.pos.x * 0.01) * 0.5;
         }
 
@@ -1751,7 +1979,7 @@ export class GameEngine {
             e.pos.y = Math.max(margin, Math.min(CANVAS_HEIGHT - margin, e.pos.y));
         }
 
-        if (e.type === EntityType.VIRUS && this.player.active && (e.stun ?? 0) <= 0 && e.pos.x < CANVAS_WIDTH + 100) {
+        if (e.type === EntityType.VIRUS && !e.id.startsWith('shiny_') && this.player.active && (e.stun ?? 0) <= 0 && e.pos.x < CANVAS_WIDTH + 100) {
             if (e.shootTimer !== undefined) {
                 e.shootTimer -= dtSeconds;
                 if (e.shootTimer <= 0) {
@@ -1913,7 +2141,8 @@ export class GameEngine {
          }
 
       } else if (this.isEnemy(e.type) || e.type === EntityType.BOSS) {
-        if (this.player.active) {
+        if (e.id.startsWith('shiny_')) this.tickShiny(e, dtSeconds);
+        if (this.player.active && e.active) {
           const dx = this.player.pos.x - e.pos.x;
           const dy = this.player.pos.y - e.pos.y;
           if (e.pos.x > -200 && e.pos.x < CANVAS_WIDTH + 200) {
@@ -1929,7 +2158,7 @@ export class GameEngine {
                 if (e.isElite) speed *= 0.72;
                 if (e.type === EntityType.FUNGI) speed = 0.16; 
 
-                if (e.type !== EntityType.BOSS && (e.stun ?? 0) <= 0) {
+                if (!e.id.startsWith('shiny_') && e.type !== EntityType.BOSS && (e.stun ?? 0) <= 0) {
                     e.vel.x += (dx / dMag) * speed * tick;
                     e.vel.y += (dy / dMag) * speed * tick;
                 }
@@ -1968,7 +2197,7 @@ export class GameEngine {
 
             if (dist - step < this.player.radius + e.radius) {
               e.active = false;
-              const energyGain = e.isElite ? 12 : 3;
+              const energyGain = e.damage > 0 ? e.damage : (e.isElite ? 12 : 3);
               this.energy = Math.min(this.energy + energyGain, stats.maxEnergy);
               const val = (e.value || 1);
               this.biomass += val; 
@@ -1976,9 +2205,9 @@ export class GameEngine {
               achievementManager.track('biomass_10k', val);
               if (this.biomass >= 3000) achievementManager.track('rich', 3000);
               audioManager.playCoin(e.pos);
-              if (!this.isLowQuality && this.particles.length < 180) {
-                  for (let k = 0; k < 6; k++) {
-                      const a = (k / 6) * Math.PI * 2;
+              if (!this.isLowQuality && this.particles.length < 110) {
+                  for (let k = 0; k < 3; k++) {
+                      const a = (k / 3) * Math.PI * 2;
                       this.particles.push({
                           id: 'coin',
                           type: EntityType.PARTICLE,
@@ -3407,13 +3636,13 @@ export class GameEngine {
             const r = e.radius;
             spin = this.time / 900;
             this.ctx.rotate(spin); 
-            this.ctx.fillStyle = (e.hitFlash && e.hitFlash > 0) ? '#ffffff' : '#00aa00';
+            this.ctx.fillStyle = (e.hitFlash && e.hitFlash > 0) ? '#ffffff' : (e.id.startsWith('shiny_') ? e.color : '#00aa00');
             this.ctx.beginPath();
             this.ctx.arc(0, 0, r, 0, Math.PI*2);
             this.ctx.fill();
             this.ctx.stroke();
             const spikes = 8;
-            this.ctx.fillStyle = '#00ff00';
+            this.ctx.fillStyle = e.id.startsWith('shiny_') ? '#fff6c2' : '#00ff00';
             for(let i=0; i<spikes; i++) {
                 const angle = (i/spikes) * Math.PI*2;
                 const sx = Math.cos(angle) * (r * 1.2);
@@ -3438,6 +3667,7 @@ export class GameEngine {
             this.ctx.stroke();
         }
         if (spin) this.ctx.rotate(-spin);
+        if (e.id.startsWith('shiny_')) this.drawShinyGlint(e.radius);
         if ((e.stun ?? 0) > 0) {
             this.ctx.save();
             const flick = Math.floor(this.time / 42) % 3;

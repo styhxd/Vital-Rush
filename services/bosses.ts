@@ -99,11 +99,11 @@ export const BOSSES: BossSpec[] = [
     },
     {
         id: 'liver>heart', from: 'liver', to: 'heart', shape: 'trypo', play: 'flagellum',
-        color: '#d7e07a', accent: '#6a7420', hp: 0.9, speed: 0.34, radius: 100,
+        color: '#d7e07a', accent: '#6a7420', hp: 0.9, speed: 0.42, radius: 100,
         short: text('T. CRUZI', 'T. CRUZI', 'T. CRUZI'),
         disease: text('Doença de Chagas', 'Chagas disease', 'Enfermedad de Chagas'),
         intro: text('O tripanossoma largou o fígado e entrou no músculo do coração.', 'The trypanosome left the liver and went into the heart muscle.', 'El tripanosoma dejó el hígado y entró en el músculo del corazón.'),
-        trick: text('Não vai reto. O flagelo faz onda e ele corta de lado.', 'It will not go straight. The flagellum waves and it cuts sideways.', 'No va recto. El flagelo hace onda y corta de lado.'),
+        trick: text('Não vai reto. O flagelo faz onda e ele corta de lado. Na metade da vida, o corte estala.', 'It will not go straight. The flagellum waves and it cuts sideways. At half health, the cut snaps.', 'No va recto. El flagelo hace onda y corta de lado. A la mitad de la vida, el corte estalla.'),
         lesson: text(
             'No sangue, o Trypanosoma cruzi é uma curva em C, com um ponto escuro atrás, o cinetoplasto, e uma membrana que ondula até o flagelo. Na fase aguda o fígado incha. O ninho de verdade, dentro da célula, é o músculo do coração.',
             'In the blood, Trypanosoma cruzi is a C, with a dark dot behind it, the kinetoplast, and a membrane that waves out to the flagellum. In the acute phase the liver swells. The real nest, inside the cell, is the heart muscle.',
@@ -203,11 +203,11 @@ export const BOSSES: BossSpec[] = [
     },
     {
         id: 'lung>liver', from: 'lung', to: 'liver', shape: 'schisto', play: 'flagellum',
-        color: '#c98b6a', accent: '#6a3030', hp: 0.95, speed: 0.34, radius: 114,
+        color: '#c98b6a', accent: '#6a3030', hp: 0.95, speed: 0.42, radius: 114,
         short: text('S. MANSONI', 'S. MANSONI', 'S. MANSONI'),
         disease: text('Esquistossomose', 'Schistosomiasis', 'Esquistosomiasis'),
         intro: text('O verme jovem atravessou o pulmão. O destino dele é o fígado.', 'The young worm crossed the lung. Its destination is the liver.', 'El gusano joven cruzó el pulmón. Su destino es el hígado.'),
-        trick: text('Nada em S, com as ventosas. Não mira em linha reta.', 'It swims in an S, suckers and all. It does not aim straight.', 'Nada en S, con las ventosas. No apunta en línea recta.'),
+        trick: text('Nada em S, com as ventosas. Não mira em linha reta. Na metade da vida, o corte estala.', 'It swims in an S, suckers and all. It does not aim straight. At half health, the cut snaps.', 'Nada en S, con las ventosas. No apunta en línea recta. A la mitad de la vida, el corte estalla.'),
         lesson: text(
             'Schistosoma mansoni entra pela pele, vira esquistossômulo e tem que passar pelo pulmão. O endereço final é a veia da porta, encostado no fígado, onde o adulto solta os ovos. No desenho: corpo de verme, duas ventosas, e uma cauda que ainda lembra a cercária.',
             'Schistosoma mansoni enters through the skin, becomes a schistosomulum, and has to pass the lung. The last address is the portal vein, against the liver, where the adult sheds eggs. In the drawing: a worm body, two suckers, and a tail that still remembers the cercaria.',
@@ -268,11 +268,11 @@ export const BOSSES: BossSpec[] = [
     },
     {
         id: 'brain>heart', from: 'brain', to: 'heart', shape: 'crescent', play: 'crescent',
-        color: '#b7e0ff', accent: '#4a7ea8', hp: 0.85, speed: 0.4, radius: 90,
+        color: '#b7e0ff', accent: '#4a7ea8', hp: 1, speed: 0.5, radius: 90,
         short: text('T. GONDII', 'T. GONDII', 'T. GONDII'),
         disease: text('Toxoplasmose', 'Toxoplasmosis', 'Toxoplasmosis'),
         intro: text('O crescente saiu do cisto no cérebro e invadiu o músculo do coração.', 'The crescent left the cyst in the brain and invaded the heart muscle.', 'El creciente salió del quiste en el cerebro e invadió el músculo del corazón.'),
-        trick: text('Vários crescentes. Cada um dá um bote curto e escorrega pro lado.', 'Several crescents. Each one lunges short and slips aside.', 'Varios crecientes. Cada uno da un salto corto y se escurre de lado.'),
+        trick: text('Caça de lado. O bote escorrega e solta taquizoítos. Na metade da vida o cisto rompe, e ele não para.', 'It hunts on a slant. The lunge slips and sheds tachyzoites. At half health the cyst breaks, and it does not stop.', 'Caza de lado. El salto se escurre y suelta taquizoítos. A la mitad de la vida el quiste se rompe, y no para.'),
         lesson: text(
             'Toxoplasma gondii, na hora de invadir, tem forma de crescente. O nome vem de toxon, que é arco. O cisto quieto mora no cérebro. Quando rompe, os taquizoítos caem no sangue, e um músculo que eles ocupam é o coração.',
             'Toxoplasma gondii, when it invades, is shaped like a crescent. The name comes from toxon, a bow. The quiet cyst lives in the brain. When it breaks, the tachyzoites fall into the blood, and one muscle they occupy is the heart.',
@@ -320,6 +320,7 @@ export function mutationFrom(spec: BossSpec): BossMutation {
         split: false,
         open: false,
         attack: 0,
+        enraged: false,
     };
 }
 
