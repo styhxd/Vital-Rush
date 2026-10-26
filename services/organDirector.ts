@@ -678,7 +678,7 @@ export class OrganDirector {
         this.wind.y = 0;
         this.speedMul = 1;
         this.ridingSaliva = false;
-        this.fireMul = this.oxygenT > 0 ? 0.72 : 1;
+        this.fireMul = this.oxygenT > 0 ? 0.5 : 1;
         this.critAdd = this.dopamineT > 0 ? 0.22 : 0;
         this.shield = this.fluorideT > 0 ? 0.5 : this.rinseT > 0 ? 0.35 : 0;
         this.pulse = 0;
@@ -1552,7 +1552,7 @@ export class OrganDirector {
                 hooks.popup(hooks.player.pos, hooks.t('MSG_GLYCOGEN'), '#ffe08a', 24);
             } else if (e.value === PICK_OXYGEN) {
                 this.oxygenT = 4;
-                this.fireMul = 0.72;
+                this.fireMul = 0.5;
                 hooks.popup(hooks.player.pos, hooks.t('OXYGEN_HINT'), '#9aefff', 24);
             } else if (e.value === PICK_DOPAMINE) {
                 this.dopamineT = 4;

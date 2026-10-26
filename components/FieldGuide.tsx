@@ -62,7 +62,7 @@ const COPY: Record<Language, Section[]> = {
             cards: [
                 { kind: 'gust', title: 'LUFADA', body: 'O ar empurra numa faixa. Os fios mostram a direção. Não tira vida sozinho.' },
                 { kind: 'cough', title: 'TOSSE', body: 'A faixa avisa e aperta. No estouro, varre e tira um naco de vida.' },
-                { kind: 'oxygen', title: 'OXIGÊNIO', body: 'Molécula clara. Por uns segundos os tiros saem mais seguidos.' },
+                { kind: 'oxygen', title: 'OXIGÊNIO', body: 'Molécula clara. Por uns segundos os tiros saem duas vezes mais rápido, na batida dobrada. A música fica a mesma.' },
             ],
         },
         {
@@ -122,7 +122,7 @@ const COPY: Record<Language, Section[]> = {
             cards: [
                 { kind: 'gust', title: 'GUST', body: 'Air pushes in a band. The strands show the direction. It does not take health by itself.' },
                 { kind: 'cough', title: 'COUGH', body: 'The band warns and tightens. On the burst it sweeps and takes a chunk of health.' },
-                { kind: 'oxygen', title: 'OXYGEN', body: 'A pale molecule. For a few seconds the shots come out closer together.' },
+                { kind: 'oxygen', title: 'OXYGEN', body: 'A pale molecule. For a few seconds the shots come twice as fast, on a doubled beat. The music stays the same.' },
             ],
         },
         {
@@ -182,7 +182,7 @@ const COPY: Record<Language, Section[]> = {
             cards: [
                 { kind: 'gust', title: 'RÁFAGA', body: 'El aire empuja en una franja. Los hilos muestran la dirección. No quita vida solo.' },
                 { kind: 'cough', title: 'TOS', body: 'La franja avisa y aprieta. En el estallido barre y quita un trozo de vida.' },
-                { kind: 'oxygen', title: 'OXÍGENO', body: 'Molécula clara. Por unos segundos los disparos salen más seguidos.' },
+                { kind: 'oxygen', title: 'OXÍGENO', body: 'Molécula clara. Por unos segundos los disparos salen al doble, en el pulso doble. La música sigue igual.' },
             ],
         },
         {

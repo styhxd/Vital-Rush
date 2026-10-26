@@ -719,6 +719,7 @@ export const Game: React.FC = () => {
     lastTimeRef.current = time;
 
     if (engineRef.current) {
+      try {
           engineRef.current.allowSerum = upgradesRef.current.some(u => u.level < u.maxLevel);
           engineRef.current.update(
             dt, 
@@ -863,6 +864,10 @@ export const Game: React.FC = () => {
             organId: eng.organ.id
           });
           setPassage(passageRef.current || eng.organ.charting());
+      }
+      } catch (err) {
+          console.error(err);
+          engineRef.current.recoverDraw();
       }
     }
     
@@ -1522,7 +1527,7 @@ export const Game: React.FC = () => {
             left: 50%;
             bottom: calc(18px + env(safe-area-inset-bottom, 0px));
             transform: translateX(-50%);
-            z-index: 45;
+            z-index: 70;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -1530,13 +1535,16 @@ export const Game: React.FC = () => {
             width: min(92vw, 420px);
             pointer-events: auto;
         }
-        .lymph-hint { color: #fff1df; font-size: 12px; letter-spacing: 0.08em; text-align: center; text-shadow: 0 2px 8px rgba(0,0,0,0.8); }
+        .lymph-hint { color: #fff6ea; font-size: 14px; line-height: 1.35; letter-spacing: 0.04em; text-align: center; text-shadow: 0 2px 8px rgba(0,0,0,0.85); max-width: 34rem; }
+        .lymph-rate { color: #ffd27a; font-size: 12px; letter-spacing: 0.14em; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,0.85); }
         .lymph-rest, .lymph-leave {
             width: 100%;
             border: 0;
             font-weight: 800;
             letter-spacing: 0.18em;
             text-transform: uppercase;
+            touch-action: none;
+            user-select: none;
         }
         .lymph-rest {
             background: radial-gradient(circle at 50% 120%, rgba(255, 214, 150, 0.95), rgba(196, 72, 72, 0.92) 58%);
@@ -1618,19 +1626,28 @@ export const Game: React.FC = () => {
       {lymphOn && gameState === GameState.PLAYING && !isPaused && (
           <div className="lymph-dock">
               <div className="lymph-hint">{t('NODE_HINT')}</div>
+              <div className="lymph-rate">{t('NODE_RATE')}</div>
               <button
                   className="lymph-rest"
                   onPointerDown={(e) => {
                       e.preventDefault();
-                      if (engineRef.current) engineRef.current.nodeFeed = true;
+                      e.stopPropagation();
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                      engineRef.current?.beginRest();
                   }}
-                  onPointerUp={() => { if (engineRef.current) engineRef.current.nodeFeed = false; }}
-                  onPointerLeave={() => { if (engineRef.current) engineRef.current.nodeFeed = false; }}
+                  onPointerUp={(e) => {
+                      if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+                      if (engineRef.current) engineRef.current.nodeFeed = false;
+                  }}
                   onPointerCancel={() => { if (engineRef.current) engineRef.current.nodeFeed = false; }}
               >{t('NODE_REST')}</button>
               <button
                   className="lymph-leave"
-                  onClick={() => { if (engineRef.current) engineRef.current.nodeLeave = true; }}
+                  onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (engineRef.current) engineRef.current.nodeLeave = true;
+                  }}
               >{t('NODE_LEAVE')}</button>
           </div>
       )}

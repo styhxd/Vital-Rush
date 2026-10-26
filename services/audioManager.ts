@@ -88,6 +88,9 @@ export class AudioManager {
   private reverbSend: GainNode | null = null;
   private fireMs = 450;
   private drumEvery = 4;
+  private musicEvery = 4;
+  private rapid = false;
+  private halfBeat = false;
   private chordDegree = 0;
   private lockedEvery = 0;
   private grid: { t: number; sixteenth: number }[] = [];
@@ -602,32 +605,78 @@ export class AudioManager {
   private coinAt: { x: number; y: number } | null = null;
 
   public queueCoins(n: number, at?: { x: number; y: number } | null) {
-      this.coinQueue = Math.min(18, this.coinQueue + Math.max(0, n));
+      this.coinQueue = Math.min(96, this.coinQueue + Math.max(0, n));
       if (at) this.coinAt = at;
+  }
+
+  public trimCoins(keep = 5) {
+      this.coinQueue = Math.min(this.coinQueue, Math.max(0, keep));
   }
 
   public pumpCoins() {
       if (this.coinQueue <= 0 || !this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
       const now = performance.now();
-      if (now - (this.lastPlayTime['coin'] || 0) < 36) return;
+      if (now - (this.lastPlayTime['coin'] || 0) < 54) return;
       this.coinQueue--;
-      this.playCoin(this.coinAt);
+      this.playCoin(this.coinAt, true);
   }
 
-  public playCoin(at?: { x: number; y: number } | null) {
+  /**
+   * Moeda de recompensa. O ouvido é mais sensível perto de 3–4 kHz, então o
+   * clique de metal mora aí. O corpo sobe numa pentatônica maior (consonante,
+   * sem intervalo que "erre") e o parcial em 2,67× é inarmônico de propósito:
+   * harmônico inteiro soa órgão, não moeda. Uma quinta logo depois é o
+   * intervalo ascendente comprimido — o mesmo gesto do coin do Mario
+   * (Si5 → Mi6), que o ouvido lê como ganho. Uma a cada ~54 ms: mais rápido
+   * que isso vira um bolo, mais lento perde o chuveiro de cassino.
+   */
+  public playCoin(at?: { x: number; y: number } | null, force = false) {
       if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
       const now = performance.now();
       const prev = this.lastPlayTime['coin'] || 0;
-      if (now - prev < 28) return;
-      this.coinRun = now - prev < 240 ? (this.coinRun + 1) % 8 : 0;
+      if (!force && now - prev < 54) {
+          this.queueCoins(1, at);
+          return;
+      }
+      this.coinRun = now - prev < 280 ? (this.coinRun + 1) % 5 : 0;
       this.lastPlayTime['coin'] = now;
-      const dest = this.sfxOut(at, 0.14);
+      const dest = this.sfxOut(at, 0.16);
       const t = this.ctx.currentTime;
-      const scale = [1174.7, 1318.5, 1568, 1760, 2093, 2349.3, 2637, 3136];
+      const scale = [1046.5, 1174.66, 1318.51, 1567.98, 1760];
       const f = scale[this.coinRun];
-      this.tone(t, f, 0.048, 'sine', 0.04, 5600, dest);
-      this.tone(t, f * 2.76, 0.022, 'sine', 0.01, 7400, dest);
-      this.tone(t + 0.012, f * 1.498, 0.034, 'triangle', 0.013, 5000, dest);
+      const lift = 1 + this.coinRun * 0.045;
+      this.puff(0.004, 3400 + this.coinRun * 140, 0.03 * lift, t, dest);
+      this.tone(t, f, 0.072, 'sine', 0.058 * lift, 4200, dest);
+      this.tone(t, Math.min(4200, f * 2.67), 0.026, 'sine', 0.016 * lift, 5200, dest);
+      this.tone(t + 0.012, f * 1.498, 0.042, 'triangle', 0.014 * lift, 4800, dest);
+  }
+
+  public playSigh(at?: { x: number; y: number } | null, strength = 1) {
+      if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+      const dest = this.sfxOut(at, 0.9);
+      const t = this.ctx.currentTime;
+      const dur = 0.62 + Math.min(0.4, Math.max(0, strength) * 0.22);
+      const noise = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * dur), this.ctx.sampleRate);
+      const data = noise.getChannelData(0);
+      for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+      const src = this.ctx.createBufferSource();
+      src.buffer = noise;
+      const air = this.ctx.createBiquadFilter();
+      air.type = 'bandpass';
+      air.Q.value = 0.85;
+      air.frequency.setValueAtTime(720, t);
+      air.frequency.exponentialRampToValueAtTime(280, t + dur);
+      const g = this.ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.07, t + 0.08);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      src.connect(air);
+      air.connect(g);
+      g.connect(dest);
+      src.start(t);
+      src.stop(t + dur + 0.02);
+      this.tone(t + 0.04, 196, dur * 0.85, 'sine', 0.03, 640, dest);
+      this.tone(t + 0.16, 146.8, dur * 0.7, 'sine', 0.02, 480, dest);
   }
   public playShiny(at?: { x: number; y: number } | null) {
       if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
@@ -1010,6 +1059,9 @@ export class AudioManager {
       this.cadenceTarget = 1;
       this.shotCursor = -1;
       this.lockedEvery = 0;
+      this.musicEvery = 4;
+      this.halfBeat = false;
+      this.rapid = false;
       this.grid = [];
       this.nextNoteTime = this.ctx.currentTime + 0.1;
       this.scheduler();
@@ -1043,7 +1095,15 @@ export class AudioManager {
       while (this.nextNoteTime < now + 0.12 && iterations < 8) {
           this.playStep(this.current16thNote, this.nextNoteTime);
           const secondsPerBeat = 60 / this.liveBpm();
-          this.nextNoteTime += 0.25 * secondsPerBeat;
+          const step = 0.25 * secondsPerBeat;
+          if (this.halfBeat) {
+              this.grid.push({
+                  t: this.nextNoteTime + step * 0.5,
+                  sixteenth: ((this.current16thNote % 16) * 2 + 1) % 16,
+              });
+              if (this.grid.length > 64) this.grid.splice(0, this.grid.length - 64);
+          }
+          this.nextNoteTime += step;
           this.current16thNote = (this.current16thNote + 1) % 64;
           iterations++;
       }
@@ -1057,27 +1117,34 @@ export class AudioManager {
       return score.root * Math.pow(2, semi / 12);
   }
 
-  public armGun(intervalMs: number) {
-      this.fireMs = Math.max(140, intervalMs);
+  public armGun(intervalMs: number, rapid = false) {
+      const musicMs = Math.max(140, rapid ? intervalMs * 2 : intervalMs);
+      const shotMs = rapid ? musicMs / 2 : musicMs;
+      this.fireMs = shotMs;
+      this.rapid = rapid;
       if (this.currentTrack !== 'GAME') return;
       const score = SCORES[this.organ];
       const base = score.bpm * (this.boss ? 1.12 : 1) * this.tempoMul;
-      const fit = this.fitCadence(this.fireMs, base);
-      if (fit.every !== this.drumEvery) this.shotCursor = -1;
-      this.drumEvery = fit.every;
+      const fit = this.fitCadence(musicMs, base);
+      this.musicEvery = fit.every;
+      const shotEvery = rapid ? Math.max(1, fit.every / 2) : fit.every;
+      this.halfBeat = rapid && shotEvery === fit.every;
+      if (shotEvery !== this.drumEvery) this.shotCursor = -1;
+      this.drumEvery = shotEvery;
       this.cadenceTarget = fit.cadence;
   }
 
   /** A cadência escolhe a subdivisão, e o tempo da música estica até o tiro cair nela. */
   private fitCadence(fireMs: number, baseBpm: number): { every: number; cadence: number } {
       const ladder = [8, 4, 2, 1];
-      let best = { every: this.drumEvery || 4, cadence: 1, err: Infinity };
+      const held = this.musicEvery || 4;
+      let best = { every: held, cadence: 1, err: Infinity };
       for (const every of ladder) {
           const natural = every * (60000 / Math.max(40, baseBpm)) / 4;
           const cadence = Math.max(0.78, Math.min(1.68, natural / fireMs));
           const actual = natural / cadence;
           let err = Math.abs(Math.log(actual / fireMs));
-          if (every === this.drumEvery) err -= 0.012;
+          if (every === held) err -= 0.012;
           if (err < best.err) best = { every, cadence, err };
       }
       return best;
@@ -1254,7 +1321,7 @@ export class AudioManager {
       if (!this.ctx || !this.musicGain) return;
       if (this.currentTrack === 'GAME') {
           this.grid.push({ t: time, sixteenth: step % 16 });
-          if (this.grid.length > 48) this.grid.splice(0, this.grid.length - 48);
+          if (this.grid.length > 64) this.grid.splice(0, this.grid.length - 64);
       }
       const menu = this.currentTrack === 'MENU';
       const key: OrganId | 'menu' = menu ? 'menu' : this.organ;
@@ -1268,7 +1335,7 @@ export class AudioManager {
       const bed = 2.55;
       const cut = score.color === 'murk' ? 520 : score.color === 'spark' ? 3200 : score.color === 'glass' ? 2400 : score.color === 'air' ? 1600 : 1400;
       const wave: OscillatorType = score.color === 'murk' || score.color === 'spark' ? 'sawtooth' : 'triangle';
-      const every = menu ? 4 : this.drumEvery;
+      const every = menu ? 4 : this.musicEvery;
 
       if (layers >= 1) {
           if (score.color === 'thump') {

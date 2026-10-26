@@ -201,15 +201,29 @@ export class GameEngine {
   private clearBufferTimer: number = 0; 
   private isVacuuming: boolean = false; 
   private vacuumingTimer: number = 0;
+  private coinCascade = false;
+  private coinLaneAt = 0;
   public lymphOpen = false;
   public nodeFeed = false;
   public nodeLeave = false;
+
+  public beginRest() {
+      this.nodeFeed = true;
+      if (!this.lymphOpen || this.lymphPhase !== 'hold' || this.nodeWasFeeding) return;
+      this.nodeWasFeeding = true;
+      this.payRest(4, 5);
+  }
   public nodeSpending = false;
+  private nodeWasFeeding = false;
   private lymphPhase: 'in' | 'hold' | 'out' = 'hold';
   private lymphT = 0;
   private lymphScale = 0;
   private lymphCoin = 0;
-  private lymphPop = 0; 
+  private lymphPop = 0;
+  private lymphSpent = 0;
+  private lymphShow = 0;
+  private lymphDrain = 0;
+  private lymphRelief = 0; 
   
   public isLowQuality: boolean = false; 
   public forceHighQuality: boolean = false;
@@ -443,7 +457,7 @@ export class GameEngine {
           pos: { ...mine.pos },
           vel: { x: 0, y: 0 },
           radius,
-          health: 1, maxHealth: 1,
+          health: 1, maxHealth: 22,
           color, damage: 0, active: true, ttl: 22,
       });
       const sparkCount = this.isLowQuality ? 4 : cyan ? 14 : 8;
@@ -559,6 +573,38 @@ export class GameEngine {
       }
   }
 
+  private syncCoinShower() {
+      const pull = this.surgeActive || this.isVacuuming;
+      if (pull) this.coinCascade = true;
+      if (!this.coinCascade) return;
+      if (this.coinLaneAt < this.time) this.coinLaneAt = this.time;
+      const waiting: Entity[] = [];
+      let busy = 0;
+      for (const e of this.entities) {
+          if (!e.active || e.type !== EntityType.DNA_FRAGMENT) continue;
+          if (e.angle === 1 || (e.orbitOffset ?? 0) > 0) {
+              busy++;
+              continue;
+          }
+          waiting.push(e);
+      }
+      waiting.sort((a, b) => {
+          const da = (a.pos.x - this.player.pos.x) ** 2 + (a.pos.y - this.player.pos.y) ** 2;
+          const db = (b.pos.x - this.player.pos.x) ** 2 + (b.pos.y - this.player.pos.y) ** 2;
+          return da - db;
+      });
+      for (const e of waiting) {
+          e.orbitOffset = this.coinLaneAt;
+          e.angle = 0;
+          this.coinLaneAt += 58;
+          busy++;
+      }
+      if (!pull && busy === 0) {
+          this.coinCascade = false;
+          this.coinLaneAt = 0;
+      }
+  }
+
   private coinTrail(e: Entity) {
       if (this.isLowQuality || this.particles.length > 150) return;
       const gate = (e.shootTimer ?? 0) - 1;
@@ -627,44 +673,72 @@ export class GameEngine {
           this.lymphT = 0;
       }
       this.nodeSpending = false;
-      if (this.lymphPhase === 'hold' && this.nodeFeed) this.spendRest(dt);
+      if (this.lymphPhase === 'hold' && this.nodeFeed) {
+          if (!this.nodeWasFeeding) {
+              this.nodeWasFeeding = true;
+              this.payRest(4, 5);
+          }
+          this.payRest(12 * dt, 1);
+          this.lymphDrain = Math.min(1, this.lymphDrain + dt * 2.4);
+      } else if (this.nodeWasFeeding) {
+          this.nodeWasFeeding = false;
+          if (this.lymphSpent >= 16) {
+              this.lymphShow = this.lymphSpent;
+              this.lymphRelief = 1;
+              audioManager.trimCoins(5);
+              audioManager.playSigh(this.player.pos, Math.min(1.4, this.lymphSpent / 180));
+              this.spawnText(
+                  { x: this.player.pos.x, y: this.player.pos.y - 64 },
+                  `-${Math.round(this.lymphSpent)} DNA`,
+                  '#ffd27a',
+                  34
+              );
+          }
+          this.lymphSpent = 0;
+      }
+      if (!this.nodeFeed) this.lymphDrain = Math.max(0, this.lymphDrain - dt * 1.1);
+      if (this.lymphRelief > 0) this.lymphRelief = Math.max(0, this.lymphRelief - dt * 0.42);
       if (this.lymphPhase === 'out' && this.lymphT >= 0.48) {
           this.lymphOpen = false;
           this.nodeFeed = false;
           this.nodeLeave = false;
           this.nodeSpending = false;
+          this.nodeWasFeeding = false;
           this.lymphScale = 0;
+          this.lymphDrain = 0;
+          this.lymphSpent = 0;
       }
   }
 
-  private spendRest(dt: number) {
+  private payRest(hp: number, burst: number) {
       const missing = this.player.maxHealth - this.player.health;
-      if (missing < 0.35 || this.biomass < 1) return;
-      const want = Math.min(missing, 18 * dt);
+      if (missing < 0.35 || this.biomass < 1 || hp <= 0) return 0;
+      const want = Math.min(missing, hp);
       const pay = Math.min(this.biomass, Math.max(1, Math.round(want * 16)));
       const healed = Math.min(missing, pay / 16);
       this.biomass -= pay;
       this.player.health = Math.min(this.player.maxHealth, this.player.health + healed);
       this.nodeSpending = true;
+      this.lymphSpent += pay;
       this.lymphPop += healed;
       audioManager.queueCoins(1, this.player.pos);
-      if (this.particles.length < 160) {
+      if (this.particles.length < 170 && burst > 0) {
           const hilum = this.lymphHilum();
-          const born = 1 + (pay > 8 ? 1 : 0);
+          const born = Math.min(6, burst);
           for (let i = 0; i < born; i++) {
               const ang = Math.random() * Math.PI * 2;
               this.particles.push({
                   id: 'node_coin',
                   type: EntityType.PARTICLE,
-                  pos: { x: this.player.pos.x + Math.cos(ang) * 12, y: this.player.pos.y + Math.sin(ang) * 8 },
+                  pos: { x: this.player.pos.x + Math.cos(ang) * 14, y: this.player.pos.y + Math.sin(ang) * 10 },
                   vel: {
-                      x: (hilum.x - this.player.pos.x) * 0.075 + (Math.random() - 0.5) * 1.6,
-                      y: (hilum.y - this.player.pos.y) * 0.075 + (Math.random() - 0.5) * 1.6,
+                      x: (hilum.x - this.player.pos.x) * 0.09 + (Math.random() - 0.5) * 2.4,
+                      y: (hilum.y - this.player.pos.y) * 0.09 + (Math.random() - 0.5) * 2.4,
                   },
-                  radius: 4.4,
+                  radius: 3.6 + (i % 3) * 1.1,
                   health: 1, maxHealth: 1,
                   color: i % 2 ? '#fff1b0' : '#f0b429',
-                  damage: 0, active: true, ttl: 24,
+                  damage: 0, active: true, ttl: 28,
               });
           }
       }
@@ -673,15 +747,17 @@ export class GameEngine {
           this.lymphPop = 0;
           this.spawnText({ x: this.player.pos.x - 8, y: this.player.pos.y - 42 }, `+${shown}`, '#ffb0b0', 30);
       }
+      return pay;
   }
 
   private drawLymph(front: boolean) {
       const s = Math.max(0.02, this.lymphScale);
+      const pump = 1 + this.lymphDrain * 0.07 * Math.sin(this.time / 46);
       const cx = CANVAS_WIDTH * 0.5;
       const cy = CANVAS_HEIGHT * 0.52;
       this.ctx.save();
       this.ctx.translate(cx, cy);
-      this.ctx.scale(s, s);
+      this.ctx.scale(s * pump, s * pump);
       const bean = () => {
           this.ctx.beginPath();
           this.ctx.moveTo(24, -156);
@@ -702,6 +778,20 @@ export class GameEngine {
           this.ctx.fillStyle = flesh;
           bean();
           this.ctx.fill();
+          if (this.lymphDrain > 0.04) {
+              this.ctx.globalAlpha = 0.42 * this.lymphDrain;
+              this.ctx.fillStyle = '#7a1428';
+              bean();
+              this.ctx.fill();
+              this.ctx.globalAlpha = 1;
+          }
+          if (this.lymphRelief > 0.04) {
+              this.ctx.globalAlpha = 0.48 * this.lymphRelief;
+              this.ctx.fillStyle = '#ffe6c4';
+              bean();
+              this.ctx.fill();
+              this.ctx.globalAlpha = 1;
+          }
           this.ctx.shadowBlur = 0;
           this.ctx.save();
           this.ctx.clip();
@@ -741,6 +831,19 @@ export class GameEngine {
           this.ctx.font = '800 28px "Chakra Petch", sans-serif';
           this.ctx.strokeText(this.t('NODE_TITLE'), 0, -198);
           this.ctx.fillText(this.t('NODE_TITLE'), 0, -198);
+          const spent = this.nodeSpending ? this.lymphSpent : this.lymphShow;
+          const spentAlpha = this.nodeSpending ? 1 : this.lymphRelief;
+          if (spent >= 16 && spentAlpha > 0.04) {
+              this.ctx.globalAlpha = spentAlpha;
+              this.ctx.font = '800 40px "Chakra Petch", sans-serif';
+              this.ctx.lineWidth = 8;
+              this.ctx.strokeStyle = 'rgba(48, 12, 16, 0.8)';
+              this.ctx.fillStyle = '#ffd27a';
+              const bill = `-${Math.round(spent)} DNA`;
+              this.ctx.strokeText(bill, 0, 214);
+              this.ctx.fillText(bill, 0, 214);
+              this.ctx.globalAlpha = 1;
+          }
       }
       this.ctx.restore();
   }
@@ -1272,6 +1375,8 @@ export class GameEngine {
     this.clearBufferTimer = 0; 
     this.isVacuuming = false;  
     this.vacuumingTimer = 0;
+    this.coinCascade = false;
+    this.coinLaneAt = 0;
     this.lymphOpen = false;
     this.nodeFeed = false;
     this.nodeLeave = false;
@@ -1313,19 +1418,8 @@ export class GameEngine {
           this.spawnText(this.player.pos, this.t('MSG_SURGE'), this.colors.PLAYER_CORE, 45);
       }
       audioManager.playSurge(this.player.pos);
-      this.entities.forEach(e => {
-          if (e.type === EntityType.DNA_FRAGMENT && e.active) {
-              const dx = this.player.pos.x - e.pos.x;
-              const dy = this.player.pos.y - e.pos.y;
-              const dist = Math.sqrt(dx*dx + dy*dy);
-              
-              if (dist > 0) {
-                  const speed = 25; 
-                  e.vel.x = (dx / dist) * speed;
-                  e.vel.y = (dy / dist) * speed;
-              }
-          }
-      });
+      this.coinCascade = true;
+      if (this.coinLaneAt < this.time) this.coinLaneAt = this.time;
     }
   }
 
@@ -1967,10 +2061,6 @@ export class GameEngine {
                   continue;
               }
               dnaLeft++;
-              if (this.vacuumingTimer > 6.4) {
-                  e.pos.x = this.player.pos.x;
-                  e.pos.y = this.player.pos.y;
-              }
           }
           
           if (dnaLeft === 0) {
@@ -1986,8 +2076,13 @@ export class GameEngine {
                   this.lymphScale = 0;
                   this.nodeFeed = false;
                   this.nodeLeave = false;
+                  this.nodeWasFeeding = false;
                   this.lymphCoin = 0;
                   this.lymphPop = 0;
+                  this.lymphSpent = 0;
+                  this.lymphShow = 0;
+                  this.lymphDrain = 0;
+                  this.lymphRelief = 0;
               } else onWaveClear();
           }
       }
@@ -2133,7 +2228,7 @@ export class GameEngine {
         this.regenTimer = 0;
       }
       
-      audioManager.armGun(stats.fireRate * this.organ.fireMul);
+      audioManager.armGun(stats.fireRate * this.organ.fireMul, this.organ.fireMul < 0.6);
       const drum = audioManager.takeDrum();
       if (drum && !this.isDashing && this.waveStartDelay <= 0 && !this.organ.charting()) {
         const target = this.findTarget();
@@ -2210,6 +2305,7 @@ export class GameEngine {
       });
     }
 
+    this.syncCoinShower();
     this.clearGrid();
     for (let i = this.entities.length - 1; i >= 0; i--) {
       const e = this.entities[i];
@@ -2230,7 +2326,7 @@ export class GameEngine {
 
       if (e.type !== EntityType.TEXT_POPUP) {
         const drag = e.drag ?? 0.5;
-        const isMagnetized = e.type === EntityType.DNA_FRAGMENT && (this.surgeActive || this.isVacuuming);
+        const isMagnetized = e.type === EntityType.DNA_FRAGMENT && (this.surgeActive || this.isVacuuming || this.coinCascade);
         const flowInfluence = e.type === EntityType.BIO_MINE
           ? MINE_FLOW
           : (e.type === EntityType.ANTIBODY || e.type === EntityType.ACID_POOL || e.type === EntityType.ENEMY_PROJECTILE || isMagnetized) ? 0 : (e.type === EntityType.BOSS ? 0.1 : 1);
@@ -2240,7 +2336,20 @@ export class GameEngine {
         else if (e.type === EntityType.ACID_POOL) windScale = e.id.startsWith('bile_') ? 0.45 : 0;
         else if (e.type === EntityType.ANTIBODY || e.type === EntityType.ENEMY_PROJECTILE) windScale = 0.8;
         else if (e.type === EntityType.ORGAN_PICKUP) windScale = 1.15;
+        else if (e.type === EntityType.DNA_FRAGMENT && this.coinCascade) windScale = 0;
         else if (e.type === EntityType.PLAYER) windScale = 0;
+
+        if (e.type === EntityType.DNA_FRAGMENT && this.coinCascade && e.angle !== 1) {
+            const due = (e.orbitOffset ?? 0) > 0 && (e.orbitOffset ?? 0) <= this.time;
+            if (due) {
+                e.angle = 1;
+                e.vel.x = 0;
+                e.vel.y = 0;
+            } else {
+                e.vel.x *= 0.82;
+                e.vel.y *= 0.82;
+            }
+        }
 
         e.pos.x += (e.vel.x + (this.bloodFlow.x * (1 - drag) * flowInfluence) + this.organ.wind.x * windScale) * tick;
         e.pos.y += (e.vel.y + (this.bloodFlow.y * (1 - drag) * flowInfluence) + this.organ.wind.y * windScale) * tick;
@@ -2428,15 +2537,10 @@ export class GameEngine {
           const dx = this.player.pos.x - e.pos.x;
           const dy = this.player.pos.y - e.pos.y;
           const dist = Math.sqrt(dx*dx + dy*dy);
-          const isVacuuming = this.isVacuuming;
-          if (this.surgeActive) e.angle = 1;
-          const reeling = e.angle === 1 || isVacuuming;
-          if (dist < stats.magnetRadius || reeling) {
-            const speed = isVacuuming
-              ? Math.max(6, Math.min(14, dist * 0.022))
-              : e.angle === 1
-                ? Math.max(8, Math.min(18, dist * 0.035))
-                : 28;
+          const reeling = e.angle === 1;
+          const magnet = !this.coinCascade && dist < stats.magnetRadius;
+          if (magnet || reeling) {
+            const speed = reeling ? 24 : 28;
             // Sem o teto, o vácuo do fim da onda passa do corpo e a moeda
             // fica orbitando colada no personagem até ele se mexer.
             const step = Math.min(dist, speed * tick);
@@ -2455,8 +2559,7 @@ export class GameEngine {
               this.sessionStats.biomassCollected += val;
               achievementManager.track('biomass_10k', val);
               if (this.biomass >= 3000) achievementManager.track('rich', 3000);
-              if (reeling) audioManager.queueCoins(1, e.pos);
-              else audioManager.playCoin(e.pos);
+              audioManager.playCoin(e.pos);
               if (!this.isLowQuality && this.particles.length < 110) {
                   for (let k = 0; k < 3; k++) {
                       const a = (k / 3) * Math.PI * 2;
@@ -3464,9 +3567,29 @@ export class GameEngine {
       this.ctx.globalAlpha = 1.0;
   }
 
+  public recoverDraw() {
+      this.paintReset();
+      this.ctx.fillStyle = this.bgFill;
+      this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+  }
+
+  private paintReset() {
+      const ctx = this.ctx as CanvasRenderingContext2D & { reset?: () => void };
+      if (ctx.reset) {
+          ctx.reset();
+          return;
+      }
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.setLineDash([]);
+      ctx.shadowBlur = 0;
+  }
+
   public draw() {
     if (this.organ.charting()) this.organ.placePlayer(this.player);
     const ride = this.organ.riding();
+    this.paintReset();
     this.ctx.fillStyle = this.bgFill;
     this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
     this.organ.drawBackdrop(this.ctx, this.time, this.isLowQuality);
@@ -3539,13 +3662,13 @@ export class GameEngine {
       if (p.id === 'mine_expl' || p.id === 'mine_expl_dash') {
           this.ctx.save();
           this.ctx.globalCompositeOperation = 'screen';
-          const maxLife = p.id === 'mine_expl' ? 25 : 20; 
-          const life = p.ttl || 0;
-          const progress = 1 - (life / maxLife);
+          const maxLife = Math.max(1, p.maxHealth > 1 ? p.maxHealth : (p.id === 'mine_expl' ? 25 : 20));
+          const life = Math.max(0, p.ttl || 0);
+          const progress = Math.max(0, Math.min(1, 1 - (life / maxLife)));
           const isDashExpl = p.id === 'mine_expl_dash';
-          const radius = p.radius;
+          const radius = Math.max(0, p.radius * (1 - Math.pow(1 - progress, 3)));
           this.ctx.beginPath();
-          this.ctx.arc(p.pos.x, p.pos.y, radius * (1-Math.pow(1-progress, 3)), 0, Math.PI*2);
+          this.ctx.arc(p.pos.x, p.pos.y, Math.max(0.01, radius), 0, Math.PI*2);
           this.ctx.lineWidth = (isDashExpl ? 40 : 60) * (1 - progress); 
           if (isDashExpl) {
               this.ctx.strokeStyle = `rgba(0, 255, 255, ${life/maxLife})`;
@@ -3557,7 +3680,7 @@ export class GameEngine {
           this.ctx.stroke();
           this.ctx.setLineDash([]); 
           this.ctx.beginPath();
-          this.ctx.arc(p.pos.x, p.pos.y, radius * 0.5 * (1-progress), 0, Math.PI*2);
+          this.ctx.arc(p.pos.x, p.pos.y, Math.max(0.01, radius * 0.5 * (1 - progress)), 0, Math.PI * 2);
           this.ctx.fillStyle = isDashExpl ? `rgba(200, 255, 255, ${life/maxLife})` : `rgba(220, 255, 255, ${life/maxLife})`;
           this.ctx.fill();
           this.ctx.restore();
@@ -3991,7 +4114,35 @@ export class GameEngine {
     }
 
     if (!ride) this.drawVital();
-    if (this.lymphOpen) this.drawLymph(true);
+    if (this.lymphOpen) {
+        this.drawLymph(true);
+        if (this.lymphDrain > 0.04) {
+            this.ctx.save();
+            this.ctx.fillStyle = `rgba(28, 0, 6, ${0.34 * this.lymphDrain})`;
+            this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            this.ctx.restore();
+        }
+        if (this.lymphRelief > 0.02) {
+            const a = this.lymphRelief;
+            const home = this.lymphHome();
+            const reach = 90 + (1 - a) * 340;
+            this.ctx.save();
+            this.ctx.globalCompositeOperation = 'screen';
+            const glow = this.ctx.createRadialGradient(home.x, home.y, 16, home.x, home.y, 320);
+            glow.addColorStop(0, `rgba(255, 236, 206, ${0.72 * a})`);
+            glow.addColorStop(0.45, `rgba(255, 196, 140, ${0.22 * a})`);
+            glow.addColorStop(1, 'rgba(255, 210, 160, 0)');
+            this.ctx.fillStyle = glow;
+            this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+            this.ctx.globalCompositeOperation = 'source-over';
+            this.ctx.strokeStyle = `rgba(255, 228, 196, ${0.85 * a})`;
+            this.ctx.lineWidth = 10 * a;
+            this.ctx.beginPath();
+            this.ctx.arc(home.x, home.y, reach, 0, Math.PI * 2);
+            this.ctx.stroke();
+            this.ctx.restore();
+        }
+    }
 
     this.entities.forEach(e => {
       if (e.type === EntityType.SERUM && e.active) this.drawSerum(e);
