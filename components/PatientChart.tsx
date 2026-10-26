@@ -41,11 +41,27 @@ const chartStyles = `
 .chart-lab {
     position: relative;
     isolation: isolate;
-    background: linear-gradient(180deg, rgba(255, 250, 236, 0.96), rgba(255, 228, 170, 0.72));
-    box-shadow: inset 0 0 14px rgba(255, 196, 90, 0.45), 0 0 0 1px rgba(176, 112, 32, 0.28);
+    background:
+        linear-gradient(180deg, rgba(255, 252, 246, 0.42), rgba(255, 220, 150, 0.22) 42%, rgba(255, 196, 96, 0.34)),
+        radial-gradient(80% 90% at 50% 115%, rgba(255, 186, 64, 0.55), transparent 62%);
+    backdrop-filter: blur(7px);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.92),
+        inset 0 0 22px rgba(255, 214, 120, 0.72),
+        inset 0 -10px 18px rgba(160, 84, 16, 0.22),
+        0 0 0 1px rgba(176, 112, 32, 0.38);
     animation: chart-lab-breathe 2.2s ease-in-out infinite;
 }
 .chart-lab-label { position: relative; z-index: 2; }
+.chart-lab-core {
+    position: absolute;
+    inset: 18% 14%;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 1;
+    background: radial-gradient(circle, rgba(255, 244, 210, 0.95) 0%, rgba(255, 196, 80, 0.42) 46%, transparent 72%);
+    animation: chart-lab-core 2.2s ease-in-out infinite;
+}
 .chart-lab-sheen {
     position: absolute;
     inset: 0;
@@ -62,15 +78,25 @@ const chartStyles = `
     animation: chart-lab-sheen 2.7s ease-in-out infinite;
 }
 @keyframes chart-lab-breathe {
-    0%, 100% { box-shadow: inset 0 0 14px rgba(255, 196, 90, 0.4), 0 0 0 1px rgba(176, 112, 32, 0.28); filter: brightness(1); }
-    50% { box-shadow: inset 0 0 22px rgba(255, 186, 70, 0.85), 0 0 0 1px rgba(176, 112, 32, 0.45); filter: brightness(1.06); }
+    0%, 100% {
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.85), inset 0 0 16px rgba(255, 210, 120, 0.55), inset 0 -10px 16px rgba(160, 84, 16, 0.18), 0 0 0 1px rgba(176, 112, 32, 0.32);
+        filter: brightness(1);
+    }
+    50% {
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 1), inset 0 0 28px rgba(255, 196, 70, 0.95), inset 0 -8px 18px rgba(176, 96, 16, 0.28), 0 0 0 1px rgba(176, 112, 32, 0.5);
+        filter: brightness(1.08);
+    }
+}
+@keyframes chart-lab-core {
+    0%, 100% { opacity: 0.55; transform: scale(0.86); }
+    50% { opacity: 1; transform: scale(1); }
 }
 @keyframes chart-lab-sheen {
     0%, 36% { transform: translateX(-135%); }
     70%, 100% { transform: translateX(135%); }
 }
 @media (prefers-reduced-motion: reduce) {
-    .chart-lab, .chart-lab-sheen::after { animation: none; }
+    .chart-lab, .chart-lab-sheen::after, .chart-lab-core { animation: none; }
 }
 .chart-abandon {
     margin-top: 0.45rem;
@@ -261,6 +287,7 @@ export const PatientChart: React.FC<PatientChartProps> = ({
                     className="chart-lab flex-1 py-2 lg:py-4 border-2 font-bold tracking-[0.16em] text-[10px] lg:text-sm uppercase transition-colors hover:bg-black/5"
                     style={{ borderColor: ink, color: ink }}
                 >
+                    <span className="chart-lab-core" aria-hidden="true" />
                     <span className="chart-lab-sheen" aria-hidden="true" />
                     <span className="chart-lab-label">{t('CHART_LAB')}</span>
                 </button>
@@ -354,7 +381,8 @@ export const OutcomeChart: React.FC<OutcomeChartProps> = ({
                         className="chart-lab flex-1 py-2 lg:py-4 border-2 font-bold tracking-[0.16em] text-[10px] lg:text-sm uppercase transition-colors hover:bg-black/5"
                         style={{ borderColor: ink, color: ink }}
                     >
-                        <span className="chart-lab-sheen" aria-hidden="true" />
+                        <span className="chart-lab-core" aria-hidden="true" />
+                    <span className="chart-lab-sheen" aria-hidden="true" />
                         <span className="chart-lab-label">{t('MUTATION')}</span>
                     </button>
                 )}

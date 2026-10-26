@@ -282,6 +282,8 @@ export const Game: React.FC = () => {
   const [upgrades, setUpgrades] = useState<Upgrade[]>(UPGRADES.map(u => ({...u}))); 
   
   const shownBiomassRef = useRef(0);
+  const lymphRef = useRef(false);
+  const [lymphOn, setLymphOn] = useState(false);
   const [uiData, setUiData] = useState({ 
     health: 100, maxHealth: 100, score: 0, biomass: 0, 
     wave: 0, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100,
@@ -785,7 +787,24 @@ export const Game: React.FC = () => {
           setGameState(GameState.WAVE_CLEARED);
       }
 
-      if (engineRef.current.currentWaveIndex >= 0 && !engineRef.current.waveActive) finishWave();
+      const node = !!engineRef.current.lymphOpen;
+      if (node !== lymphRef.current) {
+          lymphRef.current = node;
+          setLymphOn(node);
+      }
+      if (node) {
+          const live = engineRef.current;
+          const health = Math.round(live.player.health);
+          const biomass = Math.round(live.biomass);
+          setUiData(prev => prev.health === health && prev.biomass === biomass ? prev : ({
+              ...prev,
+              health,
+              maxHealth: Math.round(live.player.maxHealth),
+              biomass,
+          }));
+      }
+
+      if (engineRef.current.currentWaveIndex >= 0 && !engineRef.current.waveActive && !engineRef.current.lymphOpen) finishWave();
 
       if (engineRef.current.consumeSerum()) {
           const ids = rollSerumOffers(upgradesRef.current);
@@ -1493,6 +1512,43 @@ export const Game: React.FC = () => {
             animation: outcome-pop 0.7s cubic-bezier(.2, 1.45, .35, 1) both;
         }
         .outcome-campaign { background: radial-gradient(circle at 50% 42%, rgba(255, 214, 120, 0.38), rgba(40, 8, 4, 0.2) 36%, rgba(0, 0, 0, 0.78) 72%); }
+        .lymph-hp, .lymph-dna { position: relative; z-index: 40; animation: lymph-readout 0.55s ease forwards; }
+        .lymph-hp { transform-origin: top left; }
+        .lymph-dna { transform-origin: top right; }
+        .lymph-dna .text-yellow-400 { text-shadow: 0 0 18px rgba(255, 196, 64, 0.9); }
+        @keyframes lymph-readout { from { transform: scale(1); } to { transform: scale(1.7); } }
+        .lymph-dock {
+            position: absolute;
+            left: 50%;
+            bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+            transform: translateX(-50%);
+            z-index: 45;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            width: min(92vw, 420px);
+            pointer-events: auto;
+        }
+        .lymph-hint { color: #fff1df; font-size: 12px; letter-spacing: 0.08em; text-align: center; text-shadow: 0 2px 8px rgba(0,0,0,0.8); }
+        .lymph-rest, .lymph-leave {
+            width: 100%;
+            border: 0;
+            font-weight: 800;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
+        }
+        .lymph-rest {
+            background: radial-gradient(circle at 50% 120%, rgba(255, 214, 150, 0.95), rgba(196, 72, 72, 0.92) 58%);
+            color: #fff8ef;
+            padding: 14px 18px;
+            box-shadow: inset 0 0 18px rgba(255, 236, 200, 0.8), 0 8px 0 #6a2430;
+        }
+        .lymph-leave {
+            background: transparent;
+            color: #ffe7c8;
+            padding: 8px;
+        }
         .outcome-leave-finale { animation: outcome-leave 1.4s ease forwards; }
         .finale-rig { width: min(34vh, 240px); height: min(34vh, 240px); perspective: 900px; }
         .finale-coin {
@@ -1556,6 +1612,26 @@ export const Game: React.FC = () => {
                   </div>
               </div>
               <div className="life-lost-label">{t('MSG_CRITICAL')}</div>
+          </div>
+      )}
+
+      {lymphOn && gameState === GameState.PLAYING && !isPaused && (
+          <div className="lymph-dock">
+              <div className="lymph-hint">{t('NODE_HINT')}</div>
+              <button
+                  className="lymph-rest"
+                  onPointerDown={(e) => {
+                      e.preventDefault();
+                      if (engineRef.current) engineRef.current.nodeFeed = true;
+                  }}
+                  onPointerUp={() => { if (engineRef.current) engineRef.current.nodeFeed = false; }}
+                  onPointerLeave={() => { if (engineRef.current) engineRef.current.nodeFeed = false; }}
+                  onPointerCancel={() => { if (engineRef.current) engineRef.current.nodeFeed = false; }}
+              >{t('NODE_REST')}</button>
+              <button
+                  className="lymph-leave"
+                  onClick={() => { if (engineRef.current) engineRef.current.nodeLeave = true; }}
+              >{t('NODE_LEAVE')}</button>
           </div>
       )}
 
@@ -1631,7 +1707,7 @@ export const Game: React.FC = () => {
         <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between hud-safe" style={{ fontFamily: '"Chakra Petch", sans-serif' }}>
            <div className="flex justify-between items-start">
              <div className="flex flex-col gap-1 lg:gap-3 w-28 lg:w-64">
-                <div className={uiData.adrenaline ? 'adrenaline-hp' : undefined}>
+                <div className={`${uiData.adrenaline ? 'adrenaline-hp' : ''} ${lymphOn ? 'lymph-hp' : ''}`.trim()}>
                 <StatBar label={t('INTEGRITY')} value={uiData.health} max={uiData.maxHealth} colorClass={uiData.adrenaline ? "bg-red-500 shadow-[0_0_12px_rgba(255,40,40,0.85)]" : (isPlatinum ? "bg-gradient-to-r from-purple-500 to-amber-400" : "bg-gradient-to-r from-red-600 to-red-400")} />
                 </div>
                 <StatBar label={t('SURGE_READY')} value={uiData.energy} max={uiData.maxEnergy} colorClass={isPlatinum ? "bg-gradient-to-r from-amber-400 to-white" : "bg-gradient-to-r from-cyan-600 to-cyan-400"} animate={true}/>
@@ -1706,7 +1782,7 @@ export const Game: React.FC = () => {
                      <IconButton onClick={toggleMute} icon={<IconSpeaker muted={isMuted} />} />
                      <IconButton onClick={togglePause} icon={<span className="font-bold text-base lg:text-xl">||</span>} />
                  </div>
-                 <div className="text-right">
+                 <div className={`text-right ${lymphOn ? 'lymph-dna' : ''}`}>
                     <div className="text-[9px] lg:text-xs text-white/50 tracking-widest">{t('SCORE')}</div>
                     <div className="text-base lg:text-3xl font-bold text-white tracking-tighter cyan-glow" style={{ fontVariantNumeric: 'tabular-nums' }}>{uiData.score.toString().padStart(6, '0')}</div>
                     <div className="text-[9px] lg:text-xs text-yellow-500 tracking-widest mt-0.5 lg:mt-1">{t('BIOMASS_AVAIL')}</div>

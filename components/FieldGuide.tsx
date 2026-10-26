@@ -45,7 +45,7 @@ const COPY: Record<Language, Section[]> = {
             title: 'FÍGADO',
             cards: [
                 { kind: 'bile', title: 'BILE', body: 'Poça no chão. Não persegue. Quem fica dentro queima aos poucos.' },
-                { kind: 'filter', title: 'CAPTA', body: 'Capta — puxa. O fígado tira do sangue o que está solto e leva pro centro. Chegar no meio machuca.' },
+                { kind: 'filter', title: 'KUPFFER', body: 'Células de Kupffer — puxam. O fígado tira do sangue o que está solto e leva pro centro. Chegar no meio machuca.' },
                 { kind: 'heal', title: 'AÇÚCAR', body: 'Açúcar — cura. Gota dourada do fígado. A vida volta devagar, por uns segundos.' },
             ],
         },
@@ -53,7 +53,7 @@ const COPY: Record<Language, Section[]> = {
             title: 'CORAÇÃO',
             cards: [
                 { kind: 'beat', title: 'SÍSTOLE', body: 'Cada batida te dá um tranco de velocidade e empurra a corrente.' },
-                { kind: 'ecg', title: 'ELETRO', body: 'Uma linha atravessa a faixa. Encostar nela machuca.' },
+                { kind: 'ecg', title: 'ELETRO', body: 'Uma linha atravessa a faixa. Encostar nela machuca. Quem ela cobre devolve o seu tiro, bem verde, e o eco dói.' },
                 { kind: 'clot', title: 'COÁGULO', body: 'Cresce parado. Depois se solta e desce. Saia antes dele encostar.' },
             ],
         },
@@ -105,7 +105,7 @@ const COPY: Record<Language, Section[]> = {
             title: 'LIVER',
             cards: [
                 { kind: 'bile', title: 'BILE', body: 'A puddle on the floor. It does not chase. Staying in it burns, a little at a time.' },
-                { kind: 'filter', title: 'UPTAKE', body: 'Uptake — pulls. The liver takes what is loose in the blood and draws it to the center. Reaching the middle hurts.' },
+                { kind: 'filter', title: 'KUPFFER', body: 'Kupffer cells — they pull. The liver takes what is loose in the blood and draws it to the center. Reaching the middle hurts.' },
                 { kind: 'heal', title: 'SUGAR', body: 'Sugar — heal. A gold drop from the liver. Health comes back slowly, for a few seconds.' },
             ],
         },
@@ -113,7 +113,7 @@ const COPY: Record<Language, Section[]> = {
             title: 'HEART',
             cards: [
                 { kind: 'beat', title: 'SYSTOLE', body: 'Each beat gives you a burst of speed and shoves the current.' },
-                { kind: 'ecg', title: 'ECG', body: 'A line crosses the band. Touching it hurts.' },
+                { kind: 'ecg', title: 'ECG', body: 'A line crosses the band. Touching it hurts. Whoever it covers sends your shot back, bright green, and the echo hurts.' },
                 { kind: 'clot', title: 'CLOT', body: 'It grows while still. Then it breaks loose and rides down. Leave before it touches you.' },
             ],
         },
@@ -165,7 +165,7 @@ const COPY: Record<Language, Section[]> = {
             title: 'HÍGADO',
             cards: [
                 { kind: 'bile', title: 'BILIS', body: 'Charco en el suelo. No persigue. Quedarse dentro quema de a poco.' },
-                { kind: 'filter', title: 'CAPTA', body: 'Capta — jala. El hígado saca de la sangre lo que está suelto y lo lleva al centro. Llegar al medio lastima.' },
+                { kind: 'filter', title: 'KUPFFER', body: 'Células de Kupffer — jalan. El hígado saca de la sangre lo que está suelto y lo lleva al centro. Llegar al medio lastima.' },
                 { kind: 'heal', title: 'AZÚCAR', body: 'Azúcar — cura. Gota dorada del hígado. La vida vuelve despacio, por unos segundos.' },
             ],
         },
@@ -173,7 +173,7 @@ const COPY: Record<Language, Section[]> = {
             title: 'CORAZÓN',
             cards: [
                 { kind: 'beat', title: 'SÍSTOLE', body: 'Cada latido te da un tirón de velocidad y empuja la corriente.' },
-                { kind: 'ecg', title: 'ELECTRO', body: 'Una línea cruza la franja. Tocarla lastima.' },
+                { kind: 'ecg', title: 'ELECTRO', body: 'Una línea cruza la franja. Tocarla lastima. A quien cubre le devuelve tu tiro, bien verde, y el eco duele.' },
                 { kind: 'clot', title: 'COÁGULO', body: 'Crece quieto. Después se suelta y baja. Sal antes de que te toque.' },
             ],
         },

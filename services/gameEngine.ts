@@ -200,7 +200,16 @@ export class GameEngine {
 
   private clearBufferTimer: number = 0; 
   private isVacuuming: boolean = false; 
-  private vacuumingTimer: number = 0; 
+  private vacuumingTimer: number = 0;
+  public lymphOpen = false;
+  public nodeFeed = false;
+  public nodeLeave = false;
+  public nodeSpending = false;
+  private lymphPhase: 'in' | 'hold' | 'out' = 'hold';
+  private lymphT = 0;
+  private lymphScale = 0;
+  private lymphCoin = 0;
+  private lymphPop = 0; 
   
   public isLowQuality: boolean = false; 
   public forceHighQuality: boolean = false;
@@ -404,7 +413,79 @@ export class GameEngine {
       return Math.random() < 0.7 ? edge : Math.random();
   }
 
-  private spawnMine() {
+  private mineKind(mine: Entity): 'cyan' | 'iris' | 'amber' {
+      if (mine.id.startsWith('mine_iris')) return 'iris';
+      if (mine.id.startsWith('mine_amber')) return 'amber';
+      return 'cyan';
+  }
+
+  private detonateMine(mine: Entity, stats: PlayerStats, power: number) {
+      const kind = this.mineKind(mine);
+      const cyan = kind === 'cyan';
+      const radius = cyan ? 350 : kind === 'iris' ? 300 : 240;
+      const color = cyan ? 'rgba(110, 243, 255, 0.55)' : kind === 'iris' ? 'rgba(192, 132, 252, 0.66)' : 'rgba(255, 176, 48, 0.66)';
+      this.sessionStats.mineKills++;
+      achievementManager.track('mine_pop_20', 1);
+      this.shakeIntensity = Math.max(this.shakeIntensity, cyan ? 25 : 12);
+      const label = cyan ? this.t('MSG_BURST') : kind === 'iris' ? this.t('MSG_IRIS') : this.t('MSG_AMBER');
+      this.spawnText(mine.pos, label, cyan ? '#ffcc00' : kind === 'iris' ? '#e9d5ff' : '#ffd27a', cyan ? 50 : 36);
+      if (cyan) {
+          audioManager.playMineExplosionShot(mine.pos);
+          audioManager.playSurge(mine.pos);
+          buzz('boom');
+      } else {
+          audioManager.playMineExplosionDash(mine.pos);
+          buzz('thud');
+      }
+      this.particles.push({
+          id: power > 100 ? 'mine_expl' : 'mine_expl_dash',
+          type: EntityType.PARTICLE,
+          pos: { ...mine.pos },
+          vel: { x: 0, y: 0 },
+          radius,
+          health: 1, maxHealth: 1,
+          color, damage: 0, active: true, ttl: 22,
+      });
+      const sparkCount = this.isLowQuality ? 4 : cyan ? 14 : 8;
+      const spark = cyan ? '#ffeeaa' : kind === 'iris' ? '#f3e8ff' : '#ffe0a0';
+      for (let k = 0; k < sparkCount; k++) {
+          const ang = Math.random() * Math.PI * 2;
+          const spd = Math.random() * 16 + 6;
+          this.particles.push({
+              id: 'spark', type: EntityType.PARTICLE, pos: { ...mine.pos },
+              vel: { x: Math.cos(ang) * spd, y: Math.sin(ang) * spd },
+              radius: 4, health: 1, maxHealth: 1, color: spark, damage: 0, active: true, ttl: 28,
+          });
+      }
+      const r2 = radius * radius;
+      for (const victim of this.entities) {
+          if (!(this.isEnemy(victim.type) || victim.type === EntityType.BOSS) || !victim.active) continue;
+          const d2 = distSq(victim.pos, mine.pos);
+          if (d2 >= r2) continue;
+          const d = Math.sqrt(d2) || 1;
+          const nx = (victim.pos.x - mine.pos.x) / d;
+          const ny = (victim.pos.y - mine.pos.y) / d;
+          if (kind === 'iris') {
+              victim.stun = Math.max(victim.stun ?? 0, victim.type === EntityType.BOSS ? 0.45 : 1.35);
+              victim.hitFlash = 10;
+              victim.vel.x += nx * 6;
+              victim.vel.y += ny * 6;
+              continue;
+          }
+          const dmg = kind === 'amber' ? Math.min(70, power * 0.09) : power;
+          this.damageEnemy(victim, dmg, true, stats);
+          const force = cyan ? (power > 100 ? 40 : 15) : 8;
+          victim.vel.x += nx * force;
+          victim.vel.y += ny * force;
+      }
+      if (kind === 'amber' && this.player.active && distSq(this.player.pos, mine.pos) < r2) {
+          const heal = Math.max(1, Math.round(this.player.maxHealth * 0.07));
+          this.player.health = Math.min(this.player.maxHealth, this.player.health + heal);
+          this.spawnText(this.player.pos, `+${heal}`, '#ffe08a', 22);
+      }
+  }
+
+  private spawnMine(kind: 'cyan' | 'iris' | 'amber' = 'cyan') {
       const padX = 150;
       const padY = 120;
       const tx = padX + this.screenSpread() * (CANVAS_WIDTH - padX * 2);
@@ -436,10 +517,12 @@ export class GameEngine {
       }
       vx += (Math.random() - 0.5) * 0.55;
       vy += (Math.random() - 0.5) * 0.55;
+      const tint = kind === 'iris' ? '#c084fc' : kind === 'amber' ? '#ffb020' : this.colors.BIO_MINE;
+      const tag = kind === 'cyan' ? 'mine' : `mine_${kind}`;
       this.entities.push({
-          id: `mine_${Date.now()}_${Math.random()}`, type: EntityType.BIO_MINE,
+          id: `${tag}_${Date.now()}_${Math.random()}`, type: EntityType.BIO_MINE,
           pos: { x, y }, vel: { x: vx, y: vy },
-          radius: 20, health: 10, maxHealth: 10, color: this.colors.BIO_MINE, damage: 150, active: true, drag: 0.1
+          radius: 20, health: 10, maxHealth: 10, color: tint, damage: 150, active: true, drag: 0.1
       });
   }
 
@@ -449,8 +532,14 @@ export class GameEngine {
       const base = Math.floor(total / shards);
       let leftover = total - base * shards;
       const energy = Math.max(0, energyBudget) / shards;
+      const toCx = CANVAS_WIDTH * 0.5 - pos.x;
+      const toCy = CANVAS_HEIGHT * 0.5 - pos.y;
+      const inward = Math.atan2(toCy, toCx);
+      const edge = Math.min(pos.x, pos.y, CANVAS_WIDTH - pos.x, CANVAS_HEIGHT - pos.y);
+      const pull = edge < 280 ? (1 - edge / 280) * 0.85 : 0;
       for (let i = 0; i < shards; i++) {
-          const ang = (i / shards) * Math.PI * 2 + Math.random() * 0.4;
+          let ang = (i / shards) * Math.PI * 2 + Math.random() * 0.4;
+          if (pull > 0) ang += Math.atan2(Math.sin(inward - ang), Math.cos(inward - ang)) * pull;
           const kick = 2.05 + Math.random() * (shards > 20 ? 3.1 : 2.2);
           const share = base + (leftover > 0 ? 1 : 0);
           if (leftover > 0) leftover--;
@@ -470,6 +559,192 @@ export class GameEngine {
       }
   }
 
+  private coinTrail(e: Entity) {
+      if (this.isLowQuality || this.particles.length > 150) return;
+      const gate = (e.shootTimer ?? 0) - 1;
+      if (gate > 0) {
+          e.shootTimer = gate;
+          return;
+      }
+      e.shootTimer = 2;
+      this.particles.push({
+          id: 'coin_trail',
+          type: EntityType.PARTICLE,
+          pos: { x: e.pos.x, y: e.pos.y },
+          vel: { x: (Math.random() - 0.5) * 0.35, y: (Math.random() - 0.5) * 0.35 },
+          radius: 3.1,
+          health: 1, maxHealth: 1,
+          color: '#ffd56a',
+          damage: 0, active: true, ttl: 16,
+      });
+  }
+
+  private reflectShot(shot: Entity, foe: Entity) {
+      const dx = shot.pos.x - foe.pos.x;
+      const dy = shot.pos.y - foe.pos.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const spd = Math.max(12, Math.hypot(shot.vel.x, shot.vel.y));
+      shot.type = EntityType.ENEMY_PROJECTILE;
+      shot.id = `echo_${shot.id}`;
+      shot.color = '#d6ff3a';
+      shot.radius = Math.max(11, shot.radius);
+      shot.damage = Math.max(8, this.player.maxHealth * 0.09);
+      shot.vel.x = (dx / d) * spd;
+      shot.vel.y = (dy / d) * spd;
+      shot.pos.x = foe.pos.x + (dx / d) * (foe.radius + shot.radius + 6);
+      shot.pos.y = foe.pos.y + (dy / d) * (foe.radius + shot.radius + 6);
+      audioManager.playEnemyShoot(shot.pos);
+  }
+
+  private lymphHome() {
+      return { x: CANVAS_WIDTH * 0.5 - 28, y: CANVAS_HEIGHT * 0.52 + 6 };
+  }
+
+  private lymphHilum() {
+      return { x: CANVAS_WIDTH * 0.5 + 150, y: CANVAS_HEIGHT * 0.52 + 10 };
+  }
+
+  private tickLymph(dt: number) {
+      this.player.vel.x = 0;
+      this.player.vel.y = 0;
+      this.isDashing = false;
+      this.lymphT += dt;
+      if (this.lymphPhase === 'in') this.lymphScale = Math.min(1, this.lymphT / 0.85);
+      else if (this.lymphPhase === 'out') this.lymphScale = Math.max(0, 1 - this.lymphT / 0.48);
+      else this.lymphScale = 1;
+      const home = this.lymphHome();
+      const glide = Math.min(1, dt * (1.6 + this.lymphScale * 2.4));
+      this.player.pos.x += (home.x - this.player.pos.x) * glide;
+      this.player.pos.y += (home.y - this.player.pos.y) * glide;
+      if (this.lymphPhase === 'in' && this.lymphT >= 0.85) {
+          this.lymphPhase = 'hold';
+          this.lymphT = 0;
+      }
+      if (this.lymphPhase === 'hold' && this.nodeLeave) {
+          this.nodeLeave = false;
+          this.nodeFeed = false;
+          this.lymphPhase = 'out';
+          this.lymphT = 0;
+      }
+      this.nodeSpending = false;
+      if (this.lymphPhase === 'hold' && this.nodeFeed) this.spendRest(dt);
+      if (this.lymphPhase === 'out' && this.lymphT >= 0.48) {
+          this.lymphOpen = false;
+          this.nodeFeed = false;
+          this.nodeLeave = false;
+          this.nodeSpending = false;
+          this.lymphScale = 0;
+      }
+  }
+
+  private spendRest(dt: number) {
+      const missing = this.player.maxHealth - this.player.health;
+      if (missing < 0.35 || this.biomass < 1) return;
+      const want = Math.min(missing, 18 * dt);
+      const pay = Math.min(this.biomass, Math.max(1, Math.round(want * 16)));
+      const healed = Math.min(missing, pay / 16);
+      this.biomass -= pay;
+      this.player.health = Math.min(this.player.maxHealth, this.player.health + healed);
+      this.nodeSpending = true;
+      this.lymphPop += healed;
+      audioManager.queueCoins(1, this.player.pos);
+      if (this.particles.length < 160) {
+          const hilum = this.lymphHilum();
+          const born = 1 + (pay > 8 ? 1 : 0);
+          for (let i = 0; i < born; i++) {
+              const ang = Math.random() * Math.PI * 2;
+              this.particles.push({
+                  id: 'node_coin',
+                  type: EntityType.PARTICLE,
+                  pos: { x: this.player.pos.x + Math.cos(ang) * 12, y: this.player.pos.y + Math.sin(ang) * 8 },
+                  vel: {
+                      x: (hilum.x - this.player.pos.x) * 0.075 + (Math.random() - 0.5) * 1.6,
+                      y: (hilum.y - this.player.pos.y) * 0.075 + (Math.random() - 0.5) * 1.6,
+                  },
+                  radius: 4.4,
+                  health: 1, maxHealth: 1,
+                  color: i % 2 ? '#fff1b0' : '#f0b429',
+                  damage: 0, active: true, ttl: 24,
+              });
+          }
+      }
+      if (this.lymphPop >= 5) {
+          const shown = Math.max(1, Math.round(this.lymphPop));
+          this.lymphPop = 0;
+          this.spawnText({ x: this.player.pos.x - 8, y: this.player.pos.y - 42 }, `+${shown}`, '#ffb0b0', 30);
+      }
+  }
+
+  private drawLymph(front: boolean) {
+      const s = Math.max(0.02, this.lymphScale);
+      const cx = CANVAS_WIDTH * 0.5;
+      const cy = CANVAS_HEIGHT * 0.52;
+      this.ctx.save();
+      this.ctx.translate(cx, cy);
+      this.ctx.scale(s, s);
+      const bean = () => {
+          this.ctx.beginPath();
+          this.ctx.moveTo(24, -156);
+          this.ctx.bezierCurveTo(168, -176, 206, -78, 138, -6);
+          this.ctx.bezierCurveTo(78, 36, 92, 18, 140, 70);
+          this.ctx.bezierCurveTo(204, 132, 184, 176, 36, 162);
+          this.ctx.bezierCurveTo(-168, 186, -248, 78, -224, -18);
+          this.ctx.bezierCurveTo(-208, -158, -78, -186, 24, -156);
+          this.ctx.closePath();
+      };
+      if (!front) {
+          this.ctx.shadowColor = 'rgba(80, 16, 24, 0.45)';
+          this.ctx.shadowBlur = 28;
+          const flesh = this.ctx.createRadialGradient(-30, -10, 20, 0, 10, 230);
+          flesh.addColorStop(0, '#fff0e4');
+          flesh.addColorStop(0.45, '#f3b7a4');
+          flesh.addColorStop(1, '#c47468');
+          this.ctx.fillStyle = flesh;
+          bean();
+          this.ctx.fill();
+          this.ctx.shadowBlur = 0;
+          this.ctx.save();
+          this.ctx.clip();
+          const glow = 0.28 + 0.12 * Math.sin(this.time / 220);
+          const well = this.ctx.createRadialGradient(-20, 8, 10, -10, 8, 150);
+          well.addColorStop(0, `rgba(255, 228, 186, ${0.55 + glow})`);
+          well.addColorStop(1, 'rgba(255, 210, 170, 0)');
+          this.ctx.fillStyle = well;
+          this.ctx.fillRect(-260, -200, 520, 400);
+          this.ctx.strokeStyle = 'rgba(122, 42, 48, 0.35)';
+          this.ctx.lineWidth = 3;
+          this.ctx.beginPath();
+          this.ctx.moveTo(-150, -40);
+          this.ctx.bezierCurveTo(-40, -90, 40, 20, 90, 48);
+          this.ctx.moveTo(-120, 50);
+          this.ctx.bezierCurveTo(-10, 10, 60, 80, 110, 36);
+          this.ctx.stroke();
+          this.ctx.restore();
+          this.ctx.strokeStyle = 'rgba(92, 28, 32, 0.55)';
+          this.ctx.lineWidth = 8;
+          bean();
+          this.ctx.stroke();
+      } else {
+          const door = 0.55 + (this.nodeSpending ? 0.4 : 0.15 * Math.sin(this.time / 180));
+          this.ctx.fillStyle = `rgba(42, 10, 14, ${door})`;
+          this.ctx.beginPath();
+          this.ctx.ellipse(124, 28, 34, 22, 0.4, 0, Math.PI * 2);
+          this.ctx.fill();
+          this.ctx.strokeStyle = 'rgba(255, 214, 170, 0.85)';
+          this.ctx.lineWidth = 4;
+          this.ctx.stroke();
+          this.ctx.textAlign = 'center';
+          this.ctx.textBaseline = 'middle';
+          this.ctx.lineWidth = 6;
+          this.ctx.strokeStyle = 'rgba(48, 12, 16, 0.72)';
+          this.ctx.fillStyle = '#fff1df';
+          this.ctx.font = '800 28px "Chakra Petch", sans-serif';
+          this.ctx.strokeText(this.t('NODE_TITLE'), 0, -198);
+          this.ctx.fillText(this.t('NODE_TITLE'), 0, -198);
+      }
+      this.ctx.restore();
+  }
+
   private maybeSpawnShiny() {
       if (this.shinySpawned || this.currentWaveIndex !== this.shinyWave) return;
       if (this.waveTimer < 6.5) return;
@@ -483,15 +758,15 @@ export class GameEngine {
       const config = this.configFor(this.currentWaveIndex);
       const type = config.enemyTypes[Math.floor(Math.random() * config.enemyTypes.length)] ?? EntityType.BACTERIA;
       const pressure = campaignPressure(this.currentWaveIndex);
-      const hp = 26 * (0.85 + (this.difficultyMods.hp ?? 1) * 0.22) * (1 + pressure * 0.45);
-      const jackpot = Math.round(460 * (this.difficultyMods.score ?? 1) * (1 + pressure * 0.5));
-      const y = 140 + Math.random() * (CANVAS_HEIGHT - 280);
+      const hp = 1;
+      const jackpot = Math.round(1280 * (this.difficultyMods.score ?? 1) * (1 + pressure * 0.45));
+      const y = 180 + Math.random() * (CANVAS_HEIGHT - 360);
       this.entities.push({
           id: `shiny_${Date.now()}_${Math.random()}`,
           type,
-          pos: { x: CANVAS_WIDTH - 220, y },
-          vel: { x: -2.4, y: (Math.random() - 0.5) * 2.2 },
-          radius: 24,
+          pos: { x: CANVAS_WIDTH - 420, y },
+          vel: { x: -1.6, y: (Math.random() - 0.5) * 1.4 },
+          radius: 28,
           health: hp, maxHealth: hp,
           color: '#ffe27a',
           damage: 6,
@@ -500,7 +775,7 @@ export class GameEngine {
           isElite: false,
           drag: 0.1,
           hitFlash: 0,
-          ttl: 8.6,
+          ttl: 13.2,
       });
       this.spawnText({ x: CANVAS_WIDTH - 220, y: y - 36 }, this.t('SHINY'), '#ffe08a', 30);
       audioManager.playShiny({ x: CANVAS_WIDTH - 220, y });
@@ -509,18 +784,18 @@ export class GameEngine {
   private tickShiny(e: Entity, dtSeconds: number) {
       if (!e.active || e.health <= 0) return;
       e.ttl = (e.ttl ?? 8) - dtSeconds;
-      const desperate = (e.ttl ?? 0) < 1.55;
+      const desperate = (e.ttl ?? 0) < 2.2;
       const hue = (this.time / (desperate ? 3.2 : 8)) % 360;
       e.color = `hsl(${Math.floor(hue)}, 90%, ${desperate ? 68 : 62}%)`;
       const dx = e.pos.x - this.player.pos.x;
       const dy = e.pos.y - this.player.pos.y;
       const dist = Math.max(1, Math.hypot(dx, dy));
       const weave = Math.sin(this.time * 0.006 + e.pos.y * 0.01);
-      const push = desperate ? 1.45 : 0.64;
+      const push = desperate ? 0.92 : 0.3;
       e.vel.x += ((dx / dist) * push + (-dy / dist) * weave * 0.9);
       e.vel.y += ((dy / dist) * push + (dx / dist) * weave * 0.9);
       if (!desperate) {
-          const m = 78;
+          const m = 170;
           if (e.pos.x < m) { e.pos.x = m; e.vel.x = Math.abs(e.vel.x) + 1.2; }
           if (e.pos.x > CANVAS_WIDTH - m) { e.pos.x = CANVAS_WIDTH - m; e.vel.x = -Math.abs(e.vel.x) - 1.2; }
           if (e.pos.y < m) { e.pos.y = m; e.vel.y = Math.abs(e.vel.y) + 1.2; }
@@ -811,7 +1086,11 @@ export class GameEngine {
           const shiny = target.id.startsWith('shiny_');
           if (shiny) {
               const jackpot = Math.max(1, Math.floor(target.value || 1));
-              this.spillCoins(target.pos, jackpot, 30, true, 36);
+              const burst = {
+                  x: target.pos.x + (CANVAS_WIDTH * 0.5 - target.pos.x) * 0.42,
+                  y: target.pos.y + (CANVAS_HEIGHT * 0.5 - target.pos.y) * 0.42,
+              };
+              this.spillCoins(burst, jackpot, 52, true, 42);
               audioManager.playPowerUp(target.pos);
               this.spawnText(target.pos, this.t('SHINY'), '#ffe08a', 34);
           } else {
@@ -993,6 +1272,10 @@ export class GameEngine {
     this.clearBufferTimer = 0; 
     this.isVacuuming = false;  
     this.vacuumingTimer = 0;
+    this.lymphOpen = false;
+    this.nodeFeed = false;
+    this.nodeLeave = false;
+    this.nodeSpending = false;
     const waveNum = waveIndex + 1;
     audioManager.setGameState(waveNum, 1.0, false);
     const organIx = Math.floor(waveIndex / 6);
@@ -1492,6 +1775,7 @@ export class GameEngine {
     } else {
         audioManager.setGameState(this.currentWaveIndex + 1, 1, false);
     }
+    audioManager.pumpCoins();
 
     const safeDt = dt * timeScale;
     this.time += safeDt;
@@ -1539,33 +1823,7 @@ export class GameEngine {
             if (e.type === EntityType.BIO_MINE && e.active) {
                 if (distSq(this.player.pos, e.pos) < (this.player.radius + e.radius) ** 2) {
                     e.active = false;
-                    this.sessionStats.mineKills++;
-                    achievementManager.track('mine_pop_20', 1);
-                    this.spawnText(e.pos, this.t('MSG_BURST'), '#ffcc00', 45);
-                    // VARIETY: SOUND CALL FOR MINE EXPLOSION (DASH)
-                    audioManager.playMineExplosionDash(e.pos);
-                    audioManager.playSurge(e.pos);
-                    buzz('boom'); 
-
-                    this.particles.push({
-                        id: 'mine_expl_dash', type: EntityType.PARTICLE, pos: {...e.pos},
-                        vel: {x:0, y:0}, radius: 350, health:1, maxHealth:1, color: 'rgba(0, 255, 255, 0.5)', damage:0, active:true, ttl: 20
-                    });
-
-                    this.entities.forEach(victim => {
-                        if ((this.isEnemy(victim.type) || victim.type === EntityType.BOSS) && victim.active) {
-                            if (distSq(victim.pos, e.pos) < 350*350) {
-                                this.damageEnemy(victim, 25, true, stats); 
-                                const dx = victim.pos.x - e.pos.x;
-                                const dy = victim.pos.y - e.pos.y;
-                                const d = Math.sqrt(dx*dx + dy*dy);
-                                if (d > 0) {
-                                    victim.vel.x += (dx/d) * 15;
-                                    victim.vel.y += (dy/d) * 15;
-                                }
-                            }
-                        }
-                    });
+                    this.detonateMine(e, stats, 25);
                 }
             }
         }
@@ -1646,8 +1904,17 @@ export class GameEngine {
                   if (ent.active && ent.type === EntityType.BIO_MINE) liveMines++;
               }
               const inTime = this.waveTimer < config.duration;
-              const chance = inTime ? 0.00215 : 0.00048;
-              if (liveMines < 2 && Math.random() < chance) this.spawnMine();
+              const bossUp = config.hasBoss && this.bossSpawned;
+              const chance = inTime ? 0.00215 : bossUp ? 0.0002 : 0.00048;
+              if (liveMines < 2 && Math.random() < chance) {
+                  let kind: 'cyan' | 'iris' | 'amber' = 'cyan';
+                  if (bossUp) {
+                      const roll = Math.random();
+                      if (roll < 0.34) kind = 'iris';
+                      else if (roll < 0.62) kind = 'amber';
+                  }
+                  this.spawnMine(kind);
+              }
           }
 
           if (this.allowSerum && this.waveStartDelay <= 0 && !this.isVacuuming && this.waveTimer > 1) {
@@ -1692,7 +1959,7 @@ export class GameEngine {
           let dnaLeft = 0;
           for (const e of this.entities) {
               if (!e.active || e.type !== EntityType.DNA_FRAGMENT) continue;
-              if (this.vacuumingTimer > 2.2 && !this.player.active) {
+              if (this.vacuumingTimer > 6.4 && !this.player.active) {
                   e.active = false;
                   const val = e.value || 1;
                   this.biomass += val;
@@ -1700,7 +1967,7 @@ export class GameEngine {
                   continue;
               }
               dnaLeft++;
-              if (this.vacuumingTimer > 2.2) {
+              if (this.vacuumingTimer > 6.4) {
                   e.pos.x = this.player.pos.x;
                   e.pos.y = this.player.pos.y;
               }
@@ -1712,7 +1979,16 @@ export class GameEngine {
               if (this.currentWaveIndex === 0 && this.sessionStats.damageTaken === 0) achievementManager.track('perfect_wave', 1);
               if (this.player.health < this.player.maxHealth * 0.2) achievementManager.track('low_hp_survive', 1);
               if (this.currentWaveIndex === 4 && this.currentDifficulty === Difficulty.APEX) achievementManager.track('win_apex', 1);
-              onWaveClear();
+              if (this.currentWaveIndex % 6 === 4 && this.player.active && this.lives > 0) {
+                  this.lymphOpen = true;
+                  this.lymphPhase = 'in';
+                  this.lymphT = 0;
+                  this.lymphScale = 0;
+                  this.nodeFeed = false;
+                  this.nodeLeave = false;
+                  this.lymphCoin = 0;
+                  this.lymphPop = 0;
+              } else onWaveClear();
           }
       }
     }
@@ -1820,7 +2096,11 @@ export class GameEngine {
           this.inputVector.y = 0;
           this.shakeIntensity = 0;
       }
-      if (this.organ.placePlayer(this.player)) {
+      if (this.lymphOpen) {
+          this.inputVector.x = 0;
+          this.inputVector.y = 0;
+          this.tickLymph(dtSeconds);
+      } else if (this.organ.placePlayer(this.player)) {
           this.isDashing = false;
       } else {
       if (!this.isDashing && !this.organ.charting()) {
@@ -2001,7 +2281,7 @@ export class GameEngine {
         }
         
         // VARIETY INJECTION: TRACKING PROJECTILES (WEAK HOMING)
-        if (e.type === EntityType.ENEMY_PROJECTILE && this.player.active) {
+        if (e.type === EntityType.ENEMY_PROJECTILE && !e.id.startsWith('echo_') && this.player.active) {
             const dx = this.player.pos.x - e.pos.x;
             const dy = this.player.pos.y - e.pos.y;
             const dist = Math.sqrt(dx*dx + dy*dy);
@@ -2063,54 +2343,18 @@ export class GameEngine {
                if (distSq(e.pos, other.pos) < (e.radius + other.radius * 2.5)**2) {
                    e.active = false;
                    other.active = false;
-                   this.sessionStats.mineKills++;
-                   achievementManager.track('mine_pop_20', 1);
-                   this.shakeIntensity = 25;
-                   this.spawnText(other.pos, this.t('MSG_BURST'), '#ffcc00', 55); 
-                   // VARIETY: SOUND CALL FOR MINE EXPLOSION (SHOT)
-                   audioManager.playMineExplosionShot(other.pos);
-                   audioManager.playSurge(other.pos);
-                   buzz('boom'); 
-                   
-                   this.particles.push({
-                        id: 'mine_expl', type: EntityType.PARTICLE, pos: {...other.pos},
-                        vel: {x:0, y:0}, radius: 350, health:1, maxHealth:1, color: 'rgba(255, 170, 0, 0.6)', damage:0, active:true, ttl: 25
-                   });
-                   
-                   // REDUZIDO DE 18 PARA 5 NO MODO LOW QUALITY PRA GARANTIR QUE A EXPLOSAO GRANDE APARECA
-                   const sparkCount = this.isLowQuality ? 5 : 18;
-                   for(let k=0; k<sparkCount; k++) {
-                       const ang = Math.random() * Math.PI * 2;
-                       const spd = Math.random() * 20 + 10;
-                       this.particles.push({
-                           id: 'spark', type: EntityType.PARTICLE, pos: {...other.pos},
-                           vel: { x: Math.cos(ang)*spd, y: Math.sin(ang)*spd },
-                           radius: 5, health:1, maxHealth:1, color: '#ffeeaa', damage:0, active:true, ttl: 35
-                       });
-                   }
-
-                   const explosionRadiusSq = 350 * 350;
-                   this.entities.forEach(victim => {
-                       if ((this.isEnemy(victim.type) || victim.type === EntityType.BOSS) && victim.active) {
-                           const d = distSq(victim.pos, other.pos);
-                           if (d < explosionRadiusSq) {
-                               this.damageEnemy(victim, 800, true, stats);
-                               const dist = Math.sqrt(d);
-                               if (dist > 0) {
-                                   const force = 40; 
-                                   const dx = victim.pos.x - other.pos.x;
-                                   const dy = victim.pos.y - other.pos.y;
-                                   victim.vel.x += (dx/dist) * force;
-                                   victim.vel.y += (dy/dist) * force;
-                               }
-                           }
-                       }
-                   });
+                   this.detonateMine(other, stats, 800);
                    break;
                }
            }
 
            if (this.isEnemy(other.type) || other.type === EntityType.BOSS) {
+             if (e.type === EntityType.ANTIBODY && (other.reflect ?? 0) > 0) {
+                 if (distSq(e.pos, other.pos) < (e.radius + other.radius) * (e.radius + other.radius)) {
+                     this.reflectShot(e, other);
+                     break;
+                 }
+             }
              if (e.type === EntityType.ORBITAL && (e.shootTimer ?? 0) > 0) break;
              const rSum = e.radius + other.radius;
              if (Math.abs(e.pos.x - other.pos.x) < rSum && Math.abs(e.pos.y - other.pos.y) < rSum) {
@@ -2141,6 +2385,7 @@ export class GameEngine {
          }
 
       } else if (this.isEnemy(e.type) || e.type === EntityType.BOSS) {
+        if ((e.reflect ?? 0) > 0) e.reflect = Math.max(0, (e.reflect ?? 0) - dtSeconds);
         if (e.id.startsWith('shiny_')) this.tickShiny(e, dtSeconds);
         if (this.player.active && e.active) {
           const dx = this.player.pos.x - e.pos.x;
@@ -2184,9 +2429,14 @@ export class GameEngine {
           const dy = this.player.pos.y - e.pos.y;
           const dist = Math.sqrt(dx*dx + dy*dy);
           const isVacuuming = this.isVacuuming;
-          
-          if (dist < stats.magnetRadius || this.surgeActive || isVacuuming) {
-            const speed = isVacuuming ? Math.max(140, dist * 0.55) : (this.surgeActive ? 50 : 28);
+          if (this.surgeActive) e.angle = 1;
+          const reeling = e.angle === 1 || isVacuuming;
+          if (dist < stats.magnetRadius || reeling) {
+            const speed = isVacuuming
+              ? Math.max(6, Math.min(14, dist * 0.022))
+              : e.angle === 1
+                ? Math.max(8, Math.min(18, dist * 0.035))
+                : 28;
             // Sem o teto, o vácuo do fim da onda passa do corpo e a moeda
             // fica orbitando colada no personagem até ele se mexer.
             const step = Math.min(dist, speed * tick);
@@ -2194,6 +2444,7 @@ export class GameEngine {
                 e.pos.x += (dx / dist) * step;
                 e.pos.y += (dy / dist) * step;
             }
+            if (reeling) this.coinTrail(e);
 
             if (dist - step < this.player.radius + e.radius) {
               e.active = false;
@@ -2204,7 +2455,8 @@ export class GameEngine {
               this.sessionStats.biomassCollected += val;
               achievementManager.track('biomass_10k', val);
               if (this.biomass >= 3000) achievementManager.track('rich', 3000);
-              audioManager.playCoin(e.pos);
+              if (reeling) audioManager.queueCoins(1, e.pos);
+              else audioManager.playCoin(e.pos);
               if (!this.isLowQuality && this.particles.length < 110) {
                   for (let k = 0; k < 3; k++) {
                       const a = (k / 3) * Math.PI * 2;
@@ -2253,6 +2505,15 @@ export class GameEngine {
                   p.pos.y = Math.random() * CANVAS_HEIGHT;
               }
           }
+      } else if (p.id === 'coin_trail' || p.id === 'node_coin') {
+          p.pos.x += p.vel.x;
+          p.pos.y += p.vel.y;
+          if (p.id === 'coin_trail') {
+              p.vel.x *= 0.9;
+              p.vel.y *= 0.9;
+          }
+          p.ttl = (p.ttl || 0) - 1;
+          if ((p.ttl || 0) <= 0) continue;
       } else if (p.id === 'zap') {
           p.ttl = (p.ttl || 0) - 1;
           if ((p.ttl || 0) <= 0) continue;
@@ -3410,6 +3671,15 @@ export class GameEngine {
     this.entities.forEach(e => {
         if (!e.active) return;
         if (e.type === EntityType.ENEMY_PROJECTILE) {
+            if (e.id.startsWith('echo_')) {
+                this.ctx.save();
+                this.ctx.globalCompositeOperation = 'screen';
+                this.ctx.fillStyle = 'rgba(214, 255, 58, 0.45)';
+                this.ctx.beginPath();
+                this.ctx.arc(e.pos.x, e.pos.y, e.radius * 2.1, 0, Math.PI * 2);
+                this.ctx.fill();
+                this.ctx.restore();
+            }
             this.ctx.fillStyle = e.color;
             this.ctx.beginPath();
             const spikes = 8;
@@ -3518,12 +3788,12 @@ export class GameEngine {
             this.ctx.save();
             this.ctx.translate(e.pos.x, e.pos.y);
             const r = e.radius;
-            const body = (e.hitFlash && e.hitFlash > 0) ? '#ffffff' : this.colors.BIO_MINE;
+            const body = (e.hitFlash && e.hitFlash > 0) ? '#ffffff' : e.color;
             const spark = 0.55 + Math.sin(this.time / 90) * 0.45;
 
             if (!this.isLowQuality) {
                 this.ctx.globalCompositeOperation = 'screen';
-                this.drawGlow(this.colors.BIO_MINE, r * 2, 0.5, null, 0.1, 0, r * 0.1);
+                this.drawGlow(e.color, r * 2, 0.5, null, 0.1, 0, r * 0.1);
             }
 
             this.ctx.globalCompositeOperation = 'source-over';
@@ -3700,7 +3970,28 @@ export class GameEngine {
       }
     });
 
+    for (const e of this.entities) {
+        if (!e.active || (e.reflect ?? 0) <= 0) continue;
+        if (!this.isEnemy(e.type) && e.type !== EntityType.BOSS) continue;
+        const pulse = 0.55 + 0.45 * Math.sin(this.time / 70 + e.pos.x);
+        this.ctx.save();
+        this.ctx.globalCompositeOperation = 'screen';
+        this.ctx.strokeStyle = `rgba(214, 255, 70, ${0.55 + pulse * 0.4})`;
+        this.ctx.lineWidth = 3;
+        this.ctx.beginPath();
+        this.ctx.arc(e.pos.x, e.pos.y, e.radius + 8 + pulse * 4, 0, Math.PI * 2);
+        this.ctx.stroke();
+        this.ctx.restore();
+    }
+
+    if (this.lymphOpen) {
+        this.ctx.fillStyle = `rgba(16, 4, 8, ${0.5 * this.lymphScale})`;
+        this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        this.drawLymph(false);
+    }
+
     if (!ride) this.drawVital();
+    if (this.lymphOpen) this.drawLymph(true);
 
     this.entities.forEach(e => {
       if (e.type === EntityType.SERUM && e.active) this.drawSerum(e);

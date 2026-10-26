@@ -578,7 +578,7 @@ export class AudioManager {
     const now = this.ctx.currentTime;
     const master = Math.max(0, Math.min(1, this.settings.master));
     const music = Math.max(0, Math.min(1, this.settings.music)) * 1.6;
-    const sfx = Math.max(0, Math.min(1, this.settings.sfx)) * 1.15;
+    const sfx = Math.max(0, Math.min(1, this.settings.sfx)) * 1.34;
     this.masterGain.gain.cancelScheduledValues(now);
     this.musicGain.gain.cancelScheduledValues(now);
     this.sfxGain.gain.cancelScheduledValues(now);
@@ -598,6 +598,22 @@ export class AudioManager {
   public playHit(at?: { x: number; y: number } | null) { this.playBuffer('hit', 0.42, 0, 50, at); }
   public playExplosion(at?: { x: number; y: number } | null) { this.playBuffer('expl', 0.48, 0, 100, at); }
   public playPowerUp(at?: { x: number; y: number } | null) { this.playBuffer('power', 0.5, 0, 80, at); }
+  private coinQueue = 0;
+  private coinAt: { x: number; y: number } | null = null;
+
+  public queueCoins(n: number, at?: { x: number; y: number } | null) {
+      this.coinQueue = Math.min(18, this.coinQueue + Math.max(0, n));
+      if (at) this.coinAt = at;
+  }
+
+  public pumpCoins() {
+      if (this.coinQueue <= 0 || !this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+      const now = performance.now();
+      if (now - (this.lastPlayTime['coin'] || 0) < 36) return;
+      this.coinQueue--;
+      this.playCoin(this.coinAt);
+  }
+
   public playCoin(at?: { x: number; y: number } | null) {
       if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
       const now = performance.now();

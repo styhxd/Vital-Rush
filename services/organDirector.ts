@@ -785,12 +785,17 @@ export class OrganDirector {
         if (this.banner && this.banner.ttl > 0) {
             const a = Math.min(1, this.banner.ttl < 0.4 ? this.banner.ttl / 0.4 : 1);
             ctx.globalAlpha = a;
-            ctx.font = '900 64px "Chakra Petch", sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.lineWidth = 8;
             ctx.strokeStyle = 'rgba(0,0,0,0.8)';
             ctx.fillStyle = this.banner.color;
+            let size = 64;
+            ctx.font = `900 ${size}px "Chakra Petch", sans-serif`;
+            const wide = ctx.measureText(this.banner.text).width;
+            const max = CANVAS_WIDTH - 180;
+            if (wide > max) size *= max / wide;
+            ctx.font = `900 ${size}px "Chakra Petch", sans-serif`;
             const y = CANVAS_HEIGHT * 0.22;
             ctx.strokeText(this.banner.text, CANVAS_WIDTH / 2, y);
             ctx.fillText(this.banner.text, CANVAS_WIDTH / 2, y);
@@ -1320,8 +1325,9 @@ export class OrganDirector {
         this.hitPolyline(pts, thick, hooks, (e) => {
             if (trace.hit.has(e.id)) return;
             trace.hit.add(e.id);
-            if (e.type === EntityType.BOSS) hooks.strike(e, e.maxHealth * 0.26);
-            else hooks.strike(e, e.health + 50);
+            e.reflect = Math.max(e.reflect ?? 0, e.type === EntityType.BOSS ? 1.7 : 2.5);
+            e.hitFlash = Math.max(e.hitFlash ?? 0, 12);
+            hooks.popup(e.pos, hooks.t('ALERT_ECG'), '#d6ff4a', 20);
         }, () => {
             if (trace.playerHit) return;
             trace.playerHit = true;
@@ -2264,9 +2270,13 @@ export class OrganDirector {
         if (showHint && this.hooks) {
             const label = this.hooks.t('ALERT_FILTER');
             const hint = this.hooks.t('FILTER_HINT');
-            ctx.font = '700 28px "Chakra Petch", sans-serif';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+            let size = 26;
+            ctx.font = `700 ${size}px "Chakra Petch", sans-serif`;
+            const wide = ctx.measureText(label).width;
+            if (wide > 340) size *= 340 / wide;
+            ctx.font = `700 ${size}px "Chakra Petch", sans-serif`;
             ctx.lineWidth = 5;
             ctx.strokeStyle = 'rgba(24, 28, 8, 0.55)';
             ctx.fillStyle = 'rgba(248, 242, 196, 0.94)';
