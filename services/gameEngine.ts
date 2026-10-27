@@ -14,6 +14,7 @@
 import { Entity, EntityType, Vector2, PlayerStats, WaveConfig, PatientProfile, Difficulty, ViralStrain, ThemePalette, Language } from '../types';
 import { COLORS_PLATINUM, CANVAS_WIDTH, CANVAS_HEIGHT, WAVES, DIFFICULTY_MODIFIERS, INITIAL_LIVES, ADRENALINE_MAX_DURATION, TEXTS } from '../constants';
 import { audioManager, type DrumHit } from './audioManager';
+import { COIN_BEAT_MS, showerPlan } from './coinFeel';
 import { buzz } from './haptics';
 import { achievementManager } from './achievementManager';
 import { bossFor, drawBossShape, mutationFrom } from './bosses';
@@ -202,10 +203,20 @@ export class GameEngine {
   private isVacuuming: boolean = false; 
   private vacuumingTimer: number = 0;
   private coinCascade = false;
-  private coinLaneAt = 0;
+  private coinShowerAt = 0;
+  private coinRingAt = 0;
+  private mineClock = 0;
+  private bossLeash: { x: number; y: number; until: number; reach: number } | null = null;
+  private bossMarkUntil = 0;
   public lymphOpen = false;
   public nodeFeed = false;
   public nodeLeave = false;
+
+  public lymphFeel() {
+      const drain = Math.round(this.lymphDrain * 20) / 20;
+      const spent = this.nodeSpending ? Math.round(this.lymphSpent) : 0;
+      return { drain, spent, spending: this.nodeSpending };
+  }
 
   public beginRest() {
       this.nodeFeed = true;
@@ -427,22 +438,36 @@ export class GameEngine {
       return Math.random() < 0.7 ? edge : Math.random();
   }
 
-  private mineKind(mine: Entity): 'cyan' | 'iris' | 'amber' {
+  private mineKind(mine: Entity): 'cyan' | 'iris' | 'amber' | 'bile' | 'leash' | 'mark' {
+      if (mine.id.startsWith('mine_leash')) return 'leash';
+      if (mine.id.startsWith('mine_mark')) return 'mark';
+      if (mine.id.startsWith('mine_bile')) return 'bile';
       if (mine.id.startsWith('mine_iris')) return 'iris';
       if (mine.id.startsWith('mine_amber')) return 'amber';
       return 'cyan';
   }
 
-  private detonateMine(mine: Entity, stats: PlayerStats, power: number) {
+  private detonateMine(mine: Entity, stats: PlayerStats, power: number, hooks?: { over: () => void; lost: () => void }) {
       const kind = this.mineKind(mine);
       const cyan = kind === 'cyan';
-      const radius = cyan ? 350 : kind === 'iris' ? 300 : 240;
-      const color = cyan ? 'rgba(110, 243, 255, 0.55)' : kind === 'iris' ? 'rgba(192, 132, 252, 0.66)' : 'rgba(255, 176, 48, 0.66)';
+      const radius = cyan ? 350 : kind === 'leash' ? 168 : kind === 'bile' ? 96 : kind === 'mark' ? 120 : kind === 'iris' ? 300 : 240;
+      const color = kind === 'leash' ? 'rgba(192, 132, 252, 0.72)'
+          : kind === 'bile' ? 'rgba(182, 232, 106, 0.55)'
+          : kind === 'mark' ? 'rgba(255, 224, 138, 0.72)'
+          : cyan ? 'rgba(110, 243, 255, 0.55)'
+          : kind === 'iris' ? 'rgba(192, 132, 252, 0.66)'
+          : 'rgba(255, 176, 48, 0.66)';
       this.sessionStats.mineKills++;
       achievementManager.track('mine_pop_20', 1);
       this.shakeIntensity = Math.max(this.shakeIntensity, cyan ? 25 : 12);
-      const label = cyan ? this.t('MSG_BURST') : kind === 'iris' ? this.t('MSG_IRIS') : this.t('MSG_AMBER');
-      this.spawnText(mine.pos, label, cyan ? '#ffcc00' : kind === 'iris' ? '#e9d5ff' : '#ffd27a', cyan ? 50 : 36);
+      const label = kind === 'leash' ? this.t('MSG_LEASH')
+          : kind === 'bile' ? this.t('MSG_BILE')
+          : kind === 'mark' ? this.t('MSG_MARK')
+          : cyan ? this.t('MSG_BURST')
+          : kind === 'iris' ? this.t('MSG_IRIS')
+          : this.t('MSG_AMBER');
+      const labelColor = kind === 'leash' ? '#e9d5ff' : kind === 'bile' ? '#d6ff8a' : kind === 'mark' ? '#ffe08a' : cyan ? '#ffcc00' : kind === 'iris' ? '#e9d5ff' : '#ffd27a';
+      this.spawnText(mine.pos, label, labelColor, cyan ? 50 : 36);
       if (cyan) {
           audioManager.playMineExplosionShot(mine.pos);
           audioManager.playSurge(mine.pos);
@@ -471,7 +496,24 @@ export class GameEngine {
               radius: 4, health: 1, maxHealth: 1, color: spark, damage: 0, active: true, ttl: 28,
           });
       }
+      if (kind === 'leash') {
+          const boss = this.entities.find(e => e.active && e.type === EntityType.BOSS);
+          const at = boss ? { x: (mine.pos.x + boss.pos.x) * 0.5, y: (mine.pos.y + boss.pos.y) * 0.5 } : mine.pos;
+          this.bossLeash = { x: at.x, y: at.y, until: this.time + 4200, reach: 168 };
+      } else if (kind === 'mark') {
+          this.bossMarkUntil = this.time + 5600;
+      } else if (kind === 'bile') {
+          const bite = 1.15;
+          this.player.health = Math.max(0, this.player.health - bite);
+          this.sessionStats.damageTaken += bite;
+          this.shakeIntensity = Math.max(this.shakeIntensity, 16);
+          this.invulnerabilityTimer = Math.max(this.invulnerabilityTimer, 0.28);
+          audioManager.playHit(this.player.pos);
+          this.spawnText(this.player.pos, `-${bite.toFixed(1)}`, '#d6ff8a', 26);
+          if (this.player.health <= 0 && hooks) this.handlePlayerDeath(hooks.over, hooks.lost, stats);
+      }
       const r2 = radius * radius;
+      if (kind === 'leash' || kind === 'mark' || kind === 'bile') return;
       for (const victim of this.entities) {
           if (!(this.isEnemy(victim.type) || victim.type === EntityType.BOSS) || !victim.active) continue;
           const d2 = distSq(victim.pos, mine.pos);
@@ -499,7 +541,7 @@ export class GameEngine {
       }
   }
 
-  private spawnMine(kind: 'cyan' | 'iris' | 'amber' = 'cyan') {
+  private spawnMine(kind: 'cyan' | 'iris' | 'amber' | 'bile' | 'leash' | 'mark' = 'cyan') {
       const padX = 150;
       const padY = 120;
       const tx = padX + this.screenSpread() * (CANVAS_WIDTH - padX * 2);
@@ -531,7 +573,11 @@ export class GameEngine {
       }
       vx += (Math.random() - 0.5) * 0.55;
       vy += (Math.random() - 0.5) * 0.55;
-      const tint = kind === 'iris' ? '#c084fc' : kind === 'amber' ? '#ffb020' : this.colors.BIO_MINE;
+      const tint = kind === 'leash' || kind === 'iris' ? '#c084fc'
+          : kind === 'mark' ? '#ffe08a'
+          : kind === 'amber' ? '#ffb020'
+          : kind === 'bile' ? '#b6e86a'
+          : this.colors.BIO_MINE;
       const tag = kind === 'cyan' ? 'mine' : `mine_${kind}`;
       this.entities.push({
           id: `${tag}_${Date.now()}_${Math.random()}`, type: EntityType.BIO_MINE,
@@ -575,9 +621,11 @@ export class GameEngine {
 
   private syncCoinShower() {
       const pull = this.surgeActive || this.isVacuuming;
-      if (pull) this.coinCascade = true;
+      if (pull && !this.coinCascade) {
+          this.coinCascade = true;
+          this.coinShowerAt = this.time;
+      }
       if (!this.coinCascade) return;
-      if (this.coinLaneAt < this.time) this.coinLaneAt = this.time;
       const waiting: Entity[] = [];
       let busy = 0;
       for (const e of this.entities) {
@@ -588,20 +636,26 @@ export class GameEngine {
           }
           waiting.push(e);
       }
-      waiting.sort((a, b) => {
-          const da = (a.pos.x - this.player.pos.x) ** 2 + (a.pos.y - this.player.pos.y) ** 2;
-          const db = (b.pos.x - this.player.pos.x) ** 2 + (b.pos.y - this.player.pos.y) ** 2;
-          return da - db;
-      });
-      for (const e of waiting) {
-          e.orbitOffset = this.coinLaneAt;
-          e.angle = 0;
-          this.coinLaneAt += 58;
-          busy++;
+      if (waiting.length) {
+          waiting.sort((a, b) => {
+              const da = (a.pos.x - this.player.pos.x) ** 2 + (a.pos.y - this.player.pos.y) ** 2;
+              const db = (b.pos.x - this.player.pos.x) ** 2 + (b.pos.y - this.player.pos.y) ** 2;
+              return da - db;
+          });
+          const kind = this.isVacuuming && !this.surgeActive ? 'vacuum' : 'surge';
+          const plan = showerPlan(waiting.length, kind);
+          const origin = this.coinShowerAt;
+          const late = plan.span > 0 && this.time >= origin + plan.span;
+          for (let i = 0; i < waiting.length; i++) {
+              const when = late ? this.time : origin + plan.slot(i) * COIN_BEAT_MS;
+              waiting[i].orbitOffset = Math.max(0.001, Math.max(this.time, when));
+              waiting[i].angle = 0;
+              busy++;
+          }
       }
       if (!pull && busy === 0) {
           this.coinCascade = false;
-          this.coinLaneAt = 0;
+          this.coinShowerAt = 0;
       }
   }
 
@@ -612,7 +666,7 @@ export class GameEngine {
           e.shootTimer = gate;
           return;
       }
-      e.shootTimer = 2;
+      e.shootTimer = 1;
       this.particles.push({
           id: 'coin_trail',
           type: EntityType.PARTICLE,
@@ -685,7 +739,7 @@ export class GameEngine {
           if (this.lymphSpent >= 16) {
               this.lymphShow = this.lymphSpent;
               this.lymphRelief = 1;
-              audioManager.trimCoins(5);
+              audioManager.stopCoins();
               audioManager.playSigh(this.player.pos, Math.min(1.4, this.lymphSpent / 180));
               this.spawnText(
                   { x: this.player.pos.x, y: this.player.pos.y - 64 },
@@ -721,7 +775,7 @@ export class GameEngine {
       this.nodeSpending = true;
       this.lymphSpent += pay;
       this.lymphPop += healed;
-      audioManager.queueCoins(1, this.player.pos);
+      audioManager.playSpend(this.player.pos);
       if (this.particles.length < 170 && burst > 0) {
           const hilum = this.lymphHilum();
           const born = Math.min(6, burst);
@@ -823,28 +877,48 @@ export class GameEngine {
           this.ctx.strokeStyle = 'rgba(255, 214, 170, 0.85)';
           this.ctx.lineWidth = 4;
           this.ctx.stroke();
-          this.ctx.textAlign = 'center';
-          this.ctx.textBaseline = 'middle';
-          this.ctx.lineWidth = 6;
-          this.ctx.strokeStyle = 'rgba(48, 12, 16, 0.72)';
-          this.ctx.fillStyle = '#fff1df';
-          this.ctx.font = '800 28px "Chakra Petch", sans-serif';
-          this.ctx.strokeText(this.t('NODE_TITLE'), 0, -198);
-          this.ctx.fillText(this.t('NODE_TITLE'), 0, -198);
-          const spent = this.nodeSpending ? this.lymphSpent : this.lymphShow;
-          const spentAlpha = this.nodeSpending ? 1 : this.lymphRelief;
-          if (spent >= 16 && spentAlpha > 0.04) {
-              this.ctx.globalAlpha = spentAlpha;
-              this.ctx.font = '800 40px "Chakra Petch", sans-serif';
-              this.ctx.lineWidth = 8;
-              this.ctx.strokeStyle = 'rgba(48, 12, 16, 0.8)';
-              this.ctx.fillStyle = '#ffd27a';
-              const bill = `-${Math.round(spent)} DNA`;
-              this.ctx.strokeText(bill, 0, 214);
-              this.ctx.fillText(bill, 0, 214);
-              this.ctx.globalAlpha = 1;
-          }
       }
+      this.ctx.restore();
+  }
+
+  private drawBossTools() {
+      const boss = this.entities.find(e => e.active && e.type === EntityType.BOSS);
+      const leash = this.bossLeash;
+      if (leash && this.time <= leash.until) {
+          const life = Math.max(0, Math.min(1, (leash.until - this.time) / 4200));
+          this.ctx.save();
+          this.ctx.fillStyle = `rgba(192, 132, 252, ${0.05 + life * 0.06})`;
+          this.ctx.beginPath();
+          this.ctx.arc(leash.x, leash.y, leash.reach, 0, Math.PI * 2);
+          this.ctx.fill();
+          this.ctx.strokeStyle = `rgba(226, 196, 255, ${0.35 + life * 0.45})`;
+          this.ctx.lineWidth = 3;
+          this.ctx.stroke();
+          if (boss) {
+              this.ctx.setLineDash([7, 9]);
+              this.ctx.strokeStyle = `rgba(244, 228, 255, ${0.55 + life * 0.35})`;
+              this.ctx.lineWidth = 2;
+              this.ctx.beginPath();
+              this.ctx.moveTo(leash.x, leash.y);
+              this.ctx.lineTo(boss.pos.x, boss.pos.y);
+              this.ctx.stroke();
+              this.ctx.setLineDash([]);
+          }
+          this.ctx.restore();
+      }
+      if (!boss || this.time >= this.bossMarkUntil) return;
+      const dx = this.player.pos.x - boss.pos.x;
+      const dy = this.player.pos.y - boss.pos.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      const len = Math.min(dist, 210);
+      this.ctx.save();
+      this.ctx.strokeStyle = 'rgba(255, 224, 138, 0.9)';
+      this.ctx.lineWidth = 3;
+      this.ctx.beginPath();
+      this.ctx.arc(boss.pos.x, boss.pos.y, boss.radius + 16, 0, Math.PI * 2);
+      this.ctx.moveTo(boss.pos.x, boss.pos.y);
+      this.ctx.lineTo(boss.pos.x + (dx / dist) * len, boss.pos.y + (dy / dist) * len);
+      this.ctx.stroke();
       this.ctx.restore();
   }
 
@@ -1376,7 +1450,11 @@ export class GameEngine {
     this.isVacuuming = false;  
     this.vacuumingTimer = 0;
     this.coinCascade = false;
-    this.coinLaneAt = 0;
+    this.coinShowerAt = 0;
+    this.mineClock = 0;
+    this.bossLeash = null;
+    this.bossMarkUntil = 0;
+    audioManager.stopCoins();
     this.lymphOpen = false;
     this.nodeFeed = false;
     this.nodeLeave = false;
@@ -1418,8 +1496,8 @@ export class GameEngine {
           this.spawnText(this.player.pos, this.t('MSG_SURGE'), this.colors.PLAYER_CORE, 45);
       }
       audioManager.playSurge(this.player.pos);
+      if (!this.coinCascade) this.coinShowerAt = this.time;
       this.coinCascade = true;
-      if (this.coinLaneAt < this.time) this.coinLaneAt = this.time;
     }
   }
 
@@ -1592,6 +1670,32 @@ export class GameEngine {
       } else m.dashTimer = 0.12;
   }
 
+  private reelBoss(e: Entity, m: NonNullable<Entity['mutation']>, dtSeconds: number) {
+      const leash = this.bossLeash;
+      if (leash && this.time > leash.until) this.bossLeash = null;
+      const live = this.bossLeash;
+      if (live) {
+          const dx = e.pos.x - live.x;
+          const dy = e.pos.y - live.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          if (dist > live.reach) {
+              e.pos.x = live.x + (dx / dist) * live.reach;
+              e.pos.y = live.y + (dy / dist) * live.reach;
+              const outward = (e.vel.x * dx + e.vel.y * dy) / dist;
+              if (outward > 0) {
+                  e.vel.x -= (dx / dist) * outward;
+                  e.vel.y -= (dy / dist) * outward;
+              }
+          }
+          if (m.dashTimer < 0.4) m.dashTimer = 0.4;
+      }
+      if (this.time > this.bossMarkUntil) return;
+      const drag = dtSeconds * 0.45;
+      if (m.shootTimer > 0) m.shootTimer += drag;
+      if (m.dashTimer > 0) m.dashTimer += drag;
+      if (m.acidTimer > 0) m.acidTimer += drag;
+  }
+
   private updateBoss(e: Entity, dtSeconds: number, _stats: PlayerStats) {
       if (!e.mutation) return;
       const m = e.mutation;
@@ -1608,6 +1712,7 @@ export class GameEngine {
       const shot = Math.max(5, e.damage * 0.22);
       this.markEnrage(e, shot);
       const hot = m.enraged;
+      this.reelBoss(e, m, dtSeconds);
       const speed = m.baseSpeed * this.difficultyMods.speed * pace;
       const chase = (mul = 1) => {
           e.vel.x += nx * speed * mul;
@@ -1917,7 +2022,7 @@ export class GameEngine {
             if (e.type === EntityType.BIO_MINE && e.active) {
                 if (distSq(this.player.pos, e.pos) < (this.player.radius + e.radius) ** 2) {
                     e.active = false;
-                    this.detonateMine(e, stats, 25);
+                    this.detonateMine(e, stats, 25, { over: onGameOver, lost: onLifeLost });
                 }
             }
         }
@@ -1927,6 +2032,11 @@ export class GameEngine {
                 if ((this.isEnemy(e.type) || e.type === EntityType.BOSS) && e.active && !this.dashStruck.has(e.id)) {
                     if (distSq(this.player.pos, e.pos) < (this.player.radius + e.radius) ** 2) {
                         this.dashStruck.add(e.id);
+                        if (e.type === EntityType.BOSS && this.bossMarkUntil > this.time && e.mutation) {
+                            e.mutation.dashTimer = Math.max(e.mutation.dashTimer, 0.85);
+                            e.mutation.shootTimer = Math.max(e.mutation.shootTimer, 0.7);
+                            e.mutation.attack = Math.max(e.mutation.attack, 0.6);
+                        }
                         if (this.damageEnemy(e, stats.dashDamage, false, stats)) {
                             this.sessionStats.dashKills++;
                             achievementManager.track('dash_kill_50', 1);
@@ -1992,22 +2102,29 @@ export class GameEngine {
               return;
           }
           
-          if (!this.isVacuuming) {
+          if (!this.isVacuuming && this.waveTimer < config.duration) {
               let liveMines = 0;
               for (const ent of this.entities) {
                   if (ent.active && ent.type === EntityType.BIO_MINE) liveMines++;
               }
-              const inTime = this.waveTimer < config.duration;
               const bossUp = config.hasBoss && this.bossSpawned;
-              const chance = inTime ? 0.00215 : bossUp ? 0.0002 : 0.00048;
-              if (liveMines < 2 && Math.random() < chance) {
-                  let kind: 'cyan' | 'iris' | 'amber' = 'cyan';
-                  if (bossUp) {
-                      const roll = Math.random();
-                      if (roll < 0.34) kind = 'iris';
-                      else if (roll < 0.62) kind = 'amber';
+              const organ = Math.floor(Math.max(0, this.currentWaveIndex) / 6);
+              if (bossUp) {
+                  this.mineClock -= dtSeconds;
+                  if (this.waveTimer > 6.5 && this.mineClock <= 0 && liveMines < 2) {
+                      this.mineClock = 9 + Math.random() * 2.4;
+                      const cycle = ['leash', 'amber', 'mark', 'bile'] as const;
+                      this.spawnMine(cycle[Math.floor(this.waveTimer / 9) % cycle.length]);
                   }
-                  this.spawnMine(kind);
+              } else if (this.currentWaveIndex >= 2) {
+                  const cap = organ >= 3 ? 2 : 1;
+                  const interval = Math.max(12, 28 - organ * 4);
+                  const grace = organ === 0 ? 16 : 10;
+                  this.mineClock -= dtSeconds;
+                  if (this.waveTimer > grace && this.mineClock <= 0 && liveMines < cap) {
+                      this.mineClock = interval;
+                      this.spawnMine('cyan');
+                  }
               }
           }
 
@@ -2343,6 +2460,12 @@ export class GameEngine {
             const due = (e.orbitOffset ?? 0) > 0 && (e.orbitOffset ?? 0) <= this.time;
             if (due) {
                 e.angle = 1;
+                const dx = this.player.pos.x - e.pos.x;
+                const dy = this.player.pos.y - e.pos.y;
+                const dist = Math.hypot(dx, dy);
+                // A velocidade fica guardada no offset: o tempo do turno já passou.
+                // Longe, cruza em ~11 quadros. Perto, não fica mais lenta que o ímã.
+                e.orbitOffset = Math.max(28, dist / 11);
                 e.vel.x = 0;
                 e.vel.y = 0;
             } else {
@@ -2405,6 +2528,15 @@ export class GameEngine {
                     e.vel.y *= before / next;
                 }
             }
+            const leash = this.bossLeash;
+            if (leash && this.time <= leash.until) {
+                const lx = e.pos.x - leash.x;
+                const ly = e.pos.y - leash.y;
+                if (lx * lx + ly * ly < leash.reach * leash.reach) {
+                    e.vel.x *= 0.93;
+                    e.vel.y *= 0.93;
+                }
+            }
         }
 
         if (e.type === EntityType.BIO_MINE) {
@@ -2439,6 +2571,7 @@ export class GameEngine {
       }
     }
 
+    let coinSparks = 0;
     for (const e of this.entities) {
       if (!e.active) continue;
 
@@ -2452,7 +2585,7 @@ export class GameEngine {
                if (distSq(e.pos, other.pos) < (e.radius + other.radius * 2.5)**2) {
                    e.active = false;
                    other.active = false;
-                   this.detonateMine(other, stats, 800);
+                   this.detonateMine(other, stats, 800, { over: onGameOver, lost: onLifeLost });
                    break;
                }
            }
@@ -2540,7 +2673,7 @@ export class GameEngine {
           const reeling = e.angle === 1;
           const magnet = !this.coinCascade && dist < stats.magnetRadius;
           if (magnet || reeling) {
-            const speed = reeling ? 24 : 28;
+            const speed = reeling ? Math.max(28, e.orbitOffset || 28) : 28;
             // Sem o teto, o vácuo do fim da onda passa do corpo e a moeda
             // fica orbitando colada no personagem até ele se mexer.
             const step = Math.min(dist, speed * tick);
@@ -2560,7 +2693,21 @@ export class GameEngine {
               achievementManager.track('biomass_10k', val);
               if (this.biomass >= 3000) achievementManager.track('rich', 3000);
               audioManager.playCoin(e.pos);
-              if (!this.isLowQuality && this.particles.length < 110) {
+              if (this.time - this.coinRingAt > 90 && this.particles.length < 180) {
+                  this.coinRingAt = this.time;
+                  this.particles.push({
+                      id: 'ring',
+                      type: EntityType.PARTICLE,
+                      pos: { x: this.player.pos.x, y: this.player.pos.y },
+                      vel: { x: 0, y: 0 },
+                      radius: this.player.radius + 8,
+                      health: 1, maxHealth: 10,
+                      color: '#ffe29a',
+                      damage: 0, active: true, ttl: 10,
+                  });
+              }
+              if (!this.isLowQuality && coinSparks < 2 && this.particles.length < 120) {
+                  coinSparks++;
                   for (let k = 0; k < 3; k++) {
                       const a = (k / 3) * Math.PI * 2;
                       this.particles.push({
@@ -2608,6 +2755,9 @@ export class GameEngine {
                   p.pos.y = Math.random() * CANVAS_HEIGHT;
               }
           }
+      } else if (p.id === 'ring') {
+          p.ttl = (p.ttl || 0) - 1;
+          if ((p.ttl || 0) <= 0) continue;
       } else if (p.id === 'coin_trail' || p.id === 'node_coin') {
           p.pos.x += p.vel.x;
           p.pos.y += p.vel.y;
@@ -3240,12 +3390,28 @@ export class GameEngine {
       const x = e.pos.x;
       const y = e.pos.y + bob;
       const gold = e.isElite ? '#ffe08a' : '#ffd56a';
+      const reeling = e.angle === 1;
+      const queued = !reeling && (e.orbitOffset ?? 0) > 0;
       this.ctx.save();
       this.ctx.fillStyle = gold;
-      this.ctx.globalAlpha = 0.28;
+      this.ctx.globalAlpha = reeling ? 0.5 : queued ? 0.38 : 0.28;
       this.ctx.beginPath();
-      this.ctx.arc(x, y, r * 1.7, 0, Math.PI * 2);
+      this.ctx.arc(x, y, r * (reeling ? 2.05 : 1.7), 0, Math.PI * 2);
       this.ctx.fill();
+      if (reeling) {
+          const dx = e.pos.x - this.player.pos.x;
+          const dy = e.pos.y - this.player.pos.y;
+          const mag = Math.hypot(dx, dy) || 1;
+          const tail = Math.min(36, mag * 0.45);
+          this.ctx.globalAlpha = 0.55;
+          this.ctx.strokeStyle = '#fff4c8';
+          this.ctx.lineWidth = 2.4;
+          this.ctx.lineCap = 'round';
+          this.ctx.beginPath();
+          this.ctx.moveTo(x, y);
+          this.ctx.lineTo(x + (dx / mag) * tail, y + (dy / mag) * tail);
+          this.ctx.stroke();
+      }
       this.ctx.restore();
 
       this.ctx.save();
@@ -3300,6 +3466,16 @@ export class GameEngine {
       this.ctx.lineTo(r * 0.36, -r * 0.34);
       this.ctx.closePath();
       this.ctx.fill();
+      if (!reeling) {
+          const wink = Math.pow(Math.max(0, Math.sin(this.time / 420 + e.pos.x * 0.02)), 8);
+          if (wink > 0.2) {
+              this.ctx.globalAlpha = wink;
+              this.ctx.fillStyle = '#fffef8';
+              this.ctx.beginPath();
+              this.ctx.arc(-r * 0.32, -r * 0.16, r * 0.09, 0, Math.PI * 2);
+              this.ctx.fill();
+          }
+      }
       this.ctx.restore();
   }
 
@@ -3911,8 +4087,10 @@ export class GameEngine {
             this.ctx.save();
             this.ctx.translate(e.pos.x, e.pos.y);
             const r = e.radius;
+            const mineKind = this.mineKind(e);
             const body = (e.hitFlash && e.hitFlash > 0) ? '#ffffff' : e.color;
             const spark = 0.55 + Math.sin(this.time / 90) * 0.45;
+            const fuse = mineKind === 'bile' ? '#243010' : mineKind === 'leash' ? '#f3e8ff' : mineKind === 'mark' ? '#fff6c8' : '#ffd650';
 
             if (!this.isLowQuality) {
                 this.ctx.globalCompositeOperation = 'screen';
@@ -3932,17 +4110,19 @@ export class GameEngine {
             this.ctx.stroke();
 
             const sparkR = r * (0.34 + spark * 0.08);
-            this.ctx.fillStyle = `rgba(255, 214, 80, ${0.7 + spark * 0.3})`;
+            this.ctx.fillStyle = fuse;
             this.ctx.beginPath();
             this.ctx.arc(0, -r * 1.48, sparkR, 0, Math.PI * 2);
             this.ctx.fill();
             this.ctx.strokeStyle = '#10282c';
             this.ctx.lineWidth = 2;
             this.ctx.stroke();
-            this.ctx.fillStyle = '#fffaf0';
-            this.ctx.beginPath();
-            this.ctx.arc(0, -r * 1.48, sparkR * 0.4, 0, Math.PI * 2);
-            this.ctx.fill();
+            if (mineKind !== 'bile') {
+                this.ctx.fillStyle = '#fffaf0';
+                this.ctx.beginPath();
+                this.ctx.arc(0, -r * 1.48, sparkR * 0.4, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
 
             this.ctx.fillStyle = body;
             this.ctx.strokeStyle = '#10282c';
@@ -3956,10 +4136,22 @@ export class GameEngine {
             this.ctx.lineWidth = Math.max(3, r * 0.16);
             const arm = r * 0.32;
             this.ctx.beginPath();
-            this.ctx.moveTo(-arm, r * 0.12);
-            this.ctx.lineTo(arm, r * 0.12);
-            this.ctx.moveTo(0, r * 0.12 - arm);
-            this.ctx.lineTo(0, r * 0.12 + arm);
+            if (mineKind === 'leash') {
+                this.ctx.arc(0, r * 0.12, r * 0.42, 0, Math.PI * 2);
+            } else if (mineKind === 'bile') {
+                this.ctx.moveTo(0, r * 0.12 - arm);
+                this.ctx.bezierCurveTo(arm * 0.8, r * 0.12, arm * 0.35, r * 0.12 + arm, 0, r * 0.12 + arm * 1.15);
+                this.ctx.bezierCurveTo(-arm * 0.35, r * 0.12 + arm, -arm * 0.8, r * 0.12, 0, r * 0.12 - arm);
+            } else if (mineKind === 'mark') {
+                this.ctx.arc(0, r * 0.12, r * 0.28, 0, Math.PI * 2);
+                this.ctx.moveTo(0, r * 0.12);
+                this.ctx.arc(0, r * 0.12, r * 0.08, 0, Math.PI * 2);
+            } else {
+                this.ctx.moveTo(-arm, r * 0.12);
+                this.ctx.lineTo(arm, r * 0.12);
+                this.ctx.moveTo(0, r * 0.12 - arm);
+                this.ctx.lineTo(0, r * 0.12 + arm);
+            }
             this.ctx.stroke();
 
             this.ctx.restore();
@@ -4113,6 +4305,7 @@ export class GameEngine {
         this.drawLymph(false);
     }
 
+    this.drawBossTools();
     if (!ride) this.drawVital();
     if (this.lymphOpen) {
         this.drawLymph(true);

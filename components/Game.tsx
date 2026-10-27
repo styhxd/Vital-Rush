@@ -284,6 +284,7 @@ export const Game: React.FC = () => {
   const shownBiomassRef = useRef(0);
   const lymphRef = useRef(false);
   const [lymphOn, setLymphOn] = useState(false);
+  const [lymphFeel, setLymphFeel] = useState({ drain: 0, spent: 0, spending: false });
   const [uiData, setUiData] = useState({ 
     health: 100, maxHealth: 100, score: 0, biomass: 0, 
     wave: 0, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100,
@@ -797,12 +798,14 @@ export const Game: React.FC = () => {
           const live = engineRef.current;
           const health = Math.round(live.player.health);
           const biomass = Math.round(live.biomass);
+          const feel = live.lymphFeel();
           setUiData(prev => prev.health === health && prev.biomass === biomass ? prev : ({
               ...prev,
               health,
               maxHealth: Math.round(live.player.maxHealth),
               biomass,
           }));
+          setLymphFeel(prev => prev.drain === feel.drain && prev.spent === feel.spent && prev.spending === feel.spending ? prev : feel);
       }
 
       if (engineRef.current.currentWaveIndex >= 0 && !engineRef.current.waveActive && !engineRef.current.lymphOpen) finishWave();
@@ -1517,45 +1520,67 @@ export const Game: React.FC = () => {
             animation: outcome-pop 0.7s cubic-bezier(.2, 1.45, .35, 1) both;
         }
         .outcome-campaign { background: radial-gradient(circle at 50% 42%, rgba(255, 214, 120, 0.38), rgba(40, 8, 4, 0.2) 36%, rgba(0, 0, 0, 0.78) 72%); }
-        .lymph-hp, .lymph-dna { position: relative; z-index: 40; animation: lymph-readout 0.55s ease forwards; }
-        .lymph-hp { transform-origin: top left; }
-        .lymph-dna { transform-origin: top right; }
-        .lymph-dna .text-yellow-400 { text-shadow: 0 0 18px rgba(255, 196, 64, 0.9); }
-        @keyframes lymph-readout { from { transform: scale(1); } to { transform: scale(1.7); } }
+        .hud-safe.is-node { opacity: 0.22; filter: saturate(0.65); }
         .lymph-dock {
             position: absolute;
             left: 50%;
-            bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+            bottom: calc(16px + env(safe-area-inset-bottom, 0px));
             transform: translateX(-50%);
             z-index: 70;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 8px;
             width: min(92vw, 420px);
             pointer-events: auto;
+            font-family: "Chakra Petch", sans-serif;
         }
-        .lymph-hint { color: #fff6ea; font-size: 14px; line-height: 1.35; letter-spacing: 0.04em; text-align: center; text-shadow: 0 2px 8px rgba(0,0,0,0.85); max-width: 34rem; }
-        .lymph-rate { color: #ffd27a; font-size: 12px; letter-spacing: 0.14em; font-weight: 800; text-shadow: 0 2px 8px rgba(0,0,0,0.85); }
-        .lymph-rest, .lymph-leave {
+        .lymph-card {
+            background: rgba(22, 8, 10, 0.88);
+            border: 1px solid rgba(255, 220, 196, 0.38);
+            border-radius: 18px;
+            padding: 14px 16px 12px;
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(8px);
+        }
+        .lymph-kicker { color: #ffd7b0; font-size: 11px; font-weight: 800; letter-spacing: 0.28em; }
+        .lymph-hint { margin-top: 6px; color: #fff6ea; font-size: 14px; line-height: 1.35; }
+        .lymph-life { margin-top: 12px; }
+        .lymph-life-row { display: flex; justify-content: space-between; align-items: baseline; color: #fff6ea; font-size: 12px; letter-spacing: 0.12em; font-weight: 700; }
+        .lymph-life-row strong { font-size: 18px; letter-spacing: 0; }
+        .lymph-track { margin-top: 6px; height: 8px; border-radius: 99px; background: rgba(255,255,255,0.08); overflow: hidden; }
+        .lymph-fill { height: 100%; background: linear-gradient(90deg, #c43a48, #ffb0a8); border-radius: 99px; }
+        .lymph-trade { margin-top: 10px; display: flex; justify-content: space-between; gap: 12px; color: #ffd27a; font-size: 12px; font-weight: 800; letter-spacing: 0.06em; }
+        .lymph-rest {
+            position: relative;
+            overflow: hidden;
             width: 100%;
-            border: 0;
+            margin-top: 12px;
+            border: 1px solid rgba(255, 220, 190, 0.55);
+            border-radius: 999px;
+            background: rgba(255,255,255,0.04);
+            color: #fff8ef;
+            padding: 13px 16px;
             font-weight: 800;
-            letter-spacing: 0.18em;
+            letter-spacing: 0.16em;
             text-transform: uppercase;
             touch-action: none;
             user-select: none;
         }
-        .lymph-rest {
-            background: radial-gradient(circle at 50% 120%, rgba(255, 214, 150, 0.95), rgba(196, 72, 72, 0.92) 58%);
-            color: #fff8ef;
-            padding: 14px 18px;
-            box-shadow: inset 0 0 18px rgba(255, 236, 200, 0.8), 0 8px 0 #6a2430;
+        .lymph-rest-fill {
+            position: absolute;
+            inset: 0 auto 0 0;
+            background: linear-gradient(90deg, rgba(196, 72, 64, 0.2), rgba(255, 196, 140, 0.85));
+            pointer-events: none;
         }
+        .lymph-rest span { position: relative; }
         .lymph-leave {
+            width: 100%;
+            margin-top: 8px;
+            border: 0;
             background: transparent;
-            color: #ffe7c8;
+            color: rgba(255, 231, 200, 0.82);
             padding: 8px;
+            font-size: 12px;
+            font-weight: 800;
+            letter-spacing: 0.18em;
+            text-transform: uppercase;
         }
         .outcome-leave-finale { animation: outcome-leave 1.4s ease forwards; }
         .finale-rig { width: min(34vh, 240px); height: min(34vh, 240px); perspective: 900px; }
@@ -1625,30 +1650,48 @@ export const Game: React.FC = () => {
 
       {lymphOn && gameState === GameState.PLAYING && !isPaused && (
           <div className="lymph-dock">
-              <div className="lymph-hint">{t('NODE_HINT')}</div>
-              <div className="lymph-rate">{t('NODE_RATE')}</div>
-              <button
-                  className="lymph-rest"
-                  onPointerDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      e.currentTarget.setPointerCapture(e.pointerId);
-                      engineRef.current?.beginRest();
-                  }}
-                  onPointerUp={(e) => {
-                      if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
-                      if (engineRef.current) engineRef.current.nodeFeed = false;
-                  }}
-                  onPointerCancel={() => { if (engineRef.current) engineRef.current.nodeFeed = false; }}
-              >{t('NODE_REST')}</button>
-              <button
-                  className="lymph-leave"
-                  onPointerDown={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      if (engineRef.current) engineRef.current.nodeLeave = true;
-                  }}
-              >{t('NODE_LEAVE')}</button>
+              <div className="lymph-card">
+                  <div className="lymph-kicker">{t('NODE_TITLE')}</div>
+                  <div className="lymph-hint">{t('NODE_HINT')}</div>
+                  <div className="lymph-life">
+                      <div className="lymph-life-row">
+                          <span>{t('INTEGRITY')}</span>
+                          <strong>{uiData.health}/{uiData.maxHealth}</strong>
+                      </div>
+                      <div className="lymph-track">
+                          <div className="lymph-fill" style={{ width: `${Math.max(0, Math.min(100, (uiData.health / Math.max(1, uiData.maxHealth)) * 100))}%` }} />
+                      </div>
+                  </div>
+                  <div className="lymph-trade">
+                      <span>{t('NODE_RATE')}</span>
+                      <span>{lymphFeel.spending ? `-${lymphFeel.spent} DNA` : `${uiData.biomass} DNA`}</span>
+                  </div>
+                  <button
+                      className="lymph-rest"
+                      onPointerDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          e.currentTarget.setPointerCapture(e.pointerId);
+                          engineRef.current?.beginRest();
+                      }}
+                      onPointerUp={(e) => {
+                          if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+                          if (engineRef.current) engineRef.current.nodeFeed = false;
+                      }}
+                      onPointerCancel={() => { if (engineRef.current) engineRef.current.nodeFeed = false; }}
+                  >
+                      <i className="lymph-rest-fill" style={{ width: `${Math.round(lymphFeel.drain * 100)}%` }} />
+                      <span>{t('NODE_REST')}</span>
+                  </button>
+                  <button
+                      className="lymph-leave"
+                      onPointerDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          if (engineRef.current) engineRef.current.nodeLeave = true;
+                      }}
+                  >{t('NODE_LEAVE')}</button>
+              </div>
           </div>
       )}
 
@@ -1721,10 +1764,10 @@ export const Game: React.FC = () => {
       </div>
 
       {(gameState === GameState.PLAYING || gameState === GameState.WAVE_CLEARED || gameState === GameState.LOADOUT) && !passage && !showBossIntro && (
-        <div className="absolute inset-0 pointer-events-none z-20 flex flex-col justify-between hud-safe" style={{ fontFamily: '"Chakra Petch", sans-serif' }}>
+        <div className={`absolute inset-0 pointer-events-none z-20 flex flex-col justify-between hud-safe ${lymphOn ? 'is-node' : ''}`} style={{ fontFamily: '"Chakra Petch", sans-serif' }}>
            <div className="flex justify-between items-start">
              <div className="flex flex-col gap-1 lg:gap-3 w-28 lg:w-64">
-                <div className={`${uiData.adrenaline ? 'adrenaline-hp' : ''} ${lymphOn ? 'lymph-hp' : ''}`.trim()}>
+                <div className={uiData.adrenaline ? 'adrenaline-hp' : ''}>
                 <StatBar label={t('INTEGRITY')} value={uiData.health} max={uiData.maxHealth} colorClass={uiData.adrenaline ? "bg-red-500 shadow-[0_0_12px_rgba(255,40,40,0.85)]" : (isPlatinum ? "bg-gradient-to-r from-purple-500 to-amber-400" : "bg-gradient-to-r from-red-600 to-red-400")} />
                 </div>
                 <StatBar label={t('SURGE_READY')} value={uiData.energy} max={uiData.maxEnergy} colorClass={isPlatinum ? "bg-gradient-to-r from-amber-400 to-white" : "bg-gradient-to-r from-cyan-600 to-cyan-400"} animate={true}/>
@@ -1799,7 +1842,7 @@ export const Game: React.FC = () => {
                      <IconButton onClick={toggleMute} icon={<IconSpeaker muted={isMuted} />} />
                      <IconButton onClick={togglePause} icon={<span className="font-bold text-base lg:text-xl">||</span>} />
                  </div>
-                 <div className={`text-right ${lymphOn ? 'lymph-dna' : ''}`}>
+                 <div className="text-right">
                     <div className="text-[9px] lg:text-xs text-white/50 tracking-widest">{t('SCORE')}</div>
                     <div className="text-base lg:text-3xl font-bold text-white tracking-tighter cyan-glow" style={{ fontVariantNumeric: 'tabular-nums' }}>{uiData.score.toString().padStart(6, '0')}</div>
                     <div className="text-[9px] lg:text-xs text-yellow-500 tracking-widest mt-0.5 lg:mt-1">{t('BIOMASS_AVAIL')}</div>
@@ -2180,7 +2223,7 @@ export const Game: React.FC = () => {
         />
       )}
 
-      {isMobile && !isPaused && !serum && !showTutorial && !passage && !showBossIntro && gameState === GameState.PLAYING && <Joystick onMove={handleJoystickMove} />}
+      {isMobile && !isPaused && !serum && !showTutorial && !passage && !showBossIntro && !lymphOn && gameState === GameState.PLAYING && <Joystick onMove={handleJoystickMove} />}
       
       {/* NEW PAUSE MENU IMPLEMENTATION */}
       <PauseMenu 

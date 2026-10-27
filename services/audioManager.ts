@@ -11,6 +11,7 @@
  */
 
 import type { OrganId } from '../types';
+import { flushCoin, latchCoin, scheduleCoinTick, type CoinVoice } from './coinFeel';
 
 export type DrumHit = 'kick' | 'snare' | 'hat' | 'tom';
 
@@ -66,6 +67,9 @@ export class AudioManager {
   // Controle de Throttling
   private lastPlayTime: Record<string, number> = {};
   private coinRun = 0;
+  private coinLast = 0;
+  private coinLatch = 0;
+  private spendAt = 0;
   
   // Sequenciador Musical Procedural
   private isPlaying: boolean = false;
@@ -601,54 +605,69 @@ export class AudioManager {
   public playHit(at?: { x: number; y: number } | null) { this.playBuffer('hit', 0.42, 0, 50, at); }
   public playExplosion(at?: { x: number; y: number } | null) { this.playBuffer('expl', 0.48, 0, 100, at); }
   public playPowerUp(at?: { x: number; y: number } | null) { this.playBuffer('power', 0.5, 0, 80, at); }
-  private coinQueue = 0;
   private coinAt: { x: number; y: number } | null = null;
 
+  private coinVoice(): CoinVoice {
+      return { run: this.coinRun, lastAt: this.coinLast, latch: this.coinLatch };
+  }
+
   public queueCoins(n: number, at?: { x: number; y: number } | null) {
-      this.coinQueue = Math.min(96, this.coinQueue + Math.max(0, n));
+      const add = Math.max(0, Math.min(8, Math.round(n)));
+      for (let i = 0; i < add; i++) this.coinLatch = latchCoin(this.coinVoice()).latch;
       if (at) this.coinAt = at;
   }
 
-  public trimCoins(keep = 5) {
-      this.coinQueue = Math.min(this.coinQueue, Math.max(0, keep));
+  public trimCoins(_keep = 0) {
+      this.stopCoins();
+  }
+
+  public stopCoins() {
+      this.coinLatch = 0;
+      this.coinRun = 0;
+      this.coinLast = 0;
   }
 
   public pumpCoins() {
-      if (this.coinQueue <= 0 || !this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
       const now = performance.now();
-      if (now - (this.lastPlayTime['coin'] || 0) < 54) return;
-      this.coinQueue--;
-      this.playCoin(this.coinAt, true);
+      const out = flushCoin(this.coinVoice(), now);
+      if (!out.play) return;
+      if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+      this.coinRun = out.voice.run;
+      this.coinLast = out.voice.lastAt;
+      this.coinLatch = 0;
+      this.lastPlayTime['coin'] = now;
+      scheduleCoinTick(this.ctx, this.sfxOut(this.coinAt, 0.08), this.ctx.currentTime, out.play.step, out.play.piled);
   }
 
   /**
-   * Moeda de recompensa. O ouvido é mais sensível perto de 3–4 kHz, então o
-   * clique de metal mora aí. O corpo sobe numa pentatônica maior (consonante,
-   * sem intervalo que "erre") e o parcial em 2,67× é inarmônico de propósito:
-   * harmônico inteiro soa órgão, não moeda. Uma quinta logo depois é o
-   * intervalo ascendente comprimido — o mesmo gesto do coin do Mario
-   * (Si5 → Mi6), que o ouvido lê como ganho. Uma a cada ~54 ms: mais rápido
-   * que isso vira um bolo, mais lento perde o chuveiro de cassino.
+   * Um tilintar por tempo, não uma fila. Moedas do mesmo instante viram um
+   * ataque só; o grau sobe enquanto elas continuam chegando e recomeça no silêncio.
    */
-  public playCoin(at?: { x: number; y: number } | null, force = false) {
+  public playCoin(at?: { x: number; y: number } | null, _force = false) {
+      this.coinLatch = latchCoin(this.coinVoice()).latch;
+      if (at) this.coinAt = at;
+  }
+
+  /** Gasto de DNA. Grave, curto, sem a frase de ganho, e cala no quadro em que se solta. */
+  public playSpend(at?: { x: number; y: number } | null) {
       if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
       const now = performance.now();
-      const prev = this.lastPlayTime['coin'] || 0;
-      if (!force && now - prev < 54) {
-          this.queueCoins(1, at);
-          return;
-      }
-      this.coinRun = now - prev < 280 ? (this.coinRun + 1) % 5 : 0;
-      this.lastPlayTime['coin'] = now;
-      const dest = this.sfxOut(at, 0.16);
+      if (now - this.spendAt < 180) return;
+      this.spendAt = now;
+      const dest = this.sfxOut(at, 0.05);
       const t = this.ctx.currentTime;
-      const scale = [1046.5, 1174.66, 1318.51, 1567.98, 1760];
-      const f = scale[this.coinRun];
-      const lift = 1 + this.coinRun * 0.045;
-      this.puff(0.004, 3400 + this.coinRun * 140, 0.03 * lift, t, dest);
-      this.tone(t, f, 0.072, 'sine', 0.058 * lift, 4200, dest);
-      this.tone(t, Math.min(4200, f * 2.67), 0.026, 'sine', 0.016 * lift, 5200, dest);
-      this.tone(t + 0.012, f * 1.498, 0.042, 'triangle', 0.014 * lift, 4800, dest);
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(310, t);
+      osc.frequency.exponentialRampToValueAtTime(180, t + 0.016);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.02, t + 0.001);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.018);
+      osc.connect(g);
+      g.connect(dest);
+      osc.start(t);
+      osc.stop(t + 0.03);
   }
 
   public playSigh(at?: { x: number; y: number } | null, strength = 1) {
