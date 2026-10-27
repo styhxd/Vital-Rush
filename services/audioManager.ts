@@ -156,6 +156,17 @@ export class AudioManager {
     this.musicFilter.connect(this.compressor);
     
     this.sfxGain.connect(this.compressor);
+
+    // A moeda não entra no compressor. A música engorda com a onda e, no PC,
+    // o compressor ia levando o tilintar junto até quase sumir.
+    this.coinBus = this.ctx.createGain();
+    try {
+        this.coinPan = this.ctx.createStereoPanner();
+        this.coinPan.connect(this.coinBus);
+    } catch {
+        this.coinPan = null;
+    }
+    this.coinBus.connect(this.masterGain);
     
     this.compressor.connect(this.masterGain);
     this.masterGain.connect(this.ctx.destination);
@@ -528,28 +539,15 @@ export class AudioManager {
       const ctx = this.ctx;
       if (!dest || !ctx) return dest as AudioNode;
       if (!at || this.settings.mono) return dest;
-      const x = Math.max(-0.68, Math.min(0.68, (at.x - this.ear.x) / 960));
-      const z = Math.max(-0.48, Math.min(0.48, (at.y - this.ear.y) / 820));
+      const x = Math.max(-1, Math.min(1, (at.x - this.ear.x) / 960));
       try {
-          const panner = ctx.createPanner();
-          panner.panningModel = 'HRTF';
-          panner.distanceModel = 'inverse';
-          panner.refDistance = 340;
-          panner.maxDistance = 2600;
-          panner.rolloffFactor = 0.65;
-          const now = ctx.currentTime;
-          panner.positionX.setValueAtTime(x * 2.6, now);
-          panner.positionY.setValueAtTime(0, now);
-          panner.positionZ.setValueAtTime(-0.4 + z * 2, now);
-          panner.connect(dest);
-          this.dropLater(panner, life);
-          return panner;
-      } catch {
           const pan = ctx.createStereoPanner();
-          pan.pan.value = x;
+          pan.pan.setValueAtTime(x, ctx.currentTime);
           pan.connect(dest);
           this.dropLater(pan, life);
           return pan;
+      } catch {
+          return dest;
       }
   }
 
@@ -596,6 +594,10 @@ export class AudioManager {
     this.masterGain.gain.setValueAtTime(master, now);
     this.musicGain.gain.setValueAtTime(music, now);
     this.sfxGain.gain.setValueAtTime(sfx, now);
+    if (this.coinBus) {
+        this.coinBus.gain.cancelScheduledValues(now);
+        this.coinBus.gain.setValueAtTime(sfx, now);
+    }
   }
 
   public playShoot() { this.playBuffer('shoot', 0.85, Math.random()*2, 60); }
@@ -646,6 +648,8 @@ export class AudioManager {
   public playExplosion(at?: { x: number; y: number } | null) { this.playBuffer('expl', 0.48, 0, 100, at); }
   public playPowerUp(at?: { x: number; y: number } | null) { this.playBuffer('power', 0.5, 0, 80, at); }
   private coinAt: { x: number; y: number } | null = null;
+  private coinBus: GainNode | null = null;
+  private coinPan: StereoPannerNode | null = null;
   private hurtAt = 0;
   private hurtHeard: HurtGrade = 0;
   private clearAt = 0;
@@ -694,9 +698,22 @@ export class AudioManager {
       if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
       this.applyCoin(out.voice);
       this.lastPlayTime['coin'] = now;
-      const dest = this.sfxOut(this.coinAt, out.play.kind === 'cadence' ? 0.24 : 0.08);
+      const dest = this.coinEar();
       if (out.play.kind === 'cadence') scheduleCadence(this.ctx, dest, this.ctx.currentTime, out.play.gear);
       else scheduleCoinTick(this.ctx, dest, this.ctx.currentTime, out.play.step, out.play.piled, out.play.gear);
+  }
+
+  /** Um pan só, reaproveitado. Cada moeda não abre um panner novo. */
+  private coinEar(): AudioNode {
+      const bus = this.coinBus ?? this.sfxGain;
+      const pan = this.coinPan;
+      const ctx = this.ctx;
+      if (!bus || !pan || !ctx) return bus ?? this.sfxGain!;
+      const x = !this.coinAt || this.settings.mono
+          ? 0
+          : Math.max(-1, Math.min(1, (this.coinAt.x - this.ear.x) / 720));
+      pan.pan.setValueAtTime(x, ctx.currentTime);
+      return pan;
   }
 
   /**

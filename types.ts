@@ -35,7 +35,8 @@ export enum EntityType {
   ORBITAL,        // Seus amigos robôs
   BIO_MINE,       // Cabum
   ACID_POOL,      // O chão é lava (ácido)
-  ORGAN_PICKUP    // Flúor, glicogênio, oxigênio, dopamina
+  ORGAN_PICKUP,   // Flúor, glicogênio, oxigênio, dopamina
+  LYMPH_NODE      // Linfonodo de passagem: abre o descanso
 }
 
 // A Máquina de Estados Finita (ou quase isso) do jogo.

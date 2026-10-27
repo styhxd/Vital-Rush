@@ -162,6 +162,18 @@ function ramp(t: number, peak: number, attack: number, dur: number): number {
     return peak * Math.pow(0.0001 / peak, u);
 }
 
+function release(source: AudioScheduledSourceNode, nodes: AudioNode[], when: number) {
+    source.stop(when);
+    source.onended = () => {
+        try { source.disconnect(); } catch { /* já saiu */ }
+        for (const node of nodes) {
+            try { node.disconnect(); } catch { /* já saiu */ }
+        }
+    };
+}
+
+const coinClicks = new WeakMap<BaseAudioContext, AudioBuffer>();
+
 /** Soma das envoltórias. O clique é o metal; o corpo morre antes do próximo tempo. */
 export function coinAmp(t: number, peak: number): number {
     return ramp(t, peak, COIN_ATTACK_S, COIN_BODY_S)
@@ -191,7 +203,7 @@ export function scheduleCadence(
         osc.connect(gain);
         gain.connect(dest);
         osc.start(start);
-        osc.stop(start + note.dur + 0.02);
+        release(osc, [gain], start + note.dur + 0.02);
     });
 }
 
@@ -219,7 +231,7 @@ export function scheduleCoinTick(
     body.connect(bodyGain);
     bodyGain.connect(dest);
     body.start(time);
-    body.stop(time + COIN_BODY_S + 0.01);
+    release(body, [bodyGain], time + COIN_BODY_S + 0.01);
 
     const partialHz = Math.min(nyquist, f * 2.37);
     if (partialHz > 80) {
@@ -233,7 +245,7 @@ export function scheduleCoinTick(
         partial.connect(partialGain);
         partialGain.connect(dest);
         partial.start(time);
-        partial.stop(time + COIN_PARTIAL_S + 0.01);
+        release(partial, [partialGain], time + COIN_PARTIAL_S + 0.01);
     }
 
     const tipHz = Math.min(nyquist, f * 4.9);
@@ -248,15 +260,19 @@ export function scheduleCoinTick(
         tip.connect(tipGain);
         tipGain.connect(dest);
         tip.start(time);
-        tip.stop(time + COIN_TIP_S + 0.01);
+        release(tip, [tipGain], time + COIN_TIP_S + 0.01);
     }
 
-    const frames = Math.max(1, Math.floor(ctx.sampleRate * COIN_CLICK_S));
-    const noise = ctx.createBuffer(1, frames, ctx.sampleRate);
-    const data = noise.getChannelData(0);
-    for (let i = 0; i < frames; i++) {
-        const env = 1 - i / frames;
-        data[i] = (Math.random() * 2 - 1) * env * env;
+    let noise = coinClicks.get(ctx);
+    if (!noise) {
+        const frames = Math.max(1, Math.floor(ctx.sampleRate * COIN_CLICK_S));
+        noise = ctx.createBuffer(1, frames, ctx.sampleRate);
+        const data = noise.getChannelData(0);
+        for (let i = 0; i < frames; i++) {
+            const env = 1 - i / frames;
+            data[i] = (Math.random() * 2 - 1) * env * env;
+        }
+        coinClicks.set(ctx, noise);
     }
     const src = ctx.createBufferSource();
     src.buffer = noise;
@@ -271,7 +287,7 @@ export function scheduleCoinTick(
     band.connect(clickGain);
     clickGain.connect(dest);
     src.start(time);
-    src.stop(time + COIN_CLICK_S + 0.01);
+    release(src, [band, clickGain], time + COIN_CLICK_S + 0.01);
 }
 
 export interface CoinReport {

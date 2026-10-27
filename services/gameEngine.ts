@@ -21,7 +21,9 @@ import { achievementManager } from './achievementManager';
 import { bossFor, drawBossShape, mutationFrom } from './bosses';
 import { OrganDirector, cellBudget, cellColor, cellRises, organBg, rollCellStyle } from './organDirector';
 const BOSS_GRACE = 1.15;
-const NODE_RATE = 32;
+const NODE_RATE = 96;
+/** O que a moeda paga de DNA, em relação ao que pagava. A quantidade na tela fica. */
+const COIN_WORTH = 0.48;
 const NODE_WIND = 0.48;
 const NODE_GULP = 0.18;
 
@@ -245,7 +247,14 @@ export class GameEngine {
   private lymphWind = 0;
   private lymphClock = 0;
   private lymphGulp = 0;
-  private lymphRelief = 0; 
+  private lymphRelief = 0;
+  /** Segundos de luta até a próxima leitura do chefe. */
+  private bossClock = 0;
+  private bossSnapHp = 0;
+  private bossSnapAt = 0;
+  private bossBombDue = 0;
+  /** O linfonodo cruza a arena. Não espera a onda anterior ao chefe. */
+  private nodePass = 22; 
   
   public isLowQuality: boolean = false; 
   public forceHighQuality: boolean = false;
@@ -294,12 +303,12 @@ export class GameEngine {
   private configFor(waveIndex: number): WaveConfig {
       const base = WAVES[waveIndex % WAVES.length];
       const lap = Math.floor(waveIndex / WAVES.length);
-      if (lap <= 0) return { ...base, waveNumber: waveIndex + 1 };
-      const tighten = Math.pow(0.9, lap);
+      const spawnRate = Math.max(420, Math.round(base.spawnRate * Math.pow(0.9, lap) * 0.9));
+      if (lap <= 0) return { ...base, waveNumber: waveIndex + 1, spawnRate };
       return {
           ...base,
           waveNumber: waveIndex + 1,
-          spawnRate: Math.max(460, Math.round(base.spawnRate * tighten)),
+          spawnRate,
           flowSpeed: base.flowSpeed * (1 + Math.min(0.35, lap * 0.06)),
       };
   }
@@ -551,6 +560,61 @@ export class GameEngine {
       }
   }
 
+  /**
+   * A luta já vai longe e a vida do chefe quase não desce: entra uma das bombas
+   * dele. O relógio antigo morria quando a onda acabava, então a ferramenta
+   * nunca chegava a aparecer.
+   */
+  private feedBossBombs(boss: Entity, dt: number, live: number) {
+      if (this.bossClock <= 0) {
+          this.bossClock = 0.001;
+          this.bossSnapHp = boss.health;
+          this.bossSnapAt = 0;
+          this.bossBombDue = 16;
+      }
+      this.bossClock += dt;
+      if (live >= 2) return;
+      this.bossBombDue -= dt;
+      if (this.bossBombDue > 0) return;
+      const span = Math.max(0.4, this.bossClock - this.bossSnapAt);
+      const dropped = (this.bossSnapHp - boss.health) / Math.max(1, boss.maxHealth);
+      const pace = dropped / span;
+      const stalled = this.bossClock > 16 && pace < 0.011;
+      this.bossSnapHp = boss.health;
+      this.bossSnapAt = this.bossClock;
+      if (!stalled) {
+          this.bossBombDue = 4;
+          return;
+      }
+      this.bossBombDue = 8 + Math.random() * 2.4;
+      const cycle = ['leash', 'amber', 'mark', 'bile'] as const;
+      this.spawnMine(cycle[Math.floor(this.bossClock / 8) % cycle.length]);
+  }
+
+  private openLymph() {
+      this.lymphOpen = true;
+      this.lymphPhase = 'in';
+      this.lymphT = 0;
+      this.lymphScale = 0;
+      this.nodeFeed = false;
+      this.nodeLeave = false;
+      this.nodeWasFeeding = false;
+      this.lymphCoin = 0;
+      this.lymphPop = 0;
+      this.lymphSpent = 0;
+      this.lymphShow = 0;
+      this.lymphPressure = 0;
+      this.lymphWind = 0;
+      this.lymphClock = 0;
+      this.lymphGulp = 0;
+      this.lymphRelief = 0;
+      this.isDashing = false;
+      this.inputVector.x = 0;
+      this.inputVector.y = 0;
+      this.invulnerabilityTimer = Math.max(this.invulnerabilityTimer, 1.2);
+      audioManager.playPowerUp(this.player.pos);
+  }
+
   private spawnMine(kind: 'cyan' | 'iris' | 'amber' | 'bile' | 'leash' | 'mark' = 'cyan') {
       const padX = 150;
       const padY = 120;
@@ -610,7 +674,8 @@ export class GameEngine {
       for (let i = 0; i < shards; i++) {
           let ang = (i / shards) * Math.PI * 2 + Math.random() * 0.4;
           if (pull > 0) ang += Math.atan2(Math.sin(inward - ang), Math.cos(inward - ang)) * pull;
-          const kick = 2.05 + Math.random() * (shards > 20 ? 3.1 : 2.2);
+          const burst = shards > 50;
+          const kick = (burst ? 3.6 : 2.05) + Math.random() * (burst ? 5.2 : shards > 20 ? 3.1 : 2.2);
           const share = base + (leftover > 0 ? 1 : 0);
           if (leftover > 0) leftover--;
           this.entities.push({
@@ -618,7 +683,7 @@ export class GameEngine {
               type: EntityType.DNA_FRAGMENT,
               pos: { x: pos.x, y: pos.y },
               vel: { x: Math.cos(ang) * kick, y: Math.sin(ang) * kick },
-              radius: shards > 20 ? 5.1 : 6.15,
+              radius: shards > 50 ? 4.4 : shards > 20 ? 5.1 : 6.15,
               health: 1, maxHealth: 1,
               color: this.colors.DNA,
               damage: energy, active: true,
@@ -739,7 +804,7 @@ export class GameEngine {
           this.lymphPressure = Math.min(1, this.lymphPressure + dt * 2.2);
           const canTrade = this.player.maxHealth - this.player.health >= 0.35 && this.biomass >= 1;
           if (canTrade) {
-              const heavy = Math.min(1, this.lymphSpent / 480);
+              const heavy = Math.min(1, this.lymphSpent / (NODE_RATE * 15));
               hum(this.lymphWind < NODE_WIND ? 0.16 : 0.24 + heavy * 0.76);
           }
           if (this.lymphWind >= NODE_WIND) {
@@ -754,11 +819,11 @@ export class GameEngine {
           this.nodeWasFeeding = false;
           this.lymphWind = 0;
           this.lymphClock = 0;
-          if (this.lymphSpent >= 32) {
+          if (this.lymphSpent >= NODE_RATE) {
               this.lymphShow = this.lymphSpent;
               this.lymphRelief = 1;
               audioManager.stopCoins();
-              audioManager.playSigh(this.player.pos, Math.min(1.4, this.lymphSpent / 220));
+              audioManager.playSigh(this.player.pos, Math.min(1.4, this.lymphSpent / (NODE_RATE * 7)));
               this.spawnText(
                   { x: this.player.pos.x, y: this.player.pos.y - 64 },
                   `-${Math.round(this.lymphSpent)} DNA`,
@@ -773,7 +838,8 @@ export class GameEngine {
           this.lymphWind = 0;
       }
       if (this.lymphRelief > 0) this.lymphRelief = Math.max(0, this.lymphRelief - dt * 0.42);
-      if (this.lymphPhase === 'out' && this.lymphT >= 0.48) {
+          if (this.lymphPhase === 'out' && this.lymphT >= 0.48) {
+          this.invulnerabilityTimer = Math.max(this.invulnerabilityTimer, 0.7);
           this.lymphOpen = false;
           this.nodeFeed = false;
           this.nodeLeave = false;
@@ -1292,16 +1358,18 @@ export class GameEngine {
           const shiny = target.id.startsWith('shiny_');
           if (shiny) {
               const jackpot = Math.max(1, Math.floor(target.value || 1));
-              this.spillCoins({ x: target.pos.x, y: target.pos.y }, jackpot, 40, true, 56);
+              this.spillCoins({ x: target.pos.x, y: target.pos.y }, jackpot, 92, true, 56);
               audioManager.playPowerUp(target.pos);
               this.spawnText(target.pos, this.t('SHINY'), '#ffe08a', 34);
           } else {
-              const dnaYield = 1.15;
-              const total = Math.max(1, Math.ceil((target.value || 10) * Math.min(3, comboPower) * dnaYield));
-              const oldShards = Math.min(total, Math.min(6, Math.max(3, Math.ceil(total / 12))));
-              const want = Math.min(18, Math.max(oldShards, Math.round(4 + Math.sqrt(total) * 1.05)));
-              const energyBudget = oldShards * (target.isElite ? 12 : 3);
-              this.spillCoins(target.pos, total, want, !!target.isElite, energyBudget);
+          const dnaYield = 1.15;
+          const gross = Math.max(1, Math.ceil((target.value || 10) * Math.min(3, comboPower) * dnaYield));
+          const oldShards = Math.min(gross, Math.min(6, Math.max(3, Math.ceil(gross / 12))));
+          const want = Math.min(18, Math.max(oldShards, Math.round(4 + Math.sqrt(gross) * 1.05)));
+          const shown = Math.min(want, gross);
+          const total = Math.max(shown, Math.round(gross * COIN_WORTH));
+          const energyBudget = oldShards * (target.isElite ? 12 : 3);
+          this.spillCoins(target.pos, total, want, !!target.isElite, energyBudget);
           }
           
           return true;
@@ -1496,6 +1564,8 @@ export class GameEngine {
     this.coinCascade = false;
     this.coinShowerAt = 0;
     this.mineClock = 0;
+    this.bossClock = 0;
+    this.bossBombDue = 0;
     this.bossLeash = null;
     this.bossMarkUntil = 0;
     this.hurt = 0;
@@ -1996,6 +2066,16 @@ export class GameEngine {
         return;
     }
 
+    if (this.lymphOpen) {
+        this.isLowQuality = this.leanGraphics;
+        this.time += dt;
+        this.adrenalineActive = false;
+        this.isDashing = false;
+        this.tickLymph(Math.min(0.05, dt / 1000));
+        audioManager.pumpCoins();
+        return;
+    }
+
     this.isLowQuality = this.leanGraphics;
 
     if (this.hitStopTimer > 0) {
@@ -2131,7 +2211,7 @@ export class GameEngine {
           if (this.patient.strain === ViralStrain.SWARM) spawnRateMod = 0.72;
           if (this.patient.strain === ViralStrain.TITAN) spawnRateMod = 1.35;
           const crowd = this.difficultyMods.crowd ?? 1;
-          const foeCap = this.difficultyMods.cap ?? 16;
+          const foeCap = (this.difficultyMods.cap ?? 16) + 2;
           let foes = 0;
           for (const ent of this.entities) {
               if (ent.active && this.isEnemy(ent.type)) foes++;
@@ -2152,28 +2232,26 @@ export class GameEngine {
               return;
           }
           
-          if (!this.isVacuuming && this.waveTimer < config.duration) {
+          if (!this.isVacuuming) {
               let liveMines = 0;
               for (const ent of this.entities) {
                   if (ent.active && ent.type === EntityType.BIO_MINE) liveMines++;
               }
-              const bossUp = config.hasBoss && this.bossSpawned;
+              const boss = this.entities.find(e => e.active && e.type === EntityType.BOSS);
               const organ = Math.floor(Math.max(0, this.currentWaveIndex) / 6);
-              if (bossUp) {
-                  this.mineClock -= dtSeconds;
-                  if (this.waveTimer > 6.5 && this.mineClock <= 0 && liveMines < 2) {
-                      this.mineClock = 9 + Math.random() * 2.4;
-                      const cycle = ['leash', 'amber', 'mark', 'bile'] as const;
-                      this.spawnMine(cycle[Math.floor(this.waveTimer / 9) % cycle.length]);
-                  }
-              } else if (this.currentWaveIndex >= 2) {
-                  const cap = organ >= 3 ? 2 : 1;
-                  const interval = Math.max(12, 28 - organ * 4);
-                  const grace = organ === 0 ? 16 : 10;
-                  this.mineClock -= dtSeconds;
-                  if (this.waveTimer > grace && this.mineClock <= 0 && liveMines < cap) {
-                      this.mineClock = interval;
-                      this.spawnMine('cyan');
+              if (boss) {
+                  this.feedBossBombs(boss, dtSeconds, liveMines);
+              } else {
+                  this.bossClock = 0;
+                  if (this.waveTimer < config.duration && this.currentWaveIndex >= 2) {
+                      const cap = organ >= 3 ? 2 : 1;
+                      const interval = Math.max(11, 25 - organ * 3.5);
+                      const grace = organ === 0 ? 14 : 9;
+                      this.mineClock -= dtSeconds;
+                      if (this.waveTimer > grace && this.mineClock <= 0 && liveMines < cap) {
+                          this.mineClock = interval;
+                          this.spawnMine('cyan');
+                      }
                   }
               }
           }
@@ -2185,6 +2263,18 @@ export class GameEngine {
                   if (this.serumClock <= 0) {
                       this.spawnSerum();
                       this.serumClock = 168 + Math.random() * 50;
+                  }
+              }
+          }
+
+          if (this.waveStartDelay <= 0 && !this.isVacuuming && !this.lymphOpen && this.waveTimer > 1.4 && this.player.active) {
+              const nodeLive = this.entities.some(e => e.active && e.type === EntityType.LYMPH_NODE);
+              const serumLive = this.entities.some(e => e.active && e.type === EntityType.SERUM);
+              if (!nodeLive && !serumLive) {
+                  this.nodePass -= dtSeconds;
+                  if (this.nodePass <= 0) {
+                      this.spawnLymph();
+                      this.nodePass = 62 + Math.random() * 26;
                   }
               }
           }
@@ -2236,24 +2326,7 @@ export class GameEngine {
               if (this.currentWaveIndex === 0 && this.sessionStats.damageTaken === 0) achievementManager.track('perfect_wave', 1);
               if (this.player.health < this.player.maxHealth * 0.2) achievementManager.track('low_hp_survive', 1);
               if (this.currentWaveIndex === 4 && this.currentDifficulty === Difficulty.APEX) achievementManager.track('win_apex', 1);
-              if (this.currentWaveIndex % 6 === 4 && this.player.active && this.lives > 0) {
-                  this.lymphOpen = true;
-                  this.lymphPhase = 'in';
-                  this.lymphT = 0;
-                  this.lymphScale = 0;
-                  this.nodeFeed = false;
-                  this.nodeLeave = false;
-                  this.nodeWasFeeding = false;
-                  this.lymphCoin = 0;
-                  this.lymphPop = 0;
-                  this.lymphSpent = 0;
-                  this.lymphShow = 0;
-                  this.lymphPressure = 0;
-                  this.lymphWind = 0;
-                  this.lymphClock = 0;
-                  this.lymphGulp = 0;
-                  this.lymphRelief = 0;
-              } else onWaveClear();
+              onWaveClear();
           }
       }
     }
@@ -2483,6 +2556,11 @@ export class GameEngine {
 
       if (e.type === EntityType.SERUM) {
           this.updateSerum(e, tick);
+          continue;
+      }
+
+      if (e.type === EntityType.LYMPH_NODE) {
+          this.updateLymph(e, tick);
           continue;
       }
 
@@ -2973,6 +3051,136 @@ export class GameEngine {
           }
       }
       if (e.pos.x < -140) e.active = false;
+  }
+
+  private spawnLymph() {
+      const y = 150 + Math.random() * (CANVAS_HEIGHT - 300);
+      this.entities.push({
+          id: `lymphpass_${Date.now()}`,
+          type: EntityType.LYMPH_NODE,
+          pos: { x: CANVAS_WIDTH + 90, y },
+          vel: { x: 0, y: 0 },
+          radius: 42,
+          health: 1,
+          maxHealth: 1,
+          color: '#f0b7a8',
+          damage: 46,
+          active: true,
+          value: y,
+          orbitOffset: Math.random() * Math.PI * 2,
+      });
+  }
+
+  private updateLymph(e: Entity, tick: number) {
+      const anchor = e.value || e.pos.y;
+      const amp = e.damage || 0;
+      e.pos.x -= 3.15 * tick;
+      e.pos.y = anchor + Math.sin(this.time / 260 + (e.orbitOffset || 0)) * amp;
+      if (this.player.active && !this.lymphOpen) {
+          const reach = this.player.radius + e.radius * 0.82;
+          if (distSq(this.player.pos, e.pos) < reach * reach) {
+              e.active = false;
+              this.openLymph();
+              return;
+          }
+      }
+      if (e.pos.x < -160) e.active = false;
+  }
+
+  private drawLymphPass(e: Entity) {
+      const x = e.pos.x;
+      const y = e.pos.y;
+      const pulse = 1 + Math.sin(this.time / 280) * 0.045;
+      this.ctx.save();
+      this.ctx.translate(x, y);
+      this.ctx.scale(pulse, pulse);
+      if (!this.isLowQuality) {
+          this.ctx.save();
+          this.ctx.globalCompositeOperation = 'screen';
+          this.drawGlow('#ffb0b8', 64, 0.4, 0.12, 0.08);
+          this.ctx.restore();
+      }
+      this.ctx.lineCap = 'round';
+      this.ctx.strokeStyle = '#e8c4c6';
+      this.ctx.lineWidth = 5.5;
+      this.ctx.beginPath();
+      this.ctx.moveTo(36, 8);
+      this.ctx.bezierCurveTo(54, -6, 72, 14, 90, 4);
+      this.ctx.stroke();
+      this.ctx.strokeStyle = 'rgba(255, 240, 232, 0.9)';
+      this.ctx.lineWidth = 2;
+      this.ctx.beginPath();
+      this.ctx.moveTo(36, 8);
+      this.ctx.bezierCurveTo(54, -6, 72, 14, 90, 4);
+      this.ctx.stroke();
+      const bean = () => {
+          this.ctx.beginPath();
+          this.ctx.moveTo(10, -30);
+          this.ctx.bezierCurveTo(42, -40, 50, -8, 30, 4);
+          this.ctx.bezierCurveTo(16, 12, 24, 6, 34, 18);
+          this.ctx.bezierCurveTo(48, 36, 28, 48, 2, 40);
+          this.ctx.bezierCurveTo(-38, 48, -54, 16, -46, -6);
+          this.ctx.bezierCurveTo(-40, -36, -14, -42, 10, -30);
+          this.ctx.closePath();
+      };
+      const flesh = this.ctx.createRadialGradient(-10, -8, 8, 0, 4, 54);
+      flesh.addColorStop(0, '#fff6f0');
+      flesh.addColorStop(0.42, '#f4b8aa');
+      flesh.addColorStop(1, '#c25660');
+      this.ctx.fillStyle = flesh;
+      this.ctx.strokeStyle = 'rgba(92, 28, 36, 0.78)';
+      this.ctx.lineWidth = 3.2;
+      bean();
+      this.ctx.fill();
+      this.ctx.stroke();
+      this.ctx.save();
+      bean();
+      this.ctx.clip();
+      this.ctx.fillStyle = 'rgba(255, 232, 220, 0.92)';
+      this.ctx.beginPath();
+      this.ctx.arc(-10, -8, 12, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.beginPath();
+      this.ctx.arc(6, 14, 8, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.fillStyle = 'rgba(255, 250, 244, 0.95)';
+      this.ctx.beginPath();
+      this.ctx.arc(-12, -10, 4.2, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.fillStyle = 'rgba(110, 32, 44, 0.55)';
+      const dots = this.isLowQuality ? 5 : 8;
+      for (let i = 0; i < dots; i++) {
+          const a = this.time / 680 + (i / dots) * Math.PI * 2;
+          const ring = i % 2 ? 15 : 22;
+          this.ctx.beginPath();
+          this.ctx.arc(Math.cos(a) * ring * 0.72, Math.sin(a) * ring * 0.5, i % 3 === 0 ? 2.5 : 1.6, 0, Math.PI * 2);
+          this.ctx.fill();
+      }
+      this.ctx.restore();
+      this.ctx.strokeStyle = 'rgba(255, 236, 220, 0.85)';
+      this.ctx.lineWidth = 2;
+      this.ctx.beginPath();
+      this.ctx.arc(28, 10, 7.5, 0.5, 2.5);
+      this.ctx.stroke();
+      this.ctx.restore();
+
+      const tag = this.t('NODE_TITLE');
+      this.ctx.save();
+      this.ctx.font = '700 15px "Chakra Petch", sans-serif';
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      const plateW = Math.max(72, this.ctx.measureText(tag).width + 18);
+      const ly = y + 54;
+      this.ctx.fillStyle = 'rgba(42, 12, 16, 0.92)';
+      this.ctx.beginPath();
+      this.ctx.roundRect(x - plateW / 2, ly - 11, plateW, 22, 8);
+      this.ctx.fill();
+      this.ctx.strokeStyle = 'rgba(255, 214, 176, 0.75)';
+      this.ctx.lineWidth = 1.5;
+      this.ctx.stroke();
+      this.ctx.fillStyle = '#ffe8d6';
+      this.ctx.fillText(tag, x, ly + 0.5);
+      this.ctx.restore();
   }
 
   private drawSerum(e: Entity) {
@@ -4414,6 +4622,7 @@ export class GameEngine {
 
     this.entities.forEach(e => {
       if (e.type === EntityType.SERUM && e.active) this.drawSerum(e);
+      if (e.type === EntityType.LYMPH_NODE && e.active) this.drawLymphPass(e);
     });
 
     this.entities.forEach(e => {

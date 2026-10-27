@@ -203,6 +203,38 @@ const COPY: Record<Language, Section[]> = {
     ],
 };
 
+type GuideStage = {
+    ctx: CanvasRenderingContext2D;
+    dpr: number;
+    w: number;
+    h: number;
+    visible: boolean;
+    draw: (ctx: CanvasRenderingContext2D, time: number, w: number, h: number) => void;
+};
+
+const guideStages = new Set<GuideStage>();
+let guideFrame = 0;
+
+function paintGuide(now: number) {
+    if (guideStages.size === 0) {
+        guideFrame = 0;
+        return;
+    }
+    if (!document.hidden) {
+        for (const stage of guideStages) {
+            if (!stage.visible) continue;
+            stage.ctx.setTransform(stage.dpr, 0, 0, stage.dpr, 0, 0);
+            stage.draw(stage.ctx, now, stage.w, stage.h);
+        }
+    }
+    guideFrame = requestAnimationFrame(paintGuide);
+}
+
+function wakeGuide() {
+    if (guideFrame || guideStages.size === 0) return;
+    guideFrame = requestAnimationFrame(paintGuide);
+}
+
 function LiveCanvas({
     width,
     height,
@@ -223,17 +255,28 @@ function LiveCanvas({
         const dpr = Math.min(2, window.devicePixelRatio || 1);
         canvas.width = Math.round(width * dpr);
         canvas.height = Math.round(height * dpr);
-        let frame = 0;
-        const loop = (now: number) => {
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-                drawRef.current(ctx, now, width, height);
-            }
-            frame = requestAnimationFrame(loop);
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+        const stage: GuideStage = {
+            ctx,
+            dpr,
+            w: width,
+            h: height,
+            visible: false,
+            draw: (c, time, w, h) => drawRef.current(c, time, w, h),
         };
-        frame = requestAnimationFrame(loop);
-        return () => cancelAnimationFrame(frame);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        stage.draw(ctx, performance.now(), width, height);
+        guideStages.add(stage);
+        const watch = new IntersectionObserver((entries) => {
+            stage.visible = entries.some((entry) => entry.isIntersecting);
+        }, { rootMargin: '160px' });
+        watch.observe(canvas);
+        wakeGuide();
+        return () => {
+            watch.disconnect();
+            guideStages.delete(stage);
+        };
     }, [width, height]);
     return <canvas ref={ref} width={width} height={height} className={className} aria-hidden />;
 }
