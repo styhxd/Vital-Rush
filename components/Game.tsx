@@ -8,7 +8,7 @@ import { buzz, crownBuzz } from '../services/haptics';
 import { bossById } from '../services/bosses';
 import { achievementManager } from '../services/achievementManager';
 import { GameState, PlayerStats, Upgrade, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
-import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES, ADRENALINE_MAX_DURATION } from '../constants';
+import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES, ADRENALINE_MAX_DURATION, CANVAS_WIDTH, CANVAS_HEIGHT } from '../constants';
 import { CANON_ROUTE, randomRoute } from '../services/casebook';
 import { postRun } from '../services/board';
 import { Joystick } from './Joystick';
@@ -285,6 +285,9 @@ export const Game: React.FC = () => {
   const shownBiomassRef = useRef(0);
   const lymphRef = useRef(false);
   const gulpRef = useRef(0);
+  const adrenalineRef = useRef<HTMLDivElement>(null);
+  const restPadRef = useRef<HTMLButtonElement>(null);
+  const leavePadRef = useRef<HTMLButtonElement>(null);
   const [lymphOn, setLymphOn] = useState(false);
   const [lymphFeel, setLymphFeel] = useState({ drain: 0, spent: 0, spending: false, gulp: 0 });
   const [motes, setMotes] = useState<{ id: number; kind: 'coin' | 'life' }[]>([]);
@@ -709,6 +712,8 @@ export const Game: React.FC = () => {
     }
 
     if (gameState !== GameState.PLAYING || isPaused || serumLockRef.current) {
+        if (restPadRef.current) restPadRef.current.style.visibility = 'hidden';
+        if (leavePadRef.current) leavePadRef.current.style.visibility = 'hidden';
         const live = Math.round(engineRef.current.biomass);
         if (live !== shownBiomassRef.current) {
             shownBiomassRef.current = live;
@@ -833,6 +838,77 @@ export const Game: React.FC = () => {
           }
       }
       
+      const canvas = canvasRef.current;
+      const eng = engineRef.current;
+      const pads = eng.lymphPads();
+      const restPad = restPadRef.current;
+      const leavePad = leavePadRef.current;
+      if (canvas && restPad && leavePad && pads && parseFloat(canvas.style.width) > 0) {
+          const cw = parseFloat(canvas.style.width);
+          const ch = parseFloat(canvas.style.height);
+          const cleft = parseFloat(canvas.style.left) || 0;
+          const ctop = parseFloat(canvas.style.top) || 0;
+          const put = (el: HTMLButtonElement, box: { x: number; y: number; w: number; h: number }) => {
+              el.style.left = `${cleft + (box.x / CANVAS_WIDTH) * cw}px`;
+              el.style.top = `${ctop + (box.y / CANVAS_HEIGHT) * ch}px`;
+              el.style.width = `${(box.w / CANVAS_WIDTH) * cw}px`;
+              el.style.height = `${(box.h / CANVAS_HEIGHT) * ch}px`;
+              el.style.visibility = 'visible';
+          };
+          put(restPad, pads.rest);
+          put(leavePad, pads.leave);
+      } else {
+          if (restPad) restPad.style.visibility = 'hidden';
+          if (leavePad) leavePad.style.visibility = 'hidden';
+      }
+
+      const banner = adrenalineRef.current;
+      const stage = stageRef.current;
+      if (banner && canvas && stage && eng.adrenalineActive && eng.player.active) {
+          const cw = parseFloat(canvas.style.width);
+          const ch = parseFloat(canvas.style.height);
+          if (cw > 0 && ch > 0) {
+              const cleft = parseFloat(canvas.style.left) || 0;
+              const ctop = parseFloat(canvas.style.top) || 0;
+              const px = cleft + (eng.player.pos.x / CANVAS_WIDTH) * cw;
+              const py = ctop + (eng.player.pos.y / CANVAS_HEIGHT) * ch;
+              let bx = 0;
+              let by = 0;
+              let node: HTMLElement | null = banner;
+              while (node && node !== stage) {
+                  bx += node.offsetLeft;
+                  by += node.offsetTop;
+                  node = node.offsetParent as HTMLElement | null;
+              }
+              const bw = banner.offsetWidth;
+              const bh = banner.offsetHeight;
+              const nx = Math.max(bx, Math.min(px, bx + bw));
+              const ny = Math.max(by, Math.min(py, by + bh));
+              const dist = Math.hypot(px - nx, py - ny);
+              const body = (eng.player.radius / CANVAS_WIDTH) * cw;
+              const reach = body + 56;
+              if (dist >= reach) {
+                  banner.style.opacity = '1';
+                  banner.style.maskImage = 'none';
+                  banner.style.webkitMaskImage = 'none';
+              } else {
+                  const k = 1 - dist / reach;
+                  const smooth = k * k * (3 - 2 * k);
+                  const hole = smooth * (body + 42);
+                  const hx = px - bx;
+                  const hy = py - by;
+                  banner.style.opacity = String(1 - smooth * 0.84);
+                  const mask = `radial-gradient(circle at ${hx}px ${hy}px, transparent ${Math.max(0, hole * 0.62).toFixed(1)}px, rgba(0,0,0,0.4) ${hole.toFixed(1)}px, #000 ${(hole + 28).toFixed(1)}px)`;
+                  banner.style.maskImage = mask;
+                  banner.style.webkitMaskImage = mask;
+              }
+          }
+      } else if (banner) {
+          banner.style.opacity = '1';
+          banner.style.maskImage = 'none';
+          banner.style.webkitMaskImage = 'none';
+      }
+
       engineRef.current.draw();
       
       uiUpdateAccumulatorRef.current += dt;
@@ -1348,11 +1424,16 @@ export const Game: React.FC = () => {
             width: min(24rem, 88vw);
             padding: 7px 9px 8px;
             border: 1px solid rgba(255, 214, 120, 0.75);
-            background: rgba(28, 14, 6, 0.78);
-            box-shadow: 0 0 16px rgba(255, 180, 60, 0.28);
+            background:
+                linear-gradient(105deg, rgba(255, 236, 190, 0.2), transparent 34%),
+                rgba(28, 14, 6, 0.72);
+            box-shadow:
+                0 0 16px rgba(255, 180, 60, 0.28),
+                inset 0 0 14px rgba(255, 214, 150, 0.08);
             display: flex;
             align-items: center;
             gap: 10px;
+            -webkit-text-stroke: 0.35px rgba(255, 224, 138, 0.28);
         }
         .adrenaline-copy { min-width: 0; }
         .adrenaline-clock {
@@ -1571,66 +1652,17 @@ export const Game: React.FC = () => {
         .node-coins.is-paying .node-count { transform: translateY(2px); color: #ffe7a2; }
         @keyframes node-fall { to { transform: translateY(48px); opacity: 0; } }
         @keyframes node-rise { to { transform: translateY(-44px); opacity: 0; } }
-        .lymph-dock {
+        .lymph-hot {
             position: absolute;
-            left: 50%;
-            bottom: calc(16px + env(safe-area-inset-bottom, 0px));
-            transform: translateX(-50%);
-            z-index: 70;
-            width: min(92vw, 420px);
-            pointer-events: auto;
-            font-family: "Chakra Petch", sans-serif;
-        }
-        .lymph-card {
-            background: rgba(22, 8, 10, 0.88);
-            border: 1px solid rgba(255, 220, 196, 0.38);
-            border-radius: 18px;
-            padding: 14px 16px 12px;
-            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
-            backdrop-filter: blur(8px);
-        }
-        .lymph-kicker { color: #ffd7b0; font-size: 11px; font-weight: 800; letter-spacing: 0.28em; }
-        .lymph-hint { margin-top: 6px; color: #fff6ea; font-size: 14px; line-height: 1.35; }
-        .lymph-life { margin-top: 12px; }
-        .lymph-life-row { display: flex; justify-content: space-between; align-items: baseline; color: #fff6ea; font-size: 12px; letter-spacing: 0.12em; font-weight: 700; }
-        .lymph-life-row strong { font-size: 18px; letter-spacing: 0; }
-        .lymph-track { margin-top: 6px; height: 8px; border-radius: 99px; background: rgba(255,255,255,0.08); overflow: hidden; }
-        .lymph-fill { height: 100%; background: linear-gradient(90deg, #c43a48, #ffb0a8); border-radius: 99px; }
-        .lymph-trade { margin-top: 10px; display: flex; justify-content: space-between; gap: 12px; color: #ffd27a; font-size: 12px; font-weight: 800; letter-spacing: 0.06em; }
-        .lymph-rest {
-            position: relative;
-            overflow: hidden;
-            width: 100%;
-            margin-top: 12px;
-            border: 1px solid rgba(255, 220, 190, 0.55);
-            border-radius: 999px;
-            background: rgba(255,255,255,0.04);
-            color: #fff8ef;
-            padding: 13px 16px;
-            font-weight: 800;
-            letter-spacing: 0.16em;
-            text-transform: uppercase;
-            touch-action: none;
-            user-select: none;
-        }
-        .lymph-rest-fill {
-            position: absolute;
-            inset: 0 auto 0 0;
-            background: linear-gradient(90deg, rgba(196, 72, 64, 0.2), rgba(255, 196, 140, 0.85));
-            pointer-events: none;
-        }
-        .lymph-rest span { position: relative; }
-        .lymph-leave {
-            width: 100%;
-            margin-top: 8px;
+            z-index: 72;
+            margin: 0;
+            padding: 0;
             border: 0;
             background: transparent;
-            color: rgba(255, 231, 200, 0.82);
-            padding: 8px;
-            font-size: 12px;
-            font-weight: 800;
-            letter-spacing: 0.18em;
-            text-transform: uppercase;
+            color: transparent;
+            visibility: hidden;
+            touch-action: none;
+            user-select: none;
         }
         .outcome-leave-finale { animation: outcome-leave 1.4s ease forwards; }
         .finale-rig { width: min(34vh, 240px); height: min(34vh, 240px); perspective: 900px; }
@@ -1698,51 +1730,35 @@ export const Game: React.FC = () => {
           </div>
       )}
 
-      {lymphOn && gameState === GameState.PLAYING && !isPaused && (
-          <div className="lymph-dock">
-              <div className="lymph-card">
-                  <div className="lymph-kicker">{t('NODE_TITLE')}</div>
-                  <div className="lymph-hint">{t('NODE_HINT')}</div>
-                  <div className="lymph-life">
-                      <div className="lymph-life-row">
-                          <span>{t('INTEGRITY')}</span>
-                          <strong>{uiData.health}/{uiData.maxHealth}</strong>
-                      </div>
-                      <div className="lymph-track">
-                          <div className="lymph-fill" style={{ width: `${Math.max(0, Math.min(100, (uiData.health / Math.max(1, uiData.maxHealth)) * 100))}%` }} />
-                      </div>
-                  </div>
-                  <div className="lymph-trade">
-                      <span>{t('NODE_RATE')}</span>
-                      <span>{lymphFeel.spending ? `-${lymphFeel.spent} DNA` : `${uiData.biomass} DNA`}</span>
-                  </div>
-                  <button
-                      className="lymph-rest"
-                      onPointerDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          e.currentTarget.setPointerCapture(e.pointerId);
-                          engineRef.current?.beginRest();
-                      }}
-                      onPointerUp={(e) => {
-                          if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
-                          if (engineRef.current) engineRef.current.nodeFeed = false;
-                      }}
-                      onPointerCancel={() => { if (engineRef.current) engineRef.current.nodeFeed = false; }}
-                  >
-                      <i className="lymph-rest-fill" style={{ width: `${Math.round(lymphFeel.drain * 100)}%` }} />
-                      <span>{t('NODE_REST')}</span>
-                  </button>
-                  <button
-                      className="lymph-leave"
-                      onPointerDown={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          if (engineRef.current) engineRef.current.nodeLeave = true;
-                      }}
-                  >{t('NODE_LEAVE')}</button>
-              </div>
-          </div>
+      {gameState === GameState.PLAYING && (
+          <>
+              <button
+                  ref={restPadRef}
+                  className="lymph-hot"
+                  aria-label={t('NODE_REST')}
+                  onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      e.currentTarget.setPointerCapture(e.pointerId);
+                      engineRef.current?.beginRest();
+                  }}
+                  onPointerUp={(e) => {
+                      if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId);
+                      if (engineRef.current) engineRef.current.nodeFeed = false;
+                  }}
+                  onPointerCancel={() => { if (engineRef.current) engineRef.current.nodeFeed = false; }}
+              />
+              <button
+                  ref={leavePadRef}
+                  className="lymph-hot"
+                  aria-label={t('NODE_LEAVE')}
+                  onPointerDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      if (engineRef.current) engineRef.current.nodeLeave = true;
+                  }}
+              />
+          </>
       )}
 
       {/* TUTORIAL OVERLAY (FANTASMA) */}
@@ -1845,7 +1861,7 @@ export const Game: React.FC = () => {
                 </div>
 
                 {uiData.adrenaline && (
-                    <div className="adrenaline-call">
+                    <div ref={adrenalineRef} className="adrenaline-call">
                         <div className="adrenaline-copy">
                             <div className="adrenaline-title">{t('ADRENALINE')}</div>
                             <div className="adrenaline-hint">{t('ADRENALINE_HINT')}</div>
