@@ -4,6 +4,7 @@ import React, { useEffect, useLayoutEffect, useRef, useState, useCallback } from
 import { GameEngine, comboDamageMultiplier, COMBO_RAMP_KILLS } from '../services/gameEngine';
 import { organAccent, organNameKey, organVeinStyle, type OrganId } from '../services/organDirector';
 import { audioManager } from '../services/audioManager';
+import { buzz, crownBuzz } from '../services/haptics';
 import { bossById } from '../services/bosses';
 import { achievementManager } from '../services/achievementManager';
 import { GameState, PlayerStats, Upgrade, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
@@ -283,8 +284,10 @@ export const Game: React.FC = () => {
   
   const shownBiomassRef = useRef(0);
   const lymphRef = useRef(false);
+  const gulpRef = useRef(0);
   const [lymphOn, setLymphOn] = useState(false);
-  const [lymphFeel, setLymphFeel] = useState({ drain: 0, spent: 0, spending: false });
+  const [lymphFeel, setLymphFeel] = useState({ drain: 0, spent: 0, spending: false, gulp: 0 });
+  const [motes, setMotes] = useState<{ id: number; kind: 'coin' | 'life' }[]>([]);
   const [uiData, setUiData] = useState({ 
     health: 100, maxHealth: 100, score: 0, biomass: 0, 
     wave: 0, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100,
@@ -351,7 +354,7 @@ export const Game: React.FC = () => {
   const [bossCard, setBossCard] = useState<{ name: string; disease: string; line: string; color: string; shown: number } | null>(null);
   const bossHoldRef = useRef<number | null>(null);
   const [bossEntity, setBossEntity] = useState<{hp: number, max: number, name: string} | null>(null);
-  const [labPulse, setLabPulse] = useState<{id: string, kind: 'ok' | 'no', token: number, cost: number} | null>(null);
+  const [labPulse, setLabPulse] = useState<{id: string, kind: 'ok' | 'no' | 'max', token: number, cost: number} | null>(null);
   const [serum, setSerum] = useState<{ids: string[], endsAt: number} | null>(null);
   const [serumNow, setSerumNow] = useState(0);
   const [serumCollapse, setSerumCollapse] = useState<string | null>(null);
@@ -793,19 +796,28 @@ export const Game: React.FC = () => {
       if (node !== lymphRef.current) {
           lymphRef.current = node;
           setLymphOn(node);
+          if (!node) {
+              gulpRef.current = 0;
+              setMotes([]);
+          }
       }
       if (node) {
           const live = engineRef.current;
           const health = Math.round(live.player.health);
           const biomass = Math.round(live.biomass);
           const feel = live.lymphFeel();
+          if (feel.gulp !== gulpRef.current) {
+              const id = feel.gulp;
+              gulpRef.current = id;
+              setMotes(prev => [...prev, { id: id * 2, kind: 'coin' as const }, { id: id * 2 + 1, kind: 'life' as const }].slice(-10));
+          }
           setUiData(prev => prev.health === health && prev.biomass === biomass ? prev : ({
               ...prev,
               health,
               maxHealth: Math.round(live.player.maxHealth),
               biomass,
           }));
-          setLymphFeel(prev => prev.drain === feel.drain && prev.spent === feel.spent && prev.spending === feel.spending ? prev : feel);
+          setLymphFeel(prev => prev.drain === feel.drain && prev.spent === feel.spent && prev.spending === feel.spending && prev.gulp === feel.gulp ? prev : feel);
       }
 
       if (engineRef.current.currentWaveIndex >= 0 && !engineRef.current.waveActive && !engineRef.current.lymphOpen) finishWave();
@@ -996,7 +1008,14 @@ export const Game: React.FC = () => {
           if (eng.player.maxHealth >= 200) achievementManager.track('max_hp_200', Math.floor(eng.player.maxHealth));
           setStats(newStats);
           if (free) audioManager.playPowerUp();
-          else audioManager.playBuy();
+          else {
+              audioManager.playBuy();
+              buzz('thud');
+          }
+          if (nextLevel >= upgState.maxLevel) {
+              audioManager.playCrown();
+              crownBuzz();
+          }
 
           const nextUpgrades = upgradesRef.current.map(u => u.id === upgradeId ? { ...u, level: nextLevel } : u);
           upgradesRef.current = nextUpgrades;
@@ -1029,8 +1048,9 @@ export const Game: React.FC = () => {
       const current = UPGRADES.find(u => u.id === upgradeId);
       const level = levelRef.current[upgradeId] ?? 0;
       const cost = current ? Math.floor(current.baseCost * Math.pow(current.costMultiplier, level)) : 0;
+      const willMax = !!current && level + 1 >= current.maxLevel;
       const ok = grantUpgrade(upgradeId, false);
-      setLabPulse({ id: upgradeId, kind: ok ? 'ok' : 'no', token: Date.now(), cost });
+      setLabPulse({ id: upgradeId, kind: ok ? (willMax ? 'max' : 'ok') : 'no', token: Date.now(), cost });
   };
 
   const closeSerum = (id: string) => {
@@ -1520,7 +1540,37 @@ export const Game: React.FC = () => {
             animation: outcome-pop 0.7s cubic-bezier(.2, 1.45, .35, 1) both;
         }
         .outcome-campaign { background: radial-gradient(circle at 50% 42%, rgba(255, 214, 120, 0.38), rgba(40, 8, 4, 0.2) 36%, rgba(0, 0, 0, 0.78) 72%); }
-        .hud-safe.is-node { opacity: 0.22; filter: saturate(0.65); }
+        .hud-safe.is-node .node-dim { opacity: 0.28; filter: saturate(0.65); }
+        .node-life, .node-coins { position: relative; }
+        .hud-safe.is-node .node-life,
+        .hud-safe.is-node .node-coins {
+            z-index: 5;
+            transform: scale(calc(1 + var(--booth, 0) * 0.9));
+            transition: transform 0.16s linear;
+        }
+        .hud-safe.is-node .node-life { transform-origin: left top; }
+        .hud-safe.is-node .node-coins { transform-origin: right top; }
+        .node-fall, .node-rise {
+            position: absolute;
+            top: 62%;
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        .node-fall {
+            right: 6px;
+            background: radial-gradient(circle at 35% 35%, #fff6c4, #f0b429 55%, #a56a12);
+            animation: node-fall 0.7s ease-in forwards;
+        }
+        .node-rise {
+            left: 6px;
+            background: radial-gradient(circle at 35% 35%, #ffe4ea, #ff6a7a 60%, #c43a48);
+            animation: node-rise 0.7s ease-out forwards;
+        }
+        .node-coins.is-paying .node-count { transform: translateY(2px); color: #ffe7a2; }
+        @keyframes node-fall { to { transform: translateY(48px); opacity: 0; } }
+        @keyframes node-rise { to { transform: translateY(-44px); opacity: 0; } }
         .lymph-dock {
             position: absolute;
             left: 50%;
@@ -1764,12 +1814,14 @@ export const Game: React.FC = () => {
       </div>
 
       {(gameState === GameState.PLAYING || gameState === GameState.WAVE_CLEARED || gameState === GameState.LOADOUT) && !passage && !showBossIntro && (
-        <div className={`absolute inset-0 pointer-events-none z-20 flex flex-col justify-between hud-safe ${lymphOn ? 'is-node' : ''}`} style={{ fontFamily: '"Chakra Petch", sans-serif' }}>
+        <div className={`absolute inset-0 pointer-events-none z-20 flex flex-col justify-between hud-safe ${lymphOn ? 'is-node' : ''}`} style={{ fontFamily: '"Chakra Petch", sans-serif', ['--booth' as string]: lymphFeel.drain }}>
            <div className="flex justify-between items-start">
              <div className="flex flex-col gap-1 lg:gap-3 w-28 lg:w-64">
-                <div className={uiData.adrenaline ? 'adrenaline-hp' : ''}>
+                <div className={`node-life ${uiData.adrenaline ? 'adrenaline-hp' : ''}`}>
                 <StatBar label={t('INTEGRITY')} value={uiData.health} max={uiData.maxHealth} colorClass={uiData.adrenaline ? "bg-red-500 shadow-[0_0_12px_rgba(255,40,40,0.85)]" : (isPlatinum ? "bg-gradient-to-r from-purple-500 to-amber-400" : "bg-gradient-to-r from-red-600 to-red-400")} />
+                {motes.filter(m => m.kind === 'life').map(m => <i key={m.id} className="node-rise" style={{ left: `${8 + (m.id % 5) * 10}px` }} />)}
                 </div>
+                <div className="node-dim flex flex-col gap-1 lg:gap-3">
                 <StatBar label={t('SURGE_READY')} value={uiData.energy} max={uiData.maxEnergy} colorClass={isPlatinum ? "bg-gradient-to-r from-amber-400 to-white" : "bg-gradient-to-r from-cyan-600 to-cyan-400"} animate={true}/>
                 {/* GLOBAL DASH INDICATOR (NEW) */}
                 <StatBar label={t('DASH')} value={uiData.dashProgress * 100} max={100} colorClass="bg-gradient-to-r from-cyan-300 to-white shadow-[0_0_12px_rgba(170,245,255,0.95)]" animate={uiData.dashReady} />
@@ -1814,9 +1866,10 @@ export const Game: React.FC = () => {
                         </div>
                     </div>
                 )}
+                </div>
              </div>
 
-             <div className="flex flex-col items-center">
+             <div className="node-dim flex flex-col items-center">
                  <div className="bg-black/50 border border-white/10 px-3 py-1 lg:px-3 lg:py-1 rounded-full backdrop-blur-md mb-1">
                      <span className={`font-bold tracking-widest text-sm lg:text-2xl text-glow ${isPlatinum ? 'text-amber-400' : 'text-red-400'}`}>{t('WAVE')} {uiData.wave}</span>
                  </div>
@@ -1837,22 +1890,25 @@ export const Game: React.FC = () => {
              </div>
 
              <div className="flex flex-col items-end gap-1 lg:gap-2">
-                 <div className="pointer-events-auto flex gap-1.5 lg:gap-2">
+                 <div className="node-dim pointer-events-auto flex gap-1.5 lg:gap-2">
                      <IconButton onClick={openLoadout} icon={<IconDNA />} />
                      <IconButton onClick={toggleMute} icon={<IconSpeaker muted={isMuted} />} />
                      <IconButton onClick={togglePause} icon={<span className="font-bold text-base lg:text-xl">||</span>} />
                  </div>
-                 <div className="text-right">
+                 <div className="node-dim text-right">
                     <div className="text-[9px] lg:text-xs text-white/50 tracking-widest">{t('SCORE')}</div>
                     <div className="text-base lg:text-3xl font-bold text-white tracking-tighter cyan-glow" style={{ fontVariantNumeric: 'tabular-nums' }}>{uiData.score.toString().padStart(6, '0')}</div>
+                 </div>
+                 <div className={`node-coins text-right ${lymphFeel.spending ? 'is-paying' : ''}`}>
                     <div className="text-[9px] lg:text-xs text-yellow-500 tracking-widest mt-0.5 lg:mt-1">{t('BIOMASS_AVAIL')}</div>
-                    <div className="text-base lg:text-xl font-bold text-yellow-400 tracking-tighter" style={{ fontVariantNumeric: 'tabular-nums' }}>{Math.round(uiData.biomass)}</div>
+                    <div className="node-count text-base lg:text-xl font-bold text-yellow-400 tracking-tighter" style={{ fontVariantNumeric: 'tabular-nums' }}>{Math.round(uiData.biomass)}</div>
+                    {motes.filter(m => m.kind === 'coin').map(m => <i key={m.id} className="node-fall" style={{ right: `${4 + (m.id % 5) * 9}px` }} />)}
                  </div>
              </div>
            </div>
 
            {isMobile && !isPaused && (
-             <div className="absolute inset-0 z-10 pointer-events-none">
+             <div className="node-dim absolute inset-0 z-10 pointer-events-none">
                  <div
                     className="absolute flex gap-4 items-end"
                     style={{

@@ -72,7 +72,7 @@ export function upgradeCost(upgrade: Upgrade): number {
     return Math.floor(upgrade.baseCost * Math.pow(upgrade.costMultiplier, upgrade.level));
 }
 
-type Pulse = { id: string; kind: 'ok' | 'no'; token: number; cost: number } | null;
+type Pulse = { id: string; kind: 'ok' | 'no' | 'max'; token: number; cost: number } | null;
 
 type CardProps = {
     upgrade: Upgrade;
@@ -97,6 +97,7 @@ const MutationCard: React.FC<CardProps> = ({
     const ink = RARITY_INK[upgrade.rarity];
     const art = ART[upgrade.id] ?? ART.mitosis;
     const pulsing = pulse?.id === upgrade.id ? pulse : null;
+    const bought = pulsing?.kind === 'ok' || pulsing?.kind === 'max';
 
     const fire = () => {
         if (guard && !guard()) return;
@@ -130,7 +131,7 @@ const MutationCard: React.FC<CardProps> = ({
                     fire();
                 }
             }}
-            className={`lab-card is-${upgrade.rarity.toLowerCase()} ${mode === 'offer' ? 'is-offer' : ''} ${alive ? 'is-hot' : ''} ${!alive && !maxed ? 'is-poor' : ''} ${maxed ? 'is-max' : ''} ${forced ? 'is-forced' : ''}`}
+            className={`lab-card is-${upgrade.rarity.toLowerCase()} ${mode === 'offer' ? 'is-offer' : ''} ${alive ? 'is-hot' : ''} ${!alive && !maxed ? 'is-poor' : ''} ${maxed ? 'is-max' : ''} ${bought ? 'is-bought' : ''} ${pulsing?.kind === 'max' ? 'is-crowning' : ''} ${forced ? 'is-forced' : ''}`}
             style={{
                 ['--ink' as string]: ink,
                 ['--accent' as string]: art.tint,
@@ -171,7 +172,7 @@ const MutationCard: React.FC<CardProps> = ({
             {upgrade.rarity === 'LEGENDARY' && <span className="lab-glint" />}
             <span className="lab-rim" />
 
-            {pulsing?.kind === 'ok' && (
+            {bought && pulsing && (
                 <span key={pulsing.token}>
                     <span className="lab-flash" />
                     <span className="lab-burst" />
@@ -935,28 +936,43 @@ export const mutationCardStyles = `
 }
 .lab-card.is-max {
     cursor: default;
-    background: #3a2a08;
-    box-shadow: 0 0 0 4px #ffe08a, 0 0 0 9px #6a4208, 0 7px 0 #2a1c04;
-    filter: saturate(0.55);
+    box-shadow:
+        0 0 0 2px #fff1b8,
+        0 0 0 6px #e2a01f,
+        0 10px 0 #3a2408,
+        0 0 28px rgba(255, 196, 70, 0.55);
+    filter: saturate(1.15) brightness(1.04);
 }
-.lab-card.is-max .lab-art { filter: grayscale(0.85) brightness(0.72) contrast(1.05); }
-.lab-card.is-max .lab-wash { opacity: 1; background: linear-gradient(180deg, rgba(255, 214, 90, 0.55), rgba(80, 50, 0, 0.35) 70%) !important; }
-.lab-card.is-max .lab-sheen,
-.lab-card.is-max .lab-scan,
-.lab-card.is-max .lab-glint { animation: none; opacity: 0; }
-.lab-card.is-max .lab-name { color: #ffe7a8; }
+.lab-card.is-max .lab-art {
+    filter: saturate(1.2) brightness(1.08) drop-shadow(0 8px 0 rgba(0,0,0,0.28)) drop-shadow(0 0 12px rgba(255, 200, 80, 0.45));
+    transform: scale(1.06);
+}
+.lab-card.is-max .lab-wash { opacity: 0.45; }
+.lab-card.is-max .lab-sheen {
+    animation: lab-sheen 5.5s ease-in-out infinite;
+    opacity: 0.85;
+    background: linear-gradient(105deg, transparent 38%, rgba(255, 236, 170, 0.55) 50%, transparent 62%);
+}
+.lab-card.is-max.is-legendary .lab-glint { animation: lab-glint 6s ease-in-out infinite; opacity: 0.7; }
+.lab-card.is-max .lab-name { color: #fff6d8; text-shadow: 0 2px 0 rgba(0,0,0,0.65), 0 0 12px rgba(255, 196, 70, 0.65); }
+.lab-card.is-max .lab-level strong { color: #ffe08a; }
 .lab-card.is-max .lab-evolve {
     z-index: 6;
-    color: #3a2504;
-    background: linear-gradient(#fff6cc, #e2a01f);
+    color: #3a2204;
+    background: linear-gradient(180deg, #fff8d0, #ffd35a 45%, #e2a01f);
     border-radius: 4px;
-    box-shadow: 0 0 0 2px #fff1b8, 0 0 18px rgba(255, 200, 60, 0.9);
+    box-shadow: 0 0 0 2px #fff6cc, 0 0 16px rgba(255, 200, 60, 0.85);
+    letter-spacing: 0.14em;
 }
 .lab-card.is-max .lab-rim {
-    box-shadow: inset 0 0 0 6px #ffe08a;
+    box-shadow: inset 0 0 0 5px #ffe08a, inset 0 0 18px rgba(255, 196, 70, 0.35);
     opacity: 1;
+    animation: lab-max-breathe 2.8s ease-in-out infinite;
 }
-.lab-card.is-max .lab-meter b { background: #ffe08a; }
+.lab-card.is-max .lab-meter b { background: linear-gradient(180deg, #fff6d2, #ffe08a); }
+.lab-card.is-bought { animation: lab-buy 0.42s cubic-bezier(.2, 1.4, .3, 1); }
+.lab-card.is-crowning { animation: lab-crown 0.72s cubic-bezier(.2, 1.3, .3, 1); }
+.lab-card.is-crowning .lab-flash { background: radial-gradient(circle at 50% 48%, rgba(255, 236, 170, 0.72), transparent 62%); }
 .lab-card.is-offer .lab-evolve { animation: lab-invite 1.15s ease-in-out infinite; }
 .lab-card.is-forced {
     transform: translateY(-8px) scale(1.04);
@@ -1074,6 +1090,21 @@ export const mutationCardStyles = `
     min-width: 0;
     max-width: 340px;
     animation: serum-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes lab-buy {
+    0% { transform: scale(1); }
+    35% { transform: scale(0.96); }
+    70% { transform: translateY(-6px) scale(1.045); }
+    100% { transform: none; }
+}
+@keyframes lab-crown {
+    0% { transform: scale(0.94); filter: brightness(1.45) saturate(1.2); }
+    42% { transform: translateY(-8px) scale(1.06); filter: brightness(1.2) saturate(1.25); }
+    100% { transform: none; filter: saturate(1.15) brightness(1.04); }
+}
+@keyframes lab-max-breathe {
+    0%, 100% { opacity: 0.82; }
+    50% { opacity: 1; }
 }
 @keyframes lab-pop {
     0% { transform: scale(1); }

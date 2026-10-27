@@ -15,11 +15,15 @@ import { Entity, EntityType, Vector2, PlayerStats, WaveConfig, PatientProfile, D
 import { COLORS_PLATINUM, CANVAS_WIDTH, CANVAS_HEIGHT, WAVES, DIFFICULTY_MODIFIERS, INITIAL_LIVES, ADRENALINE_MAX_DURATION, TEXTS } from '../constants';
 import { audioManager, type DrumHit } from './audioManager';
 import { COIN_BEAT_MS, showerPlan } from './coinFeel';
-import { buzz } from './haptics';
+import { buzz, hum } from './haptics';
+import { hurtGrade, hurtKick, hurtPunch, hurtShake, hurtStop, type HurtGrade } from './hurtFeel';
 import { achievementManager } from './achievementManager';
 import { bossFor, drawBossShape, mutationFrom } from './bosses';
 import { OrganDirector, cellBudget, cellColor, cellRises, organBg, rollCellStyle } from './organDirector';
 const BOSS_GRACE = 1.15;
+const NODE_RATE = 32;
+const NODE_WIND = 0.48;
+const NODE_GULP = 0.18;
 
 export interface BossCard {
   name: string;
@@ -192,6 +196,13 @@ export class GameEngine {
   public bossCard: BossCard | null = null;
   private bossCardAge = 0;
   private hitStopTimer: number = 0;
+  private hurt = 0;
+  private hurtFlash = 0;
+  private hurtEase = 0;
+  private hurtSerious = false;
+  private hurtKickX = 0;
+  private hurtKickY = 0;
+  private hurtAngle = 0;
   private acidContact: number = 0;
   private acidBite: number = 0;
   private acidCue: number = 0;
@@ -213,16 +224,13 @@ export class GameEngine {
   public nodeLeave = false;
 
   public lymphFeel() {
-      const drain = Math.round(this.lymphDrain * 20) / 20;
+      const drain = Math.round(this.lymphPressure * 20) / 20;
       const spent = this.nodeSpending ? Math.round(this.lymphSpent) : 0;
-      return { drain, spent, spending: this.nodeSpending };
+      return { drain, spent, spending: this.nodeSpending, gulp: this.lymphGulp };
   }
 
   public beginRest() {
       this.nodeFeed = true;
-      if (!this.lymphOpen || this.lymphPhase !== 'hold' || this.nodeWasFeeding) return;
-      this.nodeWasFeeding = true;
-      this.payRest(4, 5);
   }
   public nodeSpending = false;
   private nodeWasFeeding = false;
@@ -233,7 +241,10 @@ export class GameEngine {
   private lymphPop = 0;
   private lymphSpent = 0;
   private lymphShow = 0;
-  private lymphDrain = 0;
+  private lymphPressure = 0;
+  private lymphWind = 0;
+  private lymphClock = 0;
+  private lymphGulp = 0;
   private lymphRelief = 0; 
   
   public isLowQuality: boolean = false; 
@@ -506,9 +517,8 @@ export class GameEngine {
           const bite = 1.15;
           this.player.health = Math.max(0, this.player.health - bite);
           this.sessionStats.damageTaken += bite;
-          this.shakeIntensity = Math.max(this.shakeIntensity, 16);
           this.invulnerabilityTimer = Math.max(this.invulnerabilityTimer, 0.28);
-          audioManager.playHit(this.player.pos);
+          this.sting(bite, mine.pos, 1);
           this.spawnText(this.player.pos, `-${bite.toFixed(1)}`, '#d6ff8a', 26);
           if (this.player.health <= 0 && hooks) this.handlePlayerDeath(hooks.over, hooks.lost, stats);
       }
@@ -700,10 +710,6 @@ export class GameEngine {
       return { x: CANVAS_WIDTH * 0.5 - 28, y: CANVAS_HEIGHT * 0.52 + 6 };
   }
 
-  private lymphHilum() {
-      return { x: CANVAS_WIDTH * 0.5 + 150, y: CANVAS_HEIGHT * 0.52 + 10 };
-  }
-
   private tickLymph(dt: number) {
       this.player.vel.x = 0;
       this.player.vel.y = 0;
@@ -728,19 +734,31 @@ export class GameEngine {
       }
       this.nodeSpending = false;
       if (this.lymphPhase === 'hold' && this.nodeFeed) {
-          if (!this.nodeWasFeeding) {
-              this.nodeWasFeeding = true;
-              this.payRest(4, 5);
+          this.nodeWasFeeding = true;
+          this.lymphWind = Math.min(NODE_WIND, this.lymphWind + dt);
+          this.lymphPressure = Math.min(1, this.lymphPressure + dt * 2.2);
+          const canTrade = this.player.maxHealth - this.player.health >= 0.35 && this.biomass >= 1;
+          if (canTrade) {
+              const heavy = Math.min(1, this.lymphSpent / 480);
+              hum(this.lymphWind < NODE_WIND ? 0.16 : 0.24 + heavy * 0.76);
           }
-          this.payRest(12 * dt, 1);
-          this.lymphDrain = Math.min(1, this.lymphDrain + dt * 2.4);
+          if (this.lymphWind >= NODE_WIND) {
+              this.lymphClock -= dt;
+              if (this.lymphClock <= 0) {
+                  this.lymphClock = NODE_GULP;
+                  const paid = this.payRest(4, 3);
+                  if (paid > 0) this.lymphGulp += 1;
+              }
+          }
       } else if (this.nodeWasFeeding) {
           this.nodeWasFeeding = false;
-          if (this.lymphSpent >= 16) {
+          this.lymphWind = 0;
+          this.lymphClock = 0;
+          if (this.lymphSpent >= 32) {
               this.lymphShow = this.lymphSpent;
               this.lymphRelief = 1;
               audioManager.stopCoins();
-              audioManager.playSigh(this.player.pos, Math.min(1.4, this.lymphSpent / 180));
+              audioManager.playSigh(this.player.pos, Math.min(1.4, this.lymphSpent / 220));
               this.spawnText(
                   { x: this.player.pos.x, y: this.player.pos.y - 64 },
                   `-${Math.round(this.lymphSpent)} DNA`,
@@ -750,7 +768,10 @@ export class GameEngine {
           }
           this.lymphSpent = 0;
       }
-      if (!this.nodeFeed) this.lymphDrain = Math.max(0, this.lymphDrain - dt * 1.1);
+      if (!this.nodeFeed) {
+          this.lymphPressure = Math.max(0, this.lymphPressure - dt * 1.5);
+          this.lymphWind = 0;
+      }
       if (this.lymphRelief > 0) this.lymphRelief = Math.max(0, this.lymphRelief - dt * 0.42);
       if (this.lymphPhase === 'out' && this.lymphT >= 0.48) {
           this.lymphOpen = false;
@@ -759,7 +780,10 @@ export class GameEngine {
           this.nodeSpending = false;
           this.nodeWasFeeding = false;
           this.lymphScale = 0;
-          this.lymphDrain = 0;
+          this.lymphPressure = 0;
+          this.lymphWind = 0;
+          this.lymphClock = 0;
+          this.lymphGulp = 0;
           this.lymphSpent = 0;
       }
   }
@@ -768,35 +792,40 @@ export class GameEngine {
       const missing = this.player.maxHealth - this.player.health;
       if (missing < 0.35 || this.biomass < 1 || hp <= 0) return 0;
       const want = Math.min(missing, hp);
-      const pay = Math.min(this.biomass, Math.max(1, Math.round(want * 16)));
-      const healed = Math.min(missing, pay / 16);
+      const pay = Math.min(this.biomass, Math.max(1, Math.round(want * NODE_RATE)));
+      const healed = Math.min(missing, pay / NODE_RATE);
       this.biomass -= pay;
       this.player.health = Math.min(this.player.maxHealth, this.player.health + healed);
       this.nodeSpending = true;
       this.lymphSpent += pay;
       this.lymphPop += healed;
-      audioManager.playSpend(this.player.pos);
+      audioManager.playSpend();
+      audioManager.playMend();
       if (this.particles.length < 170 && burst > 0) {
-          const hilum = this.lymphHilum();
-          const born = Math.min(6, burst);
-          for (let i = 0; i < born; i++) {
-              const ang = Math.random() * Math.PI * 2;
+          for (let i = 0; i < 3; i++) {
               this.particles.push({
                   id: 'node_coin',
                   type: EntityType.PARTICLE,
-                  pos: { x: this.player.pos.x + Math.cos(ang) * 14, y: this.player.pos.y + Math.sin(ang) * 10 },
-                  vel: {
-                      x: (hilum.x - this.player.pos.x) * 0.09 + (Math.random() - 0.5) * 2.4,
-                      y: (hilum.y - this.player.pos.y) * 0.09 + (Math.random() - 0.5) * 2.4,
-                  },
-                  radius: 3.6 + (i % 3) * 1.1,
+                  pos: { x: this.player.pos.x + 16 + i * 5, y: this.player.pos.y - 8 },
+                  vel: { x: 0.35 + Math.random() * 0.9, y: 1.5 + Math.random() * 1.8 },
+                  radius: 3.4 + (i % 2),
                   health: 1, maxHealth: 1,
                   color: i % 2 ? '#fff1b0' : '#f0b429',
+                  damage: 0, active: true, ttl: 26,
+              });
+              this.particles.push({
+                  id: 'node_life',
+                  type: EntityType.PARTICLE,
+                  pos: { x: this.player.pos.x - 16 - i * 5, y: this.player.pos.y + 6 },
+                  vel: { x: -0.3 - Math.random() * 0.6, y: -1.7 - Math.random() * 1.5 },
+                  radius: 3.2,
+                  health: 1, maxHealth: 1,
+                  color: i % 2 ? '#ffd0d8' : '#ff8a98',
                   damage: 0, active: true, ttl: 28,
               });
           }
       }
-      if (this.lymphPop >= 5) {
+      if (this.lymphPop >= 8) {
           const shown = Math.max(1, Math.round(this.lymphPop));
           this.lymphPop = 0;
           this.spawnText({ x: this.player.pos.x - 8, y: this.player.pos.y - 42 }, `+${shown}`, '#ffb0b0', 30);
@@ -806,7 +835,7 @@ export class GameEngine {
 
   private drawLymph(front: boolean) {
       const s = Math.max(0.02, this.lymphScale);
-      const pump = 1 + this.lymphDrain * 0.07 * Math.sin(this.time / 46);
+      const pump = 1 + this.lymphPressure * 0.06 * Math.sin(this.time / 46);
       const cx = CANVAS_WIDTH * 0.5;
       const cy = CANVAS_HEIGHT * 0.52;
       this.ctx.save();
@@ -832,8 +861,8 @@ export class GameEngine {
           this.ctx.fillStyle = flesh;
           bean();
           this.ctx.fill();
-          if (this.lymphDrain > 0.04) {
-              this.ctx.globalAlpha = 0.42 * this.lymphDrain;
+          if (this.lymphPressure > 0.04) {
+              this.ctx.globalAlpha = 0.42 * this.lymphPressure;
               this.ctx.fillStyle = '#7a1428';
               bean();
               this.ctx.fill();
@@ -936,7 +965,7 @@ export class GameEngine {
       const type = config.enemyTypes[Math.floor(Math.random() * config.enemyTypes.length)] ?? EntityType.BACTERIA;
       const pressure = campaignPressure(this.currentWaveIndex);
       const hp = 1;
-      const jackpot = Math.round(1280 * (this.difficultyMods.score ?? 1) * (1 + pressure * 0.45));
+      const jackpot = Math.round(4200 * (this.difficultyMods.score ?? 1) * (1 + pressure * 0.4));
       const y = 180 + Math.random() * (CANVAS_HEIGHT - 360);
       this.entities.push({
           id: `shiny_${Date.now()}_${Math.random()}`,
@@ -954,8 +983,8 @@ export class GameEngine {
           hitFlash: 0,
           ttl: 13.2,
       });
-      this.spawnText({ x: CANVAS_WIDTH - 220, y: y - 36 }, this.t('SHINY'), '#ffe08a', 30);
-      audioManager.playShiny({ x: CANVAS_WIDTH - 220, y });
+      this.spawnText({ x: CANVAS_WIDTH - 420, y: y - 36 }, this.t('SHINY'), '#ffe08a', 30);
+      audioManager.playShiny({ x: CANVAS_WIDTH - 420, y });
   }
 
   private tickShiny(e: Entity, dtSeconds: number) {
@@ -1263,11 +1292,7 @@ export class GameEngine {
           const shiny = target.id.startsWith('shiny_');
           if (shiny) {
               const jackpot = Math.max(1, Math.floor(target.value || 1));
-              const burst = {
-                  x: target.pos.x + (CANVAS_WIDTH * 0.5 - target.pos.x) * 0.42,
-                  y: target.pos.y + (CANVAS_HEIGHT * 0.5 - target.pos.y) * 0.42,
-              };
-              this.spillCoins(burst, jackpot, 52, true, 42);
+              this.spillCoins({ x: target.pos.x, y: target.pos.y }, jackpot, 40, true, 56);
               audioManager.playPowerUp(target.pos);
               this.spawnText(target.pos, this.t('SHINY'), '#ffe08a', 34);
           } else {
@@ -1285,6 +1310,30 @@ export class GameEngine {
       return false;
   }
 
+  private sting(amount: number, source: Vector2, force?: HurtGrade) {
+      const grade = force ?? hurtGrade(amount);
+      const dx = this.player.pos.x - source.x;
+      const dy = this.player.pos.y - source.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      const nx = dx / dist;
+      const ny = dy / dist;
+      this.hurt = Math.max(this.hurt, hurtPunch(grade));
+      this.hurtFlash = Math.max(this.hurtFlash, grade === 0 ? 0.07 : 0.1);
+      this.hurtAngle = Math.atan2(-ny, -nx);
+      const kick = hurtKick(grade);
+      this.hurtKickX = nx * kick;
+      this.hurtKickY = ny * kick;
+      this.shakeIntensity = Math.max(this.shakeIntensity, hurtShake(grade));
+      const stop = hurtStop(grade);
+      if (stop > 0) {
+          this.hitStopTimer = Math.max(this.hitStopTimer, stop);
+          this.hurtSerious = true;
+      }
+      audioManager.playHurt(grade, this.player.pos);
+      if (grade === 1) buzz('tap');
+      else if (grade === 2) buzz('sting');
+  }
+
   // --- REVISED: DAMAGE PLAYER LOGIC ---
   private damagePlayer(amount: number, sourcePos: Vector2, onGameOver: () => void, onLifeLost: () => void, stats: PlayerStats, isEnvironmental: boolean = false, sourceEntity?: Entity) {
       if (this.invulnerabilityTimer > 0 || this.isDashing) return;
@@ -1293,10 +1342,7 @@ export class GameEngine {
 
       this.player.health = Math.max(0, this.player.health - amount);
       this.sessionStats.damageTaken += amount;
-      
-      // Feedback: Screen Shake
-      this.shakeIntensity = amount > 15 ? 20 : 10;
-      this.screenShake = { x: (Math.random()-0.5)*15, y: (Math.random()-0.5)*15 };
+      this.sting(amount, sourcePos);
       
       // Reset Combo
       if (this.comboCount > 5) this.spawnText(this.player.pos, this.t('MSG_COMBO_LOST'), this.colors.PARASITE, 20);
@@ -1327,8 +1373,6 @@ export class GameEngine {
               this.player.vel.y = (dy / dist) * force;
           }
       }
-
-      if (!isEnvironmental || amount >= 2) audioManager.playHit(sourcePos);
 
       if (this.player.health <= 0) {
           this.handlePlayerDeath(onGameOver, onLifeLost, stats);
@@ -1454,6 +1498,12 @@ export class GameEngine {
     this.mineClock = 0;
     this.bossLeash = null;
     this.bossMarkUntil = 0;
+    this.hurt = 0;
+    this.hurtFlash = 0;
+    this.hurtEase = 0;
+    this.hurtSerious = false;
+    this.hurtKickX = 0;
+    this.hurtKickY = 0;
     audioManager.stopCoins();
     this.lymphOpen = false;
     this.nodeFeed = false;
@@ -2198,7 +2248,10 @@ export class GameEngine {
                   this.lymphPop = 0;
                   this.lymphSpent = 0;
                   this.lymphShow = 0;
-                  this.lymphDrain = 0;
+                  this.lymphPressure = 0;
+                  this.lymphWind = 0;
+                  this.lymphClock = 0;
+                  this.lymphGulp = 0;
                   this.lymphRelief = 0;
               } else onWaveClear();
           }
@@ -2817,6 +2870,18 @@ export class GameEngine {
 
     this.shakeIntensity *= 0.9;
     if (this.shakeIntensity < 0.5) this.shakeIntensity = 0;
+    this.hurtKickX *= 0.86;
+    this.hurtKickY *= 0.86;
+    const hurtWas = this.hurt;
+    const step = dt / 1000;
+    this.hurt = Math.max(0, this.hurt - step * 1.35);
+    this.hurtFlash = Math.max(0, this.hurtFlash - step);
+    if (hurtWas > 0.22 && this.hurt <= 0.22 && this.hurtSerious) {
+        this.hurtSerious = false;
+        this.hurtEase = 0.55;
+        audioManager.playHurtClear(this.player.pos);
+    }
+    this.hurtEase = Math.max(0, this.hurtEase - step * 1.6);
     this.compactInactive(this.entities);
   }
 
@@ -3702,10 +3767,13 @@ export class GameEngine {
       this.ctx.globalCompositeOperation = 'source-over';
       this.ctx.globalAlpha = 1.0;
       const burning = this.acidContact > 0;
-      this.ctx.fillStyle = burning
+      const struck = this.hurtFlash > 0.04;
+      this.ctx.fillStyle = struck
+          ? '#fff6f6'
+          : burning
           ? (Math.floor(this.time / 70) % 2 === 0 ? '#e7d4ff' : '#ffffff')
           : (this.isDashing || this.invulnerabilityTimer > 0 ? this.colors.PLAYER_CORE : this.colors.PLAYER);
-      if (this.invulnerabilityTimer > 0 && Math.floor(this.time / 100) % 2 === 0) {
+      if (!struck && this.invulnerabilityTimer > 0 && Math.floor(this.time / 100) % 2 === 0) {
           this.ctx.globalAlpha = 0.5;
       }
       this.ctx.beginPath();
@@ -3726,6 +3794,13 @@ export class GameEngine {
       this.ctx.beginPath();
       this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius*0.4, 0, Math.PI*2);
       this.ctx.fill();
+      if (this.hurt > 0.18) {
+          this.ctx.strokeStyle = `rgba(255, 84, 72, ${Math.min(1, this.hurt)})`;
+          this.ctx.lineWidth = 3;
+          this.ctx.beginPath();
+          this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius + 11, this.hurtAngle - 0.6, this.hurtAngle + 0.6);
+          this.ctx.stroke();
+      }
       if (burning) {
           this.ctx.globalAlpha = 0.9;
           this.ctx.strokeStyle = '#d7b4ff';
@@ -3783,9 +3858,9 @@ export class GameEngine {
 
     this.ctx.save();
     
-    if (this.shakeIntensity > 0) {
-      const sx = (Math.random() - 0.5) * this.shakeIntensity;
-      const sy = (Math.random() - 0.5) * this.shakeIntensity;
+    if (this.shakeIntensity > 0 || Math.abs(this.hurtKickX) > 0.2 || Math.abs(this.hurtKickY) > 0.2) {
+      const sx = (Math.random() - 0.5) * this.shakeIntensity + this.hurtKickX;
+      const sy = (Math.random() - 0.5) * this.shakeIntensity + this.hurtKickY;
       this.ctx.translate(sx, sy);
     }
 
@@ -4309,9 +4384,9 @@ export class GameEngine {
     if (!ride) this.drawVital();
     if (this.lymphOpen) {
         this.drawLymph(true);
-        if (this.lymphDrain > 0.04) {
+        if (this.lymphPressure > 0.04) {
             this.ctx.save();
-            this.ctx.fillStyle = `rgba(28, 0, 6, ${0.34 * this.lymphDrain})`;
+            this.ctx.fillStyle = `rgba(28, 0, 6, ${0.28 * this.lymphPressure})`;
             this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
             this.ctx.restore();
         }
@@ -4355,7 +4430,47 @@ export class GameEngine {
     this.organ.drawHazards(this.ctx, this.player, this.isLowQuality);
 
     this.ctx.restore();
+    this.drawHurt();
     this.organ.drawTransit(this.ctx);
     if (ride) this.drawVital();
+  }
+
+  private drawHurt() {
+      const edge = this.hurt;
+      const ease = this.hurtEase;
+      if (edge < 0.02 && ease < 0.02) return;
+      const w = CANVAS_WIDTH;
+      const h = CANVAS_HEIGHT;
+      this.ctx.save();
+      if (edge >= 0.02) {
+          const reach = Math.min(w, h) * 0.72;
+          const veil = this.ctx.createRadialGradient(w * 0.5, h * 0.5, reach * 0.42, w * 0.5, h * 0.5, reach);
+          veil.addColorStop(0, 'rgba(120, 0, 16, 0)');
+          veil.addColorStop(0.7, `rgba(120, 0, 16, ${0.04 * edge})`);
+          veil.addColorStop(1, `rgba(86, 0, 14, ${0.5 * edge})`);
+          this.ctx.fillStyle = veil;
+          this.ctx.fillRect(0, 0, w, h);
+          const cx = w * 0.5 + Math.cos(this.hurtAngle) * w * 0.4;
+          const cy = h * 0.5 + Math.sin(this.hurtAngle) * h * 0.38;
+          this.ctx.save();
+          this.ctx.translate(cx, cy);
+          this.ctx.rotate(this.hurtAngle);
+          this.ctx.fillStyle = `rgba(255, 76, 64, ${0.28 * edge})`;
+          this.ctx.beginPath();
+          this.ctx.moveTo(16, 0);
+          this.ctx.lineTo(-8, 11);
+          this.ctx.lineTo(-8, -11);
+          this.ctx.closePath();
+          this.ctx.fill();
+          this.ctx.restore();
+      }
+      if (ease >= 0.02) {
+          const veil = this.ctx.createRadialGradient(w * 0.5, h * 0.5, Math.min(w, h) * 0.2, w * 0.5, h * 0.5, Math.min(w, h) * 0.62);
+          veil.addColorStop(0, 'rgba(210, 255, 236, 0)');
+          veil.addColorStop(1, `rgba(186, 255, 226, ${0.16 * ease})`);
+          this.ctx.fillStyle = veil;
+          this.ctx.fillRect(0, 0, w, h);
+      }
+      this.ctx.restore();
   }
 }

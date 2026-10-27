@@ -11,7 +11,8 @@
  */
 
 import type { OrganId } from '../types';
-import { flushCoin, latchCoin, scheduleCoinTick, type CoinVoice } from './coinFeel';
+import { flushCoin, latchCoin, scheduleCadence, scheduleCoinTick, type CoinVoice } from './coinFeel';
+import { scheduleHurt, scheduleHurtClear, type HurtGrade } from './hurtFeel';
 
 export type DrumHit = 'kick' | 'snare' | 'hat' | 'tom';
 
@@ -69,6 +70,9 @@ export class AudioManager {
   private coinRun = 0;
   private coinLast = 0;
   private coinLatch = 0;
+  private coinGear = 0;
+  private coinClosing = false;
+  private coinCadenceUntil = 0;
   private spendAt = 0;
   
   // Sequenciador Musical Procedural
@@ -597,18 +601,73 @@ export class AudioManager {
   public playShoot() { this.playBuffer('shoot', 0.85, Math.random()*2, 60); }
   public playDash() { this.playBuffer('shoot', 0.28, 8, 40); }
   public playBuy() {
-      if (!this.ctx || !this.sfxGain) return;
+      if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+      const dest = this.sfxGain;
       const t = this.ctx.currentTime;
-      this.tone(t, 740, 0.04, 'square', 0.045, 2800, this.sfxGain);
-      this.tone(t + 0.028, 988, 0.055, 'sine', 0.04, 3200, this.sfxGain);
+      this.tone(t, 523.25, 0.09, 'triangle', 0.05, 2200, dest);
+      this.tone(t + 0.05, 659.25, 0.11, 'sine', 0.055, 2800, dest);
+      this.tone(t + 0.1, 783.99, 0.14, 'sine', 0.048, 3400, dest);
+  }
+
+  /** A carta fechou. Acorde maior, curto, alto o bastante para mostrar. */
+  public playCrown() {
+      if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+      const dest = this.sfxGain;
+      const t = this.ctx.currentTime;
+      this.tone(t, 392, 0.18, 'triangle', 0.05, 1600, dest);
+      this.tone(t + 0.045, 493.88, 0.16, 'sine', 0.042, 2100, dest);
+      this.tone(t + 0.09, 587.33, 0.2, 'sine', 0.05, 2600, dest);
+      this.tone(t + 0.14, 783.99, 0.22, 'sine', 0.036, 3600, dest);
   }
   public playHit(at?: { x: number; y: number } | null) { this.playBuffer('hit', 0.42, 0, 50, at); }
+
+  /**
+   * Dano no corpo. Grave e curto, com um clique seco, abaixo da moeda e longe da bomba.
+   * O toque comum pode repetir; o golpe espera um pouco mais para não virar drone.
+   */
+  public playHurt(grade: HurtGrade, at?: { x: number; y: number } | null) {
+      if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+      const now = performance.now();
+      const gate = grade === 0 ? 90 : 140;
+      if (now - this.hurtAt < gate && grade <= this.hurtHeard) return;
+      this.hurtAt = now;
+      this.hurtHeard = grade;
+      scheduleHurt(this.ctx, this.sfxOut(at, 0.08), this.ctx.currentTime, grade);
+  }
+
+  /** Sopro de saída, só depois de um golpe de verdade. Mais quieto que o toque. */
+  public playHurtClear(at?: { x: number; y: number } | null) {
+      if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+      const now = performance.now();
+      if (now - this.clearAt < 420) return;
+      this.clearAt = now;
+      scheduleHurtClear(this.ctx, this.sfxOut(at, 0.04), this.ctx.currentTime);
+  }
   public playExplosion(at?: { x: number; y: number } | null) { this.playBuffer('expl', 0.48, 0, 100, at); }
   public playPowerUp(at?: { x: number; y: number } | null) { this.playBuffer('power', 0.5, 0, 80, at); }
   private coinAt: { x: number; y: number } | null = null;
+  private hurtAt = 0;
+  private hurtHeard: HurtGrade = 0;
+  private clearAt = 0;
 
   private coinVoice(): CoinVoice {
-      return { run: this.coinRun, lastAt: this.coinLast, latch: this.coinLatch };
+      return {
+          run: this.coinRun,
+          lastAt: this.coinLast,
+          latch: this.coinLatch,
+          gear: this.coinGear,
+          closing: this.coinClosing,
+          cadenceUntil: this.coinCadenceUntil,
+      };
+  }
+
+  private applyCoin(v: CoinVoice) {
+      this.coinRun = v.run;
+      this.coinLast = v.lastAt;
+      this.coinLatch = v.latch;
+      this.coinGear = v.gear;
+      this.coinClosing = v.closing;
+      this.coinCadenceUntil = v.cadenceUntil;
   }
 
   public queueCoins(n: number, at?: { x: number; y: number } | null) {
@@ -622,21 +681,22 @@ export class AudioManager {
   }
 
   public stopCoins() {
-      this.coinLatch = 0;
-      this.coinRun = 0;
-      this.coinLast = 0;
+      this.applyCoin({ run: 0, lastAt: 0, latch: 0, gear: 0, closing: false, cadenceUntil: 0 });
   }
 
   public pumpCoins() {
       const now = performance.now();
       const out = flushCoin(this.coinVoice(), now);
-      if (!out.play) return;
+      if (!out.play) {
+          this.applyCoin(out.voice);
+          return;
+      }
       if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
-      this.coinRun = out.voice.run;
-      this.coinLast = out.voice.lastAt;
-      this.coinLatch = 0;
+      this.applyCoin(out.voice);
       this.lastPlayTime['coin'] = now;
-      scheduleCoinTick(this.ctx, this.sfxOut(this.coinAt, 0.08), this.ctx.currentTime, out.play.step, out.play.piled);
+      const dest = this.sfxOut(this.coinAt, out.play.kind === 'cadence' ? 0.24 : 0.08);
+      if (out.play.kind === 'cadence') scheduleCadence(this.ctx, dest, this.ctx.currentTime, out.play.gear);
+      else scheduleCoinTick(this.ctx, dest, this.ctx.currentTime, out.play.step, out.play.piled, out.play.gear);
   }
 
   /**
@@ -648,26 +708,43 @@ export class AudioManager {
       if (at) this.coinAt = at;
   }
 
-  /** Gasto de DNA. Grave, curto, sem a frase de ganho, e cala no quadro em que se solta. */
-  public playSpend(at?: { x: number; y: number } | null) {
+  private hardPan(pan: number, life: number): AudioNode {
+      const dest = this.sfxGain;
+      const ctx = this.ctx;
+      if (!dest || !ctx || this.settings.mono) return dest as AudioNode;
+      try {
+          const panner = ctx.createStereoPanner();
+          panner.pan.setValueAtTime(Math.max(-1, Math.min(1, pan)), ctx.currentTime);
+          panner.connect(dest);
+          this.dropLater(panner, life);
+          return panner;
+      } catch {
+          return dest;
+      }
+  }
+
+  /** Orelha esquerda. A vida sobe: terça maior, curta, gostosa. */
+  public playMend() {
+      if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+      const dest = this.hardPan(-1, 0.16);
+      const t = this.ctx.currentTime;
+      this.tone(t, 523.25, 0.11, 'sine', 0.042, 2000, dest);
+      this.tone(t + 0.04, 659.25, 0.14, 'sine', 0.048, 2600, dest);
+  }
+
+  /**
+   * Orelha direita. O DNA desce. O timbre continua doce (sine, terça menor
+   * para baixo), mas o contorno cai: gastar é bom, gastar vida dói.
+   */
+  public playSpend(_at?: { x: number; y: number } | null) {
       if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
       const now = performance.now();
-      if (now - this.spendAt < 180) return;
+      if (now - this.spendAt < 140) return;
       this.spendAt = now;
-      const dest = this.sfxOut(at, 0.05);
+      const dest = this.hardPan(1, 0.14);
       const t = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const g = this.ctx.createGain();
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(310, t);
-      osc.frequency.exponentialRampToValueAtTime(180, t + 0.016);
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(0.02, t + 0.001);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.018);
-      osc.connect(g);
-      g.connect(dest);
-      osc.start(t);
-      osc.stop(t + 0.03);
+      this.tone(t, 880, 0.07, 'sine', 0.04, 2400, dest);
+      this.tone(t + 0.028, 698.46, 0.11, 'triangle', 0.036, 1800, dest);
   }
 
   public playSigh(at?: { x: number; y: number } | null, strength = 1) {

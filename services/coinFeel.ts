@@ -13,11 +13,23 @@
  * pausa, por cima de tudo. A chuva cabe numa frase curta e depois cala.
  * Gastar DNA no linfonodo não usa essa voz: som de ganho em cima de perda é
  * o "loss disguised as a win" (Dixon, Harrigan, Sandhu, Collins e Fugelsang, 2010).
+ *
+ * No fim da frase, três sinos fecham a sentença em ~180 ms. O level-up do
+ * Minecraft é um arpejo maior rolado por cerca de 0,7 s; este é mais curto e
+ * o contorno é outro (quinta, tônica, quinta acima), no mesmo timbre da moeda.
+ * Uma cadência fecha a expectativa (Meyer; Huron, Sweet Anticipation). Se ainda
+ * houver moeda quando o botão acaba, a frase recomeça um tom acima: +2, depois
+ * +4, depois +7 semitons. A quinta justa é o último convite; dali a frase
+ * repete no mesmo lugar para não virar apito. Um gole de uma nota não ganha
+ * botão. A celebração é da frase, não de cada moeda.
  */
 
 export const COIN_BEAT_MS = 100;
 export const COIN_RESET_MS = 420;
 export const COIN_PHRASE = 7;
+export const COIN_CADENCE_MS = 200;
+/** Semitons acima da casa: tom, terça maior, quinta justa. */
+export const COIN_GEARS = [0, 2, 4, 7];
 export const COIN_ATTACK_S = 0.0014;
 export const COIN_BODY_S = 0.042;
 export const COIN_PARTIAL_S = 0.016;
@@ -31,23 +43,68 @@ export interface CoinVoice {
     run: number;
     lastAt: number;
     latch: number;
+    gear: number;
+    closing: boolean;
+    cadenceUntil: number;
 }
 
+export type CoinPlay =
+    | { kind: 'tick'; step: number; piled: number; gear: number }
+    | { kind: 'cadence'; gear: number };
+
 export function freshVoice(): CoinVoice {
-    return { run: 0, lastAt: 0, latch: 0 };
+    return { run: 0, lastAt: 0, latch: 0, gear: 0, closing: false, cadenceUntil: 0 };
 }
 
 export function latchCoin(v: CoinVoice): CoinVoice {
     return { ...v, latch: Math.min(48, v.latch + 1) };
 }
 
-export function flushCoin(v: CoinVoice, now: number): { voice: CoinVoice; play: { step: number; piled: number } | null } {
+export function gearSemi(gear: number): number {
+    return COIN_GEARS[Math.max(0, Math.min(COIN_GEARS.length - 1, gear))] ?? 0;
+}
+
+export function flushCoin(v: CoinVoice, now: number): { voice: CoinVoice; play: CoinPlay | null } {
+    if (v.cadenceUntil > now) return { voice: v, play: null };
+
+    if (v.closing && v.cadenceUntil > 0 && now >= v.cadenceUntil) {
+        if (v.latch <= 0) {
+            return { voice: freshVoice(), play: null };
+        }
+        const gear = Math.min(COIN_GEARS.length - 1, v.gear + 1);
+        const piled = v.latch;
+        return {
+            voice: { run: 0, lastAt: now, latch: 0, gear, closing: false, cadenceUntil: 0 },
+            play: { kind: 'tick', step: 0, piled, gear },
+        };
+    }
+
+    if (v.latch > 0 && v.lastAt > 0 && now - v.lastAt < COIN_BEAT_MS) return { voice: v, play: null };
+
+    const gap = v.lastAt > 0 ? now - v.lastAt : 0;
+    if (v.closing && v.cadenceUntil === 0 && gap >= COIN_BEAT_MS && gap < COIN_RESET_MS) {
+        return {
+            voice: { ...v, cadenceUntil: now + COIN_CADENCE_MS, lastAt: now },
+            play: { kind: 'cadence', gear: v.gear },
+        };
+    }
+
     if (v.latch <= 0) return { voice: v, play: null };
-    if (v.lastAt > 0 && now - v.lastAt < COIN_BEAT_MS) return { voice: v, play: null };
+
     const piled = v.latch;
-    const fresh = v.lastAt <= 0 || now - v.lastAt >= COIN_RESET_MS;
-    const run = fresh ? 0 : Math.min(COIN_PHRASE - 1, v.run + 1);
-    return { voice: { run, lastAt: now, latch: 0 }, play: { step: run, piled } };
+    const fresh = v.lastAt <= 0 || gap >= COIN_RESET_MS;
+    if (fresh) {
+        return {
+            voice: { run: 0, lastAt: now, latch: 0, gear: 0, closing: false, cadenceUntil: 0 },
+            play: { kind: 'tick', step: 0, piled, gear: 0 },
+        };
+    }
+
+    const run = Math.min(COIN_PHRASE - 1, v.run + 1);
+    return {
+        voice: { run, lastAt: now, latch: 0, gear: v.gear, cadenceUntil: 0, closing: run >= COIN_PHRASE - 1 },
+        play: { kind: 'tick', step: run, piled, gear: v.gear },
+    };
 }
 
 /** Quantos ataques cabem numa chuva. O teto é o que impede a onda de ficar esperando. */
@@ -74,10 +131,23 @@ export function showerPlan(count: number, kind: 'vacuum' | 'surge') {
     };
 }
 
-export function coinFreq(step: number, piled: number): number {
+export function coinFreq(step: number, piled: number, gear = 0): number {
     const f = COIN_SCALE[Math.max(0, Math.min(COIN_PHRASE - 1, step))] ?? COIN_SCALE[0];
     const cents = ((step * 5 + piled * 3) % 9) - 4;
-    return f * Math.pow(2, cents / 1200);
+    return f * Math.pow(2, (cents + gearSemi(gear) * 100) / 1200);
+}
+
+/** Quinta, tônica, quinta acima. Três sinos, um fôlego, não um arpejo rolado. */
+export const CADENCE_NOTES = [
+    { at: 0, mul: 1.5, dur: 0.05 },
+    { at: 0.052, mul: 2, dur: 0.062 },
+    { at: 0.112, mul: 3, dur: 0.07 },
+];
+
+export function cadenceFreq(index: number, gear: number): number {
+    const tonic = COIN_SCALE[0] * Math.pow(2, gearSemi(gear) / 12);
+    const mul = CADENCE_NOTES[index]?.mul ?? 2;
+    return tonic * mul;
 }
 
 export function coinGain(piled: number): number {
@@ -100,15 +170,41 @@ export function coinAmp(t: number, peak: number): number {
         + (t >= 0 && t < COIN_CLICK_S ? peak * 0.55 * (1 - t / COIN_CLICK_S) : 0);
 }
 
+export function scheduleCadence(
+    ctx: BaseAudioContext,
+    dest: AudioNode,
+    time: number,
+    gear: number,
+) {
+    const nyquist = ctx.sampleRate * 0.45;
+    CADENCE_NOTES.forEach((note, index) => {
+        const f = Math.min(nyquist, cadenceFreq(index, gear));
+        const start = time + note.at;
+        const peak = index === CADENCE_NOTES.length - 1 ? 0.05 : 0.04;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(Math.max(40, f), start);
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(peak, start + 0.006);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + note.dur);
+        osc.connect(gain);
+        gain.connect(dest);
+        osc.start(start);
+        osc.stop(start + note.dur + 0.02);
+    });
+}
+
 export function scheduleCoinTick(
     ctx: BaseAudioContext,
     dest: AudioNode,
     time: number,
     step: number,
     piled: number,
+    gear = 0,
 ) {
     const wobble = Math.pow(2, (Math.random() * 10 - 5) / 1200);
-    const f = Math.min(ctx.sampleRate * 0.22, coinFreq(step, piled) * wobble);
+    const f = Math.min(ctx.sampleRate * 0.22, coinFreq(step, piled, gear) * wobble);
     const peak = coinGain(piled);
     const nyquist = ctx.sampleRate * 0.45;
 
@@ -196,11 +292,11 @@ function audibleEnd(peak: number): number {
 }
 
 /** O quadro trava o som no começo e as moedas entram depois, como no update do jogo. */
-function simulate(arrivalTimes: number[]): { step: number; piled: number; at: number }[] {
+function simulate(arrivalTimes: number[]): (CoinPlay & { at: number })[] {
     let voice = freshVoice();
-    const played: { step: number; piled: number; at: number }[] = [];
+    const played: (CoinPlay & { at: number })[] = [];
     const sorted = [...arrivalTimes].sort((a, b) => a - b);
-    const end = (sorted[sorted.length - 1] ?? 0) + COIN_BEAT_MS + 48;
+    const end = (sorted[sorted.length - 1] ?? 0) + COIN_CADENCE_MS + COIN_BEAT_MS + 64;
     let next = 0;
     for (let t = 0; t <= end; t += 16) {
         const flushed = flushCoin(voice, t);
@@ -232,30 +328,50 @@ export function checkCoinFeel(): CoinReport {
     if (Math.abs(audibleEnd(coinGain(20)) - end) > 0.004) bad('pilha alongou o som');
 
     const gulp = simulate(Array.from({ length: 20 }, () => 8));
-    lines.push(`20 moedas no mesmo quadro: ${gulp.length} ataque, passo ${gulp.map(p => p.step).join(',')}`);
-    if (gulp.length !== 1) bad(`gole virou fila: ${gulp.length} ataques`);
+    lines.push(`20 moedas no mesmo quadro: ${gulp.length} ataque, passo ${gulp.map(p => p.kind === 'tick' ? p.step : 'botão').join(',')}`);
+    if (gulp.length !== 1 || gulp[0]?.kind !== 'tick') bad(`gole virou fila: ${gulp.length} ataques`);
     if (gulp[0] && gulp[0].at > 40) bad('o gole demorou a soar');
 
     const smear = simulate(Array.from({ length: 20 }, (_, i) => i * 3));
     lines.push(`20 moedas em 60 ms: ${smear.length} ataques, e depois silêncio`);
     if (smear.length < 1 || smear.length > 2) bad(`gole espalhado virou fila: ${smear.length}`);
+    if (smear.some(p => p.kind === 'cadence')) bad('um gole curto ganhou botão');
 
     const walk = simulate([0, 100, 200, 300, 400, 500, 600, 700, 800]);
-    lines.push(`caminhada a cada 100 ms: passos ${walk.map(p => p.step).join('-')}`);
-    const steps = walk.map(p => p.step);
-    if (walk.length !== 9) bad(`a caminhada comeu moedas: ${walk.length}`);
-    if (steps[0] !== 0) bad('a frase não começa no grau 0');
-    for (let i = 1; i < steps.length; i++) {
-        if (steps[i] < steps[i - 1]) bad('a frase deu a volta');
-        if (steps[i] > steps[i - 1] + 1) bad('a frase pulou um grau');
-        if (steps[i] > COIN_PHRASE - 1) bad('a frase passou do topo');
-        if (walk[i].at - walk[i - 1].at < COIN_BEAT_MS - 1) bad('dois ataques mais perto que o tempo');
+    const ticks = walk.filter((p): p is CoinPlay & { at: number; kind: 'tick' } => p.kind === 'tick');
+    const buttons = walk.filter(p => p.kind === 'cadence');
+    lines.push(`caminhada: ${walk.map(p => p.kind === 'tick' ? String(p.step) : 'botão').join('-')}`);
+    const phrase = ticks.slice(0, COIN_PHRASE);
+    if (phrase.length !== COIN_PHRASE) bad(`a frase não completou: ${phrase.length}`);
+    if (phrase[0]?.step !== 0 || phrase[0]?.gear !== 0) bad('a frase não começa no grau 0');
+    for (let i = 1; i < phrase.length; i++) {
+        if (phrase[i].step !== phrase[i - 1].step + 1) bad('a frase pulou ou voltou antes do botão');
+        if (phrase[i].gear !== 0) bad('a primeira frase já subiu de tom');
+        if (phrase[i].at - phrase[i - 1].at < COIN_BEAT_MS - 1) bad('dois ataques mais perto que o tempo');
     }
-    if (steps[steps.length - 1] !== COIN_PHRASE - 1) bad('a frase não segurou o topo');
-    if (walk[walk.length - 1].at > 800 + COIN_BEAT_MS + 32) bad('a caminhada continuou depois da última moeda');
+    if (buttons.length !== 1) bad(`a frase não fechou uma vez: ${buttons.length} botões`);
+    if (buttons[0] && phrase[phrase.length - 1] && buttons[0].at < phrase[phrase.length - 1].at) bad('o botão veio antes da última nota');
+    const againTick = ticks[COIN_PHRASE];
+    if (!againTick || againTick.step !== 0 || againTick.gear !== 1) bad(`a frase não recomeçou um tom acima: ${againTick ? `${againTick.step}@${againTick.gear}` : 'nada'}`);
+    if (againTick && buttons[0] && againTick.at < buttons[0].at + COIN_CADENCE_MS - 32) bad('a frase seguinte falou por cima do botão');
+    const lift = coinFreq(0, 1, 1) / coinFreq(0, 1, 0);
+    lines.push(`o tom seguinte é ${lift.toFixed(3)}× o de casa (um tom inteiro)`);
+    if (lift < 1.11 || lift > 1.14) bad(`o tom seguinte não é um tom: ${lift.toFixed(3)}`);
+    const buttonEnd = CADENCE_NOTES[CADENCE_NOTES.length - 1];
+    const buttonSpan = buttonEnd.at + buttonEnd.dur;
+    lines.push(`o botão dura ${Math.round(buttonSpan * 1000)} ms`);
+    if (buttonSpan < 0.14 || buttonSpan > 0.22) bad(`botão fora da faixa curta: ${buttonSpan.toFixed(3)} s`);
+    if (cadenceFreq(2, 0) <= cadenceFreq(0, 0)) bad('o botão não sobe');
+
+    const quiet = simulate([0, 100, 200, 300, 400, 500, 600]);
+    const quietButtons = quiet.filter(p => p.kind === 'cadence');
+    const quietTicks = quiet.filter(p => p.kind === 'tick');
+    if (quietTicks.length !== COIN_PHRASE || quietButtons.length !== 1) bad(`sete notas não fecharam: ${quietTicks.length} notas, ${quietButtons.length} botões`);
 
     const again = simulate([0, 800]);
-    if (again.length !== 2 || again[1].step !== 0) bad(`a pausa não recomeçou a frase: ${again.map(p => p.step).join(',')}`);
+    const againTicks = again.filter((p): p is CoinPlay & { at: number; kind: 'tick' } => p.kind === 'tick');
+    if (againTicks.length !== 2 || againTicks[1].step !== 0 || againTicks[1].gear !== 0) bad(`a pausa não recomeçou a frase: ${again.map(p => p.kind === 'tick' ? p.step : 'botão').join(',')}`);
+    if (again.some(p => p.kind === 'cadence')) bad('duas notas soltas ganharam botão');
 
     const legacySpan = (n: number) => Math.max(0, n - 1) * 58;
     const legacyTail = (n: number) => Math.max(0, n - 1) * 54 + 72;
