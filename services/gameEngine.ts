@@ -231,6 +231,11 @@ export class GameEngine {
   private coinShowerAt = 0;
   private coinRingAt = 0;
   private mineClock = 0;
+  private sweepMines = false;
+  private fusoEchoIn = -1;
+  private fusoVeilLeft = 0;
+  private fusoVeilHold = false;
+  private fusoShown = 0;
   private bossLeash: { x: number; y: number; until: number; reach: number } | null = null;
   private bossMarkUntil = 0;
   public lymphOpen = false;
@@ -288,7 +293,7 @@ export class GameEngine {
   private bossSnapAt = 0;
   private bossBombDue = 0;
   /** O linfonodo cruza a arena. Não espera a onda anterior ao chefe. */
-  private nodePass = 30; 
+  private nodePass = 96; 
   
   public isLowQuality: boolean = false; 
   public forceHighQuality: boolean = false;
@@ -337,7 +342,7 @@ export class GameEngine {
   private configFor(waveIndex: number): WaveConfig {
       const base = WAVES[waveIndex % WAVES.length];
       const lap = Math.floor(waveIndex / WAVES.length);
-      const spawnRate = Math.max(420, Math.round(base.spawnRate * Math.pow(0.9, lap) * 0.9));
+      const spawnRate = Math.max(360, Math.round(base.spawnRate * Math.pow(0.9, lap) * 0.82));
       if (lap <= 0) return { ...base, waveNumber: waveIndex + 1, spawnRate };
       return {
           ...base,
@@ -975,57 +980,77 @@ export class GameEngine {
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'middle';
 
-      this.ctx.fillStyle = 'rgba(255, 236, 224, 0.22)';
+      this.ctx.fillStyle = 'rgba(28, 8, 14, 0.86)';
+      this.ctx.strokeStyle = 'rgba(255, 214, 186, 0.72)';
+      this.ctx.lineWidth = 2;
       this.ctx.beginPath();
-      this.ctx.ellipse(0, -96, 158, 58, 0, 0, Math.PI * 2);
+      this.ctx.roundRect(-180, -164, 360, 372, 26);
+      this.ctx.fill();
+      this.ctx.stroke();
+      this.ctx.fillStyle = 'rgba(255, 228, 206, 0.08)';
+      this.ctx.beginPath();
+      this.ctx.roundRect(-168, -152, 336, 54, 16);
       this.ctx.fill();
 
-      this.ctx.fillStyle = '#fff6ee';
-      this.ctx.font = '700 30px "Chakra Petch", sans-serif';
-      this.ctx.fillText(this.t('NODE_TITLE'), 0, -118);
+      this.ctx.fillStyle = '#fff4e8';
+      this.ctx.font = '700 26px "Chakra Petch", sans-serif';
+      this.ctx.fillText(this.t('NODE_TITLE'), 0, -126);
+      this.ctx.strokeStyle = 'rgba(255, 196, 168, 0.45)';
+      this.ctx.lineWidth = 1;
+      this.ctx.beginPath();
+      this.ctx.moveTo(-46, -110);
+      this.ctx.lineTo(46, -110);
+      this.ctx.stroke();
 
-      this.ctx.font = '600 18px "Chakra Petch", sans-serif';
-      this.ctx.fillStyle = 'rgba(255, 244, 232, 0.9)';
+      this.ctx.font = '600 15px "Chakra Petch", sans-serif';
+      this.ctx.fillStyle = 'rgba(255, 228, 210, 0.82)';
       const lines = this.wrapText(this.t('NODE_HINT'), 300).slice(0, 2);
-      lines.forEach((line, i) => this.ctx.fillText(line, 0, -98 + i * 20));
+      lines.forEach((line, i) => this.ctx.fillText(line, 0, -90 + i * 18));
 
-      const barY = -52;
-      this.ctx.font = '700 16px "Chakra Petch", sans-serif';
-      this.ctx.fillStyle = '#fff1e6';
+      const barY = -48;
+      this.ctx.font = '700 13px "Chakra Petch", sans-serif';
+      this.ctx.fillStyle = 'rgba(255, 236, 224, 0.78)';
       this.ctx.textAlign = 'left';
-      this.ctx.fillText(this.t('INTEGRITY'), -132, barY - 16);
+      this.ctx.fillText(this.t('INTEGRITY'), -148, barY - 16);
       this.ctx.textAlign = 'right';
-      this.ctx.fillText(`${Math.round(this.player.health)}/${Math.round(this.player.maxHealth)}`, 132, barY - 16);
+      this.ctx.fillText(`${Math.round(this.player.health)}/${Math.round(this.player.maxHealth)}`, 148, barY - 16);
       this.ctx.textAlign = 'center';
-      this.ctx.fillStyle = 'rgba(92, 28, 36, 0.35)';
+      this.ctx.fillStyle = 'rgba(255, 214, 196, 0.16)';
       this.ctx.beginPath();
-      this.ctx.roundRect(-132, barY - 6, 264, 12, 8);
+      this.ctx.roundRect(-148, barY - 6, 296, 16, 8);
       this.ctx.fill();
-      this.ctx.fillStyle = '#ffb0a8';
+      const lifeWash = this.ctx.createLinearGradient(-148, 0, 148, 0);
+      lifeWash.addColorStop(0, '#c44a52');
+      lifeWash.addColorStop(1, '#ffd0b0');
+      this.ctx.fillStyle = lifeWash;
       this.ctx.beginPath();
-      this.ctx.roundRect(-132, barY - 6, Math.max(8, 264 * ratio), 12, 8);
+      this.ctx.roundRect(-148, barY - 6, Math.max(12, 296 * ratio), 16, 8);
       this.ctx.fill();
       const pocket = this.nodeSpending ? `-${Math.round(this.lymphSpent)} ${dna}` : `${Math.round(this.biomass)} ${dna}`;
-      this.ctx.font = '700 15px "Chakra Petch", sans-serif';
-      this.ctx.fillStyle = this.nodeSpending ? '#ffd0a8' : 'rgba(255, 236, 210, 0.9)';
-      this.ctx.fillText(pocket, 0, barY + 16);
+      this.ctx.font = '700 14px "Chakra Petch", sans-serif';
+      this.ctx.fillStyle = this.nodeSpending ? '#ffd0a4' : '#ffe7c4';
+      this.ctx.fillText(pocket, 0, barY + 22);
 
       const climbing = this.nodeVisits > 0 || this.nodeTariff > 1.03;
-      const scale = 1 + pop * 0.16;
+      const scale = 1 + pop * 0.08;
       this.ctx.save();
-      this.ctx.translate(0, 58);
+      this.ctx.translate(0, 28);
       this.ctx.scale(scale, scale);
-      this.ctx.font = '700 36px "Chakra Petch", sans-serif';
-      const hot = Math.round(224 - heat * 70);
-      this.ctx.fillStyle = pop > 0.2 ? '#fff6d2' : `rgb(255, ${hot}, ${Math.round(138 - heat * 40)})`;
-      this.ctx.fillText(String(price), 0, -8);
-      this.ctx.font = '700 16px "Chakra Petch", sans-serif';
-      this.ctx.fillStyle = '#fff1d0';
-      this.ctx.fillText(`${dna}  →  1 ${life}`, 0, 16);
+      this.ctx.fillStyle = 'rgba(255, 220, 196, 0.08)';
+      this.ctx.beginPath();
+      this.ctx.roundRect(-78, -28, 156, 58, 16);
+      this.ctx.fill();
+      this.ctx.font = '700 32px "Chakra Petch", sans-serif';
+      const hot = Math.round(236 - heat * 80);
+      this.ctx.fillStyle = pop > 0.2 ? '#fff6d2' : `rgb(255, ${hot}, ${Math.round(176 - heat * 40)})`;
+      this.ctx.fillText(String(price), 0, -4);
+      this.ctx.font = '700 13px "Chakra Petch", sans-serif';
+      this.ctx.fillStyle = 'rgba(255, 228, 206, 0.8)';
+      this.ctx.fillText(`${dna}  →  1 ${life}`, 0, 18);
       this.ctx.restore();
 
       const rest = NODE_REST;
-      this.ctx.fillStyle = 'rgba(110, 28, 36, 0.28)';
+      this.ctx.fillStyle = '#f3cbb8';
       this.ctx.beginPath();
       this.ctx.roundRect(rest.x - rest.w / 2, rest.y - rest.h / 2, rest.w, rest.h, 28);
       this.ctx.fill();
@@ -1036,36 +1061,36 @@ export class GameEngine {
           this.ctx.roundRect(rest.x - rest.w / 2, rest.y - rest.h / 2, rest.w, rest.h, 28);
           this.ctx.clip();
           const wash = this.ctx.createLinearGradient(rest.x - rest.w / 2, 0, rest.x + rest.w / 2, 0);
-          wash.addColorStop(0, 'rgba(196, 72, 64, 0.35)');
-          wash.addColorStop(1, 'rgba(255, 214, 150, 0.92)');
+          wash.addColorStop(0, '#e07a62');
+          wash.addColorStop(1, '#fff1d4');
           this.ctx.fillStyle = wash;
           this.ctx.fillRect(rest.x - rest.w / 2, rest.y - rest.h / 2, fillW, rest.h);
           this.ctx.restore();
       }
-      this.ctx.strokeStyle = `rgba(255, ${Math.round(220 - heat * 40)}, ${Math.round(190 - heat * 50)}, ${0.55 + heat * 0.35})`;
+      this.ctx.strokeStyle = `rgba(92, 28, 32, ${0.35 + heat * 0.35})`;
       this.ctx.lineWidth = 2;
       this.ctx.beginPath();
       this.ctx.roundRect(rest.x - rest.w / 2, rest.y - rest.h / 2, rest.w, rest.h, 28);
       this.ctx.stroke();
-      this.ctx.fillStyle = '#fff8ef';
+      this.ctx.fillStyle = '#3c1218';
       this.ctx.font = '700 18px "Chakra Petch", sans-serif';
-      this.ctx.fillText(this.t('NODE_REST'), rest.x, climbing ? rest.y + 7 : rest.y);
+      this.ctx.fillText(this.t('NODE_REST'), rest.x, climbing ? rest.y + 8 : rest.y);
       if (climbing) {
-          this.ctx.font = '700 12px "Chakra Petch", sans-serif';
-          this.ctx.fillStyle = '#ffd0c0';
+          this.ctx.font = '700 11px "Chakra Petch", sans-serif';
+          this.ctx.fillStyle = '#7a2430';
           this.ctx.fillText(`${this.t('NODE_CLIMB')} · ${this.t('NODE_USE')} ${this.nodeVisits + 1}`, rest.x, rest.y - 14);
       }
 
       const marks = Math.min(8, this.nodeVisits);
       for (let i = 0; i < marks; i++) {
-          this.ctx.fillStyle = i === marks - 1 && pop > 0.05 ? '#fff1c4' : '#ffb090';
+          this.ctx.fillStyle = i === marks - 1 && pop > 0.05 ? '#fff6d8' : '#a84848';
           this.ctx.beginPath();
-          this.ctx.arc(rest.x - (marks - 1) * 7 + i * 14, rest.y + rest.h / 2 - 9, 2.8, 0, Math.PI * 2);
+          this.ctx.arc(rest.x - (marks - 1) * 7 + i * 14, rest.y + rest.h / 2 - 10, 2.6, 0, Math.PI * 2);
           this.ctx.fill();
       }
 
-      this.ctx.fillStyle = 'rgba(255, 236, 214, 0.82)';
-      this.ctx.font = '700 16px "Chakra Petch", sans-serif';
+      this.ctx.fillStyle = 'rgba(255, 228, 210, 0.88)';
+      this.ctx.font = '700 15px "Chakra Petch", sans-serif';
       this.ctx.fillText(this.t('NODE_LEAVE'), NODE_LEAVE.x, NODE_LEAVE.y);
       this.ctx.restore();
   }
@@ -1426,6 +1451,10 @@ export class GameEngine {
 
   public damageEnemy(target: Entity, amount: number, canCrit: boolean, stats: PlayerStats): boolean {
       if (!target.active) return false;
+      if (target.id.startsWith('fuso_echo')) {
+          target.hitFlash = 4;
+          return false;
+      }
       
       let finalDamage = amount;
       let isCrit = false;
@@ -1473,6 +1502,10 @@ export class GameEngine {
           }
           
           if (target.type === EntityType.BOSS) {
+              for (const other of this.entities) {
+                  if (other.id.startsWith('fuso_echo')) other.active = false;
+              }
+              this.fusoShown = 0;
               this.sessionStats.bossesKilled++;
               // Boss-down stays on the organ card. A canvas popup here flashed and died before the chart.
               achievementManager.track('boss_1', 1);
@@ -1736,6 +1769,11 @@ export class GameEngine {
     this.coinCascade = false;
     this.coinShowerAt = 0;
     this.mineClock = 0;
+    this.sweepMines = false;
+    this.fusoEchoIn = -1;
+    this.fusoVeilLeft = 0;
+    this.fusoVeilHold = false;
+    this.fusoShown = 0;
     this.bossClock = 0;
     this.bossBombDue = 0;
     this.bossLeash = null;
@@ -1916,6 +1954,7 @@ export class GameEngine {
   }
   private killAllEnemies() {
       this.entities.forEach(e => {
+          if (e.id.startsWith('fuso_echo')) { e.active = false; return; }
           if (e.type === EntityType.BOSS && e.health > 0) return;
           if (this.isEnemy(e.type) || e.type === EntityType.BOSS) {
               e.health = 0; e.active = false; e.pos.x = -10000; 
@@ -1988,6 +2027,90 @@ export class GameEngine {
       if (m.acidTimer > 0) m.acidTimer += drag;
   }
 
+  private chief(): Entity | undefined {
+      return this.entities.find(e => e.active && e.type === EntityType.BOSS && !e.id.startsWith('fuso_echo'));
+  }
+
+  private tickFusoShade(m: NonNullable<Entity['mutation']>, dt: number, hot: boolean, winding: boolean) {
+      if (!hot) {
+          m.veil = Math.max(0, m.veil - dt * 1.8);
+          this.fusoShown = m.veil;
+          this.fusoEchoIn = -1;
+          this.fusoVeilLeft = 0;
+          this.fusoVeilHold = false;
+          return;
+      }
+      if (this.fusoEchoIn < 0) {
+          this.fusoEchoIn = 4.6;
+          this.fusoVeilHold = false;
+          this.fusoVeilLeft = 2.6;
+      }
+      this.fusoEchoIn -= dt;
+      const echoes = this.entities.some(x => x.active && x.id.startsWith('fuso_echo'));
+      if (!echoes && this.fusoEchoIn <= 0) {
+          const boss = this.chief();
+          if (boss) this.spawnFusoEchoes(boss);
+          this.fusoEchoIn = 12;
+      }
+      if (this.fusoVeilLeft <= 0) {
+          this.fusoVeilHold = !this.fusoVeilHold;
+          this.fusoVeilLeft = this.fusoVeilHold ? 2.15 : 4.6;
+      }
+      this.fusoVeilLeft -= dt;
+      const target = winding ? 0.12 : (this.fusoVeilHold ? 1 : 0);
+      m.veil += (target - m.veil) * Math.min(1, dt * 2.6);
+      this.fusoShown = m.veil;
+  }
+
+  private spawnFusoEchoes(boss: Entity) {
+      const m = boss.mutation;
+      if (!m) return;
+      audioManager.playBossDash(boss.pos);
+      for (let i = 0; i < 2; i++) {
+          const ang = (i === 0 ? -0.9 : 0.55) + (Math.random() - 0.5) * 0.25;
+          this.entities.push({
+              id: `fuso_echo_${this.time}_${i}`,
+              type: EntityType.BOSS,
+              pos: {
+                  x: Math.max(90, Math.min(CANVAS_WIDTH - 90, boss.pos.x + Math.cos(ang) * 130)),
+                  y: Math.max(90, Math.min(CANVAS_HEIGHT - 90, boss.pos.y + Math.sin(ang) * 100)),
+              },
+              vel: { x: Math.cos(ang) * 3.4, y: Math.sin(ang) * 3.4 },
+              radius: boss.radius * 0.92,
+              health: boss.maxHealth,
+              maxHealth: boss.maxHealth,
+              color: boss.color,
+              damage: Math.max(8, boss.damage * 0.28),
+              active: true,
+              value: 0,
+              drag: 0.12,
+              ttl: 6.6,
+              mutation: {
+                  ...m,
+                  veil: 0,
+                  dashTimer: 1.15 + i * 0.75,
+                  acidTimer: 99,
+                  shootTimer: 99,
+                  attack: 0,
+                  phase: m.phase + i * 1.3,
+              },
+          });
+      }
+  }
+
+  private bossPresence(e: Entity): number {
+      if (e.id.startsWith('fuso_echo')) {
+          const life = e.ttl ?? 0;
+          const fadeIn = Math.min(1, (6.6 - life) / 0.35);
+          const fadeOut = life < 0.8 ? Math.max(0, life / 0.8) : 1;
+          return (0.5 + this.fusoShown * 0.36) * fadeIn * fadeOut;
+      }
+      if (e.mutation?.id !== 'molar>liver') return 1;
+      const veiled = 1 - (e.mutation.veil ?? 0) * 0.82;
+      if ((e.hitFlash ?? 0) > 0) return Math.max(veiled, 0.72);
+      return veiled;
+  }
+
   private updateBoss(e: Entity, dtSeconds: number, _stats: PlayerStats) {
       if (!e.mutation) return;
       const m = e.mutation;
@@ -2014,6 +2137,23 @@ export class GameEngine {
           e.vel.x = (nx * power + (-ny) * side * sidePower) * pace;
           e.vel.y = (ny * power + nx * side * sidePower) * pace;
       };
+
+      if (e.id.startsWith('fuso_echo')) {
+          e.ttl = (e.ttl ?? 0) - dtSeconds;
+          if ((e.ttl ?? 0) <= 0 || !this.chief()) {
+              e.active = false;
+              return;
+          }
+          e.vel.x += nx * speed * 0.9;
+          e.vel.y += ny * speed * 0.9;
+          m.dashTimer -= dtSeconds;
+          if (m.dashTimer <= 0) {
+              lunge(8.5);
+              m.dashTimer = 2.9;
+              m.attack = Math.max(m.attack, 0.65);
+          }
+          return;
+      }
 
       if (m.play === 'coil') {
           const tight = hot ? 0.7 : 1;
@@ -2153,8 +2293,24 @@ export class GameEngine {
           if (m.acidTimer <= 0) {
               const grain = m.play === 'filament';
               this.bossPool(e, (grain ? 46 : 72) * (hot ? 1.12 : 1), grain ? 3.6 : 5);
-              if (hot && !grain) lunge(7);
+              if (hot && !grain && m.id !== 'molar>liver') lunge(7);
               m.acidTimer = (grain ? 3.05 : 2.55) * (hot ? 0.64 : 1) * haste;
+          }
+          if (m.id === 'molar>liver') {
+              m.dashTimer -= dtSeconds;
+              const wind = hot ? 0.38 : 0.5;
+              const winding = m.dashTimer > 0 && m.dashTimer < wind;
+              if (winding) {
+                  e.vel.x *= 0.82;
+                  e.vel.y *= 0.82;
+              }
+              if (m.dashTimer <= 0) {
+                  lunge(hot ? 14.5 : 12);
+                  m.dashTimer = (hot ? 2.55 : 3.35) * haste;
+                  m.attack = Math.max(m.attack, 0.8);
+                  audioManager.playBossDash(e.pos);
+              }
+              this.tickFusoShade(m, dtSeconds, hot, winding);
           }
       }
 
@@ -2234,6 +2390,7 @@ export class GameEngine {
   public update(dt: number, stats: PlayerStats, onWaveClear: () => void, onGameOver: () => void, onLifeLost: () => void, onBossSpawn?: () => void) {
     if (dt > 32) dt = 32;
     if (this.bossCard || this.organ.charting()) {
+        audioManager.pumpCoins();
         this.tickPresentation(dt);
         return;
     }
@@ -2252,6 +2409,7 @@ export class GameEngine {
 
     if (this.hitStopTimer > 0) {
         this.hitStopTimer -= (dt / 1000);
+        audioManager.pumpCoins();
         return;
     }
 
@@ -2383,7 +2541,7 @@ export class GameEngine {
           if (this.patient.strain === ViralStrain.SWARM) spawnRateMod = 0.72;
           if (this.patient.strain === ViralStrain.TITAN) spawnRateMod = 1.35;
           const crowd = this.difficultyMods.crowd ?? 1;
-          const foeCap = (this.difficultyMods.cap ?? 16) + 2;
+          const foeCap = (this.difficultyMods.cap ?? 16) + 4;
           let foes = 0;
           for (const ent of this.entities) {
               if (ent.active && this.isEnemy(ent.type)) foes++;
@@ -2409,18 +2567,25 @@ export class GameEngine {
               for (const ent of this.entities) {
                   if (ent.active && ent.type === EntityType.BIO_MINE) liveMines++;
               }
-              const boss = this.entities.find(e => e.active && e.type === EntityType.BOSS);
+              const boss = this.chief();
               const organ = Math.floor(Math.max(0, this.currentWaveIndex) / 6);
               if (boss) {
                   this.feedBossBombs(boss, dtSeconds, liveMines);
               } else {
                   this.bossClock = 0;
-                  if (this.waveTimer < config.duration && this.currentWaveIndex >= 2) {
-                      const cap = organ >= 2 ? 2 : 1;
-                      const interval = Math.max(8.5, 20 - organ * 3.1);
-                      const grace = organ === 0 ? 11 : 7;
+                  const cleaning = this.waveTimer >= config.duration;
+                  if (!cleaning) this.sweepMines = false;
+                  else if (!this.sweepMines) {
+                      this.sweepMines = true;
+                      this.mineClock = Math.min(this.mineClock, 1.05);
+                  }
+                  const arm = cleaning ? this.currentWaveIndex >= 0 : this.currentWaveIndex >= 1;
+                  if (arm) {
+                      const cap = cleaning ? (organ >= 1 ? 3 : 2) : (organ >= 2 ? 3 : 2);
+                      const interval = cleaning ? 4.2 : Math.max(6.2, 13.2 - organ * 1.7);
+                      const grace = organ === 0 ? 8 : 5.2;
                       this.mineClock -= dtSeconds;
-                      if (this.waveTimer > grace && this.mineClock <= 0 && liveMines < cap) {
+                      if ((cleaning || this.waveTimer > grace) && this.mineClock <= 0 && liveMines < cap) {
                           this.mineClock = interval;
                           this.spawnMine('cyan');
                       }
@@ -2446,13 +2611,13 @@ export class GameEngine {
                   this.nodePass -= dtSeconds;
                   if (this.nodePass <= 0) {
                       this.spawnLymph();
-                      this.nodePass = 82 + Math.random() * 34;
+                      this.nodePass = 200 + Math.random() * 80;
                   }
               }
           }
 
-          const enemiesRemaining = this.entities.some(e => e.active && (this.isEnemy(e.type) || e.type === EntityType.BOSS));
-          const bossRemaining = this.entities.some(e => e.active && e.type === EntityType.BOSS);
+          const enemiesRemaining = this.entities.some(e => e.active && !e.id.startsWith('fuso_echo') && (this.isEnemy(e.type) || e.type === EntityType.BOSS));
+          const bossRemaining = !!this.chief();
           
           if (this.waveTimer >= config.duration) {
               const bossStillDue = config.hasBoss && (!this.bossSpawned || bossRemaining);
@@ -2487,6 +2652,7 @@ export class GameEngine {
                   const val = e.value || 1;
                   this.biomass += val;
                   this.sessionStats.biomassCollected += val;
+                  audioManager.playCoin(e.pos);
                   continue;
               }
               dnaLeft++;
@@ -2901,7 +3067,7 @@ export class GameEngine {
                }
            }
 
-           if (this.isEnemy(other.type) || other.type === EntityType.BOSS) {
+           if ((this.isEnemy(other.type) || other.type === EntityType.BOSS) && !other.id.startsWith('fuso_echo')) {
              if (e.type === EntityType.ANTIBODY && (other.reflect ?? 0) > 0) {
                  if (distSq(e.pos, other.pos) < (e.radius + other.radius) * (e.radius + other.radius)) {
                      this.reflectShot(e, other);
@@ -3516,6 +3682,7 @@ export class GameEngine {
     let checks = 0;
     for (const e of this.entities) {
       if (checks > 50) break; 
+      if (e.id.startsWith('fuso_echo')) continue;
       if ((this.isEnemy(e.type) || e.type === EntityType.BOSS) && e.active) {
          if (e.pos.x > -200) { 
              const d = distSq(this.player.pos, e.pos);
@@ -4692,6 +4859,8 @@ export class GameEngine {
       if (!e.active) return;
       if (this.isEnemy(e.type) || e.type === EntityType.BOSS) {
         this.ctx.translate(e.pos.x, e.pos.y);
+        const presence = this.bossPresence(e);
+        this.ctx.globalAlpha = presence;
         let spin = 0;
         const glowColor = e.isElite || e.type === EntityType.BOSS 
             ? (e.type === EntityType.BOSS ? e.color : this.colors.ELITE_GLOW)
@@ -4710,7 +4879,7 @@ export class GameEngine {
             this.ctx.fill();
         }
         this.ctx.globalCompositeOperation = 'source-over';
-        this.ctx.globalAlpha = 1.0;
+        this.ctx.globalAlpha = presence;
         this.ctx.fillStyle = (e.hitFlash && e.hitFlash > 0) ? '#ffffff' : e.color;
         this.ctx.strokeStyle = '#220000';
         this.ctx.lineWidth = 2;
@@ -4729,6 +4898,14 @@ export class GameEngine {
                 e.mutation.split,
                 e.mutation.attack,
             );
+            if (!e.id.startsWith('fuso_echo') && (e.mutation.veil ?? 0) > 0.4) {
+                this.ctx.globalAlpha = 0.26 + (1 - e.mutation.veil) * 0.2;
+                this.ctx.strokeStyle = '#f6d2c4';
+                this.ctx.lineWidth = 3;
+                this.ctx.beginPath();
+                this.ctx.ellipse(0, 0, e.radius * 0.24, e.radius * 0.9, Math.sin(this.time / 240) * 0.35, 0, Math.PI * 2);
+                this.ctx.stroke();
+            }
             drawn = true;
         } else if (e.type === EntityType.BACTERIA) {
           spin = this.time / 500;

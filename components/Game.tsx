@@ -924,7 +924,7 @@ export const Game: React.FC = () => {
           const currentWaveConfig = WAVES[waveIdx];
           
           // Check for active boss for HP Bar
-          const activeBoss = eng.entities.find(e => e.type === EntityType.BOSS && e.active);
+          const activeBoss = eng.entities.find(e => e.type === EntityType.BOSS && e.active && !e.id.startsWith('fuso_echo'));
           if (activeBoss && !eng.bossCard) {
               const spec = activeBoss.mutation?.id ? bossById(activeBoss.mutation.id) : null;
               setBossEntity({

@@ -38,7 +38,7 @@ export const BOSSES: BossSpec[] = [
         short: text('F. NUCLEATUM', 'F. NUCLEATUM', 'F. NUCLEATUM'),
         disease: text('Abscesso hepático', 'Liver abscess', 'Absceso hepático'),
         intro: text('Um palito da gengiva, fino nas duas pontas. Caiu no sangue e abriu pus no fígado.', 'A splinter from the gum, sharp at both ends. It rode the blood down and opened pus in the liver.', 'Un palito de la encía, afilado en las dos puntas. Bajó por la sangre y abrió pus en el hígado.'),
-        trick: text('Anda devagar e larga poça pelo caminho, e pisar nela queima.', 'It moves slow and leaves a puddle behind, and standing in it burns.', 'Anda despacio y deja un charco al pasar, y pisarlo quema.'),
+        trick: text('Anda devagar, larga poça que queima e, de vez em quando, investe. Na metade da vida quase some de vista e solta dois palitos iguais, que não levam dano e somem sozinhos.', 'It moves slow, leaves a burning puddle, and every so often charges. At half health it nearly fades from sight and sheds two lookalike splinters that take no damage and vanish on their own.', 'Anda despacio, deja un charco que quema y, de vez en cuando, embiste. A la mitad de la vida casi desaparece y suelta dos palitos iguales, que no reciben daño y se esfuman solos.'),
         lesson: text(
             'O Fusobacterium nucleatum parece um palito de dente, pontudo dos dois lados. Mora escondido na placa da gengiva. Quando cai no sangue, faz o que quase nenhuma bactéria faz sozinha: viaja até o fígado e abre um abscesso cheio de pus sem precisar de ajuda.',
             'Fusobacterium nucleatum looks like a toothpick, pointed at both ends. It lives tucked inside gum plaque. When it slips into the blood, it does what few bacteria pull off alone: it rides down to the liver and opens a pocket of pus without calling anyone else.',
@@ -321,6 +321,7 @@ export function mutationFrom(spec: BossSpec): BossMutation {
         open: false,
         attack: 0,
         enraged: false,
+        veil: 0,
     };
 }
 

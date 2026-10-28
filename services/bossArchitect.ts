@@ -39,6 +39,8 @@ export interface BossMutation {
     open: boolean;
     attack: number;
     enraged: boolean;
+    /** 0 opaca, 1 quase sumida. Só o F. nucleatum usa. */
+    veil: number;
 }
 
 export class BossArchitect {
@@ -78,6 +80,7 @@ export class BossArchitect {
             open: false,
             attack: 0,
             enraged: false,
+            veil: 0,
         };
     }
 }

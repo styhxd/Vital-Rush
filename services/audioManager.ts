@@ -11,7 +11,7 @@
  */
 
 import type { OrganId } from '../types';
-import { flushCoin, latchCoin, scheduleCadence, scheduleCoinTick, type CoinVoice } from './coinFeel';
+import { COIN_PHRASE, scheduleCadence, scheduleCoinTick, type CoinVoice } from './coinFeel';
 import { scheduleHurt, scheduleHurtClear, type HurtGrade } from './hurtFeel';
 
 export type DrumHit = 'kick' | 'snare' | 'hat' | 'tom';
@@ -73,6 +73,9 @@ export class AudioManager {
   private coinGear = 0;
   private coinClosing = false;
   private coinCadenceUntil = 0;
+  private coinHeard = 0;
+  private coinFold = 0;
+  private coinDue: number[] = [];
   private spendAt = 0;
   
   // Sequenciador Musical Procedural
@@ -675,9 +678,8 @@ export class AudioManager {
   }
 
   public queueCoins(n: number, at?: { x: number; y: number } | null) {
-      const add = Math.max(0, Math.min(8, Math.round(n)));
-      for (let i = 0; i < add; i++) this.coinLatch = latchCoin(this.coinVoice()).latch;
-      if (at) this.coinAt = at;
+      const add = Math.max(0, Math.min(32, Math.round(n)));
+      for (let i = 0; i < add; i++) this.playCoin(at);
   }
 
   public trimCoins(_keep = 0) {
@@ -685,22 +687,50 @@ export class AudioManager {
   }
 
   public stopCoins() {
+      this.coinDue.length = 0;
+      this.coinFold = 0;
+      this.coinHeard = 0;
       this.applyCoin({ run: 0, lastAt: 0, latch: 0, gear: 0, closing: false, cadenceUntil: 0 });
   }
 
   public pumpCoins() {
-      const now = performance.now();
-      const out = flushCoin(this.coinVoice(), now);
-      if (!out.play) {
-          this.applyCoin(out.voice);
+      this.drainCoins();
+  }
+
+  /** Cada coleta entra na fila. O tilintar sai mesmo no hit-stop e com o contexto dormindo. */
+  private drainCoins() {
+      if (!this.ctx || !this.sfxGain) return;
+      if (this.ctx.state !== 'running') {
+          this.resume();
           return;
       }
-      if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
-      this.applyCoin(out.voice);
-      this.lastPlayTime['coin'] = now;
+      const now = performance.now();
       const dest = this.coinEar();
-      if (out.play.kind === 'cadence') scheduleCadence(this.ctx, dest, this.ctx.currentTime, out.play.gear);
-      else scheduleCoinTick(this.ctx, dest, this.ctx.currentTime, out.play.step, out.play.piled, out.play.gear);
+      let n = 0;
+      while (this.coinDue.length && this.coinDue[0] <= now + 12 && n < 2) {
+          this.coinDue.shift();
+          const piled = 1 + (n === 0 ? this.coinFold : 0);
+          if (n === 0) this.coinFold = 0;
+          const step = this.coinRun;
+          const gear = this.coinGear;
+          const gap = this.coinLast > 0 ? now - this.coinLast : 999;
+          const fresh = gap > 480;
+          const toneStep = fresh ? 0 : step;
+          const toneGear = fresh ? 0 : gear;
+          this.coinRun = toneStep + 1;
+          this.coinGear = toneGear;
+          if (this.coinRun >= COIN_PHRASE) {
+              this.coinRun = 0;
+              this.coinGear = Math.min(3, toneGear + 1);
+          }
+          this.coinLast = now;
+          scheduleCoinTick(this.ctx, dest, this.ctx.currentTime + n * 0.042, toneStep, piled, toneGear);
+          if (toneStep === COIN_PHRASE - 1 && this.coinDue.length === 0 && this.coinFold === 0) {
+              scheduleCadence(this.ctx, dest, this.ctx.currentTime + 0.07, toneGear);
+          }
+          n++;
+      }
+      if (n > 0) this.coinHeard = now;
   }
 
   /** Um pan só, reaproveitado. Cada moeda não abre um panner novo. */
@@ -721,8 +751,12 @@ export class AudioManager {
    * ataque só; o grau sobe enquanto elas continuam chegando e recomeça no silêncio.
    */
   public playCoin(at?: { x: number; y: number } | null, _force = false) {
-      this.coinLatch = latchCoin(this.coinVoice()).latch;
       if (at) this.coinAt = at;
+      const now = performance.now();
+      const last = this.coinDue.length ? this.coinDue[this.coinDue.length - 1] : this.coinHeard;
+      if (this.coinDue.length < 32) this.coinDue.push(Math.max(now, (last || 0) + 46));
+      else this.coinFold = Math.min(16, this.coinFold + 1);
+      this.drainCoins();
   }
 
   private hardPan(pan: number, life: number): AudioNode {
