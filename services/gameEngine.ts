@@ -654,38 +654,74 @@ export class GameEngine {
       audioManager.playPowerUp(this.player.pos);
   }
 
+  private mineSpot() {
+      const inset = 70;
+      const w = CANVAS_WIDTH - inset * 2;
+      const h = CANVAS_HEIGHT - inset * 2;
+      if (Math.random() < 0.46) {
+          const edge = Math.floor(Math.random() * 4);
+          const along = Math.random();
+          const depth = 0.04 + Math.random() * 0.2;
+          if (edge === 0) return { x: inset + along * w, y: inset + depth * h };
+          if (edge === 1) return { x: inset + along * w, y: inset + (1 - depth) * h };
+          if (edge === 2) return { x: inset + depth * w, y: inset + along * h };
+          return { x: inset + (1 - depth) * w, y: inset + along * h };
+      }
+      return { x: inset + Math.random() * w, y: inset + Math.random() * h };
+  }
+
+  private settleMine(e: Entity) {
+      const tx = e.value;
+      const ty = e.orbitOffset;
+      if (tx !== undefined && ty !== undefined) {
+          const dx = tx - e.pos.x;
+          const dy = ty - e.pos.y;
+          const dist = Math.hypot(dx, dy);
+          const cap = 10;
+          if (dist < 24) {
+              e.vel.x *= 0.7;
+              e.vel.y *= 0.7;
+              e.pos.x += dx * 0.4;
+              e.pos.y += dy * 0.4;
+          } else {
+              const aim = Math.min(cap, 4.8 + dist * 0.006);
+              e.vel.x = e.vel.x * 0.84 + (dx / dist) * aim * 0.16;
+              e.vel.y = e.vel.y * 0.84 + (dy / dist) * aim * 0.16;
+              const mag = Math.hypot(e.vel.x, e.vel.y);
+              if (mag > cap) {
+                  e.vel.x *= cap / mag;
+                  e.vel.y *= cap / mag;
+              }
+          }
+      } else {
+          e.vel.x *= 0.94;
+          e.vel.y *= 0.94;
+      }
+      const box = 42;
+      if (e.pos.x < box) { e.pos.x = box; if (e.vel.x < 0) e.vel.x = 0; }
+      if (e.pos.x > CANVAS_WIDTH - box) { e.pos.x = CANVAS_WIDTH - box; if (e.vel.x > 0) e.vel.x = 0; }
+      if (e.pos.y < box) { e.pos.y = box; if (e.vel.y < 0) e.vel.y = 0; }
+      if (e.pos.y > CANVAS_HEIGHT - box) { e.pos.y = CANVAS_HEIGHT - box; if (e.vel.y > 0) e.vel.y = 0; }
+  }
+
   private spawnMine(kind: 'cyan' | 'iris' | 'amber' | 'bile' | 'leash' | 'mark' = 'cyan') {
-      const padX = 150;
-      const padY = 120;
-      const tx = padX + this.screenSpread() * (CANVAS_WIDTH - padX * 2);
-      const ty = padY + this.screenSpread() * (CANVAS_HEIGHT - padY * 2);
+      const spot = this.mineSpot();
+      const tx = spot.x;
+      const ty = spot.y;
       const roll = Math.random();
       let x = 0;
       let y = 0;
-      if (roll < 0.4) {
-          x = tx < CANVAS_WIDTH * 0.5 ? CANVAS_WIDTH + 52 : -52;
-          y = Math.max(36, Math.min(CANVAS_HEIGHT - 36, ty + (Math.random() - 0.5) * 240));
-      } else if (roll < 0.74) {
-          y = ty < CANVAS_HEIGHT * 0.5 ? CANVAS_HEIGHT + 52 : -52;
-          x = Math.max(36, Math.min(CANVAS_WIDTH - 36, tx + (Math.random() - 0.5) * 280));
-      } else if (Math.random() < 0.5) {
-          x = Math.random() < 0.5 ? -46 : CANVAS_WIDTH + 46;
-          y = Math.max(36, Math.min(CANVAS_HEIGHT - 36, ty));
+      if (roll < 0.5) {
+          x = tx < CANVAS_WIDTH * 0.5 ? -40 : CANVAS_WIDTH + 40;
+          y = Math.max(48, Math.min(CANVAS_HEIGHT - 48, ty + (Math.random() - 0.5) * 180));
       } else {
-          y = Math.random() < 0.5 ? -46 : CANVAS_HEIGHT + 46;
-          x = Math.max(36, Math.min(CANVAS_WIDTH - 36, tx));
+          y = ty < CANVAS_HEIGHT * 0.5 ? -40 : CANVAS_HEIGHT + 40;
+          x = Math.max(48, Math.min(CANVAS_WIDTH - 48, tx + (Math.random() - 0.5) * 180));
       }
-      const reach = 1 / (1 - MINE_COAST);
-      let vx = (tx - x) / reach;
-      let vy = (ty - y) / reach;
-      const mag = Math.hypot(vx, vy) || 1;
-      const cap = 27;
-      if (mag > cap) {
-          vx *= cap / mag;
-          vy *= cap / mag;
-      }
-      vx += (Math.random() - 0.5) * 0.55;
-      vy += (Math.random() - 0.5) * 0.55;
+      const dx = tx - x;
+      const dy = ty - y;
+      const dist = Math.hypot(dx, dy) || 1;
+      const speed = Math.min(8.2, 3.6 + dist * 0.0022);
       const tint = kind === 'leash' || kind === 'iris' ? '#c084fc'
           : kind === 'mark' ? '#ffe08a'
           : kind === 'amber' ? '#ffb020'
@@ -694,8 +730,9 @@ export class GameEngine {
       const tag = kind === 'cyan' ? 'mine' : `mine_${kind}`;
       this.entities.push({
           id: `${tag}_${Date.now()}_${Math.random()}`, type: EntityType.BIO_MINE,
-          pos: { x, y }, vel: { x: vx, y: vy },
-          radius: 20, health: 10, maxHealth: 10, color: tint, damage: 150, active: true, drag: 0.1
+          pos: { x, y }, vel: { x: (dx / dist) * speed, y: (dy / dist) * speed },
+          radius: 20, health: 10, maxHealth: 10, color: tint, damage: 150, active: true, drag: 0.1,
+          value: tx, orbitOffset: ty,
       });
   }
 
@@ -713,28 +750,24 @@ export class GameEngine {
       const edge = Math.min(pos.x, pos.y, CANVAS_WIDTH - pos.x, CANVAS_HEIGHT - pos.y);
       const pull = edge < 280 ? (1 - edge / 280) * 0.85 : 0;
       for (let i = 0; i < shards; i++) {
-          let ang = (i / shards) * Math.PI * 2 + (carpet ? i * 0.17 : Math.random() * 0.4);
+          let ang = (i / shards) * Math.PI * 2 + Math.random() * 0.4;
           if (pull > 0) ang += Math.atan2(Math.sin(inward - ang), Math.cos(inward - ang)) * pull;
           const burst = shards > 50;
-          const kick = carpet
-              ? 7.5 + Math.random() * 8.5
-              : (burst ? 3.6 : 2.05) + Math.random() * (burst ? 5.2 : shards > 20 ? 3.1 : 2.2);
-          const launch = carpet ? 36 + Math.random() * 26 : 0;
+          const kick = (burst ? 3.6 : 2.05) + Math.random() * (burst ? 5.2 : shards > 20 ? 3.1 : 2.2);
           const share = base + (leftover > 0 ? 1 : 0);
           if (leftover > 0) leftover--;
           this.entities.push({
               id: carpet ? `dna_shiny_${this.time}_${i}_${Math.random()}` : `dna_${this.time}_${i}_${Math.random()}`,
               type: EntityType.DNA_FRAGMENT,
-              pos: { x: pos.x + Math.cos(ang) * launch, y: pos.y + Math.sin(ang) * launch },
+              pos: { x: pos.x, y: pos.y },
               vel: { x: Math.cos(ang) * kick, y: Math.sin(ang) * kick },
-              radius: carpet ? 7.6 : shards > 50 ? 4.4 : shards > 20 ? 5.1 : 6.15,
+              radius: shards > 50 ? 4.4 : shards > 20 ? 5.1 : 6.15,
               health: 1, maxHealth: 1,
               color: carpet ? '#ffe08a' : this.colors.DNA,
               damage: energy, active: true,
-              drag: carpet ? 0.08 : 0.05,
+              drag: 0.05,
               value: Math.max(1, share),
               isElite: elite || carpet,
-              ttl: carpet ? 0.72 : undefined,
           });
       }
   }
@@ -1174,43 +1207,120 @@ export class GameEngine {
   }
 
   private drawBossTools() {
-      const boss = this.entities.find(e => e.active && e.type === EntityType.BOSS);
+      const boss = this.chief();
       const leash = this.bossLeash;
       if (leash && this.time <= leash.until) {
           const life = Math.max(0, Math.min(1, (leash.until - this.time) / 4200));
           this.ctx.save();
-          this.ctx.fillStyle = `rgba(192, 132, 252, ${0.05 + life * 0.06})`;
+          this.ctx.strokeStyle = `rgba(214, 176, 255, ${0.28 + life * 0.35})`;
+          this.ctx.lineWidth = 2;
           this.ctx.beginPath();
           this.ctx.arc(leash.x, leash.y, leash.reach, 0, Math.PI * 2);
-          this.ctx.fill();
-          this.ctx.strokeStyle = `rgba(226, 196, 255, ${0.35 + life * 0.45})`;
-          this.ctx.lineWidth = 3;
           this.ctx.stroke();
-          if (boss) {
-              this.ctx.setLineDash([7, 9]);
-              this.ctx.strokeStyle = `rgba(244, 228, 255, ${0.55 + life * 0.35})`;
-              this.ctx.lineWidth = 2;
+          this.ctx.strokeStyle = `rgba(244, 228, 255, ${0.18 + life * 0.2})`;
+          this.ctx.lineWidth = 1;
+          this.ctx.beginPath();
+          this.ctx.arc(leash.x, leash.y, leash.reach - 10, 0, Math.PI * 2);
+          this.ctx.stroke();
+
+          this.ctx.fillStyle = '#1a1024';
+          this.ctx.strokeStyle = '#f3e8ff';
+          this.ctx.lineWidth = 3;
+          this.ctx.beginPath();
+          this.ctx.arc(leash.x, leash.y, 11, 0, Math.PI * 2);
+          this.ctx.fill();
+          this.ctx.stroke();
+          this.ctx.fillStyle = '#d8b4fe';
+          this.ctx.beginPath();
+          this.ctx.arc(leash.x, leash.y, 4, 0, Math.PI * 2);
+          this.ctx.fill();
+
+          const end = boss ? { x: boss.pos.x, y: boss.pos.y } : { x: leash.x, y: leash.y - 36 };
+          const dx = end.x - leash.x;
+          const dy = end.y - leash.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          const ang = Math.atan2(dy, dx);
+          const links = Math.max(3, Math.round(dist / 18));
+          this.ctx.strokeStyle = `rgba(243, 232, 255, ${0.75 + life * 0.2})`;
+          this.ctx.lineWidth = 3.5;
+          for (let i = 0; i < links; i++) {
+              const t = (i + 0.5) / links;
+              const cx = leash.x + dx * t;
+              const cy = leash.y + dy * t;
+              this.ctx.save();
+              this.ctx.translate(cx, cy);
+              this.ctx.rotate(ang + (i % 2 === 0 ? 0.5 : -0.5));
               this.ctx.beginPath();
-              this.ctx.moveTo(leash.x, leash.y);
-              this.ctx.lineTo(boss.pos.x, boss.pos.y);
+              this.ctx.ellipse(0, 0, 7.5, 4.2, 0, 0, Math.PI * 2);
               this.ctx.stroke();
-              this.ctx.setLineDash([]);
+              this.ctx.restore();
+          }
+          if (boss) {
+              this.ctx.save();
+              this.ctx.translate(boss.pos.x, boss.pos.y);
+              this.ctx.rotate(ang);
+              this.ctx.strokeStyle = '#f6edff';
+              this.ctx.lineWidth = 5;
+              this.ctx.beginPath();
+              this.ctx.arc(0, 0, boss.radius * 0.62, -0.9, 0.9);
+              this.ctx.stroke();
+              this.ctx.fillStyle = '#c084fc';
+              this.ctx.beginPath();
+              this.ctx.roundRect(boss.radius * 0.48, -7, 16, 14, 3);
+              this.ctx.fill();
+              this.ctx.restore();
+              this.drawToolPlate(boss.pos.x, boss.pos.y - boss.radius - 36, this.t('MSG_LEASH_ON'), '#f3e8ff');
           }
           this.ctx.restore();
       }
       if (!boss || this.time >= this.bossMarkUntil) return;
-      const dx = this.player.pos.x - boss.pos.x;
-      const dy = this.player.pos.y - boss.pos.y;
-      const dist = Math.hypot(dx, dy) || 1;
-      const len = Math.min(dist, 210);
+      const life = Math.max(0, Math.min(1, (this.bossMarkUntil - this.time) / 5600));
       this.ctx.save();
-      this.ctx.strokeStyle = 'rgba(255, 224, 138, 0.9)';
+      this.ctx.translate(boss.pos.x, boss.pos.y);
+      this.ctx.strokeStyle = `rgba(255, 214, 120, ${0.55 + life * 0.4})`;
+      this.ctx.lineWidth = 4;
+      const arm = boss.radius + 18;
+      const cut = 16;
+      const corner = (sx: number, sy: number) => {
+          this.ctx.beginPath();
+          this.ctx.moveTo(sx * (arm - cut), sy * arm);
+          this.ctx.lineTo(sx * arm, sy * arm);
+          this.ctx.lineTo(sx * arm, sy * (arm - cut));
+          this.ctx.stroke();
+      };
+      corner(1, 1);
+      corner(1, -1);
+      corner(-1, 1);
+      corner(-1, -1);
+      this.ctx.strokeStyle = 'rgba(255, 236, 180, 0.9)';
       this.ctx.lineWidth = 3;
       this.ctx.beginPath();
-      this.ctx.arc(boss.pos.x, boss.pos.y, boss.radius + 16, 0, Math.PI * 2);
-      this.ctx.moveTo(boss.pos.x, boss.pos.y);
-      this.ctx.lineTo(boss.pos.x + (dx / dist) * len, boss.pos.y + (dy / dist) * len);
+      this.ctx.arc(0, 0, 18, 0, Math.PI * 1.35);
       this.ctx.stroke();
+      this.ctx.beginPath();
+      this.ctx.moveTo(16, -6);
+      this.ctx.lineTo(6, -2);
+      this.ctx.lineTo(12, 8);
+      this.ctx.stroke();
+      this.ctx.restore();
+      this.drawToolPlate(boss.pos.x, boss.pos.y - boss.radius - 36 - (this.bossLeash && this.time <= this.bossLeash.until ? 42 : 0), this.t('MSG_MARK_ON'), '#ffe7a8');
+  }
+
+  private drawToolPlate(x: number, y: number, text: string, color: string) {
+      this.ctx.save();
+      this.ctx.font = '700 18px "Chakra Petch", sans-serif';
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      const w = Math.min(520, this.ctx.measureText(text).width + 28);
+      this.ctx.fillStyle = 'rgba(16, 10, 8, 0.88)';
+      this.ctx.strokeStyle = color;
+      this.ctx.lineWidth = 2;
+      this.ctx.beginPath();
+      this.ctx.roundRect(x - w / 2, y - 16, w, 32, 10);
+      this.ctx.fill();
+      this.ctx.stroke();
+      this.ctx.fillStyle = color;
+      this.ctx.fillText(text, x, y + 1);
       this.ctx.restore();
   }
 
@@ -2946,14 +3056,6 @@ export class GameEngine {
         e.pos.x += (e.vel.x + (this.bloodFlow.x * (1 - drag) * flowInfluence) + this.organ.wind.x * windScale) * tick;
         e.pos.y += (e.vel.y + (this.bloodFlow.y * (1 - drag) * flowInfluence) + this.organ.wind.y * windScale) * tick;
 
-        if (e.type === EntityType.DNA_FRAGMENT && e.id.startsWith('dna_shiny')) {
-            const m = 40;
-            if (e.pos.x < m) { e.pos.x = m; e.vel.x = Math.abs(e.vel.x) * 0.62; }
-            if (e.pos.x > CANVAS_WIDTH - m) { e.pos.x = CANVAS_WIDTH - m; e.vel.x = -Math.abs(e.vel.x) * 0.62; }
-            if (e.pos.y < m) { e.pos.y = m; e.vel.y = Math.abs(e.vel.y) * 0.62; }
-            if (e.pos.y > CANVAS_HEIGHT - m) { e.pos.y = CANVAS_HEIGHT - m; e.vel.y = -Math.abs(e.vel.y) * 0.62; }
-        }
-        
         // VARIETY INJECTION: ZIG-ZAG FUNGI
         if (e.type === EntityType.FUNGI && this.player.active && !e.id.startsWith('shiny_')) {
             e.vel.y += Math.sin(this.time * 0.005 + e.pos.x * 0.01) * 0.5;
@@ -3017,8 +3119,7 @@ export class GameEngine {
         }
 
         if (e.type === EntityType.BIO_MINE) {
-            e.vel.x *= MINE_COAST;
-            e.vel.y *= MINE_COAST;
+            this.settleMine(e);
         } else if (e.type !== EntityType.ANTIBODY && e.type !== EntityType.ACID_POOL && e.type !== EntityType.ENEMY_PROJECTILE && e.type !== EntityType.BOSS) {
           e.vel.x *= 0.95;
           e.vel.y *= 0.95;
@@ -3149,10 +3250,9 @@ export class GameEngine {
           const dy = this.player.pos.y - e.pos.y;
           const dist = Math.sqrt(dx*dx + dy*dy);
           const reeling = e.angle === 1;
-          const carpet = e.id.startsWith('dna_shiny');
           const airborne = (e.ttl ?? 0) > 0;
           const touching = !airborne && dist < this.player.radius + e.radius + 10;
-          const magnet = !carpet && !airborne && !this.coinCascade && dist < stats.magnetRadius;
+          const magnet = !airborne && !this.coinCascade && dist < stats.magnetRadius;
           if (magnet || reeling || touching) {
             const speed = reeling ? Math.max(28, e.orbitOffset || 28) : 28;
             // Sem o teto, o vácuo do fim da onda passa do corpo e a moeda
@@ -4831,15 +4931,24 @@ export class GameEngine {
             const arm = r * 0.32;
             this.ctx.beginPath();
             if (mineKind === 'leash') {
-                this.ctx.arc(0, r * 0.12, r * 0.42, 0, Math.PI * 2);
+                this.ctx.beginPath();
+                this.ctx.arc(0, r * 0.12, r * 0.46, 0.4, Math.PI * 2 - 0.2);
+                this.ctx.stroke();
+                this.ctx.fillStyle = '#ffffff';
+                this.ctx.fillRect(r * 0.28, r * 0.02, r * 0.22, r * 0.2);
             } else if (mineKind === 'bile') {
                 this.ctx.moveTo(0, r * 0.12 - arm);
                 this.ctx.bezierCurveTo(arm * 0.8, r * 0.12, arm * 0.35, r * 0.12 + arm, 0, r * 0.12 + arm * 1.15);
                 this.ctx.bezierCurveTo(-arm * 0.35, r * 0.12 + arm, -arm * 0.8, r * 0.12, 0, r * 0.12 - arm);
             } else if (mineKind === 'mark') {
-                this.ctx.arc(0, r * 0.12, r * 0.28, 0, Math.PI * 2);
-                this.ctx.moveTo(0, r * 0.12);
-                this.ctx.arc(0, r * 0.12, r * 0.08, 0, Math.PI * 2);
+                this.ctx.beginPath();
+                this.ctx.arc(0, r * 0.1, r * 0.34, 0, Math.PI * 1.4);
+                this.ctx.stroke();
+                this.ctx.beginPath();
+                this.ctx.moveTo(r * 0.22, r * 0.02);
+                this.ctx.lineTo(r * 0.02, r * 0.08);
+                this.ctx.lineTo(r * 0.1, r * 0.28);
+                this.ctx.stroke();
             } else {
                 this.ctx.moveTo(-arm, r * 0.12);
                 this.ctx.lineTo(arm, r * 0.12);
@@ -4847,6 +4956,23 @@ export class GameEngine {
                 this.ctx.lineTo(0, r * 0.12 + arm);
             }
             this.ctx.stroke();
+            if (mineKind === 'mark' || mineKind === 'leash') {
+                const tag = mineKind === 'mark' ? this.t('MSG_MARK') : this.t('MSG_LEASH');
+                const ink = mineKind === 'mark' ? '#ffe7a8' : '#f3e8ff';
+                this.ctx.font = '700 14px "Chakra Petch", sans-serif';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                const tw = this.ctx.measureText(tag).width + 18;
+                this.ctx.fillStyle = 'rgba(16, 10, 8, 0.9)';
+                this.ctx.strokeStyle = ink;
+                this.ctx.lineWidth = 1.6;
+                this.ctx.beginPath();
+                this.ctx.roundRect(-tw / 2, -r * 2.7, tw, 24, 8);
+                this.ctx.fill();
+                this.ctx.stroke();
+                this.ctx.fillStyle = ink;
+                this.ctx.fillText(tag, 0, -r * 2.7 + 12);
+            }
 
             this.ctx.restore();
         }
