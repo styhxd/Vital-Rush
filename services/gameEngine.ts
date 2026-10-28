@@ -179,6 +179,15 @@ export class GameEngine {
   private shinyOrgan = -1;
   private shinySpawned = false;
   private shinyWave = 1;
+  public star = false;
+  private swarmRolled = false;
+  private swarmAt = -1;
+  private waveHurt = 0;
+  private pillOffers = 0;
+  private pillGap = 0;
+  private starTaken = false;
+  private starGhost = 0;
+  private starHue = 0;
   
   // NOVO: Controle de atraso inicial da onda (para tutoriais)
   public waveStartDelay: number = 0;
@@ -459,7 +468,9 @@ export class GameEngine {
       // A rampa vai até a onda 30. O expoente da parede só entra depois do cérebro.
       const pastTheWall = wavesPastTheWall(this.currentWaveIndex);
       const pressure = campaignPressure(this.currentWaveIndex);
-      const isElite = Math.random() < (0.04 + pressure * 0.08 + Math.min(0.06, pastTheWall * 0.008));
+      const swarm = this.swarmHere();
+      const eliteChance = swarm ? 0.025 : (0.04 + pressure * 0.08 + Math.min(0.06, pastTheWall * 0.008));
+      const isElite = Math.random() < eliteChance;
       if (isElite) {
           hp *= 2.4;
           dmg *= 1.5;
@@ -631,6 +642,7 @@ export class GameEngine {
   }
 
   private openLymph() {
+      if (this.star) return;
       this.lymphOpen = true;
       this.lymphPhase = 'in';
       this.lymphT = 0;
@@ -1324,6 +1336,103 @@ export class GameEngine {
       this.ctx.restore();
   }
 
+  private rollSwarm() {
+      if (this.swarmRolled) return;
+      this.swarmRolled = true;
+      if (Math.random() > 0.78) {
+          this.swarmAt = -1;
+          return;
+      }
+      const early: number[] = [];
+      const late: number[] = [];
+      for (let i = 1; i < WAVES.length; i++) {
+          if (WAVES[i].hasBoss) continue;
+          if (i < 12) early.push(i);
+          else late.push(i);
+      }
+      const bag = Math.random() < 0.62 ? early : late;
+      this.swarmAt = bag[Math.floor(Math.random() * bag.length)];
+  }
+
+  private swarmHere(): boolean {
+      if (this.currentWaveIndex < 0 || this.swarmAt < 0) return false;
+      const config = this.configFor(this.currentWaveIndex);
+      if (config.hasBoss) return false;
+      return (this.currentWaveIndex % WAVES.length) === this.swarmAt;
+  }
+
+  private watchLeucogen(dtSeconds: number) {
+      if (this.star || this.starTaken || !this.player.active || this.waveTimer < 2.1) return;
+      for (const e of this.entities) {
+          if (e.active && e.type === EntityType.LEUCOGEN) return;
+      }
+      if (this.pillOffers >= 2) return;
+      if (this.pillGap > 0) {
+          this.pillGap -= dtSeconds;
+          return;
+      }
+      const max = Math.max(1, this.player.maxHealth);
+      const hurting = this.waveHurt >= max * 0.12 || this.player.health <= max * 0.74;
+      if (!hurting) return;
+      if (this.pillOffers >= 1 && this.player.health > max * 0.58) return;
+      this.spawnPill();
+  }
+
+  private spawnPill() {
+      if (this.entities.length > this.maxEntities - 8) return;
+      this.pillOffers++;
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const y = Math.max(140, Math.min(CANVAS_HEIGHT - 140, this.player.pos.y + side * (100 + Math.random() * 180)));
+      this.entities.push({
+          id: `leucogen_${Date.now()}`,
+          type: EntityType.LEUCOGEN,
+          pos: { x: CANVAS_WIDTH + 60, y },
+          vel: { x: -4.4, y: 0 },
+          radius: 28,
+          health: 1, maxHealth: 1,
+          color: '#ff2a32',
+          damage: 0, active: true,
+          value: y,
+          orbitOffset: Math.random() * Math.PI * 2,
+      });
+      audioManager.starOffer({ x: CANVAS_WIDTH - 80, y });
+  }
+
+  private tickPill(e: Entity, tick: number) {
+      const anchor = e.value || e.pos.y;
+      e.pos.x -= 4.4 * tick;
+      e.pos.y = anchor + Math.sin(this.time / 220 + (e.orbitOffset || 0)) * 26;
+      if (this.player.active) {
+          const reach = this.player.radius + e.radius;
+          if (distSq(this.player.pos, e.pos) < reach * reach) {
+              this.takePill(e);
+              return;
+          }
+      }
+      if (e.pos.x < -140) {
+          e.active = false;
+          if (!this.starTaken) this.pillGap = 7;
+      }
+  }
+
+  private takePill(e: Entity) {
+      e.active = false;
+      this.star = true;
+      this.starTaken = true;
+      this.starGhost = 0;
+      this.adrenalineActive = false;
+      this.surgeActive = false;
+      this.coinCascade = false;
+      this.dashCooldownTimer = 0;
+      this.isDashing = false;
+      for (const ent of this.entities) {
+          if (ent.active && ent.type === EntityType.ANTIBODY) ent.active = false;
+      }
+      this.spawnText(this.player.pos, this.t('LEUCOGEN'), '#fff1a8', 44);
+      this.shakeIntensity = Math.max(this.shakeIntensity, 14);
+      audioManager.beginStar();
+  }
+
   private maybeSpawnShiny() {
       if (this.shinySpawned || this.currentWaveIndex !== this.shinyWave) return;
       if (this.waveTimer < 6.5) return;
@@ -1719,12 +1828,13 @@ export class GameEngine {
 
   // --- REVISED: DAMAGE PLAYER LOGIC ---
   private damagePlayer(amount: number, sourcePos: Vector2, onGameOver: () => void, onLifeLost: () => void, stats: PlayerStats, isEnvironmental: boolean = false, sourceEntity?: Entity) {
-      if (this.invulnerabilityTimer > 0 || this.isDashing) return;
+      if (this.star || this.invulnerabilityTimer > 0 || this.isDashing) return;
       if (this.organ.shield > 0) amount *= (1 - this.organ.shield);
       if (stats.guard > 0) amount *= (1 - Math.min(0.45, stats.guard));
 
       this.player.health = Math.max(0, this.player.health - amount);
       this.sessionStats.damageTaken += amount;
+      this.waveHurt += amount;
       this.sting(amount, sourcePos);
       
       // Reset Combo
@@ -1760,6 +1870,50 @@ export class GameEngine {
       if (this.player.health <= 0) {
           this.handlePlayerDeath(onGameOver, onLifeLost, stats);
       }
+  }
+
+  private phagocytose(e: Entity, stats: PlayerStats) {
+      if (!this.star || !e.active || !this.isEnemy(e.type)) return;
+      if (e.id.startsWith('shiny_')) {
+          this.damageEnemy(e, 9999, false, stats);
+      } else {
+          e.health = 0;
+          e.active = false;
+          this.sessionStats.enemiesKilled++;
+          achievementManager.track('kill_100', 1);
+          achievementManager.track('kill_1000', 1);
+          achievementManager.track('kill_5000', 1);
+          achievementManager.track('kill_10000', 1);
+          this.comboCount++;
+          if (this.comboCount >= 50) achievementManager.track('combo_50', 50);
+          this.comboTimer = this.COMBO_DURATION;
+          if (this.comboCount > this.sessionStats.maxCombo) this.sessionStats.maxCombo = this.comboCount;
+          this.score += Math.floor((e.value || 10) * comboScoreMultiplier(this.comboCount));
+          if (this.score >= 50000) achievementManager.track('score_50k', 50000);
+          const purse = dnaPurse(this.currentWaveIndex);
+          const gross = Math.max(8, Math.ceil((e.value || 10) * 1.85));
+          const total = Math.max(4, Math.round(gross * COIN_WORTH * purse * 2.2));
+          const want = Math.min(7, Math.max(4, Math.round(3 + Math.sqrt(total) * 0.7)));
+          this.spillCoins(e.pos, total, want, true, 5);
+          const sparks = this.isLowQuality ? 4 : 9;
+          for (let i = 0; i < sparks; i++) {
+              const ang = (i / sparks) * Math.PI * 2;
+              const spd = 5 + Math.random() * 7;
+              this.particles.push({
+                  id: 'star_pop', type: EntityType.PARTICLE, pos: { ...e.pos },
+                  vel: { x: Math.cos(ang) * spd, y: Math.sin(ang) * spd },
+                  radius: 3.5, health: 1, maxHealth: 1,
+                  color: i % 2 ? '#fff6d0' : '#ff3355',
+                  damage: 0, active: true, ttl: 16,
+              });
+          }
+      }
+      audioManager.starKill();
+      this.hitStopTimer = Math.max(this.hitStopTimer, 0.035);
+      const mag = Math.hypot(this.player.vel.x, this.player.vel.y) || 1;
+      this.hurtKickX = (this.player.vel.x / mag) * 6.5;
+      this.hurtKickY = (this.player.vel.y / mag) * 6.5;
+      this.shakeIntensity = Math.max(this.shakeIntensity, 8);
   }
 
   private environmentalHit(amount: number, pos: Vector2, iframe: number, stats: PlayerStats, onGameOver: () => void, onLifeLost: () => void) {
@@ -1894,6 +2048,15 @@ export class GameEngine {
     this.hurtSerious = false;
     this.hurtKickX = 0;
     this.hurtKickY = 0;
+    this.rollSwarm();
+    this.waveHurt = 0;
+    this.pillOffers = 0;
+    this.pillGap = 0;
+    this.starTaken = false;
+    if (this.star) {
+        this.star = false;
+        audioManager.endStar(true);
+    }
     audioManager.stopCoins();
     this.lymphOpen = false;
     this.nodeFeed = false;
@@ -1925,6 +2088,7 @@ export class GameEngine {
   }
 
   public triggerSurge(stats: PlayerStats, force: boolean = false) {
+    if (this.star && !force) return;
     if (force || this.energy >= stats.maxEnergy) {
       if (!force) this.energy = 0;
       this.surgeActive = true;
@@ -1970,23 +2134,35 @@ export class GameEngine {
       }
   }
 
+  private launchDash(stats: PlayerStats) {
+      let dx = this.inputVector.x;
+      let dy = this.inputVector.y;
+      if (dx === 0 && dy === 0) dx = 1;
+      const mag = Math.hypot(dx, dy) || 1;
+      this.dashVector = { x: dx / mag, y: dy / mag };
+      const mul = this.star ? 1.85 : 1;
+      this.player.vel.x = this.dashVector.x * stats.dashSpeed * mul;
+      this.player.vel.y = this.dashVector.y * stats.dashSpeed * mul;
+      this.shakeIntensity = Math.max(this.shakeIntensity, this.star ? 6 : 10);
+      this.screenShake = { x: -this.dashVector.x * 5, y: -this.dashVector.y * 5 };
+      audioManager.playDash();
+  }
+
   public triggerDash(stats: PlayerStats) {
-      if (this.dashCooldownTimer <= 0 && !this.isDashing) {
-          this.dashCooldownTimer = stats.dashCooldown / 1000;
-          this.isDashing = true;
+      if (this.star && this.isDashing) {
+          this.dashDuration = 0.22;
+          this.dashCooldownTimer = 0;
           this.dashStruck.clear();
-          this.dashDuration = 0.2; 
-          let dx = this.inputVector.x;
-          let dy = this.inputVector.y;
-          if (dx === 0 && dy === 0) dx = 1;
-          const mag = Math.sqrt(dx*dx + dy*dy);
-          this.dashVector = { x: (dx / mag), y: (dy / mag) };
-          this.player.vel.x = this.dashVector.x * stats.dashSpeed;
-          this.player.vel.y = this.dashVector.y * stats.dashSpeed;
-          this.shakeIntensity = 10;
-          this.screenShake = { x: -this.dashVector.x * 5, y: -this.dashVector.y * 5 };
-          audioManager.playDash();
+          this.launchDash(stats);
+          return;
       }
+      if (!this.star && (this.dashCooldownTimer > 0 || this.isDashing)) return;
+      if (this.isDashing) return;
+      this.dashCooldownTimer = this.star ? 0 : stats.dashCooldown / 1000;
+      this.isDashing = true;
+      this.dashStruck.clear();
+      this.dashDuration = this.star ? 0.24 : 0.2;
+      this.launchDash(stats);
   }
 
   private manageOrbitals(stats: PlayerStats, dtSeconds: number) {
@@ -2515,6 +2691,11 @@ export class GameEngine {
         return;
     }
 
+    if (this.star && !audioManager.starLive()) {
+        this.star = false;
+        this.invulnerabilityTimer = Math.max(this.invulnerabilityTimer, 0.45);
+    }
+
     this.isLowQuality = this.leanGraphics;
 
     if (this.hitStopTimer > 0) {
@@ -2537,9 +2718,13 @@ export class GameEngine {
             this.adrenalineActive = false;
         }
         if (this.organ.charting()) timeScale = 1;
+    if (this.star) {
+        timeScale = 1;
+        this.adrenalineActive = false;
+    }
     
     if (this.player.active) {
-        const healthRatio = Math.max(0, this.player.health / this.player.maxHealth);
+        const healthRatio = this.star ? 1 : Math.max(0, this.player.health / this.player.maxHealth);
         audioManager.setGameState(this.currentWaveIndex + 1, healthRatio, this.adrenalineActive);
     } else {
         audioManager.setGameState(this.currentWaveIndex + 1, 1, false);
@@ -2573,7 +2758,8 @@ export class GameEngine {
         this.sessionStats.idleTime = 0;
     }
 
-    if (this.dashCooldownTimer > 0) this.dashCooldownTimer -= (dt / 1000); 
+    if (this.dashCooldownTimer > 0 && !this.star) this.dashCooldownTimer -= (dt / 1000);
+    if (this.star) this.dashCooldownTimer = 0; 
     if (this.comboTimer > 0) {
         this.comboTimer -= dtSeconds;
     } else {
@@ -2592,16 +2778,28 @@ export class GameEngine {
             if (e.type === EntityType.BIO_MINE && e.active) {
                 if (distSq(this.player.pos, e.pos) < (this.player.radius + e.radius) ** 2) {
                     e.active = false;
-                    this.detonateMine(e, stats, 25, { over: onGameOver, lost: onLifeLost });
+                    if (this.star) {
+                        this.particles.push({
+                            id: 'spark', type: EntityType.PARTICLE, pos: { ...e.pos },
+                            vel: { x: 0, y: 0 },
+                            radius: 10, health: 1, maxHealth: 1, color: '#fff4ea', damage: 0, active: true, ttl: 10,
+                        });
+                    } else {
+                        this.detonateMine(e, stats, 25, { over: onGameOver, lost: onLifeLost });
+                    }
                 }
             }
         }
 
-        if (stats.dashDamage > 0) {
+        if (this.star || stats.dashDamage > 0) {
             for (const e of this.entities) {
                 if ((this.isEnemy(e.type) || e.type === EntityType.BOSS) && e.active && !this.dashStruck.has(e.id)) {
                     if (distSq(this.player.pos, e.pos) < (this.player.radius + e.radius) ** 2) {
                         this.dashStruck.add(e.id);
+                        if (this.star && e.type !== EntityType.BOSS) {
+                            this.phagocytose(e, stats);
+                            continue;
+                        }
                         if (e.type === EntityType.BOSS && this.bossMarkUntil > this.time && e.mutation) {
                             e.mutation.dashTimer = Math.max(e.mutation.dashTimer, 0.85);
                             e.mutation.shootTimer = Math.max(e.mutation.shootTimer, 0.7);
@@ -2621,7 +2819,7 @@ export class GameEngine {
             }
         }
 
-        if (this.dashTrailTimer <= 0 && !this.isLowQuality) {
+        if (!this.star && this.dashTrailTimer <= 0 && !this.isLowQuality) {
             this.particles.push({
                 id: 'ghost', type: EntityType.PARTICLE,
                 pos: { ...this.player.pos }, vel: { x: 0, y: 0 },
@@ -2659,11 +2857,22 @@ export class GameEngine {
 
           if (this.waveTimer < config.duration) {
               this.spawnTimer += safeDt;
-              if (this.spawnTimer >= (config.spawnRate * spawnRateMod * crowd) && foes < foeCap && this.entities.length < this.maxEntities) {
+              const swarm = this.swarmHere();
+              let spawnEvery = config.spawnRate * spawnRateMod * crowd;
+              let cap = foeCap;
+              if (swarm) {
+                  spawnEvery *= 0.4;
+                  cap = Math.min(58, Math.round(foeCap * 2.4));
+              }
+              if (this.spawnTimer >= spawnEvery && foes < cap && this.entities.length < this.maxEntities) {
                 this.spawnEnemy(config);
+                if (swarm && foes + 1 < cap && foes < cap * 0.55 && this.entities.length < this.maxEntities - 2) {
+                    this.spawnEnemy(config);
+                }
                 this.spawnTimer = 0;
               }
               this.maybeSpawnShiny();
+              if (swarm) this.watchLeucogen(dtSeconds);
           } else if (config.hasBoss && !this.bossSpawned) {
               this.spawnBoss(config);
               this.bossSpawned = true;
@@ -2769,6 +2978,11 @@ export class GameEngine {
           }
           
           if (dnaLeft === 0) {
+              if (this.star) {
+                  this.star = false;
+                  audioManager.endStar(true);
+                  this.invulnerabilityTimer = Math.max(this.invulnerabilityTimer, 0.45);
+              }
               this.waveActive = false;
               this.isVacuuming = false;
               if (this.currentWaveIndex === 0 && this.sessionStats.damageTaken === 0) achievementManager.track('perfect_wave', 1);
@@ -2891,7 +3105,7 @@ export class GameEngine {
       } else {
       if (!this.isDashing && !this.organ.charting()) {
           const moveScale = this.adrenalineActive ? tick * 1.5 : tick;
-          const pace = this.organ.speedMul;
+          const pace = this.organ.speedMul * (this.star ? 2.2 : 1);
           this.player.vel.x += this.inputVector.x * stats.speed * 0.2 * moveScale * pace;
           this.player.vel.y += this.inputVector.y * stats.speed * 0.2 * moveScale * pace;
           this.player.vel.x *= this.player.drag!;
@@ -2910,6 +3124,23 @@ export class GameEngine {
       if (this.player.pos.x > CANVAS_WIDTH - this.player.radius) this.player.pos.x = CANVAS_WIDTH - this.player.radius;
       if (this.player.pos.y < this.player.radius) this.player.pos.y = this.player.radius;
       if (this.player.pos.y > CANVAS_HEIGHT - this.player.radius) this.player.pos.y = CANVAS_HEIGHT - this.player.radius;
+      if (this.star) {
+          this.starGhost -= dtSeconds;
+          if (this.starGhost <= 0) {
+              this.starGhost = this.isLowQuality ? 0.07 : 0.038;
+              const hues = ['#39ff14', '#ff2bd6', '#ffe600', '#3dfff3', '#ffffff', '#ff3b3b'];
+              this.particles.push({
+                  id: 'star_ghost', type: EntityType.PARTICLE,
+                  pos: { x: this.player.pos.x, y: this.player.pos.y },
+                  vel: { x: 0, y: 0 },
+                  radius: this.player.radius,
+                  health: 1, maxHealth: 1,
+                  color: hues[this.starHue % hues.length],
+                  damage: 0, active: true, ttl: 12,
+              });
+              this.starHue++;
+          }
+      }
       }
 
       if (this.leechLock > 0) this.leechLock -= dtSeconds;
@@ -2919,6 +3150,7 @@ export class GameEngine {
         this.regenTimer = 0;
       }
       
+      if (!this.star) {
       audioManager.armGun(stats.fireRate * this.organ.fireMul, this.organ.fireMul < 0.6);
       const drum = audioManager.takeDrum();
       if (drum && !this.isDashing && this.waveStartDelay <= 0 && !this.organ.charting()) {
@@ -2928,6 +3160,7 @@ export class GameEngine {
         } else if (this.sessionStats.timePlayed > 30 && this.sessionStats.bulletsFired === 0) {
             achievementManager.track('pacifist', 30);
         }
+      }
       }
       
       this.entities.forEach(e => {
@@ -2988,8 +3221,11 @@ export class GameEngine {
               }
           } else if (e.type === EntityType.ENEMY_PROJECTILE && e.active) {
               if (distSq(this.player.pos, e.pos) < (e.radius + this.player.radius)**2) {
-                  // environmental=true removes knockback/protection logic
-                  this.damagePlayer(e.damage, e.pos, onGameOver, onLifeLost, stats, true);
+                  if (this.star) {
+                      e.active = false;
+                  } else {
+                      this.damagePlayer(e.damage, e.pos, onGameOver, onLifeLost, stats, true);
+                  }
                   e.active = false; 
               }
           }
@@ -3004,6 +3240,11 @@ export class GameEngine {
 
       if (e.type === EntityType.SERUM) {
           this.updateSerum(e, tick);
+          continue;
+      }
+
+      if (e.type === EntityType.LEUCOGEN) {
+          this.tickPill(e, tick);
           continue;
       }
 
@@ -3154,6 +3395,7 @@ export class GameEngine {
       if (!e.active) continue;
 
       if (e.type === EntityType.ANTIBODY || e.type === EntityType.ORBITAL) {
+         if (this.star) continue;
          const candidates = this.getPotentialCollisions(e);
          
          for (const other of candidates) {
@@ -3231,7 +3473,9 @@ export class GameEngine {
 
               const pSum = e.radius + this.player.radius;
               if (dMag < pSum * 0.8 && (e.stun ?? 0) <= 0) {
-                 if (this.invulnerabilityTimer <= 0 && !this.isDashing) {
+                 if (this.star && e.type !== EntityType.BOSS) {
+                     this.phagocytose(e, stats);
+                 } else if (this.invulnerabilityTimer <= 0 && !this.isDashing) {
                      if (stats.thorns > 0) this.damageEnemy(e, stats.thorns, false, stats);
                      let damage = e.isElite ? 2.5 : 0.6;
                      damage *= this.difficultyMods.dmg;
@@ -3252,9 +3496,9 @@ export class GameEngine {
           const reeling = e.angle === 1;
           const airborne = (e.ttl ?? 0) > 0;
           const touching = !airborne && dist < this.player.radius + e.radius + 10;
-          const magnet = !airborne && !this.coinCascade && dist < stats.magnetRadius;
+          const magnet = !airborne && !this.coinCascade && dist < (this.star ? 980 : stats.magnetRadius);
           if (magnet || reeling || touching) {
-            const speed = reeling ? Math.max(28, e.orbitOffset || 28) : 28;
+            const speed = reeling ? Math.max(28, e.orbitOffset || 28) : (this.star ? 54 : 28);
             // Sem o teto, o vácuo do fim da onda passa do corpo e a moeda
             // fica orbitando colada no personagem até ele se mexer.
             const step = Math.min(dist, speed * tick);
@@ -4467,9 +4711,67 @@ export class GameEngine {
       this.ctx.restore();
   }
 
+  private drawPill(e: Entity) {
+      const w = 52;
+      const h = 24;
+      this.ctx.save();
+      this.ctx.translate(e.pos.x, e.pos.y);
+      this.ctx.rotate(this.time / 170);
+      if (!this.isLowQuality) {
+          this.ctx.shadowColor = 'rgba(255, 36, 48, 0.85)';
+          this.ctx.shadowBlur = 18;
+      }
+      this.ctx.beginPath();
+      this.ctx.roundRect(-w / 2, -h / 2, w, h, h / 2);
+      this.ctx.fillStyle = '#fff7f4';
+      this.ctx.fill();
+      this.ctx.save();
+      this.ctx.beginPath();
+      this.ctx.rect(-w / 2, -h / 2, w / 2, h);
+      this.ctx.clip();
+      this.ctx.beginPath();
+      this.ctx.roundRect(-w / 2, -h / 2, w, h, h / 2);
+      this.ctx.fillStyle = '#ff2430';
+      this.ctx.fill();
+      this.ctx.restore();
+      this.ctx.shadowBlur = 0;
+      this.ctx.strokeStyle = '#2a0c10';
+      this.ctx.lineWidth = 2.4;
+      this.ctx.beginPath();
+      this.ctx.roundRect(-w / 2, -h / 2, w, h, h / 2);
+      this.ctx.stroke();
+      this.ctx.beginPath();
+      this.ctx.moveTo(0, -h / 2 + 3);
+      this.ctx.lineTo(0, h / 2 - 3);
+      this.ctx.strokeStyle = 'rgba(40, 10, 14, 0.4)';
+      this.ctx.lineWidth = 1.5;
+      this.ctx.stroke();
+      this.ctx.fillStyle = 'rgba(255, 255, 255, 0.62)';
+      this.ctx.beginPath();
+      this.ctx.ellipse(-9, -4, 8, 3.2, -0.45, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.restore();
+
+      this.ctx.save();
+      this.ctx.font = '700 15px "Chakra Petch", sans-serif';
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.lineWidth = 4;
+      this.ctx.strokeStyle = 'rgba(40, 8, 12, 0.85)';
+      this.ctx.fillStyle = '#fff4ea';
+      this.ctx.strokeText(this.t('LEUCOGEN'), e.pos.x, e.pos.y - 32);
+      this.ctx.fillText(this.t('LEUCOGEN'), e.pos.x, e.pos.y - 32);
+      this.ctx.restore();
+  }
+
   private drawVital() {
       if (!this.player.active) return;
-      if (!this.isLowQuality) {
+      const neon = ['#39ff14', '#ff2bd6', '#ffe600', '#3dfff3', '#ffffff', '#ff3b3b'];
+      const neonColor = neon[Math.floor(this.time / 46) % neon.length];
+      if (this.star && !this.isLowQuality) {
+          this.ctx.globalCompositeOperation = 'screen';
+          this.drawGlow(neonColor, this.player.radius * 3.6, 0.95, null, 0.045, this.player.pos.x, this.player.pos.y);
+      } else if (!this.isLowQuality) {
           const boosted = this.isDashing || this.invulnerabilityTimer > 0;
           const glowRadius = this.player.radius * (boosted ? 3 : 2.5);
           this.ctx.globalCompositeOperation = 'screen';
@@ -4487,12 +4789,14 @@ export class GameEngine {
       this.ctx.globalAlpha = 1.0;
       const burning = this.acidContact > 0;
       const struck = this.hurtFlash > 0.04;
-      this.ctx.fillStyle = struck
+      this.ctx.fillStyle = this.star
+          ? neonColor
+          : struck
           ? '#fff6f6'
           : burning
           ? (Math.floor(this.time / 70) % 2 === 0 ? '#e7d4ff' : '#ffffff')
           : (this.isDashing || this.invulnerabilityTimer > 0 ? this.colors.PLAYER_CORE : this.colors.PLAYER);
-      if (!struck && this.invulnerabilityTimer > 0 && Math.floor(this.time / 100) % 2 === 0) {
+      if (!this.star && !struck && this.invulnerabilityTimer > 0 && Math.floor(this.time / 100) % 2 === 0) {
           this.ctx.globalAlpha = 0.5;
       }
       this.ctx.beginPath();
@@ -4509,10 +4813,17 @@ export class GameEngine {
       this.ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI*2);
       this.ctx.fill();
       this.ctx.restore();
-      this.ctx.fillStyle = this.colors.PLAYER_CORE;
+      this.ctx.fillStyle = this.star ? '#ffffff' : this.colors.PLAYER_CORE;
       this.ctx.beginPath();
       this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius*0.4, 0, Math.PI*2);
       this.ctx.fill();
+      if (this.star) {
+          this.ctx.strokeStyle = neon[(Math.floor(this.time / 46) + 2) % neon.length];
+          this.ctx.lineWidth = 3;
+          this.ctx.beginPath();
+          this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius + 12 + Math.sin(this.time / 40) * 3, 0, Math.PI * 2);
+          this.ctx.stroke();
+      }
       if (this.hurt > 0.18) {
           this.ctx.strokeStyle = `rgba(255, 84, 72, ${Math.min(1, this.hurt)})`;
           this.ctx.lineWidth = 3;
@@ -4608,6 +4919,18 @@ export class GameEngine {
       this.ctx.restore();
     }
 
+    if (this.star && !this.isLowQuality) {
+        this.ctx.save();
+        this.ctx.globalCompositeOperation = 'screen';
+        const glow = this.ctx.createRadialGradient(this.player.pos.x, this.player.pos.y, 18, this.player.pos.x, this.player.pos.y, 320);
+        glow.addColorStop(0, 'rgba(255, 250, 210, 0.2)');
+        glow.addColorStop(0.45, 'rgba(255, 50, 140, 0.08)');
+        glow.addColorStop(1, 'rgba(255, 40, 160, 0)');
+        this.ctx.fillStyle = glow;
+        this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+        this.ctx.restore();
+    }
+
     if (!this.isLowQuality) {
         this.ctx.globalCompositeOperation = 'source-over';
         for (let i = 0; i < this.particles.length; i++) {
@@ -4686,6 +5009,15 @@ export class GameEngine {
           this.ctx.strokeStyle = p.color;
           this.ctx.lineWidth = 1.7;
           this.ctx.stroke();
+          this.ctx.restore();
+      } else if (p.id === 'star_ghost') {
+          this.ctx.save();
+          this.ctx.globalCompositeOperation = 'screen';
+          this.ctx.globalAlpha = Math.max(0, (p.ttl || 0) / 14) * 0.55;
+          this.ctx.fillStyle = p.color;
+          this.ctx.beginPath();
+          this.ctx.ellipse(p.pos.x, p.pos.y, p.radius * 1.05, p.radius * 0.9, 0, 0, Math.PI * 2);
+          this.ctx.fill();
           this.ctx.restore();
       } else if (p.id === 'system_glitch') {
           this.ctx.fillStyle = p.color;
@@ -5169,6 +5501,7 @@ export class GameEngine {
 
     this.entities.forEach(e => {
       if (e.type === EntityType.SERUM && e.active) this.drawSerum(e);
+      if (e.type === EntityType.LEUCOGEN && e.active) this.drawPill(e);
       if (e.type === EntityType.LYMPH_NODE && e.active) this.drawLymphPass(e);
     });
 

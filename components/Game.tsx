@@ -295,7 +295,7 @@ export const Game: React.FC = () => {
     health: 100, maxHealth: 100, score: 0, biomass: 0, 
     wave: 0, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100,
     combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, adrenalineLeft: ADRENALINE_MAX_DURATION, lives: INITIAL_LIVES,
-    organId: 'molar' as OrganId
+    organId: 'molar' as OrganId, star: false
   });
   
   const [isMobile, setIsMobile] = useState(false);
@@ -426,7 +426,7 @@ export const Game: React.FC = () => {
         health: 100, maxHealth: 100, score: 0, biomass: 0, 
         wave: 0, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100,
         combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, adrenalineLeft: ADRENALINE_MAX_DURATION, lives: INITIAL_LIVES,
-        organId: 'molar'
+        organId: 'molar', star: false
       });
       setDifficulty(Difficulty.NORMAL);
       setPatient(null);
@@ -631,7 +631,7 @@ export const Game: React.FC = () => {
           health: godStats.maxHealth, maxHealth: godStats.maxHealth, score: 0, biomass: 0,
           wave: waveNum, waveTime: 0, waveDuration: WAVES[jump].duration, energy: godStats.maxEnergy, maxEnergy: godStats.maxEnergy,
           combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, adrenalineLeft: ADRENALINE_MAX_DURATION, lives: INITIAL_LIVES,
-          organId: engineRef.current.organ.id
+          organId: engineRef.current.organ.id, star: false
       });
       setWaveDeck(false);
       setGameState(GameState.PLAYING);
@@ -947,12 +947,13 @@ export const Game: React.FC = () => {
             energy: Math.round(eng.energy),
             maxEnergy: Math.round(stats.maxEnergy),
             combo: eng.comboCount,
-            dashReady: eng.dashCooldownTimer <= 0,
-            dashProgress: eng.getDashProgress(stats),
+            dashReady: eng.star || eng.dashCooldownTimer <= 0,
+            dashProgress: eng.star ? 1 : eng.getDashProgress(stats),
             adrenaline: eng.adrenalineActive,
             adrenalineLeft: Math.max(0, ADRENALINE_MAX_DURATION - eng.adrenalineTimer),
             lives: eng.lives,
-            organId: eng.organ.id
+            organId: eng.organ.id,
+            star: eng.star
           });
           setPassage(passageRef.current || eng.organ.charting());
       }
@@ -1043,7 +1044,7 @@ export const Game: React.FC = () => {
          setUiData({ 
            health: 100, maxHealth: 100, score: 0, biomass: 0, 
            wave: 1, waveTime: 0, waveDuration: 1, energy: 0, maxEnergy: 100, combo: 0, dashReady: true, dashProgress: 1, adrenaline: false, adrenalineLeft: ADRENALINE_MAX_DURATION, lives: INITIAL_LIVES,
-           organId: 'molar'
+           organId: 'molar', star: false
          });
          
          setGameState(GameState.BRIEFING);
@@ -1201,7 +1202,7 @@ export const Game: React.FC = () => {
   const togglePause = () => {
       if (!isPaused) {
           setIsPaused(true);
-          audioManager.stopMusic();
+          if (!audioManager.holdStar()) audioManager.stopMusic();
           return;
       }
       lastTimeRef.current = performance.now();
@@ -1213,7 +1214,7 @@ export const Game: React.FC = () => {
           }
           return;
       }
-      if (gameState === GameState.PLAYING) audioManager.startGameMusic();
+      if (gameState === GameState.PLAYING && !audioManager.resumeStar()) audioManager.startGameMusic();
   };
 
   const toggleMute = () => {
@@ -1963,8 +1964,8 @@ export const Game: React.FC = () => {
                                 triggerUltimate();
                             }}
                             onClick={!isMobile ? triggerUltimate : undefined}
-                            disabled={uiData.energy < uiData.maxEnergy}
-                            className={`pad pad-pulse ${uiData.energy >= uiData.maxEnergy ? 'is-hot' : ''} ${isPlatinum ? 'is-gold' : ''}`}
+                            disabled={uiData.star || uiData.energy < uiData.maxEnergy}
+                            className={`pad pad-pulse ${!uiData.star && uiData.energy >= uiData.maxEnergy ? 'is-hot' : ''} ${isPlatinum ? 'is-gold' : ''}`}
                          >
                              <PadMark kind="pulse" />
                              <span className="pad-shade" style={{ ['--p' as string]: uiData.energy / Math.max(1, uiData.maxEnergy) }} />

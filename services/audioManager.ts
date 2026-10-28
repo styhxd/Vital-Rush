@@ -13,6 +13,7 @@
 import type { OrganId } from '../types';
 import { COIN_PHRASE, scheduleCadence, scheduleCoinTick, type CoinVoice } from './coinFeel';
 import { scheduleHurt, scheduleHurtClear, type HurtGrade } from './hurtFeel';
+import { STAR_STEPS, playStarDown, playStarFanfare, playStarKill, playStarStep, starBpm } from './starMusic';
 
 export type DrumHit = 'kick' | 'snare' | 'hat' | 'tom';
 
@@ -110,6 +111,21 @@ export class AudioManager {
   
   private timerID: number | null = null;
 
+  // Leucogen. A fanfarra sai por fora do filtro de pouca vida.
+  private starOn = false;
+  private starHeld = false;
+  private starStep = 0;
+  private starNext = 0;
+  private starWarm = 0;
+  private killStreak = 0;
+  private starKillAt = 0;
+  private starBurst = 0;
+  private starBurstAt = 0;
+  private starBus: GainNode | null = null;
+  private starDuck: GainNode | null = null;
+  private coinEcho: DelayNode | null = null;
+  private coinEchoGain: GainNode | null = null;
+
   public settings = {
     master: 0.82,
     music: 1,
@@ -160,6 +176,13 @@ export class AudioManager {
     
     this.sfxGain.connect(this.compressor);
 
+    this.starDuck = this.ctx.createGain();
+    this.starDuck.gain.value = 1;
+    this.starBus = this.ctx.createGain();
+    this.starBus.gain.value = 0.0001;
+    this.starDuck.connect(this.starBus);
+    this.starBus.connect(this.compressor);
+
     // A moeda não entra no compressor. A música engorda com a onda e, no PC,
     // o compressor ia levando o tilintar junto até quase sumir.
     this.coinBus = this.ctx.createGain();
@@ -170,6 +193,22 @@ export class AudioManager {
         this.coinPan = null;
     }
     this.coinBus.connect(this.masterGain);
+    try {
+        this.coinEcho = this.ctx.createDelay(0.4);
+        this.coinEcho.delayTime.value = 0.098;
+        this.coinEchoGain = this.ctx.createGain();
+        this.coinEchoGain.gain.value = 0.0001;
+        const echoBack = this.ctx.createGain();
+        echoBack.gain.value = 0.34;
+        this.coinBus.connect(this.coinEcho);
+        this.coinEcho.connect(this.coinEchoGain);
+        this.coinEchoGain.connect(this.masterGain);
+        this.coinEchoGain.connect(echoBack);
+        echoBack.connect(this.coinEcho);
+    } catch {
+        this.coinEcho = null;
+        this.coinEchoGain = null;
+    }
     
     this.compressor.connect(this.masterGain);
     this.masterGain.connect(this.ctx.destination);
@@ -211,6 +250,8 @@ export class AudioManager {
 
   public setGameState(wave: number, healthRatio: number, adrenaline = false) {
       if (!this.musicFilter || !this.musicBed || !this.ctx) return;
+      if (this.starOn || this.starHeld) return;
+      if (this.ctx.currentTime < this.starWarm) return;
       const now = this.ctx.currentTime;
       const low = healthRatio < 0.3;
       const hurt = low ? 1 - Math.max(0, healthRatio) / 0.3 : 0;
@@ -597,10 +638,165 @@ export class AudioManager {
     this.masterGain.gain.setValueAtTime(master, now);
     this.musicGain.gain.setValueAtTime(music, now);
     this.sfxGain.gain.setValueAtTime(sfx, now);
-    if (this.coinBus) {
-        this.coinBus.gain.cancelScheduledValues(now);
-        this.coinBus.gain.setValueAtTime(sfx, now);
-    }
+    this.applyCoinLevel(now);
+  }
+
+  private starLevel(): number {
+      return Math.max(0.001, Math.max(0, Math.min(1, this.settings.music)) * 1.6 * 1.12);
+  }
+
+  private applyCoinLevel(now: number) {
+      if (!this.coinBus || !this.ctx) return;
+      const sfx = Math.max(0, Math.min(1, this.settings.sfx)) * 1.34;
+      const coin = sfx * (this.starOn ? 1.62 : 1);
+      this.coinBus.gain.cancelScheduledValues(now);
+      this.coinBus.gain.setValueAtTime(Math.max(0.0001, coin), now);
+      if (this.coinEchoGain) {
+          const echo = this.starOn ? 0.62 : 0.0001;
+          this.coinEchoGain.gain.cancelScheduledValues(now);
+          this.coinEchoGain.gain.setValueAtTime(Math.max(0.0001, this.coinEchoGain.gain.value), now);
+          this.coinEchoGain.gain.linearRampToValueAtTime(echo, now + 0.05);
+      }
+  }
+
+  public starLive(): boolean {
+      return this.starOn || this.starHeld;
+  }
+
+  /** Pausa a música do órgão e entra a fanfarra, já no gancho. */
+  public beginStar() {
+      if (!this.ctx || !this.starBus || !this.starDuck) {
+          void this.init().then(() => this.beginStar());
+          return;
+      }
+      if (this.ctx.state === 'suspended') void this.ctx.resume();
+      if (this.starOn) return;
+      this.starHeld = false;
+      this.starOn = true;
+      this.starStep = 0;
+      this.killStreak = 0;
+      this.starKillAt = 0;
+      this.starBurst = 0;
+      const now = this.ctx.currentTime;
+      this.starNext = now + 0.04;
+      this.currentTrack = 'GAME';
+      this.isPlaying = true;
+      if (this.musicBed) {
+          this.musicBed.gain.cancelScheduledValues(now);
+          this.musicBed.gain.setValueAtTime(Math.max(0.0001, this.musicBed.gain.value), now);
+          this.musicBed.gain.linearRampToValueAtTime(0.0001, now + 0.05);
+      }
+      this.starDuck.gain.cancelScheduledValues(now);
+      this.starDuck.gain.setValueAtTime(1, now);
+      this.starBus.gain.cancelScheduledValues(now);
+      this.starBus.gain.setValueAtTime(0.0001, now);
+      this.starBus.gain.exponentialRampToValueAtTime(this.starLevel(), now + 0.03);
+      this.applyCoinLevel(now);
+      if (this.sfxGain) playStarFanfare(this.ctx, this.sfxGain, now);
+      if (this.timerID === null) this.scheduler();
+  }
+
+  /** A pausa do jogo segura o compasso. O tema do órgão não entra no meio. */
+  public holdStar(): boolean {
+      if (!this.starOn || !this.ctx) return false;
+      this.starHeld = true;
+      this.starOn = false;
+      this.silenceStar(this.ctx.currentTime);
+      this.isPlaying = false;
+      if (this.timerID !== null) {
+          window.clearTimeout(this.timerID);
+          this.timerID = null;
+      }
+      return true;
+  }
+
+  public resumeStar(): boolean {
+      if (!this.starHeld || !this.ctx || !this.starBus || !this.starDuck) return false;
+      if (this.ctx.state === 'suspended') void this.ctx.resume();
+      this.starHeld = false;
+      this.starOn = true;
+      this.isPlaying = true;
+      this.currentTrack = 'GAME';
+      const now = this.ctx.currentTime;
+      this.starNext = now + 0.04;
+      if (this.musicBed) this.musicBed.gain.setValueAtTime(0.0001, now);
+      this.starDuck.gain.setValueAtTime(1, now);
+      this.starBus.gain.cancelScheduledValues(now);
+      this.starBus.gain.setValueAtTime(0.0001, now);
+      this.starBus.gain.exponentialRampToValueAtTime(this.starLevel(), now + 0.04);
+      this.applyCoinLevel(now);
+      if (this.timerID === null) this.scheduler();
+      return true;
+  }
+
+  public endStar(handoff: boolean) {
+      if (!this.starOn && !this.starHeld) return;
+      if (!this.ctx) {
+          this.starOn = false;
+          this.starHeld = false;
+          return;
+      }
+      this.finishStarAudio(Math.max(this.ctx.currentTime, this.starNext), handoff);
+  }
+
+  public starKill() {
+      if (!this.starOn || !this.ctx || !this.starDuck || !this.sfxGain) return;
+      if (this.ctx.state !== 'running') return;
+      const wall = performance.now();
+      if (wall - this.starBurstAt > 70) this.starBurst = 0;
+      this.starBurstAt = wall;
+      const delay = Math.min(0.08, this.starBurst * 0.014);
+      this.starBurst++;
+      this.starKillAt = wall;
+      this.killStreak++;
+      playStarKill(this.ctx, this.starDuck, this.sfxGain, this.ctx.currentTime + delay, this.killStreak - 1);
+  }
+
+  public starOffer(at?: { x: number; y: number } | null) {
+      if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+      const dest = this.sfxOut(at, 0.36);
+      const t = this.ctx.currentTime;
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone(t + i * 0.042, f, 0.11, 'triangle', 0.05, 3400, dest));
+  }
+
+  private silenceStar(at: number) {
+      if (!this.ctx || !this.starBus) return;
+      const t = Math.max(at, this.ctx.currentTime);
+      this.starBus.gain.cancelScheduledValues(t);
+      this.starBus.gain.setValueAtTime(Math.max(0.0001, this.starBus.gain.value), t);
+      this.starBus.gain.linearRampToValueAtTime(0.0001, t + 0.04);
+      this.starOn = false;
+      this.applyCoinLevel(t);
+  }
+
+  private finishStarAudio(at: number, handoff: boolean) {
+      if (!this.ctx || !this.starBus) return;
+      const now = this.ctx.currentTime;
+      const seam = Math.max(now + 0.03, at);
+      this.starOn = false;
+      this.starHeld = false;
+      this.killStreak = 0;
+      if (this.starDuck) {
+          this.starDuck.gain.cancelScheduledValues(now);
+          this.starDuck.gain.setValueAtTime(1, now);
+      }
+      this.starBus.gain.cancelScheduledValues(now);
+      this.starBus.gain.setValueAtTime(Math.max(0.0001, this.starBus.gain.value), now);
+      this.starBus.gain.linearRampToValueAtTime(0.0001, seam + 0.08);
+      this.applyCoinLevel(now);
+      if (!handoff || !this.musicBed) return;
+      if (this.sfxGain) playStarDown(this.ctx, this.sfxGain, Math.max(now, seam - 0.06));
+      this.starWarm = seam + 0.5;
+      this.currentTrack = 'GAME';
+      this.isPlaying = true;
+      this.current16thNote = 0;
+      this.nextNoteTime = seam;
+      this.lastDuck = 1;
+      this.musicBed.gain.cancelScheduledValues(now);
+      this.musicBed.gain.setValueAtTime(Math.max(0.0001, this.musicBed.gain.value), now);
+      this.musicBed.gain.linearRampToValueAtTime(0.82, seam);
+      this.musicBed.gain.linearRampToValueAtTime(1, seam + 0.18);
+      if (this.timerID === null) this.scheduler();
   }
 
   public playShoot() { this.playBuffer('shoot', 0.85, Math.random()*2, 60); }
@@ -1178,6 +1374,9 @@ export class AudioManager {
   }
 
   public stopMusic() {
+    if ((this.starOn || this.starHeld) && this.ctx) this.finishStarAudio(this.ctx.currentTime, false);
+    this.starOn = false;
+    this.starHeld = false;
     this.isPlaying = false;
     this.currentTrack = 'NONE';
     this.lubAt = -1;
@@ -1194,6 +1393,10 @@ export class AudioManager {
   private startTrack(track: 'MENU' | 'GAME') {
       if (!this.ctx) {
           void this.init().then(() => this.startTrack(track));
+          return;
+      }
+      if (this.starHeld && track === 'GAME') {
+          this.resumeStar();
           return;
       }
       if (this.currentTrack === track) return;
@@ -1226,8 +1429,34 @@ export class AudioManager {
       return bpm;
   }
 
+  private scheduleStar() {
+      if (!this.ctx || !this.starOn || !this.starDuck) return;
+      const now = this.ctx.currentTime;
+      if (this.starKillAt > 0 && performance.now() - this.starKillAt > 1800 && this.killStreak > 0) {
+          this.killStreak = Math.max(0, this.killStreak - 1);
+          this.starKillAt = performance.now();
+      }
+      if (this.starNext < now - 0.2) this.starNext = now;
+      let n = 0;
+      while (this.starOn && this.starNext < now + 0.12 && n < 8) {
+          if (this.starStep >= STAR_STEPS) {
+              this.finishStarAudio(this.starNext, true);
+              break;
+          }
+          playStarStep(this.ctx, this.starDuck, this.starStep, this.starNext, this.killStreak);
+          this.starNext += (60 / starBpm(this.starStep)) / 4;
+          this.starStep++;
+          n++;
+      }
+  }
+
   private scheduler() {
       if (!this.ctx || !this.isPlaying) return;
+      if (this.starOn) this.scheduleStar();
+      if (this.starOn) {
+          this.timerID = window.setTimeout(() => this.scheduler(), 25);
+          return;
+      }
       const now = this.ctx.currentTime;
       if (this.tempoBackAt > 0 && now > this.tempoBackAt) {
           this.tempoMul = 1;

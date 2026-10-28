@@ -36,7 +36,8 @@ export enum EntityType {
   BIO_MINE,       // Cabum
   ACID_POOL,      // O chão é lava (ácido)
   ORGAN_PICKUP,   // Flúor, glicogênio, oxigênio, dopamina
-  LYMPH_NODE      // Linfonodo de passagem: abre o descanso
+  LYMPH_NODE,     // Linfonodo de passagem: abre o descanso
+  LEUCOGEN        // Pílula: metade vermelha, metade branca
 }
 
 // A Máquina de Estados Finita (ou quase isso) do jogo.
