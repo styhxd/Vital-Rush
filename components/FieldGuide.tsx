@@ -26,10 +26,10 @@ const COPY: Record<Language, Section[]> = {
             title: 'QUEM CORRE NO SANGUE',
             cards: [
                 { kind: 'vital', title: 'VITAL', body: 'Célula de defesa que atira anticorpos sozinha em quem chega perto. Você só guia o caminho, escapa do aperto e solta o pulso.' },
-                { kind: 'bacteria', title: 'BACTÉRIA', body: 'Viajante solitária que vem na enxurrada da tela e vai fechando o ângulo pro seu lado. Não dá tiro: o perigo todo é deixar encostar.' },
-                { kind: 'virus', title: 'VÍRUS', body: 'Quase não sai do lugar e aguenta tiro sem recuar. De tempos em tempos, cospe um espinho que faz curva quando chega perto de você.' },
-                { kind: 'fungi', title: 'FUNGO', body: 'Magro, apressado e de vida curta. Corta a arena em zigue-zague para passar raspando antes que você tenha tempo de tirar o corpo.' },
-                { kind: 'parasite', title: 'PARASITA', body: 'Pesado, lento e duro na queda. Avança sem pressa para encostar, mas segura a sua mira por tanto tempo que o resto da sala ganha terreno.' },
+                { kind: 'bacteria', title: 'BACTÉRIA', body: 'Vem na enxurrada, mas não chega toda pelo mesmo corredor: umas fecham por cima, outras por baixo, e uma escapa para as suas costas. Não dá tiro: o perigo todo é deixar encostar.' },
+                { kind: 'virus', title: 'VÍRUS', body: 'Quase não sai do lugar e aguenta tiro sem recuar. Cada um segura uma altura da tela e, de tempos em tempos, cospe um espinho que dobra para onde você está indo.' },
+                { kind: 'fungi', title: 'FUNGO', body: 'Magro, apressado e de vida curta. O zigue-zague continua, só que uns cruzam por cima, outros por baixo, e tem um que busca as suas costas antes de raspar.' },
+                { kind: 'parasite', title: 'PARASITA', body: 'Pesado, lento e duro na queda. Quase não recua com o tiro: corta o passo que você ia dar e tampa uma saída, enquanto o resto da sala ganha terreno.' },
                 { kind: 'boss', title: 'CHEFE', body: 'O dono da passagem quando um órgão termina e outro começa. São vinte viagens possíveis, e os cartões lá embaixo entregam o truque de cada um.' },
             ],
         },
@@ -76,7 +76,7 @@ const COPY: Record<Language, Section[]> = {
         {
             title: 'NO SEU COMANDO',
             cards: [
-                { kind: 'dash', title: 'DESVIO', body: 'Arrancada de um piscar na direção em que você já está indo. Durante o salto nenhum dano entra, mas depois o corpo pede um instante de fôlego.' },
+                { kind: 'dash', title: 'DESVIO', body: 'Arrancada de um piscar na direção em que você já está indo. Durante o salto nenhum dano entra, e o espinho inimigo atravessa o corpo sem estourar. Depois o corpo pede um instante de fôlego.' },
                 { kind: 'surge', title: 'PULSO', body: 'Onda que gasta a barra cheia para abrir espaço no aperto. Empurra ou trava os bichos por perto e puxa as moedas de DNA soltas para a sua mão.' },
             ],
         },
@@ -86,10 +86,10 @@ const COPY: Record<Language, Section[]> = {
             title: 'LOOSE IN THE BLOOD',
             cards: [
                 { kind: 'vital', title: 'VITAL', body: 'A defense cell that fires antibodies on its own at the nearest threat. You just steer the path, slip out of trouble, and trigger the pulse.' },
-                { kind: 'bacteria', title: 'BACTERIA', body: 'A lone drifter riding the current across the screen while angling toward you. It never shoots: all the danger is in letting it touch you.' },
-                { kind: 'virus', title: 'VIRUS', body: 'Barely moves an inch and takes hits without flinching. Every few seconds, it spits a spike that bends toward you as it gets close.' },
-                { kind: 'fungi', title: 'FUNGUS', body: 'Lean, fragile, and built for speed. It cuts across the arena in a sharp zigzag, trying to graze you before you can step aside.' },
-                { kind: 'parasite', title: 'PARASITE', body: 'Heavy, slow, and stubborn to bring down. It lumbers in for contact, soaking up your fire so long that the rest of the room closes in.' },
+                { kind: 'bacteria', title: 'BACTERIA', body: 'It still rides the current, but the colony no longer arrives in one line. Some pinch from above, some from below, one slips to your back, and none of them shoot: the danger is the touch.' },
+                { kind: 'virus', title: 'VIRUS', body: 'Barely moves and takes hits without flinching. Each one holds a different height and, every few seconds, spits a spike that bends toward where you are going.' },
+                { kind: 'fungi', title: 'FUNGUS', body: 'Lean, fragile, and still cutting a sharp zigzag. Some cross high, some cross low, and one tries your back before the graze.' },
+                { kind: 'parasite', title: 'PARASITE', body: 'Heavy, slow, and barely shoved by gunfire. It steps into the move you were about to make and seals an exit, while the rest of the room closes in.' },
                 { kind: 'boss', title: 'BOSS', body: 'The gatekeeper waiting where one organ ends and the next begins. There are twenty crossings in all, and the cards below reveal every one.' },
             ],
         },
@@ -136,7 +136,7 @@ const COPY: Record<Language, Section[]> = {
         {
             title: 'AT YOUR COMMAND',
             cards: [
-                { kind: 'dash', title: 'DASH', body: 'A split-second burst in the direction you are already moving. No damage can touch you mid-dash, though it takes a moment to recharge after.' },
+                { kind: 'dash', title: 'DASH', body: 'A split-second burst in the direction you are already moving. No damage can touch you mid-dash, and an enemy spike passes straight through. It takes a moment to recharge after.' },
                 { kind: 'surge', title: 'PULSE', body: 'A wave that spends a full bar to clear breathing room. It shoves or stuns nearby threats and pulls loose DNA coins straight to your hand.' },
             ],
         },
@@ -146,10 +146,10 @@ const COPY: Record<Language, Section[]> = {
             title: 'SUELTOS EN LA SANGRE',
             cards: [
                 { kind: 'vital', title: 'VITAL', body: 'Una célula de defensa que dispara anticuerpos sola al que tenga más cerca. Tú solo guías el paso, esquivas el peligro y sueltas el pulso.' },
-                { kind: 'bacteria', title: 'BACTERIA', body: 'Viajera solitaria que baja con la corriente y va cerrando el ángulo hacia ti. Nunca dispara: todo el peligro está en dejar que te toque.' },
-                { kind: 'virus', title: 'VIRUS', body: 'Casi no se mueve de su sitio y aguanta disparos sin retroceder. Cada pocos segundos escupe una espina que dobla al acercarse a ti.' },
-                { kind: 'fungi', title: 'HONGO', body: 'Frágil, ligero y apurado. Cruza la arena en zigzag subiendo y bajando para pasarte raspando antes de que puedas quitar el cuerpo.' },
-                { kind: 'parasite', title: 'PARÁSITO', body: 'Pesado, lento y duro de voltear. Avanza sin prisa buscando el roce, pero absorbe tantos tiros que el resto de la sala te gana terreno.' },
+                { kind: 'bacteria', title: 'BACTERIA', body: 'Baja con la corriente, pero ya no llega toda por el mismo pasillo: unas cierran por arriba, otras por abajo y una se cuela a tu espalda. Nunca dispara: todo el peligro está en dejar que te toque.' },
+                { kind: 'virus', title: 'VIRUS', body: 'Casi no se mueve y aguanta disparos sin retroceder. Cada uno guarda una altura y, cada pocos segundos, escupe una espina que dobla hacia donde vas.' },
+                { kind: 'fungi', title: 'HONGO', body: 'Frágil, ligero y con el mismo zigzag. Unos cruzan por arriba, otros por abajo, y hay uno que busca tu espalda antes de pasarte raspando.' },
+                { kind: 'parasite', title: 'PARÁSITO', body: 'Pesado, lento y casi no retrocede con los tiros. Te corta el paso que ibas a dar y tapa una salida, mientras el resto de la sala te gana terreno.' },
                 { kind: 'boss', title: 'JEFE', body: 'El dueño del paso donde termina un órgano y empieza el siguiente. Hay veinte viajes posibles, y las fichas de abajo revelan a cada uno.' },
             ],
         },
@@ -196,7 +196,7 @@ const COPY: Record<Language, Section[]> = {
         {
             title: 'BAJO TU MANDO',
             cards: [
-                { kind: 'dash', title: 'ESQUIVE', body: 'Arranque de un parpadeo hacia donde ya te estás moviendo. Durante el salto ningún daño te entra, pero después necesita un respiro para cargar.' },
+                { kind: 'dash', title: 'ESQUIVE', body: 'Arranque de un parpadeo hacia donde ya te estás moviendo. Durante el salto ningún daño te entra, y el tiro enemigo te atraviesa sin estallar. Después necesita un respiro para cargar.' },
                 { kind: 'surge', title: 'PULSO', body: 'Onda que gasta la barra llena para abrir espacio en el aprieto. Empuja o frena a los enemigos cercanos y atrae las monedas de DNA hacia ti.' },
             ],
         },

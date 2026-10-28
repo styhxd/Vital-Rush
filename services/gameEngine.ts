@@ -170,6 +170,9 @@ export class GameEngine {
   private dashVector: Vector2 = { x: 0, y: 0 };
   private dashTrailTimer: number = 0;
   private dashStruck = new Set<string>();
+  private dashPhased = new Map<string, number>();
+  private shotSerial = 0;
+  private squad = { n: 0, above: 0, below: 0, behind: 0 };
   
   public currentWaveIndex: number = -1; 
   public waveTimer: number = 0;
@@ -452,8 +455,8 @@ export class GameEngine {
           hp = 108; dmg = 25; radius = 42; color = this.colors.PARASITE; val = 30; speed = 0.25;
       } else if (type === EntityType.VIRUS) { 
           hp = 90; dmg = 15; radius = 28; 
-          color = this.colors.VIRUS; val = 45; speed = 0.1; 
-          shootTimer = 3.5; 
+          color = this.colors.VIRUS; val = 45; speed = 0.1;
+          shootTimer = 0.7 + Math.random() * 2.4;
       }
 
       if (strain === ViralStrain.TITAN) { hp *= 2.0; radius *= 1.2; speed *= 0.7; val *= 1.5; }
@@ -495,9 +498,10 @@ export class GameEngine {
           active: true,
           value: Math.floor(val),
           isElite,
-          drag: type === EntityType.VIRUS ? 0.2 : 0.1, 
+          drag: type === EntityType.VIRUS ? 0.2 : 0.1,
           hitFlash: 0,
-          shootTimer
+          shootTimer,
+          intent: Math.random()
       });
   }
 
@@ -1609,8 +1613,7 @@ export class GameEngine {
       target.health -= finalDamage;
       target.hitFlash = 5;
       
-      const knockback = target.type === EntityType.BOSS || target.type === EntityType.VIRUS ? 0.1 : 2; 
-      target.pos.x += knockback; 
+      this.flinch(target); 
 
       const txtColor = isCrit ? '#ffff00' : '#fff';
       const txtSize = isCrit ? (finalDamage > 30 ? 40 : 28) : (finalDamage > 20 ? 32 : 20);
@@ -3173,13 +3176,16 @@ export class GameEngine {
                   }
               }
           } else if (e.type === EntityType.ENEMY_PROJECTILE && e.active) {
-              if (distSq(this.player.pos, e.pos) < (e.radius + this.player.radius)**2) {
-                  if (this.star) {
-                      e.active = false;
-                  } else {
-                      this.damagePlayer(e.damage, e.pos, onGameOver, onLifeLost, stats, true);
-                  }
-                  e.active = false; 
+              const reach = e.radius + this.player.radius;
+              const touching = distSq(this.player.pos, e.pos) < reach * reach;
+              if (this.isDashing) {
+                  if (touching) this.dashPhased.set(e.id, this.time + 380);
+              } else if (this.dashPhased.has(e.id)) {
+                  const until = this.dashPhased.get(e.id) ?? 0;
+                  if (!touching || this.time > until) this.dashPhased.delete(e.id);
+              } else if (touching) {
+                  this.damagePlayer(e.damage, e.pos, onGameOver, onLifeLost, stats, true);
+                  e.active = false;
               }
           }
       });
@@ -3268,17 +3274,23 @@ export class GameEngine {
             if (e.shootTimer !== undefined) {
                 e.shootTimer -= dtSeconds;
                 if (e.shootTimer <= 0) {
-                    const angle = Math.atan2(this.player.pos.y - e.pos.y, this.player.pos.x - e.pos.x);
+                    const lead = this.isDashing ? 4 : 12;
+                    const seed = e.intent ?? 0.5;
+                    let aimX = this.player.pos.x + this.player.vel.x * lead;
+                    let aimY = this.player.pos.y + this.player.vel.y * lead;
+                    if (seed < 0.33) aimY -= 84;
+                    else if (seed < 0.66) aimY += 84;
+                    const angle = Math.atan2(aimY - e.pos.y, aimX - e.pos.x);
                     const speed = 8.2;
                     this.entities.push({
-                        id: `eproj_${Date.now()}`, type: EntityType.ENEMY_PROJECTILE,
+                        id: `eproj_${this.shotSerial++}`, type: EntityType.ENEMY_PROJECTILE,
                         pos: { ...e.pos },
                         vel: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
                         radius: 12, health: 1, maxHealth: 1, color: this.colors.ENEMY_PROJECTILE,
                         damage: Math.max(6, e.damage * 0.36), active: true, drag: 0
                     });
-                    
-                    e.shootTimer = 3.5; 
+
+                    e.shootTimer = 3.3 + seed * 0.55; 
                     // VARIETY: SOUND CALL FOR ENEMY SHOOT
                     audioManager.playEnemyShoot(e.pos);
                 }
@@ -3286,7 +3298,7 @@ export class GameEngine {
         }
         
         // VARIETY INJECTION: TRACKING PROJECTILES (WEAK HOMING)
-        if (e.type === EntityType.ENEMY_PROJECTILE && !e.id.startsWith('echo_') && this.player.active) {
+        if (e.type === EntityType.ENEMY_PROJECTILE && !e.id.startsWith('echo_') && this.player.active && !this.isDashing && !this.dashPhased.has(e.id)) {
             const dx = this.player.pos.x - e.pos.x;
             const dy = this.player.pos.y - e.pos.y;
             const dist = Math.sqrt(dx*dx + dy*dy);
@@ -3343,6 +3355,7 @@ export class GameEngine {
       }
     }
 
+    if (this.player.active) this.noteSquad();
     let coinSparks = 0;
     for (const e of this.entities) {
       if (!e.active) continue;
@@ -3419,8 +3432,17 @@ export class GameEngine {
                 if (e.type === EntityType.FUNGI) speed = 0.16; 
 
                 if (!e.id.startsWith('shiny_') && e.type !== EntityType.BOSS && (e.stun ?? 0) <= 0) {
-                    e.vel.x += (dx / dMag) * speed * tick;
-                    e.vel.y += (dy / dMag) * speed * tick;
+                    const aim = this.foeAim(e);
+                    let ax = aim.x - e.pos.x;
+                    let ay = aim.y - e.pos.y;
+                    let aMag = Math.hypot(ax, ay);
+                    if (aMag < 12) {
+                        ax = dx;
+                        ay = dy;
+                        aMag = dMag;
+                    }
+                    e.vel.x += (ax / aMag) * speed * tick;
+                    e.vel.y += (ay / aMag) * speed * tick;
                 }
               }
 
@@ -3609,6 +3631,137 @@ export class GameEngine {
     }
     this.hurtEase = Math.max(0, this.hurtEase - step * 1.6);
     this.compactInactive(this.entities);
+    this.forgetPhased();
+  }
+
+  private noteSquad() {
+      let n = 0;
+      let above = 0;
+      let below = 0;
+      let behind = 0;
+      const px = this.player.pos.x;
+      const py = this.player.pos.y;
+      for (let i = 0; i < this.entities.length; i++) {
+          const e = this.entities[i];
+          if (!e.active || e.id.startsWith('shiny_') || !this.isEnemy(e.type)) continue;
+          n++;
+          if (e.pos.y < py - 48) above++;
+          else if (e.pos.y > py + 48) below++;
+          if (e.pos.x < px - 36) behind++;
+      }
+      this.squad.n = n;
+      this.squad.above = above;
+      this.squad.below = below;
+      this.squad.behind = behind;
+  }
+
+  private park(x: number, y: number): Vector2 {
+      const pad = 46;
+      return {
+          x: Math.max(pad, Math.min(CANVAS_WIDTH - pad, x)),
+          y: Math.max(pad, Math.min(CANVAS_HEIGHT - pad, y)),
+      };
+  }
+
+  // O passo (velocidade, fluxo, zigue-zague) fica. Muda o ponto que ele busca.
+  private foeAim(e: Entity): Vector2 {
+      const p = this.player.pos;
+      const seed = e.intent ?? 0.5;
+      const dist = Math.hypot(p.x - e.pos.x, p.y - e.pos.y);
+      if (dist < e.radius + this.player.radius + 30) return { x: p.x, y: p.y };
+      if (e.type === EntityType.BACTERIA) return this.bacteriaAim(e, seed, dist);
+      if (e.type === EntityType.VIRUS) return this.virusAim(e, seed, dist);
+      if (e.type === EntityType.FUNGI) return this.fungiAim(e, seed, dist);
+      return this.parasiteAim(e, seed, dist);
+  }
+
+  private bacteriaAim(e: Entity, seed: number, dist: number): Vector2 {
+      const p = this.player.pos;
+      let role: 'high' | 'low' | 'back' | 'face' =
+          seed < 0.3 ? 'high' : seed < 0.58 ? 'low' : seed < 0.84 ? 'back' : 'face';
+      if (role === 'face' && this.squad.behind === 0 && this.squad.n >= 4 && seed > 0.9) role = 'back';
+      if (role === 'back' && e.pos.x > p.x + 48 && this.squad.behind >= 3) role = 'face';
+      if (role === 'face') return this.park(p.x, p.y + (seed - 0.92) * 90);
+      if (role === 'high' || role === 'low') {
+          const sign = role === 'high' ? -1 : 1;
+          const arc = dist < 260 ? 28 : 168;
+          return this.park(p.x + (dist < 260 ? 0 : 36), p.y + sign * arc);
+      }
+      const sign = seed < 0.7 ? -1 : 1;
+      if (e.pos.x < p.x - 16) return this.park(p.x - 12, p.y + sign * 22);
+      return this.park(Math.max(48, p.x - 118), p.y + sign * 172);
+  }
+
+  private virusAim(e: Entity, seed: number, dist: number): Vector2 {
+      const p = this.player.pos;
+      const lane = seed < 0.33 ? CANVAS_HEIGHT * 0.2 : seed < 0.66 ? CANVAS_HEIGHT * 0.8 : p.y;
+      const blend = Math.min(1, Math.max(0, (dist - 150) / 460));
+      let y = p.y * (1 - blend) + lane * blend;
+      let x = p.x;
+      if (seed >= 0.84 && e.pos.x > p.x - 8 && this.squad.behind < 3) {
+          x = Math.max(48, p.x - 108);
+          y = p.y + (seed < 0.92 ? -1 : 1) * 156 * Math.min(1, dist / 280);
+      } else if (e.pos.x < p.x - 24) {
+          x = p.x - 20;
+          y = p.y;
+      }
+      return this.park(x, y);
+  }
+
+  private fungiAim(e: Entity, seed: number, dist: number): Vector2 {
+      const p = this.player.pos;
+      const sign = seed < 0.5 ? -1 : 1;
+      if (Math.abs(e.pos.x - p.x) < 100) return { x: p.x, y: p.y };
+      if (seed >= 0.82 && e.pos.x > p.x && this.squad.behind < 3) {
+          return this.park(Math.max(48, p.x - 96), p.y + sign * 158);
+      }
+      const arc = dist < 240 ? 42 : 124;
+      return this.park(p.x + 20, p.y + sign * arc);
+  }
+
+  private parasiteAim(e: Entity, seed: number, dist: number): Vector2 {
+      const p = this.player.pos;
+      const ix = p.x + this.player.vel.x * 12;
+      const iy = p.y + this.player.vel.y * 12;
+      if (seed < 0.4) return this.park(ix, iy);
+      if (seed < 0.7) {
+          if (dist > 210) return this.park(p.x + 28, p.y - 150);
+          return this.park(ix, iy);
+      }
+      if (e.pos.x > p.x + 36 && this.squad.behind < 4) {
+          return this.park(Math.max(48, p.x - 72), p.y + 148);
+      }
+      return this.park(ix, p.y + (seed - 0.85) * 40);
+  }
+
+  // Empurrão de tiro não abre distância. Senão a rajada estaciona a onda na borda
+  // e o player ganha a luta sem sair do lugar.
+  private flinch(target: Entity) {
+      if (target.type === EntityType.BOSS || target.type === EntityType.VIRUS) {
+          target.pos.x += 0.1;
+          return;
+      }
+      const dx = target.pos.x - this.player.pos.x;
+      const dy = target.pos.y - this.player.pos.y;
+      const d = Math.hypot(dx, dy) || 1;
+      const side = (target.intent ?? 0) < 0.5 ? 1 : -1;
+      let mag = 0.95;
+      if (target.type === EntityType.PARASITE) mag = 0.2;
+      else if (target.type === EntityType.FUNGI) mag = 0.55;
+      target.pos.x += (-dy / d) * side * mag;
+      target.pos.y += (dx / d) * side * mag;
+  }
+
+  private forgetPhased() {
+      if (this.dashPhased.size === 0) return;
+      for (const id of this.dashPhased.keys()) {
+          let live = false;
+          for (let i = 0; i < this.entities.length; i++) {
+              const e = this.entities[i];
+              if (e.active && e.id === id) { live = true; break; }
+          }
+          if (!live) this.dashPhased.delete(id);
+      }
   }
 
   private isOutOfBoundsExtended(pos: Vector2) {

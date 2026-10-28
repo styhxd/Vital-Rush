@@ -244,13 +244,13 @@ export const TEXTS: TranslationMap = {
     MANUAL_HOSTILES: "HOSTILES",
     MANUAL_STRAINS: "VIRAL STRAINS",
     MANUAL_MECHANICS: "BATTLE MECHANICS",
-    MANUAL_BAC_DESC: "Standard pathogen. Common, predictable movement.",
-    MANUAL_VIR_DESC: "Stationary turret. Shoots tracking spikes.", // SWAPPED
-    MANUAL_PAR_DESC: "Heavy tank. Slow, high HP, absorbs damage.",
-    MANUAL_FUNGI_DESC: "Fast attacker. Erratic zig-zag movement.", // ALTERADO
+    MANUAL_BAC_DESC: "Standard pathogen. Closes from above, below, and behind.",
+    MANUAL_VIR_DESC: "Holds a lane and barely flinches. Spikes lead your step.", // SWAPPED
+    MANUAL_PAR_DESC: "Heavy tank. Shots barely move it. Cuts off your next step.",
+    MANUAL_FUNGI_DESC: "Zigzag attacker. Crosses high, low, or around your back.", // ALTERADO
     MANUAL_BOSS_DESC: "Massive anomaly. Requires extreme firepower.",
     MANUAL_MECH_DASH_TITLE: "Dodge",
-    MANUAL_MECH_DASH_DESC: "You can't be hit for a moment. Use it to slip through enemies.",
+    MANUAL_MECH_DASH_DESC: "You can't be hit for a moment, and enemy shots pass through. Use it to slip through.",
     MANUAL_MECH_SURGE_TITLE: "Pulse",
     MANUAL_MECH_SURGE_DESC: "Pushes enemies away and pulls in every DNA coin.",
     MANUAL_MECH_COMBO_TITLE: "Combo Chain",
@@ -564,13 +564,13 @@ export const TEXTS: TranslationMap = {
     MANUAL_HOSTILES: "HOSTIS",
     MANUAL_STRAINS: "CEPAS VIRAIS",
     MANUAL_MECHANICS: "MECÂNICAS DE COMBATE",
-    MANUAL_BAC_DESC: "Patógeno padrão. Movimento comum e previsível.",
-    MANUAL_VIR_DESC: "Torreta estacionária. Dispara espinas teledirigidas.", // SWAPPED
-    MANUAL_PAR_DESC: "Tanque pesado. Lento, muita vida, absorve dano.",
-    MANUAL_FUNGI_DESC: "Atacante rápido. Movimento errático em zigue-zague.", // ALTERADO
+    MANUAL_BAC_DESC: "Patógeno padrão. Fecha por cima, por baixo e por trás.",
+    MANUAL_VIR_DESC: "Quase parado, sem recuar. O espinho mira o passo à frente.", // SWAPPED
+    MANUAL_PAR_DESC: "Tanque pesado. O tiro quase não move. Corta o passo seguinte.",
+    MANUAL_FUNGI_DESC: "Zigue-zague. Cruza por cima, por baixo ou pelas costas.", // ALTERADO
     MANUAL_BOSS_DESC: "Anomalia massiva. Requer poder de fogo extremo.",
     MANUAL_MECH_DASH_TITLE: "Desvio",
-    MANUAL_MECH_DASH_DESC: "Você fica intocável por um instante. Use para passar no meio dos inimigos.",
+    MANUAL_MECH_DASH_DESC: "Você fica intocável por um instante, e o tiro inimigo atravessa. Use para passar no meio.",
     MANUAL_MECH_SURGE_TITLE: "Pulso",
     MANUAL_MECH_SURGE_DESC: "Empurra os inimigos e puxa todas as moedas de DNA.",
     MANUAL_MECH_COMBO_TITLE: "Corrente de Combo",
@@ -884,13 +884,13 @@ export const TEXTS: TranslationMap = {
     MANUAL_HOSTILES: "HOSTILES",
     MANUAL_STRAINS: "CEPAS VIRALES",
     MANUAL_MECHANICS: "MECÁNICA DE BATALLA",
-    MANUAL_BAC_DESC: "Patógeno estándar. Movimiento común y predecible.",
-    MANUAL_VIR_DESC: "Torreta estacionaria. Dispara espinas teledirigidas.", // SWAPPED
-    MANUAL_PAR_DESC: "Tanque pesado. Lento, mucha vida, absorve daño.",
-    MANUAL_FUNGI_DESC: "Atacante rápido. Movimiento errático en zig-zag.", // ALTERADO
+    MANUAL_BAC_DESC: "Patógeno estándar. Cierra por arriba, por abajo y por detrás.",
+    MANUAL_VIR_DESC: "Casi quieto, sin retroceder. La espina apunta el paso que viene.", // SWAPPED
+    MANUAL_PAR_DESC: "Tanque pesado. El tiro casi no lo mueve. Corta el paso siguiente.",
+    MANUAL_FUNGI_DESC: "Zigzag. Cruza por arriba, por abajo o por la espalda.", // ALTERADO
     MANUAL_BOSS_DESC: "Anomalia masiva. Requiere potencia de fuego extrema.",
     MANUAL_MECH_DASH_TITLE: "Esquive",
-    MANUAL_MECH_DASH_DESC: "Quedas intocable un instante. Úsalo para pasar entre los enemigos.",
+    MANUAL_MECH_DASH_DESC: "Quedas intocable un instante, y el tiro enemigo te atraviesa. Úsalo para pasar en medio.",
     MANUAL_MECH_SURGE_TITLE: "Pulso",
     MANUAL_MECH_SURGE_DESC: "Empuja a los enemigos y atrae todas las monedas de ADN.",
     MANUAL_MECH_COMBO_TITLE: "Cadena de Combo",

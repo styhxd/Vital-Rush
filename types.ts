@@ -141,6 +141,7 @@ export interface Entity {
   shootTimer?: number; // Para inimigos que atiram
   mutation?: BossMutation; // NEW: Procedural Boss Data
   lobes?: { x: number; y: number; rx: number; ry: number }[];
+  intent?: number; // Semente do bicho comum. O passo não muda; muda o lado por onde ele chega.
 }
 
 // Os números que definem se você é um deus ou um inseto.

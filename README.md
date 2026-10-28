@@ -35,8 +35,8 @@ STYH Games. Direção de Paulo Gabriel de L. S.
 
 <img src="docs/laboratorio.jpg" alt="Bio-laboratório com o saldo de DNA ainda em zero" width="100%">
 
-- O expediente normal traz bactéria, vírus, fungo e parasita, com um chefe fechando a porta na última onda de cada órgão.
-- São três vidas na ficha: o desvio deixa você intocável por um piscar de olhos, e o pulso empurra quem encosta enquanto puxa as moedas de DNA.
+- O expediente normal traz bactéria, vírus, fungo e parasita. O passo de cada um continua o mesmo, mas elas não chegam todas pela mesma reta: a bactéria fecha por cima e por baixo, o fungo corta o zigue-zague em alturas diferentes, o vírus segura uma faixa e cospe o espinho na frente do passo, o parasita quase não recua e tampa a saída. Um chefe fecha a porta na última onda de cada órgão.
+- São três vidas na ficha: o desvio deixa você intocável por um piscar de olhos e atravessa o tiro inimigo, e o pulso empurra quem encosta enquanto puxa as moedas de DNA.
 - Quatro dificuldades na triagem: Fácil, Normal, Difícil e Expert. O Normal de hoje é o Expert de antes; o Fácil existe para conhecer o corredor sem apanhar na recepção.
 - Atendimento em português, inglês e espanhol.
 - No teclado, setas ou WASD movem, Shift aciona o desvio e espaço solta o pulso. No celular, o manche aparece sozinho ao tocar e a tela trava deitada.
