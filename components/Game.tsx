@@ -62,13 +62,13 @@ const StatBar = ({ value, max, colorClass, label, animate = false, chip = false,
         <span className="text-[9px] lg:text-xs font-bold tracking-widest text-white/70">{label}</span>
         <span className={`text-[9px] lg:text-xs font-mono text-white/70 ${chip && hit > 0 ? 'integrity-num' : ''}`} key={chip ? hit : 'n'}>{Math.round(value)}/{Math.round(max)}</span>
     </div>
-    <div className="h-1.5 lg:h-3 w-full bg-black/50 border border-white/10 rounded-sm skew-x-[-10deg] overflow-hidden backdrop-blur-sm relative">
+    <div className="node-track h-1.5 lg:h-3 w-full bg-black/50 border border-white/10 rounded-sm skew-x-[-10deg] overflow-hidden backdrop-blur-sm relative">
       {chip && ghostPct > pct + 0.6 && (
         <div className="integrity-ghost" style={{ width: `${ghostPct}%` }} />
       )}
       <div
         key={chip ? hit : 'bar'}
-        className={`h-full ${colorClass} origin-left ${chip ? '' : 'transition-all duration-200'} ${chip && hit > 0 ? 'integrity-fill' : ''} ${animate && value >= max ? 'animate-pulse brightness-150' : ''}`}
+        className={`node-fill h-full ${colorClass} origin-left ${chip && hit > 0 ? 'integrity-fill' : ''} ${animate && value >= max ? 'animate-pulse brightness-150' : ''}`}
         style={{ width: `${pct}%` }}
       />
       <div className="absolute top-0 left-0 w-full h-[50%] bg-white/10"></div>
@@ -283,6 +283,7 @@ function readPrefs(): { master?: number; music?: number; sfx?: number; mono?: bo
 
 export const Game: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const transferRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<GameEngine | null>(null);
   const animationFrameRef = useRef<number>(0);
   const lastTimeRef = useRef<number>(0);
@@ -762,6 +763,22 @@ export const Game: React.FC = () => {
     if (engineRef.current) {
       try {
           engineRef.current.allowSerum = upgradesRef.current.some(u => u.level < u.maxLevel);
+          const boothStage = stageRef.current;
+          if (boothStage && engineRef.current.lymphOpen) {
+              const sr = boothStage.getBoundingClientRect();
+              const purseEl = boothStage.querySelector('.node-count');
+              const track = boothStage.querySelector('.node-life .node-track');
+              if (purseEl && track) {
+                  const pr = purseEl.getBoundingClientRect();
+                  const tr = track.getBoundingClientRect();
+                  const live = engineRef.current;
+                  const fill = Math.max(0.06, Math.min(1, live.player.health / Math.max(1, live.player.maxHealth)));
+                  live.setBoothMarks(
+                      { x: (pr.left + pr.right) / 2 - sr.left, y: pr.bottom - sr.top - 2 },
+                      { x: tr.left - sr.left + tr.width * fill, y: (tr.top + tr.bottom) / 2 - sr.top },
+                  );
+              }
+          }
           engineRef.current.update(
             dt, 
             stats, 
@@ -800,7 +817,7 @@ export const Game: React.FC = () => {
                 }
                 setHeartbreak({ index, dx, dy });
                 if (heartTimer.current) window.clearTimeout(heartTimer.current);
-                heartTimer.current = window.setTimeout(() => setHeartbreak(null), 2800);
+                heartTimer.current = window.setTimeout(() => setHeartbreak(null), 1500);
             },
             handleBossSpawn
           );
@@ -829,6 +846,26 @@ export const Game: React.FC = () => {
           setGameState(GameState.WAVE_CLEARED);
       }
 
+      const transfer = transferRef.current;
+      const stageBox = stageRef.current;
+      if (transfer && stageBox && engineRef.current) {
+          const w = stageBox.clientWidth;
+          const h = stageBox.clientHeight;
+          const dpr = Math.min(2, window.devicePixelRatio || 1);
+          const pw = Math.max(1, Math.round(w * dpr));
+          const ph = Math.max(1, Math.round(h * dpr));
+          if (transfer.width !== pw || transfer.height !== ph) {
+              transfer.width = pw;
+              transfer.height = ph;
+          }
+          const tctx = transfer.getContext('2d');
+          if (tctx) {
+              tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+              tctx.clearRect(0, 0, w, h);
+              if (engineRef.current.lymphOpen) engineRef.current.paintBoothTransfer(tctx);
+          }
+      }
+
       const node = !!engineRef.current.lymphOpen;
       if (node !== lymphRef.current) {
           lymphRef.current = node;
@@ -843,11 +880,7 @@ export const Game: React.FC = () => {
           const health = Math.round(live.player.health);
           const biomass = Math.round(live.biomass);
           const feel = live.lymphFeel();
-          if (feel.gulp !== gulpRef.current) {
-              const id = feel.gulp;
-              gulpRef.current = id;
-              setMotes(prev => [...prev, { id: id * 2, kind: 'coin' as const }, { id: id * 2 + 1, kind: 'life' as const }].slice(-10));
-          }
+          if (feel.gulp !== gulpRef.current) gulpRef.current = feel.gulp;
           setUiData(prev => prev.health === health && prev.biomass === biomass ? prev : ({
               ...prev,
               health,
@@ -1354,6 +1387,7 @@ export const Game: React.FC = () => {
       <div key={uiData.organId} className={`organ-margin is-${uiData.organId}`} aria-hidden />
       <div ref={marginFrameRef} className={`organ-margin-frame is-${uiData.organId}`} aria-hidden />
       <canvas ref={canvasRef} className="playfield" />
+      <canvas ref={transferRef} className="pointer-events-none absolute inset-0 z-30" />
       
       {/* CSS Injection for Dynamic Keyframes */}
       <style>{`
@@ -1383,8 +1417,8 @@ export const Game: React.FC = () => {
             50% { background-color: rgba(255, 0, 0, 0.4); }
         }
         .anim-shake { animation: heart-shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
-        .anim-break-left { animation: crack-left 0.75s ease-in forwards; animation-delay: 1.05s; }
-        .anim-break-right { animation: crack-right 0.75s ease-in forwards; animation-delay: 1.05s; }
+        .anim-break-left { animation: crack-left 0.5s ease-in forwards; animation-delay: 0.28s; }
+        .anim-break-right { animation: crack-right 0.5s ease-in forwards; animation-delay: 0.28s; }
         .anim-glitch { animation: glitch-text 0.5s steps(5) infinite; }
         .anim-pulse-red { animation: pulse-red 0.5s ease-in-out infinite; }
         @keyframes heart-pulse {
@@ -1425,15 +1459,19 @@ export const Game: React.FC = () => {
         .integrity-num { animation: integrity-num 0.34s ease-out; color: #fff; }
         .heart-gone { color: #4a1518; }
         @keyframes life-flight {
-            0% { transform: translate(var(--dx), var(--dy)) scale(0.18); }
-            16% { transform: translate(0, 0) scale(1.08); animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
-            24% { transform: translate(0, 0) scale(1); }
+            0% { transform: translate(var(--dx), var(--dy)) scale(0.55); }
+            22% { transform: translate(0, 0) scale(1.18); }
+            34% { transform: translate(0, 0) scale(1); }
             100% { transform: translate(0, 0) scale(1); }
         }
         @keyframes life-label {
-            0%, 12% { opacity: 0; transform: translateX(-50%) translateY(8px); }
-            22% { opacity: 1; transform: translateX(-50%) translateY(0); }
-            84% { opacity: 1; }
+            0% { opacity: 0; transform: translateX(-50%) translateY(6px); }
+            12% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            72% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        @keyframes life-cut {
+            0% { opacity: 0.92; }
             100% { opacity: 0; }
         }
         .life-stage {
@@ -1448,7 +1486,14 @@ export const Game: React.FC = () => {
         .life-flight {
             position: absolute;
             inset: 0;
-            animation: life-flight 2.7s linear forwards;
+            animation: life-flight 1.15s cubic-bezier(.16, .9, .3, 1) forwards;
+        }
+        .life-cut {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background: radial-gradient(circle, rgba(255, 248, 248, 0.72) 0%, rgba(255, 36, 48, 0.28) 38%, rgba(70, 0, 8, 0.5) 100%);
+            animation: life-cut 0.48s ease-out forwards;
         }
         .life-lost-label {
             position: absolute;
@@ -1462,7 +1507,7 @@ export const Game: React.FC = () => {
             font-size: clamp(16px, 2.6vw, 34px);
             color: #fff4f4;
             text-shadow: 0 0 18px rgba(255, 40, 50, 0.95);
-            animation: life-label 2.7s ease forwards;
+            animation: life-label 1.35s ease forwards;
         }
         @keyframes adrenaline-blink {
             0%, 100% { opacity: 1; }
@@ -1686,11 +1731,12 @@ export const Game: React.FC = () => {
         .outcome-campaign { background: radial-gradient(circle at 50% 42%, rgba(255, 214, 120, 0.38), rgba(40, 8, 4, 0.2) 36%, rgba(0, 0, 0, 0.78) 72%); }
         .hud-safe.is-node .node-dim { opacity: 0.28; filter: saturate(0.65); }
         .node-life, .node-coins { position: relative; }
+        .node-fill { transition: width 0.24s cubic-bezier(.2, .8, .2, 1); }
         .hud-safe.is-node .node-life,
         .hud-safe.is-node .node-coins {
-            z-index: 5;
-            transform: scale(calc(1 + var(--booth, 0) * 0.9));
-            transition: transform 0.16s linear;
+            z-index: 6;
+            transform: scale(1.82);
+            transition: transform 0.52s cubic-bezier(.16, .84, .24, 1);
         }
         .hud-safe.is-node .node-life { transform-origin: left top; }
         .hud-safe.is-node .node-coins { transform-origin: right top; }
@@ -1772,6 +1818,7 @@ export const Game: React.FC = () => {
 
       {heartbreak && (
           <div className="absolute inset-0 z-[150] pointer-events-none overflow-hidden">
+              <div className="life-cut" />
               <div className="life-stage">
                   <div
                       className="life-flight"
@@ -1893,7 +1940,7 @@ export const Game: React.FC = () => {
       </div>
 
       {(gameState === GameState.PLAYING || gameState === GameState.WAVE_CLEARED || gameState === GameState.LOADOUT) && !passage && !showBossIntro && (
-        <div className={`absolute inset-0 pointer-events-none z-20 flex flex-col justify-between hud-safe ${lymphOn ? 'is-node' : ''}`} style={{ fontFamily: '"Chakra Petch", sans-serif', ['--booth' as string]: lymphFeel.drain }}>
+        <div className={`absolute inset-0 pointer-events-none z-20 flex flex-col justify-between hud-safe ${lymphOn ? 'is-node' : ''}`} style={{ fontFamily: '"Chakra Petch", sans-serif' }}>
            <div className="flex justify-between items-start">
              <div className="flex flex-col gap-1 lg:gap-3 w-28 lg:w-64">
                 <div className={`node-life ${uiData.adrenaline ? 'adrenaline-hp' : ''}`}>

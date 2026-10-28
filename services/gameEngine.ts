@@ -23,14 +23,13 @@ import { OrganDirector, cellBudget, cellColor, cellRises, organBg, rollCellStyle
 const BOSS_GRACE = 1.15;
 /** Primeira cura do linfonodo. Cada uso sobe este preço. */
 const NODE_BASE = 64;
-const NODE_REST = { x: 0, y: 16, w: 250, h: 230 };
-const NODE_LEAVE = { x: 188, y: 20, w: 108, h: 96 };
+const NODE_REST = { x: 0, y: -6, w: 124, h: 112 };
+const NODE_LEAVE = { x: 0, y: 142, w: 196, h: 42 };
 /** O nódulo aberto ocupa a arena o bastante para o dedo acertar o que está escrito nele. */
 const NODE_OPEN = 2.05;
 /** O que a moeda paga de DNA, em relação ao que pagava. A bolsa da onda multiplica por cima. */
-const COIN_WORTH = 0.34;
-const NODE_WIND = 0.48;
-const NODE_GULP = 0.18;
+const COIN_WORTH = 0.4;
+const NODE_WIND = 0.46;
 
 export interface BossCard {
   name: string;
@@ -91,7 +90,7 @@ function campaignPressure(waveIndex: number): number {
 // Onda 1 entrega menos. O peso sobe devagar: a árvore não fecha no meio da campanha.
 function dnaPurse(waveIndex: number): number {
     const t = Math.min(1, Math.max(0, waveIndex) / 24);
-    return 0.5 + Math.pow(t, 1.35) * 1.12;
+    return 0.56 + Math.pow(t, 1.35) * 1.12;
 }
 
 // O mesmo chefe anda e ataca mais conforme a onda sobe. Onda 1 fica em 86% do passo escrito; a 30, em 118%.
@@ -121,6 +120,27 @@ function hexToRgba(hex: string, alpha: number): string {
         return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     }
     return hex; 
+}
+
+interface BoothCoin {
+  born: number;
+  dur: number;
+  fan: number;
+  lift: number;
+  r: number;
+}
+
+interface BoothDeal {
+  age: number;
+  price: number;
+  paid: number;
+  granted: boolean;
+  grantAt: number;
+  flyEnd: number;
+  popEnd: number;
+  done: number;
+  coins: BoothCoin[];
+  sparks: { x: number; y: number; vx: number; vy: number; life: number; max: number }[];
 }
 
 export class GameEngine {
@@ -225,6 +245,7 @@ export class GameEngine {
   private hurtFlash = 0;
   private hurtBloom = 0;
   private hurtEase = 0;
+  private lifeCut = 0;
   private hurtSerious = false;
   private hurtKickX = 0;
   private hurtKickY = 0;
@@ -295,6 +316,12 @@ export class GameEngine {
   private lymphClock = 0;
   private lymphGulp = 0;
   private lymphRelief = 0;
+  private deal: BoothDeal | null = null;
+  private dealWait = 0;
+  private boothPurse = { x: 0, y: 0 };
+  private boothTip = { x: 0, y: 0 };
+  private boothMarks = false;
+  private heartGlyph = new Path2D('M12 20.5l-1.45-1.32C5.4 14.36 2 11.28 2 7.5 2 4.42 4.42 2 7.5 2c1.74 0 3.41.81 4.5 2.09C13.09 2.81 14.76 2 16.5 2 19.58 2 22 4.42 22 7.5c0 3.78-3.4 6.86-8.55 11.68L12 20.5z');
   /** Multiplicador do preço. Sobe a cada gole e de novo ao soltar. */
   private nodeTariff = 1;
   private nodeVisits = 0;
@@ -663,6 +690,9 @@ export class GameEngine {
       this.lymphClock = 0;
       this.lymphGulp = 0;
       this.lymphRelief = 0;
+      this.deal = null;
+      this.dealWait = 0;
+      this.boothMarks = false;
       this.isDashing = false;
       this.inputVector.x = 0;
       this.inputVector.y = 0;
@@ -891,25 +921,17 @@ export class GameEngine {
           this.lymphPhase = 'out';
           this.lymphT = 0;
       }
-      this.nodeSpending = false;
+      this.nodeSpending = this.deal !== null;
       if (this.lymphPhase === 'hold' && this.nodeFeed) {
           this.nodeWasFeeding = true;
           this.lymphWind = Math.min(NODE_WIND, this.lymphWind + dt);
-          this.lymphPressure = Math.min(1, this.lymphPressure + dt * 2.2);
-          const canTrade = this.player.maxHealth - this.player.health >= 0.35 && this.biomass >= 1;
+          this.lymphPressure = Math.min(1, this.lymphPressure + dt * 3.4);
+          const canTrade = this.player.maxHealth - this.player.health >= 1 && this.biomass >= this.nodePrice();
           if (canTrade) {
               const heavy = Math.min(1, this.lymphSpent / (this.nodePrice() * 12));
               hum(this.lymphWind < NODE_WIND ? 0.16 : 0.24 + heavy * 0.76);
           }
-          if (this.lymphWind >= NODE_WIND) {
-              this.lymphClock -= dt;
-              if (this.lymphClock <= 0) {
-                  this.lymphClock = NODE_GULP;
-                  const paid = this.payRest(4, 3);
-                  if (paid > 0) this.lymphGulp += 1;
-              }
-          }
-      } else if (this.nodeWasFeeding) {
+      } else if (this.nodeWasFeeding && !this.deal) {
           this.nodeWasFeeding = false;
           this.lymphWind = 0;
           this.lymphClock = 0;
@@ -934,9 +956,19 @@ export class GameEngine {
           this.lymphPressure = Math.max(0, this.lymphPressure - dt * 1.5);
           this.lymphWind = 0;
       }
+      if (this.deal) this.stepDeal(dt);
+      else if (this.dealWait > 0) this.dealWait = Math.max(0, this.dealWait - dt);
+      else if (this.lymphPhase === 'hold' && this.nodeFeed && this.lymphWind >= NODE_WIND && this.boothMarks) {
+          const missing = this.player.maxHealth - this.player.health;
+          if (missing >= 1 && this.biomass >= this.nodePrice()) this.beginDeal();
+      }
+      this.nodeSpending = this.deal !== null;
       if (this.lymphRelief > 0) this.lymphRelief = Math.max(0, this.lymphRelief - dt * 0.42);
       if (this.lymphPricePop > 0) this.lymphPricePop = Math.max(0, this.lymphPricePop - dt * 1.7);
-          if (this.lymphPhase === 'out' && this.lymphT >= 0.48) {
+          if (this.lymphPhase === 'out' && this.lymphT >= 0.48 && !this.deal) {
+          this.deal = null;
+          this.dealWait = 0;
+          this.boothMarks = false;
           this.invulnerabilityTimer = Math.max(this.invulnerabilityTimer, 0.7);
           this.lymphOpen = false;
           this.nodeFeed = false;
@@ -952,106 +984,298 @@ export class GameEngine {
       }
   }
 
-  private payRest(hp: number, burst: number) {
-      const missing = this.player.maxHealth - this.player.health;
-      if (missing < 0.35 || this.biomass < 1 || hp <= 0) return 0;
-      const want = Math.min(missing, hp);
-      const rate = this.nodePrice();
-      const pay = Math.min(this.biomass, Math.max(1, Math.round(want * rate)));
-      const healed = Math.min(missing, pay / rate);
-      this.biomass -= pay;
-      this.player.health = Math.min(this.player.maxHealth, this.player.health + healed);
+  public setBoothMarks(purse: { x: number; y: number }, tip: { x: number; y: number }) {
+      this.boothPurse = purse;
+      this.boothTip = tip;
+      this.boothMarks = true;
+  }
+
+  private beginDeal() {
+      const price = this.nodePrice();
+      const depart = 0.3;
+      const flight = 0.46;
+      const coins: BoothCoin[] = [];
+      for (let i = 0; i < price; i++) {
+          const u = price <= 1 ? 0.5 : i / (price - 1);
+          coins.push({
+              born: u * depart,
+              dur: flight,
+              fan: (u - 0.5) * 18,
+              lift: 54 + ((i % 3) - 1) * 3,
+              r: 4.2 + (i % 3) * 0.35,
+          });
+      }
+      this.deal = {
+          age: 0,
+          price,
+          paid: 0,
+          granted: false,
+          grantAt: -1,
+          flyEnd: depart + flight,
+          popEnd: depart + flight + 0.16,
+          done: depart + flight + 0.16 + 0.32,
+          coins,
+          sparks: [],
+      };
+      this.dealWait = 0;
+      this.lymphGulp += 1;
       this.nodeSpending = true;
-      this.lymphSpent += pay;
-      this.nodeTariff *= 1.06;
-      this.lymphPricePop = 1;
-      this.lymphPop += healed;
       audioManager.playSpend();
-      audioManager.playMend();
-      if (this.particles.length < 170 && burst > 0) {
-          for (let i = 0; i < 3; i++) {
-              this.particles.push({
-                  id: 'node_coin',
-                  type: EntityType.PARTICLE,
-                  pos: { x: this.player.pos.x + 16 + i * 5, y: this.player.pos.y - 8 },
-                  vel: { x: 0.35 + Math.random() * 0.9, y: 1.5 + Math.random() * 1.8 },
-                  radius: 3.4 + (i % 2),
-                  health: 1, maxHealth: 1,
-                  color: i % 2 ? '#fff1b0' : '#f0b429',
-                  damage: 0, active: true, ttl: 26,
-              });
-              this.particles.push({
-                  id: 'node_life',
-                  type: EntityType.PARTICLE,
-                  pos: { x: this.player.pos.x - 16 - i * 5, y: this.player.pos.y + 6 },
-                  vel: { x: -0.3 - Math.random() * 0.6, y: -1.7 - Math.random() * 1.5 },
-                  radius: 3.2,
-                  health: 1, maxHealth: 1,
-                  color: i % 2 ? '#ffd0d8' : '#ff8a98',
-                  damage: 0, active: true, ttl: 28,
+  }
+
+  private stepDeal(dt: number) {
+      const d = this.deal;
+      if (!d) return;
+      d.age += dt;
+      while (d.paid < d.price && d.age >= d.coins[d.paid].born) {
+          this.biomass = Math.max(0, this.biomass - 1);
+          this.lymphSpent += 1;
+          d.paid += 1;
+      }
+      const enter = d.popEnd + (d.done - d.popEnd) * 0.62;
+      if (!d.granted && d.age >= enter) {
+          d.granted = true;
+          d.grantAt = d.age;
+          this.player.health = Math.min(this.player.maxHealth, this.player.health + 1);
+          this.nodeTariff *= 1.06;
+          this.lymphPricePop = 1;
+          audioManager.playMend();
+          const tip = this.boothTip;
+          for (let i = 0; i < 8; i++) {
+              const a = -Math.PI * 0.15 + (i / 7) * Math.PI * 1.15;
+              d.sparks.push({
+                  x: tip.x,
+                  y: tip.y,
+                  vx: Math.cos(a) * (28 + (i % 3) * 10),
+                  vy: Math.sin(a) * 18 - 10,
+                  life: 0.32,
+                  max: 0.32,
               });
           }
       }
-      if (this.lymphPop >= 8) {
-          const shown = Math.max(1, Math.round(this.lymphPop));
-          this.lymphPop = 0;
-          this.spawnText({ x: this.player.pos.x - 8, y: this.player.pos.y - 42 }, `+${shown}`, '#ffb0b0', 30);
+      for (const s of d.sparks) {
+          s.life -= dt;
+          s.x += s.vx * dt;
+          s.y += s.vy * dt;
+          s.vy += 40 * dt;
       }
-      return pay;
+      if (d.age >= d.done) {
+          this.deal = null;
+          this.dealWait = 0.12;
+      }
+  }
+
+  private drawHeartGlyph(ctx: CanvasRenderingContext2D, x: number, y: number, h: number, tone: 'live' | 'held' | 'quiet') {
+      const s = h / 18.5;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(s, s);
+      ctx.translate(-12, -11.25);
+      const g = ctx.createLinearGradient(12, 1.5, 12, 20.5);
+      if (tone === 'quiet') {
+          g.addColorStop(0, '#f3b4bc');
+          g.addColorStop(0.5, '#d85a6a');
+          g.addColorStop(1, '#a83848');
+      } else if (tone === 'held') {
+          g.addColorStop(0, '#fff0f2');
+          g.addColorStop(0.38, '#ff5a70');
+          g.addColorStop(1, '#e01834');
+      } else {
+          g.addColorStop(0, '#ffd5db');
+          g.addColorStop(0.4, '#ff2f48');
+          g.addColorStop(1, '#d0102c');
+      }
+      ctx.fillStyle = g;
+      ctx.fill(this.heartGlyph);
+      ctx.globalAlpha = tone === 'quiet' ? 0.35 : 0.62;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.ellipse(8.3, 6.4, 2.15, 1.2, -0.55, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+  }
+
+  public paintBoothTransfer(ctx: CanvasRenderingContext2D) {
+      const d = this.deal;
+      if (!d || !this.boothMarks) return;
+      const purse = this.boothPurse;
+      const tip = this.boothTip;
+      const gatherX = tip.x + 18;
+      const gatherY = tip.y;
+      ctx.save();
+      const spots: { x: number; y: number; r: number; a: number; u: number }[] = [];
+      for (const c of d.coins) {
+          const t = (d.age - c.born) / c.dur;
+          if (t <= 0 || t >= 1) continue;
+          const u = 1 - (1 - t) * (1 - t);
+          const x = purse.x + c.fan * (1 - u) + (gatherX - purse.x) * u;
+          const y = purse.y + (gatherY - purse.y) * u + Math.sin(Math.PI * u) * c.lift * (1 - u * 0.35);
+          const fade = t < 0.04 ? t / 0.04 : t > 0.9 ? (1 - t) / 0.1 : 1;
+          const shrink = u > 0.78 ? Math.max(0.15, 1 - (u - 0.78) / 0.22) : 1;
+          spots.push({ x, y, r: c.r * shrink, a: Math.max(0, fade), u });
+      }
+      spots.sort((a, b) => a.u - b.u);
+      if (spots.length > 1) {
+          ctx.beginPath();
+          ctx.moveTo(spots[0].x, spots[0].y);
+          for (let i = 1; i < spots.length; i++) ctx.lineTo(spots[i].x, spots[i].y);
+          ctx.strokeStyle = 'rgba(255, 196, 70, 0.28)';
+          ctx.lineWidth = 8;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.stroke();
+      }
+      for (const s of spots) {
+          ctx.globalAlpha = s.a;
+          ctx.fillStyle = '#b87a14';
+          ctx.beginPath();
+          ctx.arc(s.x + 0.5, s.y + 0.7, s.r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#f2b423';
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#fff4c4';
+          ctx.beginPath();
+          ctx.arc(s.x - s.r * 0.28, s.y - s.r * 0.3, s.r * 0.34, 0, Math.PI * 2);
+          ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+      const heartStart = d.flyEnd - 0.12;
+      if (d.age >= heartStart && d.age < d.done) {
+          const pop = Math.min(1, (d.age - heartStart) / (d.popEnd - heartStart));
+          const slide = d.age <= d.popEnd ? 0 : Math.min(1, (d.age - d.popEnd) / (d.done - d.popEnd));
+          const e = slide * slide * (3 - 2 * slide);
+          const over = Math.sin(Math.min(1, pop) * Math.PI) * 0.12;
+          const x = gatherX + (tip.x - gatherX) * e;
+          const y = gatherY + (tip.y - gatherY) * e;
+          const fade = slide < 0.72 ? 1 : Math.max(0, 1 - (slide - 0.72) / 0.28);
+          ctx.globalAlpha = fade;
+          this.drawHeartGlyph(ctx, x, y - 2, 28 * (pop + over) * (1 - e * 0.45), 'held');
+      }
+      if (d.granted && d.grantAt >= 0) {
+          const since = d.age - d.grantAt;
+          if (since < 0.24) {
+              const a = 1 - since / 0.24;
+              const glow = ctx.createRadialGradient(tip.x, tip.y, 1, tip.x, tip.y, 34);
+              glow.addColorStop(0, `rgba(255, 236, 240, ${0.9 * a})`);
+              glow.addColorStop(0.45, `rgba(255, 70, 96, ${0.35 * a})`);
+              glow.addColorStop(1, 'rgba(255, 40, 60, 0)');
+              ctx.globalAlpha = 1;
+              ctx.fillStyle = glow;
+              ctx.beginPath();
+              ctx.arc(tip.x, tip.y, 34, 0, Math.PI * 2);
+              ctx.fill();
+          }
+      }
+      for (const s of d.sparks) {
+          if (s.life <= 0) continue;
+          ctx.globalAlpha = Math.max(0, s.life / s.max);
+          ctx.fillStyle = '#ff5a70';
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, 2.4, 0, Math.PI * 2);
+          ctx.fill();
+      }
+      ctx.restore();
   }
 
   private drawNodeMenu() {
       const price = this.nodePrice();
       const heat = Math.min(1, Math.max(0, this.nodeTariff - 1) / 1.15);
       const pop = this.lymphPricePop;
-      const broke = this.biomass < 1 || this.player.health >= this.player.maxHealth - 0.35;
-      const beat = broke ? 0.12 : 0.55 + 0.45 * Math.sin(this.time / 150);
+      const full = this.player.health >= this.player.maxHealth - 0.5;
+      const broke = this.biomass < price;
+      const idle = full || broke;
+      const beat = idle ? 0.15 : 0.45 + 0.55 * Math.sin(this.time / 180);
       const hold = this.lymphPressure;
-      const ring = 92 + beat * 7 + hold * 10;
+      const pressing = hold > 0.08;
+      const hx = NODE_REST.x;
+      const hy = NODE_REST.y;
 
       this.ctx.save();
-      this.ctx.translate(0, 14);
+      this.ctx.fillStyle = 'rgba(20, 7, 9, 0.96)';
+      this.ctx.strokeStyle = pressing ? '#fff1d6' : '#f0c2b4';
+      this.ctx.lineWidth = 2;
       this.ctx.beginPath();
-      this.ctx.arc(0, 0, ring, 0, Math.PI * 2);
-      this.ctx.strokeStyle = `rgba(255, 214, 196, ${0.16 + beat * 0.2})`;
-      this.ctx.lineWidth = 3;
-      this.ctx.stroke();
-
-      this.ctx.beginPath();
-      this.ctx.arc(0, 0, ring, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(hold, beat * 0.08));
-      this.ctx.strokeStyle = hold > 0.04 ? '#fff1d4' : `rgba(255, 176, 164, ${0.4 + beat * 0.45})`;
-      this.ctx.lineWidth = 8;
-      this.ctx.lineCap = 'round';
-      this.ctx.stroke();
-
-      this.ctx.save();
-      this.ctx.translate(0, ring * 0.62);
-      this.ctx.scale(0.7 + beat * 0.1 + hold * 0.08, 0.7 + beat * 0.1 + hold * 0.08);
-      this.ctx.beginPath();
-      this.ctx.moveTo(0, 18);
-      this.ctx.bezierCurveTo(-30, 2, -24, -20, 0, -6);
-      this.ctx.bezierCurveTo(24, -20, 30, 2, 0, 18);
-      this.ctx.closePath();
-      this.ctx.fillStyle = hold > 0.25 ? '#fff4ee' : `rgba(255, 186, 176, ${0.5 + beat * 0.45})`;
+      this.ctx.roundRect(-188, -124, 376, 308, 22);
       this.ctx.fill();
-      this.ctx.restore();
-      this.ctx.restore();
+      this.ctx.stroke();
 
-      this.ctx.save();
-      this.ctx.translate(0, -112);
-      this.ctx.scale(1 + pop * 0.16, 1 + pop * 0.16);
       this.ctx.textAlign = 'center';
       this.ctx.textBaseline = 'middle';
-      this.ctx.font = '700 46px "Chakra Petch", sans-serif';
-      const hot = Math.round(224 - heat * 70);
-      this.ctx.fillStyle = pop > 0.2 ? '#fff6d2' : `rgb(255, ${hot}, ${Math.round(148 - heat * 36)})`;
-      this.ctx.fillText(String(price), 0, 0);
+      this.ctx.fillStyle = '#f6d5cc';
+      this.ctx.font = '700 12px "Chakra Petch", sans-serif';
+      this.ctx.fillText(this.t('NODE_TITLE'), 0, -104);
+
+      this.ctx.fillStyle = '#fff8f3';
+      let head = 20;
+      const swap = this.t('NODE_TRADE');
+      this.ctx.font = `700 ${head}px "Chakra Petch", sans-serif`;
+      while (head > 14 && this.ctx.measureText(swap).width > 332) {
+          head -= 1;
+          this.ctx.font = `700 ${head}px "Chakra Petch", sans-serif`;
+      }
+      this.ctx.fillText(swap, 0, -76);
+
+      const ring = 40;
+      this.ctx.beginPath();
+      this.ctx.arc(hx, hy, ring, 0, Math.PI * 2);
+      this.ctx.strokeStyle = `rgba(255, 214, 206, ${0.28 + beat * 0.35})`;
+      this.ctx.lineWidth = 2;
+      this.ctx.stroke();
+      if (hold > 0.02) {
+          this.ctx.beginPath();
+          this.ctx.arc(hx, hy, ring, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * hold);
+          this.ctx.strokeStyle = '#fff6e8';
+          this.ctx.lineWidth = 3.5;
+          this.ctx.lineCap = 'round';
+          this.ctx.stroke();
+      }
+
+      const tone = idle ? 'quiet' : pressing ? 'held' : 'live';
+      const bob = 1 + (pressing ? 0.06 : beat * 0.04);
+      this.drawHeartGlyph(this.ctx, hx, hy + 1, 36 * bob, tone);
+
+      const cue = pressing ? this.t('NODE_LET') : this.t('NODE_HERE');
+      this.ctx.font = '700 15px "Chakra Petch", sans-serif';
+      this.ctx.fillStyle = pressing ? '#fff6e8' : '#ffe8e2';
+      this.ctx.fillText(cue, 0, 52);
+
+      this.ctx.save();
+      this.ctx.translate(0, 80);
+      this.ctx.scale(1 + pop * 0.06, 1 + pop * 0.06);
+      this.ctx.font = '700 17px "Chakra Petch", sans-serif';
+      const hot = Math.round(214 - heat * 55);
+      this.ctx.fillStyle = pop > 0.2 ? '#fff6d4' : `rgb(255, ${hot}, 128)`;
+      this.ctx.fillText(`${price}  ${this.t('NODE_RATE')}`, 0, 0);
+      this.ctx.restore();
+
+      let note = '';
+      if (full && broke) note = `${this.t('NODE_FULL')}  ·  ${this.t('NODE_EMPTY')}`;
+      else if (full) note = this.t('NODE_FULL');
+      else if (broke) note = this.t('NODE_EMPTY');
+      else if (this.nodeTariff > 1.04) note = this.t('NODE_CLIMB');
+      if (note) {
+          this.ctx.font = '700 12px "Chakra Petch", sans-serif';
+          this.ctx.fillStyle = full || broke ? '#ffb4b4' : '#ffb07a';
+          this.ctx.fillText(note, 0, 104);
+      }
+
+      const ly = NODE_LEAVE.y;
+      const label = this.t('NODE_LEAVE');
+      this.ctx.font = '700 14px "Chakra Petch", sans-serif';
+      this.ctx.fillStyle = '#fff3e8';
+      this.ctx.beginPath();
+      this.ctx.roundRect(-98, ly - 18, 196, 36, 18);
+      this.ctx.fill();
+      this.ctx.fillStyle = '#4a141c';
+      this.ctx.fillText(label, 0, ly);
       this.ctx.restore();
   }
-
   private drawLymph(front: boolean) {
       const s = Math.max(0.02, this.lymphScale);
-      const pump = (1 + this.lymphPressure * 0.06 * Math.sin(this.time / 46)) * NODE_OPEN;
+      const breath = front ? 1 : 1 + this.lymphPressure * 0.045 * Math.sin(this.time / 46);
+      const pump = breath * NODE_OPEN;
       const cx = CANVAS_WIDTH * 0.5;
       const cy = CANVAS_HEIGHT * 0.52;
       this.ctx.save();
@@ -1115,23 +1339,6 @@ export class GameEngine {
           this.ctx.stroke();
       } else {
           this.drawNodeMenu();
-          const door = 0.45 + (this.nodeSpending ? 0.35 : 0.12 * Math.sin(this.time / 180));
-          this.ctx.fillStyle = `rgba(42, 10, 14, ${door})`;
-          this.ctx.beginPath();
-          this.ctx.ellipse(186, 18, 26, 16, 0.5, 0, Math.PI * 2);
-          this.ctx.fill();
-          this.ctx.strokeStyle = 'rgba(255, 228, 196, 0.95)';
-          this.ctx.lineWidth = 3;
-          this.ctx.stroke();
-          this.ctx.save();
-          this.ctx.translate(186, 18);
-          this.ctx.rotate(0.5);
-          this.ctx.beginPath();
-          this.ctx.moveTo(-7, -8);
-          this.ctx.lineTo(8, 0);
-          this.ctx.lineTo(-7, 8);
-          this.ctx.stroke();
-          this.ctx.restore();
       }
       this.ctx.restore();
   }
@@ -1708,7 +1915,7 @@ export class GameEngine {
           const oldShards = Math.min(gross, Math.min(6, Math.max(3, Math.ceil(gross / 12))));
           const purse = dnaPurse(this.currentWaveIndex);
           const total = Math.max(1, Math.round(gross * COIN_WORTH * purse));
-          const want = Math.min(16, total, Math.max(3, Math.round(3 + Math.sqrt(total) * 0.9)));
+          const want = Math.min(22, total, Math.max(4, Math.round(4 + Math.sqrt(total) * 1.25)));
           const energyBudget = oldShards * (target.isElite ? 12 : 3);
           this.spillCoins(target.pos, total, want, !!target.isElite, energyBudget);
           }
@@ -1845,7 +2052,7 @@ export class GameEngine {
           const purse = dnaPurse(this.currentWaveIndex);
           const gross = Math.max(4, Math.ceil((e.value || 10) * 1.2));
           const total = Math.max(2, Math.round(gross * COIN_WORTH * purse * 1.2));
-          const want = Math.min(7, Math.max(4, Math.round(3 + Math.sqrt(total) * 0.7)));
+          const want = Math.min(10, Math.max(5, Math.round(4 + Math.sqrt(total) * 0.9)));
           this.spillCoins(e.pos, total, want, true, 5);
           const sparks = this.isLowQuality ? 4 : 9;
           for (let i = 0; i < sparks; i++) {
@@ -1879,10 +2086,13 @@ export class GameEngine {
           this.lives--;
           audioManager.playCrack();
           onLifeLost();
-          this.hitStopTimer = 0.22;
+          this.hitStopTimer = 0;
           this.hurt = 1;
-          this.hurtFlash = Math.max(this.hurtFlash, 0.55);
-          this.hurtBloom = Math.max(this.hurtBloom, HURT_BLOOM); 
+          this.lifeCut = 1;
+          this.hurtFlash = Math.max(this.hurtFlash, 0.9);
+          this.hurtBloom = 0.18;
+          this.hurtKickX *= 2.1;
+          this.hurtKickY *= 2.1; 
           achievementManager.track('die_10', 1);
           
           if (this.lives === 0) {
@@ -1909,22 +2119,35 @@ export class GameEngine {
               this.energy = 0; 
               this.invulnerabilityTimer = 3.0;
               this.spawnText(this.player.pos, this.t('MSG_CRITICAL'), '#ff0000', 50);
-              
-              this.screenShake = {x: 40, y: 40}; 
-              this.shakeIntensity = 40;
-
-              const pCount = this.isLowQuality ? 10 : 40;
-              for(let i=0; i<pCount; i++) {
-                  const angle = Math.random() * Math.PI * 2;
-                  const speed = Math.random() * 15 + 5;
+              this.shakeIntensity = Math.max(this.shakeIntensity, 34);
+              this.ripMembrane(0, -1, 2);
+              const rings = [
+                  { color: '#fff6f6', radius: this.player.radius + 6, ttl: 16 },
+                  { color: '#ff2438', radius: this.player.radius + 18, ttl: 26 },
+              ];
+              for (const ring of rings) {
+                  this.particles.push({
+                      id: 'ring', type: EntityType.PARTICLE,
+                      pos: { x: this.player.pos.x, y: this.player.pos.y },
+                      vel: { x: 0, y: 0 },
+                      radius: ring.radius,
+                      health: 1, maxHealth: ring.ttl,
+                      color: ring.color,
+                      damage: 0, active: true, ttl: ring.ttl,
+                  });
+              }
+              const drops = this.isLowQuality ? 8 : 16;
+              for (let i = 0; i < drops; i++) {
+                  const angle = (i / drops) * Math.PI * 2;
+                  const speed = 7 + (i % 3) * 3;
                   this.particles.push({
                       id: 'blood_surge', type: EntityType.PARTICLE,
-                      pos: { ...this.player.pos },
-                      vel: { x: Math.cos(angle)*speed, y: Math.sin(angle)*speed },
-                      radius: Math.random() * 4 + 2,
+                      pos: { x: this.player.pos.x, y: this.player.pos.y },
+                      vel: { x: Math.cos(angle) * speed, y: Math.sin(angle) * speed },
+                      radius: 4.5 + (i % 4),
                       health: 1, maxHealth: 1,
-                      color: '#ff0000',
-                      damage: 0, active: true, ttl: 40
+                      color: i % 2 ? '#ff2030' : '#fff1f3',
+                      damage: 0, active: true, ttl: 28,
                   });
               }
               
@@ -2001,6 +2224,7 @@ export class GameEngine {
     this.hurtFlash = 0;
     this.hurtBloom = 0;
     this.hurtEase = 0;
+    this.lifeCut = 0;
     this.hurtSerious = false;
     this.hurtKickX = 0;
     this.hurtKickY = 0;
@@ -3558,13 +3782,11 @@ export class GameEngine {
       } else if (p.id === 'ring') {
           p.ttl = (p.ttl || 0) - 1;
           if ((p.ttl || 0) <= 0) continue;
-      } else if (p.id === 'coin_trail' || p.id === 'node_coin') {
+      } else if (p.id === 'coin_trail') {
           p.pos.x += p.vel.x;
           p.pos.y += p.vel.y;
-          if (p.id === 'coin_trail') {
-              p.vel.x *= 0.9;
-              p.vel.y *= 0.9;
-          }
+          p.vel.x *= 0.9;
+          p.vel.y *= 0.9;
           p.ttl = (p.ttl || 0) - 1;
           if ((p.ttl || 0) <= 0) continue;
       } else if (p.id === 'zap') {
@@ -3630,6 +3852,7 @@ export class GameEngine {
         audioManager.playHurtClear(this.player.pos);
     }
     this.hurtEase = Math.max(0, this.hurtEase - step * 1.6);
+    this.lifeCut = Math.max(0, this.lifeCut - step * 1.25);
     this.compactInactive(this.entities);
     this.forgetPhased();
   }
@@ -5592,7 +5815,7 @@ export class GameEngine {
     }
 
     if (this.lymphOpen) {
-        this.ctx.fillStyle = `rgba(16, 4, 8, ${0.5 * this.lymphScale})`;
+        this.ctx.fillStyle = `rgba(8, 2, 4, ${0.86 * this.lymphScale})`;
         this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
         this.drawLymph(false);
     }
@@ -5601,12 +5824,6 @@ export class GameEngine {
     if (!ride) this.drawVital();
     if (this.lymphOpen) {
         this.drawLymph(true);
-        if (this.lymphPressure > 0.04) {
-            this.ctx.save();
-            this.ctx.fillStyle = `rgba(28, 0, 6, ${0.28 * this.lymphPressure})`;
-            this.ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
-            this.ctx.restore();
-        }
         if (this.lymphRelief > 0.02) {
             const a = this.lymphRelief;
             const home = this.lymphHome();
@@ -5636,7 +5853,7 @@ export class GameEngine {
     });
 
     this.entities.forEach(e => {
-      if (e.type === EntityType.TEXT_POPUP) {
+      if (e.type === EntityType.TEXT_POPUP && !this.lymphOpen) {
         this.ctx.font = `700 ${e.radius || 24}px "Chakra Petch", sans-serif`;
         this.ctx.fillStyle = e.color;
         this.ctx.strokeStyle = '#000';
@@ -5655,9 +5872,9 @@ export class GameEngine {
   }
 
   private drawHurt() {
-      const edge = this.hurt;
+      const edge = Math.max(this.hurt, this.lifeCut);
       const ease = this.hurtEase;
-      if (edge < 0.02 && ease < 0.02) return;
+      if (edge < 0.02 && ease < 0.02 && this.lifeCut < 0.02) return;
       const w = CANVAS_WIDTH;
       const h = CANVAS_HEIGHT;
       this.ctx.save();
@@ -5669,6 +5886,11 @@ export class GameEngine {
           veil.addColorStop(1, `rgba(86, 0, 14, ${0.62 * edge})`);
           this.ctx.fillStyle = veil;
           this.ctx.fillRect(0, 0, w, h);
+          if (this.lifeCut > 0.62) {
+              const flash = (this.lifeCut - 0.62) / 0.38;
+              this.ctx.fillStyle = `rgba(255, 244, 244, ${0.42 * flash})`;
+              this.ctx.fillRect(0, 0, w, h);
+          }
           const cx = w * 0.5 + Math.cos(this.hurtAngle) * w * 0.4;
           const cy = h * 0.5 + Math.sin(this.hurtAngle) * h * 0.38;
           this.ctx.save();

@@ -1268,18 +1268,11 @@ export class AudioManager {
   public playCrack() {
       if (!this.ctx || !this.sfxGain) return;
       const t = this.ctx.currentTime;
-      const osc = this.ctx.createOscillator();
-      const g = this.ctx.createGain();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(240, t);
-      osc.frequency.exponentialRampToValueAtTime(48, t + 0.18);
-      g.gain.setValueAtTime(0.4, t);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
-      osc.connect(g);
-      g.connect(this.sfxGain);
-      osc.start(t);
-      osc.stop(t + 0.24);
-      this.puff(0.08, 1800, 0.35);
+      this.puff(0.16, 2800, 0.42, t);
+      this.tone(t, 640, 0.11, 'triangle', 0.22, 220, this.sfxGain);
+      this.tone(t + 0.03, 380, 0.22, 'sawtooth', 0.1, 160, this.sfxGain);
+      this.tone(t + 0.05, 210, 0.36, 'sine', 0.16, 110, this.sfxGain);
+      this.puff(0.08, 900, 0.28, t + 0.04);
   }
   public playDepart() {
       if (!this.ctx || !this.musicGain) return;
