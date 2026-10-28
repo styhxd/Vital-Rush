@@ -12,7 +12,7 @@ STYH Games. Direção de Paulo Gabriel de L. S.
 - A ordem sai no sorteio a cada ficha: são 120 caminhos possíveis, e cada combinação é uma doença diferente.
 - O prontuário entrega na largada o nome, a idade e o foco inicial do paciente. Nesta ficha, o plantão caiu na Iracema.
 
-<img src="docs/prontuario.jpg" alt="Prontuário da Iracema Bittencourt, abscesso na polpa do molar" width="100%">
+<img src="docs/prontuario.jpg" alt="Prontuário da Iracema Saturno, hepatite no lóbulo do fígado" width="100%">
 
 - No molar, uma faixa avisa antes de as paredes fecharem na mordida. O estrago é quando os dentes se encontram; ficar no meio é erro de cálculo.
 
@@ -25,7 +25,7 @@ STYH Games. Direção de Paulo Gabriel de L. S.
 - Cada órgão muda de cor e de encrenca fisiológica conforme a viagem avança por coração, pulmão e cérebro.
 
 <img src="docs/coracao.jpg" alt="Onda 17 no coração" width="49%">
-<img src="docs/pulmao.jpg" alt="Onda 23 no pulmão, com parasitas" width="49%">
+<img src="docs/pulmao.jpg" alt="Onda 23 no pulmão, com parasitas âmbar" width="49%">
 
 <img src="docs/cerebro.jpg" alt="Onda 29 no cérebro" width="100%">
 
