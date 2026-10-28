@@ -11,7 +11,7 @@
  */
 
 import type { OrganId } from '../types';
-import { COIN_PHRASE, scheduleCadence, scheduleCoinTick, type CoinVoice } from './coinFeel';
+import { flushCoin, latchCoin, scheduleCadence, scheduleCoinTick, type CoinVoice } from './coinFeel';
 import { scheduleHurt, scheduleHurtClear, type HurtGrade } from './hurtFeel';
 import { STAR_STEPS, playStarDown, playStarFanfare, playStarKill, playStarStep, starBpm } from './starMusic';
 
@@ -893,7 +893,7 @@ export class AudioManager {
       this.drainCoins();
   }
 
-  /** Cada coleta entra na fila. O tilintar sai mesmo no hit-stop e com o contexto dormindo. */
+  /** Cada coleta entra na frase. O floreio fecha mesmo com moeda ainda chegando. */
   private drainCoins() {
       if (!this.ctx || !this.sfxGain) return;
       if (this.ctx.state !== 'running') {
@@ -902,31 +902,17 @@ export class AudioManager {
       }
       const now = performance.now();
       const dest = this.coinEar();
-      let n = 0;
-      while (this.coinDue.length && this.coinDue[0] <= now + 12 && n < 2) {
-          this.coinDue.shift();
-          const piled = 1 + (n === 0 ? this.coinFold : 0);
-          if (n === 0) this.coinFold = 0;
-          const step = this.coinRun;
-          const gear = this.coinGear;
-          const gap = this.coinLast > 0 ? now - this.coinLast : 999;
-          const fresh = gap > 480;
-          const toneStep = fresh ? 0 : step;
-          const toneGear = fresh ? 0 : gear;
-          this.coinRun = toneStep + 1;
-          this.coinGear = toneGear;
-          if (this.coinRun >= COIN_PHRASE) {
-              this.coinRun = 0;
-              this.coinGear = Math.min(3, toneGear + 1);
+      for (let n = 0; n < 3; n++) {
+          const flushed = flushCoin(this.coinVoice(), now);
+          this.applyCoin(flushed.voice);
+          if (!flushed.play || !this.ctx) break;
+          if (flushed.play.kind === 'tick') {
+              scheduleCoinTick(this.ctx, dest, this.ctx.currentTime, flushed.play.step, flushed.play.piled, flushed.play.gear);
+          } else {
+              scheduleCadence(this.ctx, dest, this.ctx.currentTime, flushed.play.gear);
           }
-          this.coinLast = now;
-          scheduleCoinTick(this.ctx, dest, this.ctx.currentTime + n * 0.042, toneStep, piled, toneGear);
-          if (toneStep === COIN_PHRASE - 1 && this.coinDue.length === 0 && this.coinFold === 0) {
-              scheduleCadence(this.ctx, dest, this.ctx.currentTime + 0.07, toneGear);
-          }
-          n++;
+          this.coinHeard = now;
       }
-      if (n > 0) this.coinHeard = now;
   }
 
   /** Um pan só, reaproveitado. Cada moeda não abre um panner novo. */
@@ -944,14 +930,11 @@ export class AudioManager {
 
   /**
    * Um tilintar por tempo, não uma fila. Moedas do mesmo instante viram um
-   * ataque só; o grau sobe enquanto elas continuam chegando e recomeça no silêncio.
+   * ataque só. Nove notas sobem; o floreio fecha; se ainda houver moeda, recomeça.
    */
   public playCoin(at?: { x: number; y: number } | null, _force = false) {
       if (at) this.coinAt = at;
-      const now = performance.now();
-      const last = this.coinDue.length ? this.coinDue[this.coinDue.length - 1] : this.coinHeard;
-      if (this.coinDue.length < 32) this.coinDue.push(Math.max(now, (last || 0) + 46));
-      else this.coinFold = Math.min(16, this.coinFold + 1);
+      this.applyCoin(latchCoin(this.coinVoice()));
       this.drainCoins();
   }
 

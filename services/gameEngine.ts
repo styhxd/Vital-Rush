@@ -23,12 +23,12 @@ import { OrganDirector, cellBudget, cellColor, cellRises, organBg, rollCellStyle
 const BOSS_GRACE = 1.15;
 /** Primeira cura do linfonodo. Cada uso sobe este preço. */
 const NODE_BASE = 64;
-const NODE_REST = { x: 0, y: 118, w: 340, h: 62 };
-const NODE_LEAVE = { x: 0, y: 176, w: 300, h: 52 };
+const NODE_REST = { x: 0, y: 16, w: 250, h: 230 };
+const NODE_LEAVE = { x: 188, y: 20, w: 108, h: 96 };
 /** O nódulo aberto ocupa a arena o bastante para o dedo acertar o que está escrito nele. */
 const NODE_OPEN = 2.05;
 /** O que a moeda paga de DNA, em relação ao que pagava. A bolsa da onda multiplica por cima. */
-const COIN_WORTH = 0.48;
+const COIN_WORTH = 0.34;
 const NODE_WIND = 0.48;
 const NODE_GULP = 0.18;
 
@@ -88,11 +88,10 @@ function campaignPressure(waveIndex: number): number {
     return Math.pow(t, 1.15);
 }
 
-// Onda 1 entrega menos moeda do que antes. O peso sobe devagar e, pela onda 25,
-// o DNA somado chega perto da árvore inteira de melhorias.
+// Onda 1 entrega menos. O peso sobe devagar: a árvore não fecha no meio da campanha.
 function dnaPurse(waveIndex: number): number {
     const t = Math.min(1, Math.max(0, waveIndex) / 24);
-    return 0.62 + Math.pow(t, 1.35) * 1.6;
+    return 0.5 + Math.pow(t, 1.35) * 1.12;
 }
 
 // O mesmo chefe anda e ataca mais conforme a onda sobe. Onda 1 fica em 86% do passo escrito; a 30, em 118%.
@@ -996,147 +995,52 @@ export class GameEngine {
       return pay;
   }
 
-  private wrapText(text: string, max: number): string[] {
-      const words = text.split(/\s+/);
-      const lines: string[] = [];
-      let line = '';
-      for (const word of words) {
-          const next = line ? `${line} ${word}` : word;
-          if (line && this.ctx.measureText(next).width > max) {
-              lines.push(line);
-              line = word;
-          } else {
-              line = next;
-          }
-      }
-      if (line) lines.push(line);
-      return lines.slice(0, 3);
-  }
-
   private drawNodeMenu() {
       const price = this.nodePrice();
-      const dna = this.language === 'ES' ? 'ADN' : 'DNA';
-      const life = this.language === 'EN' ? 'HP' : 'vida';
       const heat = Math.min(1, Math.max(0, this.nodeTariff - 1) / 1.15);
       const pop = this.lymphPricePop;
-      const ratio = Math.max(0, Math.min(1, this.player.health / Math.max(1, this.player.maxHealth)));
+      const broke = this.biomass < 1 || this.player.health >= this.player.maxHealth - 0.35;
+      const beat = broke ? 0.12 : 0.55 + 0.45 * Math.sin(this.time / 150);
+      const hold = this.lymphPressure;
+      const ring = 92 + beat * 7 + hold * 10;
 
       this.ctx.save();
-      this.ctx.textAlign = 'center';
-      this.ctx.textBaseline = 'middle';
-
-      this.ctx.fillStyle = 'rgba(28, 8, 14, 0.86)';
-      this.ctx.strokeStyle = 'rgba(255, 214, 186, 0.72)';
-      this.ctx.lineWidth = 2;
+      this.ctx.translate(0, 14);
       this.ctx.beginPath();
-      this.ctx.roundRect(-180, -164, 360, 372, 26);
-      this.ctx.fill();
-      this.ctx.stroke();
-      this.ctx.fillStyle = 'rgba(255, 228, 206, 0.08)';
-      this.ctx.beginPath();
-      this.ctx.roundRect(-168, -152, 336, 54, 16);
-      this.ctx.fill();
-
-      this.ctx.fillStyle = '#fff4e8';
-      this.ctx.font = '700 26px "Chakra Petch", sans-serif';
-      this.ctx.fillText(this.t('NODE_TITLE'), 0, -126);
-      this.ctx.strokeStyle = 'rgba(255, 196, 168, 0.45)';
-      this.ctx.lineWidth = 1;
-      this.ctx.beginPath();
-      this.ctx.moveTo(-46, -110);
-      this.ctx.lineTo(46, -110);
+      this.ctx.arc(0, 0, ring, 0, Math.PI * 2);
+      this.ctx.strokeStyle = `rgba(255, 214, 196, ${0.16 + beat * 0.2})`;
+      this.ctx.lineWidth = 3;
       this.ctx.stroke();
 
-      this.ctx.font = '600 15px "Chakra Petch", sans-serif';
-      this.ctx.fillStyle = 'rgba(255, 228, 210, 0.82)';
-      const lines = this.wrapText(this.t('NODE_HINT'), 300).slice(0, 2);
-      lines.forEach((line, i) => this.ctx.fillText(line, 0, -90 + i * 18));
-
-      const barY = -48;
-      this.ctx.font = '700 13px "Chakra Petch", sans-serif';
-      this.ctx.fillStyle = 'rgba(255, 236, 224, 0.78)';
-      this.ctx.textAlign = 'left';
-      this.ctx.fillText(this.t('INTEGRITY'), -148, barY - 16);
-      this.ctx.textAlign = 'right';
-      this.ctx.fillText(`${Math.round(this.player.health)}/${Math.round(this.player.maxHealth)}`, 148, barY - 16);
-      this.ctx.textAlign = 'center';
-      this.ctx.fillStyle = 'rgba(255, 214, 196, 0.16)';
       this.ctx.beginPath();
-      this.ctx.roundRect(-148, barY - 6, 296, 16, 8);
-      this.ctx.fill();
-      const lifeWash = this.ctx.createLinearGradient(-148, 0, 148, 0);
-      lifeWash.addColorStop(0, '#c44a52');
-      lifeWash.addColorStop(1, '#ffd0b0');
-      this.ctx.fillStyle = lifeWash;
-      this.ctx.beginPath();
-      this.ctx.roundRect(-148, barY - 6, Math.max(12, 296 * ratio), 16, 8);
-      this.ctx.fill();
-      const pocket = this.nodeSpending ? `-${Math.round(this.lymphSpent)} ${dna}` : `${Math.round(this.biomass)} ${dna}`;
-      this.ctx.font = '700 14px "Chakra Petch", sans-serif';
-      this.ctx.fillStyle = this.nodeSpending ? '#ffd0a4' : '#ffe7c4';
-      this.ctx.fillText(pocket, 0, barY + 22);
+      this.ctx.arc(0, 0, ring, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(hold, beat * 0.08));
+      this.ctx.strokeStyle = hold > 0.04 ? '#fff1d4' : `rgba(255, 176, 164, ${0.4 + beat * 0.45})`;
+      this.ctx.lineWidth = 8;
+      this.ctx.lineCap = 'round';
+      this.ctx.stroke();
 
-      const climbing = this.nodeVisits > 0 || this.nodeTariff > 1.03;
-      const scale = 1 + pop * 0.08;
       this.ctx.save();
-      this.ctx.translate(0, 28);
-      this.ctx.scale(scale, scale);
-      this.ctx.fillStyle = 'rgba(255, 220, 196, 0.08)';
+      this.ctx.translate(0, ring * 0.62);
+      this.ctx.scale(0.7 + beat * 0.1 + hold * 0.08, 0.7 + beat * 0.1 + hold * 0.08);
       this.ctx.beginPath();
-      this.ctx.roundRect(-78, -28, 156, 58, 16);
+      this.ctx.moveTo(0, 18);
+      this.ctx.bezierCurveTo(-30, 2, -24, -20, 0, -6);
+      this.ctx.bezierCurveTo(24, -20, 30, 2, 0, 18);
+      this.ctx.closePath();
+      this.ctx.fillStyle = hold > 0.25 ? '#fff4ee' : `rgba(255, 186, 176, ${0.5 + beat * 0.45})`;
       this.ctx.fill();
-      this.ctx.font = '700 32px "Chakra Petch", sans-serif';
-      const hot = Math.round(236 - heat * 80);
-      this.ctx.fillStyle = pop > 0.2 ? '#fff6d2' : `rgb(255, ${hot}, ${Math.round(176 - heat * 40)})`;
-      this.ctx.fillText(String(price), 0, -4);
-      this.ctx.font = '700 13px "Chakra Petch", sans-serif';
-      this.ctx.fillStyle = 'rgba(255, 228, 206, 0.8)';
-      this.ctx.fillText(`${dna}  →  1 ${life}`, 0, 18);
+      this.ctx.restore();
       this.ctx.restore();
 
-      const rest = NODE_REST;
-      this.ctx.fillStyle = '#f3cbb8';
-      this.ctx.beginPath();
-      this.ctx.roundRect(rest.x - rest.w / 2, rest.y - rest.h / 2, rest.w, rest.h, 28);
-      this.ctx.fill();
-      const fillW = rest.w * this.lymphPressure;
-      if (fillW > 1) {
-          this.ctx.save();
-          this.ctx.beginPath();
-          this.ctx.roundRect(rest.x - rest.w / 2, rest.y - rest.h / 2, rest.w, rest.h, 28);
-          this.ctx.clip();
-          const wash = this.ctx.createLinearGradient(rest.x - rest.w / 2, 0, rest.x + rest.w / 2, 0);
-          wash.addColorStop(0, '#e07a62');
-          wash.addColorStop(1, '#fff1d4');
-          this.ctx.fillStyle = wash;
-          this.ctx.fillRect(rest.x - rest.w / 2, rest.y - rest.h / 2, fillW, rest.h);
-          this.ctx.restore();
-      }
-      this.ctx.strokeStyle = `rgba(92, 28, 32, ${0.35 + heat * 0.35})`;
-      this.ctx.lineWidth = 2;
-      this.ctx.beginPath();
-      this.ctx.roundRect(rest.x - rest.w / 2, rest.y - rest.h / 2, rest.w, rest.h, 28);
-      this.ctx.stroke();
-      this.ctx.fillStyle = '#3c1218';
-      this.ctx.font = '700 18px "Chakra Petch", sans-serif';
-      this.ctx.fillText(this.t('NODE_REST'), rest.x, climbing ? rest.y + 8 : rest.y);
-      if (climbing) {
-          this.ctx.font = '700 11px "Chakra Petch", sans-serif';
-          this.ctx.fillStyle = '#7a2430';
-          this.ctx.fillText(`${this.t('NODE_CLIMB')} · ${this.t('NODE_USE')} ${this.nodeVisits + 1}`, rest.x, rest.y - 14);
-      }
-
-      const marks = Math.min(8, this.nodeVisits);
-      for (let i = 0; i < marks; i++) {
-          this.ctx.fillStyle = i === marks - 1 && pop > 0.05 ? '#fff6d8' : '#a84848';
-          this.ctx.beginPath();
-          this.ctx.arc(rest.x - (marks - 1) * 7 + i * 14, rest.y + rest.h / 2 - 10, 2.6, 0, Math.PI * 2);
-          this.ctx.fill();
-      }
-
-      this.ctx.fillStyle = 'rgba(255, 228, 210, 0.88)';
-      this.ctx.font = '700 15px "Chakra Petch", sans-serif';
-      this.ctx.fillText(this.t('NODE_LEAVE'), NODE_LEAVE.x, NODE_LEAVE.y);
+      this.ctx.save();
+      this.ctx.translate(0, -112);
+      this.ctx.scale(1 + pop * 0.16, 1 + pop * 0.16);
+      this.ctx.textAlign = 'center';
+      this.ctx.textBaseline = 'middle';
+      this.ctx.font = '700 46px "Chakra Petch", sans-serif';
+      const hot = Math.round(224 - heat * 70);
+      this.ctx.fillStyle = pop > 0.2 ? '#fff6d2' : `rgb(255, ${hot}, ${Math.round(148 - heat * 36)})`;
+      this.ctx.fillText(String(price), 0, 0);
       this.ctx.restore();
   }
 
@@ -1209,11 +1113,20 @@ export class GameEngine {
           const door = 0.45 + (this.nodeSpending ? 0.35 : 0.12 * Math.sin(this.time / 180));
           this.ctx.fillStyle = `rgba(42, 10, 14, ${door})`;
           this.ctx.beginPath();
-          this.ctx.ellipse(186, 18, 22, 14, 0.5, 0, Math.PI * 2);
+          this.ctx.ellipse(186, 18, 26, 16, 0.5, 0, Math.PI * 2);
           this.ctx.fill();
-          this.ctx.strokeStyle = 'rgba(255, 214, 170, 0.8)';
+          this.ctx.strokeStyle = 'rgba(255, 228, 196, 0.95)';
           this.ctx.lineWidth = 3;
           this.ctx.stroke();
+          this.ctx.save();
+          this.ctx.translate(186, 18);
+          this.ctx.rotate(0.5);
+          this.ctx.beginPath();
+          this.ctx.moveTo(-7, -8);
+          this.ctx.lineTo(8, 0);
+          this.ctx.lineTo(-7, 8);
+          this.ctx.stroke();
+          this.ctx.restore();
       }
       this.ctx.restore();
   }
@@ -1447,7 +1360,7 @@ export class GameEngine {
       const type = config.enemyTypes[Math.floor(Math.random() * config.enemyTypes.length)] ?? EntityType.BACTERIA;
       const pressure = campaignPressure(this.currentWaveIndex);
       const hp = 1;
-      const jackpot = Math.round(4200 * (this.difficultyMods.score ?? 1) * (1 + pressure * 0.4));
+      const jackpot = Math.round(860 * (this.difficultyMods.score ?? 1) * (1 + pressure * 0.35));
       const y = 180 + Math.random() * (CANVAS_HEIGHT - 360);
       this.entities.push({
           id: `shiny_${Date.now()}_${Math.random()}`,
@@ -1891,8 +1804,8 @@ export class GameEngine {
           this.score += Math.floor((e.value || 10) * comboScoreMultiplier(this.comboCount));
           if (this.score >= 50000) achievementManager.track('score_50k', 50000);
           const purse = dnaPurse(this.currentWaveIndex);
-          const gross = Math.max(8, Math.ceil((e.value || 10) * 1.85));
-          const total = Math.max(4, Math.round(gross * COIN_WORTH * purse * 2.2));
+          const gross = Math.max(4, Math.ceil((e.value || 10) * 1.2));
+          const total = Math.max(2, Math.round(gross * COIN_WORTH * purse * 1.2));
           const want = Math.min(7, Math.max(4, Math.round(3 + Math.sqrt(total) * 0.7)));
           this.spillCoins(e.pos, total, want, true, 5);
           const sparks = this.isLowQuality ? 4 : 9;
@@ -3907,7 +3820,7 @@ export class GameEngine {
       this.ctx.textBaseline = 'middle';
       const plateW = Math.max(108, this.ctx.measureText(tag).width + 28, this.ctx.measureText(fare).width + 28);
       const ly = y + 62;
-      const plateH = climb ? 52 : 40;
+      const plateH = 40;
       this.ctx.fillStyle = 'rgba(42, 12, 16, 0.9)';
       this.ctx.beginPath();
       this.ctx.roundRect(x - plateW / 2, ly - 16, plateW, plateH, 12);
@@ -3920,11 +3833,6 @@ export class GameEngine {
       this.ctx.font = '700 16px "Chakra Petch", sans-serif';
       this.ctx.fillStyle = '#ffe08a';
       this.ctx.fillText(fare, x, ly + 16);
-      if (climb) {
-          this.ctx.font = '700 11px "Chakra Petch", sans-serif';
-          this.ctx.fillStyle = '#ffb4a2';
-          this.ctx.fillText(`${this.t('NODE_CLIMB')} · ${this.t('NODE_USE')} ${this.nodeVisits + 1}`, x, ly + 32);
-      }
       this.ctx.restore();
   }
 

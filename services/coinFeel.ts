@@ -14,20 +14,18 @@
  * Gastar DNA no linfonodo não usa essa voz: som de ganho em cima de perda é
  * o "loss disguised as a win" (Dixon, Harrigan, Sandhu, Collins e Fugelsang, 2010).
  *
- * No fim da frase, três sinos fecham a sentença em ~180 ms. O level-up do
- * Minecraft é um arpejo maior rolado por cerca de 0,7 s; este é mais curto e
- * o contorno é outro (quinta, tônica, quinta acima), no mesmo timbre da moeda.
- * Uma cadência fecha a expectativa (Meyer; Huron, Sweet Anticipation). Se ainda
- * houver moeda quando o botão acaba, a frase recomeça um tom acima: +2, depois
- * +4, depois +7 semitons. A quinta justa é o último convite; dali a frase
- * repete no mesmo lugar para não virar apito. Um gole de uma nota não ganha
- * botão. A celebração é da frase, não de cada moeda.
+ * Nove tilintares sobem a pentatônica. No nono, a frase fecha num floreio
+ * (piriririm), mesmo que ainda esteja chovendo moeda: o ouvido precisa do
+ * fim, senão vive repetindo o agudo. O floreio segura a fila; o que chegou
+ * durante ele começa a frase seguinte um tom acima (+2, +4, +7 semitons).
+ * A quinta justa é o último convite; dali a frase repete no mesmo lugar.
+ * Um gole de uma nota não ganha botão. A celebração é da frase, não de cada moeda.
  */
 
 export const COIN_BEAT_MS = 100;
 export const COIN_RESET_MS = 420;
-export const COIN_PHRASE = 7;
-export const COIN_CADENCE_MS = 200;
+export const COIN_PHRASE = 9;
+export const COIN_CADENCE_MS = 420;
 /** Semitons acima da casa: tom, terça maior, quinta justa. */
 export const COIN_GEARS = [0, 2, 4, 7];
 export const COIN_ATTACK_S = 0.0014;
@@ -36,8 +34,8 @@ export const COIN_PARTIAL_S = 0.016;
 export const COIN_TIP_S = 0.007;
 export const COIN_CLICK_S = 0.0045;
 
-/** Pentatônica maior, do G6 ao A7. Sobe e segura o topo. Não dá a volta. */
-export const COIN_SCALE = [1567.98, 1760, 2093, 2349.32, 2637.02, 3135.96, 3520];
+/** Pentatônica maior, do Lá5 ao Mi7. O metal mora nos parciais, não num apito. */
+export const COIN_SCALE = [880, 1046.5, 1174.66, 1318.51, 1567.98, 1760, 2093, 2349.32, 2637.02];
 
 export interface CoinVoice {
     run: number;
@@ -137,11 +135,13 @@ export function coinFreq(step: number, piled: number, gear = 0): number {
     return f * Math.pow(2, (cents + gearSemi(gear) * 100) / 1200);
 }
 
-/** Quinta, tônica, quinta acima. Três sinos, um fôlego, não um arpejo rolado. */
+/** Quinta, tônica, terça, quinta, tônica acima. O último sino é o "m" do floreio. */
 export const CADENCE_NOTES = [
-    { at: 0, mul: 1.5, dur: 0.05 },
-    { at: 0.052, mul: 2, dur: 0.062 },
-    { at: 0.112, mul: 3, dur: 0.07 },
+    { at: 0, mul: 1.5, dur: 0.07 },
+    { at: 0.052, mul: 2, dur: 0.075 },
+    { at: 0.108, mul: 2.52, dur: 0.08 },
+    { at: 0.168, mul: 3, dur: 0.09 },
+    { at: 0.236, mul: 4, dur: 0.13 },
 ];
 
 export function cadenceFreq(index: number, gear: number): number {
@@ -182,85 +182,39 @@ export function coinAmp(t: number, peak: number): number {
         + (t >= 0 && t < COIN_CLICK_S ? peak * 0.55 * (1 - t / COIN_CLICK_S) : 0);
 }
 
-export function scheduleCadence(
+/** Corpo + parciais inarmônicos (2.76, 5.15) e um tic agudo. Moeda, não apito. */
+function metalBell(
     ctx: BaseAudioContext,
     dest: AudioNode,
     time: number,
-    gear: number,
+    freq: number,
+    peak: number,
+    dur: number,
 ) {
     const nyquist = ctx.sampleRate * 0.45;
-    CADENCE_NOTES.forEach((note, index) => {
-        const f = Math.min(nyquist, cadenceFreq(index, gear));
-        const start = time + note.at;
-        const peak = index === CADENCE_NOTES.length - 1 ? 0.05 : 0.04;
+    const f = Math.max(80, Math.min(nyquist * 0.3, freq));
+    const voices: { mul: number; type: OscillatorType; gain: number; dur: number; drop: boolean }[] = [
+        { mul: 1, type: 'triangle', gain: 0.72, dur, drop: true },
+        { mul: 2.76, type: 'sine', gain: 0.48, dur: Math.min(dur, Math.max(0.012, dur * 0.55)), drop: false },
+        { mul: 5.15, type: 'sine', gain: 0.2, dur: Math.min(dur, 0.016), drop: false },
+    ];
+    for (const v of voices) {
+        const hz = Math.min(nyquist, f * v.mul);
+        if (hz < 90) continue;
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(Math.max(40, f), start);
-        gain.gain.setValueAtTime(0.0001, start);
-        gain.gain.exponentialRampToValueAtTime(peak, start + 0.006);
-        gain.gain.exponentialRampToValueAtTime(0.0001, start + note.dur);
+        osc.type = v.type;
+        const startHz = v.drop ? hz * 1.02 : hz;
+        osc.frequency.setValueAtTime(startHz, time);
+        if (v.drop) osc.frequency.exponentialRampToValueAtTime(Math.max(40, hz * 0.985), time + Math.min(0.018, v.dur));
+        const pk = Math.max(0.0002, peak * v.gain);
+        gain.gain.setValueAtTime(0.0001, time);
+        gain.gain.exponentialRampToValueAtTime(pk, time + Math.min(0.0014, v.dur * 0.18));
+        gain.gain.exponentialRampToValueAtTime(0.0001, time + v.dur);
         osc.connect(gain);
         gain.connect(dest);
-        osc.start(start);
-        release(osc, [gain], start + note.dur + 0.02);
-    });
-}
-
-export function scheduleCoinTick(
-    ctx: BaseAudioContext,
-    dest: AudioNode,
-    time: number,
-    step: number,
-    piled: number,
-    gear = 0,
-) {
-    const wobble = Math.pow(2, (Math.random() * 10 - 5) / 1200);
-    const f = Math.min(ctx.sampleRate * 0.22, coinFreq(step, piled, gear) * wobble);
-    const peak = coinGain(piled);
-    const nyquist = ctx.sampleRate * 0.45;
-
-    const body = ctx.createOscillator();
-    const bodyGain = ctx.createGain();
-    body.type = 'sine';
-    body.frequency.setValueAtTime(Math.max(40, f * 1.035), time);
-    body.frequency.exponentialRampToValueAtTime(Math.max(40, f), time + 0.012);
-    bodyGain.gain.setValueAtTime(0.0001, time);
-    bodyGain.gain.exponentialRampToValueAtTime(peak, time + COIN_ATTACK_S);
-    bodyGain.gain.exponentialRampToValueAtTime(0.0001, time + COIN_BODY_S);
-    body.connect(bodyGain);
-    bodyGain.connect(dest);
-    body.start(time);
-    release(body, [bodyGain], time + COIN_BODY_S + 0.01);
-
-    const partialHz = Math.min(nyquist, f * 2.37);
-    if (partialHz > 80) {
-        const partial = ctx.createOscillator();
-        const partialGain = ctx.createGain();
-        partial.type = 'sine';
-        partial.frequency.setValueAtTime(partialHz, time);
-        partialGain.gain.setValueAtTime(0.0001, time);
-        partialGain.gain.exponentialRampToValueAtTime(peak * 0.22, time + 0.0008);
-        partialGain.gain.exponentialRampToValueAtTime(0.0001, time + COIN_PARTIAL_S);
-        partial.connect(partialGain);
-        partialGain.connect(dest);
-        partial.start(time);
-        release(partial, [partialGain], time + COIN_PARTIAL_S + 0.01);
-    }
-
-    const tipHz = Math.min(nyquist, f * 4.9);
-    if (tipHz > partialHz + 40) {
-        const tip = ctx.createOscillator();
-        const tipGain = ctx.createGain();
-        tip.type = 'sine';
-        tip.frequency.setValueAtTime(tipHz, time);
-        tipGain.gain.setValueAtTime(0.0001, time);
-        tipGain.gain.exponentialRampToValueAtTime(peak * 0.1, time + 0.0004);
-        tipGain.gain.exponentialRampToValueAtTime(0.0001, time + COIN_TIP_S);
-        tip.connect(tipGain);
-        tipGain.connect(dest);
-        tip.start(time);
-        release(tip, [tipGain], time + COIN_TIP_S + 0.01);
+        osc.start(time);
+        release(osc, [gain], time + v.dur + 0.02);
     }
 
     let noise = coinClicks.get(ctx);
@@ -277,17 +231,43 @@ export function scheduleCoinTick(
     const src = ctx.createBufferSource();
     src.buffer = noise;
     const band = ctx.createBiquadFilter();
-    band.type = 'bandpass';
-    band.frequency.setValueAtTime(Math.min(nyquist, 6400), time);
-    band.Q.setValueAtTime(2.2, time);
+    band.type = 'highpass';
+    band.frequency.setValueAtTime(Math.min(nyquist, 7200), time);
+    band.Q.setValueAtTime(0.7, time);
     const clickGain = ctx.createGain();
-    clickGain.gain.setValueAtTime(peak * 0.55, time);
+    const click = Math.max(0.0002, peak * 0.42);
+    clickGain.gain.setValueAtTime(click, time);
     clickGain.gain.exponentialRampToValueAtTime(0.0001, time + COIN_CLICK_S);
     src.connect(band);
     band.connect(clickGain);
     clickGain.connect(dest);
     src.start(time);
     release(src, [band, clickGain], time + COIN_CLICK_S + 0.01);
+}
+
+export function scheduleCadence(
+    ctx: BaseAudioContext,
+    dest: AudioNode,
+    time: number,
+    gear: number,
+) {
+    CADENCE_NOTES.forEach((note, index) => {
+        const last = index === CADENCE_NOTES.length - 1;
+        metalBell(ctx, dest, time + note.at, cadenceFreq(index, gear), last ? 0.09 : 0.055, note.dur);
+    });
+}
+
+export function scheduleCoinTick(
+    ctx: BaseAudioContext,
+    dest: AudioNode,
+    time: number,
+    step: number,
+    piled: number,
+    gear = 0,
+) {
+    const wobble = Math.pow(2, (Math.random() * 8 - 4) / 1200);
+    const f = coinFreq(step, piled, gear) * wobble;
+    metalBell(ctx, dest, time, f, coinGain(piled), COIN_BODY_S);
 }
 
 export interface CoinReport {
@@ -353,7 +333,7 @@ export function checkCoinFeel(): CoinReport {
     if (smear.length < 1 || smear.length > 2) bad(`gole espalhado virou fila: ${smear.length}`);
     if (smear.some(p => p.kind === 'cadence')) bad('um gole curto ganhou botão');
 
-    const walk = simulate([0, 100, 200, 300, 400, 500, 600, 700, 800]);
+    const walk = simulate(Array.from({ length: 14 }, (_, i) => i * 100));
     const ticks = walk.filter((p): p is CoinPlay & { at: number; kind: 'tick' } => p.kind === 'tick');
     const buttons = walk.filter(p => p.kind === 'cadence');
     lines.push(`caminhada: ${walk.map(p => p.kind === 'tick' ? String(p.step) : 'botão').join('-')}`);
@@ -376,13 +356,13 @@ export function checkCoinFeel(): CoinReport {
     const buttonEnd = CADENCE_NOTES[CADENCE_NOTES.length - 1];
     const buttonSpan = buttonEnd.at + buttonEnd.dur;
     lines.push(`o botão dura ${Math.round(buttonSpan * 1000)} ms`);
-    if (buttonSpan < 0.14 || buttonSpan > 0.22) bad(`botão fora da faixa curta: ${buttonSpan.toFixed(3)} s`);
+    if (buttonSpan < 0.3 || buttonSpan > 0.42) bad(`botão fora da faixa do floreio: ${buttonSpan.toFixed(3)} s`);
     if (cadenceFreq(2, 0) <= cadenceFreq(0, 0)) bad('o botão não sobe');
 
-    const quiet = simulate([0, 100, 200, 300, 400, 500, 600]);
+    const quiet = simulate(Array.from({ length: COIN_PHRASE }, (_, i) => i * 100));
     const quietButtons = quiet.filter(p => p.kind === 'cadence');
     const quietTicks = quiet.filter(p => p.kind === 'tick');
-    if (quietTicks.length !== COIN_PHRASE || quietButtons.length !== 1) bad(`sete notas não fecharam: ${quietTicks.length} notas, ${quietButtons.length} botões`);
+    if (quietTicks.length !== COIN_PHRASE || quietButtons.length !== 1) bad(`a frase não fechou: ${quietTicks.length} notas, ${quietButtons.length} botões`);
 
     const again = simulate([0, 800]);
     const againTicks = again.filter((p): p is CoinPlay & { at: number; kind: 'tick' } => p.kind === 'tick');
