@@ -351,7 +351,6 @@ export const SerumOffer: React.FC<OfferProps> = ({
                                 mode="offer"
                                 canAfford
                                 cost={0}
-                                hotkey={String(index + 1)}
                                 forced={collapseId === id}
                                 pulse={null}
                                 onPress={() => onPick(id)}

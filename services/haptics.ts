@@ -1,13 +1,17 @@
 import { Capacitor } from '@capacitor/core';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
-export type Buzz = 'boom' | 'thud' | 'tap' | 'sting';
+export type Buzz = 'boom' | 'thud' | 'tap' | 'sting' | 'nick';
 
 let lastBody = 0;
+let lastNick = 0;
 
 export function buzz(kind: Buzz) {
     const now = Date.now();
-    if (kind === 'tap' || kind === 'sting') {
+    if (kind === 'nick') {
+        if (now - lastNick < 160) return;
+        lastNick = now;
+    } else if (kind === 'tap' || kind === 'sting') {
         if (now - lastBody < 280) return;
         lastBody = now;
     }
@@ -16,7 +20,7 @@ export function buzz(kind: Buzz) {
             ? Haptics.vibrate({ duration: 110 })
             : kind === 'sting'
                 ? Haptics.impact({ style: ImpactStyle.Medium })
-                : kind === 'tap'
+                : kind === 'nick' || kind === 'tap'
                     ? Haptics.impact({ style: ImpactStyle.Light })
                     : Haptics.impact({ style: ImpactStyle.Heavy });
         void pulse.catch(() => vibrateWeb(kind));
@@ -28,7 +32,8 @@ export function buzz(kind: Buzz) {
 function vibrateWeb(kind: Buzz) {
     const pattern = kind === 'boom' ? [0, 28, 36, 90]
         : kind === 'thud' ? [0, 22, 28, 64]
-        : kind === 'sting' ? [0, 16]
+        : kind === 'sting' ? [0, 18]
+        : kind === 'nick' ? [0, 16]
         : [0, 10];
     try {
         navigator.vibrate?.(pattern);

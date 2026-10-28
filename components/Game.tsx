@@ -38,21 +38,44 @@ const systemLanguage = (): Language => {
 
 // --- UI COMPONENTS (Versão Compacta - Agora Aumentada para Mobile) ---
 
-const StatBar = ({ value, max, colorClass, label, animate = false }: any) => (
+const StatBar = ({ value, max, colorClass, label, animate = false, chip = false, hit = 0 }: any) => {
+  const ghostRef = useRef(value);
+  const [ghost, setGhost] = useState(value);
+  useEffect(() => {
+    if (!chip) return;
+    if (value >= ghostRef.current - 0.2) {
+      ghostRef.current = value;
+      setGhost(value);
+      return;
+    }
+    const id = window.setTimeout(() => {
+      ghostRef.current = value;
+      setGhost(value);
+    }, 520);
+    return () => window.clearTimeout(id);
+  }, [value, chip]);
+  const pct = Math.min(100, (value / Math.max(1, max)) * 100);
+  const ghostPct = Math.min(100, (ghost / Math.max(1, max)) * 100);
+  return (
   <div className="flex flex-col w-full">
     <div className="flex justify-between items-end mb-0.5 px-0.5">
         <span className="text-[9px] lg:text-xs font-bold tracking-widest text-white/70">{label}</span>
-        <span className="text-[9px] lg:text-xs font-mono text-white/70">{Math.round(value)}/{Math.round(max)}</span>
+        <span className={`text-[9px] lg:text-xs font-mono text-white/70 ${chip && hit > 0 ? 'integrity-num' : ''}`} key={chip ? hit : 'n'}>{Math.round(value)}/{Math.round(max)}</span>
     </div>
     <div className="h-1.5 lg:h-3 w-full bg-black/50 border border-white/10 rounded-sm skew-x-[-10deg] overflow-hidden backdrop-blur-sm relative">
-      <div 
-        className={`h-full ${colorClass} transition-all duration-200 origin-left ${animate && value >= max ? 'animate-pulse brightness-150' : ''}`}
-        style={{ width: `${Math.min(100, (value / max) * 100)}%` }}
+      {chip && ghostPct > pct + 0.6 && (
+        <div className="integrity-ghost" style={{ width: `${ghostPct}%` }} />
+      )}
+      <div
+        key={chip ? hit : 'bar'}
+        className={`h-full ${colorClass} origin-left ${chip ? '' : 'transition-all duration-200'} ${chip && hit > 0 ? 'integrity-fill' : ''} ${animate && value >= max ? 'animate-pulse brightness-150' : ''}`}
+        style={{ width: `${pct}%` }}
       />
       <div className="absolute top-0 left-0 w-full h-[50%] bg-white/10"></div>
     </div>
   </div>
-);
+  );
+};
 
 const IconButton = ({ onClick, icon }: any) => (
   <button 
@@ -283,6 +306,15 @@ export const Game: React.FC = () => {
   const [upgrades, setUpgrades] = useState<Upgrade[]>(UPGRADES.map(u => ({...u}))); 
   
   const shownBiomassRef = useRef(0);
+  const healthWasRef = useRef(100);
+  const [wound, setWound] = useState(0);
+  const [heartFlinch, setHeartFlinch] = useState(false);
+  useEffect(() => {
+    if (wound === 0) return;
+    setHeartFlinch(true);
+    const id = window.setTimeout(() => setHeartFlinch(false), 340);
+    return () => window.clearTimeout(id);
+  }, [wound]);
   const lymphRef = useRef(false);
   const gulpRef = useRef(0);
   const adrenalineRef = useRef<HTMLDivElement>(null);
@@ -936,9 +968,12 @@ export const Game: React.FC = () => {
               setBossEntity(null);
           }
           
+          const hp = eng.player.health;
+          if (hp < healthWasRef.current - 0.35) setWound(n => n + 1);
+          healthWasRef.current = hp;
           setUiData({
-            health: Math.round(eng.player.health),
-            maxHealth: Math.round(eng.player.maxHealth),
+            health: hp,
+            maxHealth: eng.player.maxHealth,
             score: Math.round(eng.score),
             biomass: (shownBiomassRef.current = Math.round(eng.biomass)),
             wave: eng.currentWaveIndex + 1,
@@ -1348,8 +1383,8 @@ export const Game: React.FC = () => {
             50% { background-color: rgba(255, 0, 0, 0.4); }
         }
         .anim-shake { animation: heart-shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
-        .anim-break-left { animation: crack-left 0.75s ease-in forwards; animation-delay: 1.9s; }
-        .anim-break-right { animation: crack-right 0.75s ease-in forwards; animation-delay: 1.9s; }
+        .anim-break-left { animation: crack-left 0.75s ease-in forwards; animation-delay: 1.05s; }
+        .anim-break-right { animation: crack-right 0.75s ease-in forwards; animation-delay: 1.05s; }
         .anim-glitch { animation: glitch-text 0.5s steps(5) infinite; }
         .anim-pulse-red { animation: pulse-red 0.5s ease-in-out infinite; }
         @keyframes heart-pulse {
@@ -1359,19 +1394,46 @@ export const Game: React.FC = () => {
         .heart-live {
             color: #ff2d2d;
             filter: drop-shadow(0 0 6px rgba(255, 40, 40, 0.9));
+            transform-box: fill-box;
+            transform-origin: center;
             animation: heart-pulse 1.25s ease-in-out infinite;
         }
+        @keyframes heart-hit {
+            0% { transform: scale(1.85); color: #fff; filter: drop-shadow(0 0 10px #fff); }
+            100% { transform: scale(1); }
+        }
+        .heart-live.is-hit {
+            animation: heart-hit 0.32s ease-out, heart-pulse 1.25s ease-in-out 0.32s infinite;
+        }
+        .integrity-ghost {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            background: #fff1f3;
+            box-shadow: 0 0 10px rgba(255, 70, 80, 0.95);
+        }
+        @keyframes integrity-fill {
+            0% { filter: brightness(3); }
+            100% { filter: brightness(1); }
+        }
+        .integrity-fill { animation: integrity-fill 0.26s ease-out; }
+        @keyframes integrity-num {
+            0% { color: #fff; }
+            100% { color: rgba(255, 255, 255, 0.7); }
+        }
+        .integrity-num { animation: integrity-num 0.34s ease-out; color: #fff; }
         .heart-gone { color: #4a1518; }
         @keyframes life-flight {
-            0% { transform: translate(var(--dx), var(--dy)) scale(0.05); animation-timing-function: cubic-bezier(.45, .05, .25, 1); }
-            40% { transform: translate(0, 0) scale(0.07); animation-timing-function: cubic-bezier(.2, .85, .25, 1); }
-            66% { transform: translate(0, 0) scale(1); }
+            0% { transform: translate(var(--dx), var(--dy)) scale(0.18); }
+            16% { transform: translate(0, 0) scale(1.08); animation-timing-function: cubic-bezier(.16, 1, .3, 1); }
+            24% { transform: translate(0, 0) scale(1); }
             100% { transform: translate(0, 0) scale(1); }
         }
         @keyframes life-label {
-            0%, 58% { opacity: 0; transform: translateX(-50%) translateY(8px); }
-            70% { opacity: 1; transform: translateX(-50%) translateY(0); }
-            88% { opacity: 1; }
+            0%, 12% { opacity: 0; transform: translateX(-50%) translateY(8px); }
+            22% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            84% { opacity: 1; }
             100% { opacity: 0; }
         }
         .life-stage {
@@ -1835,7 +1897,7 @@ export const Game: React.FC = () => {
            <div className="flex justify-between items-start">
              <div className="flex flex-col gap-1 lg:gap-3 w-28 lg:w-64">
                 <div className={`node-life ${uiData.adrenaline ? 'adrenaline-hp' : ''}`}>
-                <StatBar label={t('INTEGRITY')} value={uiData.health} max={uiData.maxHealth} colorClass={uiData.adrenaline ? "bg-red-500 shadow-[0_0_12px_rgba(255,40,40,0.85)]" : (isPlatinum ? "bg-gradient-to-r from-purple-500 to-amber-400" : "bg-gradient-to-r from-red-600 to-red-400")} />
+                <StatBar chip hit={wound} label={t('INTEGRITY')} value={uiData.health} max={uiData.maxHealth} colorClass={uiData.adrenaline ? "bg-red-500 shadow-[0_0_12px_rgba(255,40,40,0.85)]" : (isPlatinum ? "bg-gradient-to-r from-purple-500 to-amber-400" : "bg-gradient-to-r from-red-600 to-red-400")} />
                 {motes.filter(m => m.kind === 'life').map(m => <i key={m.id} className="node-rise" style={{ left: `${8 + (m.id % 5) * 10}px` }} />)}
                 </div>
                 <div className="node-dim flex flex-col gap-1 lg:gap-3">
@@ -1846,14 +1908,15 @@ export const Game: React.FC = () => {
                 <div className="flex gap-1.5 lg:gap-2 mt-1 lg:mt-2">
                     {Array.from({length: INITIAL_LIVES}).map((_, i) => {
                         const alive = i < uiData.lives && heartbreak?.index !== i;
+                        const bleeding = alive && heartFlinch && i === uiData.lives - 1;
                         return (
                             <svg
                                 key={i}
                                 ref={(node) => { heartRefs.current[i] = node; }}
                                 viewBox="0 0 24 22"
                                 aria-hidden
-                                className={`w-4 h-4 lg:w-7 lg:h-7 ${alive ? 'heart-live' : 'heart-gone'}`}
-                                style={alive ? { animationDelay: `${i * 0.18}s` } : undefined}
+                                className={`w-4 h-4 lg:w-7 lg:h-7 ${alive ? 'heart-live' : 'heart-gone'} ${bleeding ? 'is-hit' : ''}`}
+                                style={alive && !bleeding ? { animationDelay: `${i * 0.18}s` } : undefined}
                             >
                                 <path fill="currentColor" d="M12 20.5l-1.45-1.32C5.4 14.36 2 11.28 2 7.5 2 4.42 4.42 2 7.5 2c1.74 0 3.41.81 4.5 2.09C13.09 2.81 14.76 2 16.5 2 19.58 2 22 4.42 22 7.5c0 3.78-3.4 6.86-8.55 11.68L12 20.5z" />
                             </svg>

@@ -823,17 +823,17 @@ export class AudioManager {
   public playHit(at?: { x: number; y: number } | null) { this.playBuffer('hit', 0.42, 0, 50, at); }
 
   /**
-   * Dano no corpo. Grave e curto, com um clique seco, abaixo da moeda e longe da bomba.
-   * O toque comum pode repetir; o golpe espera um pouco mais para não virar drone.
+   * A membrana rasga. Tom que cai na faixa do celular, com um ruído seco,
+   * longe do metal da moeda e abaixo da bomba.
    */
   public playHurt(grade: HurtGrade, at?: { x: number; y: number } | null) {
       if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
       const now = performance.now();
-      const gate = grade === 0 ? 90 : 140;
+      const gate = grade === 0 ? 120 : 160;
       if (now - this.hurtAt < gate && grade <= this.hurtHeard) return;
       this.hurtAt = now;
       this.hurtHeard = grade;
-      scheduleHurt(this.ctx, this.sfxOut(at, 0.08), this.ctx.currentTime, grade);
+      scheduleHurt(this.ctx, this.sfxOut(at, 0.28), this.ctx.currentTime, grade);
   }
 
   /** Sopro de saída, só depois de um golpe de verdade. Mais quieto que o toque. */

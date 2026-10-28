@@ -16,7 +16,7 @@ import { COLORS_PLATINUM, CANVAS_WIDTH, CANVAS_HEIGHT, WAVES, DIFFICULTY_MODIFIE
 import { audioManager, type DrumHit } from './audioManager';
 import { COIN_BEAT_MS, showerPlan } from './coinFeel';
 import { buzz, hum } from './haptics';
-import { hurtGrade, hurtKick, hurtPunch, hurtShake, hurtStop, type HurtGrade } from './hurtFeel';
+import { HURT_BLOOM, hurtBruise, hurtGrade, hurtKick, hurtPunch, hurtShake, hurtShove, hurtStop, type HurtGrade } from './hurtFeel';
 import { achievementManager } from './achievementManager';
 import { bossFor, drawBossShape, mutationFrom } from './bosses';
 import { OrganDirector, cellBudget, cellColor, cellRises, organBg, rollCellStyle } from './organDirector';
@@ -220,6 +220,7 @@ export class GameEngine {
   private hitStopTimer: number = 0;
   private hurt = 0;
   private hurtFlash = 0;
+  private hurtBloom = 0;
   private hurtEase = 0;
   private hurtSerious = false;
   private hurtKickX = 0;
@@ -1723,11 +1724,15 @@ export class GameEngine {
       const nx = dx / dist;
       const ny = dy / dist;
       this.hurt = Math.max(this.hurt, hurtPunch(grade));
-      this.hurtFlash = Math.max(this.hurtFlash, grade === 0 ? 0.07 : 0.1);
+      this.hurtFlash = Math.max(this.hurtFlash, hurtBruise(grade));
+      this.hurtBloom = HURT_BLOOM;
       this.hurtAngle = Math.atan2(-ny, -nx);
       const kick = hurtKick(grade);
       this.hurtKickX = nx * kick;
       this.hurtKickY = ny * kick;
+      const shove = hurtShove(grade);
+      this.player.vel.x = nx * shove;
+      this.player.vel.y = ny * shove;
       this.shakeIntensity = Math.max(this.shakeIntensity, hurtShake(grade));
       const stop = hurtStop(grade);
       if (stop > 0) {
@@ -1735,8 +1740,49 @@ export class GameEngine {
           this.hurtSerious = true;
       }
       audioManager.playHurt(grade, this.player.pos);
-      if (grade === 1) buzz('tap');
-      else if (grade === 2) buzz('sting');
+      this.ripMembrane(nx, ny, grade);
+      if (grade === 0) buzz('nick');
+      else if (grade === 1) buzz('tap');
+      else buzz('sting');
+  }
+
+  /** Pedaços da membrana saem para o lado oposto de quem bateu. */
+  private ripMembrane(nx: number, ny: number, grade: HurtGrade) {
+      const base = Math.atan2(ny, nx);
+      const count = (this.isLowQuality ? 4 : 7) + grade;
+      for (let i = 0; i < count; i++) {
+          const ang = base + (Math.random() - 0.5) * 1.15;
+          const spd = 6 + Math.random() * (7 + grade * 3);
+          this.particles.push({
+              id: 'membrane',
+              type: EntityType.PARTICLE,
+              pos: {
+                  x: this.player.pos.x + nx * this.player.radius * 0.35,
+                  y: this.player.pos.y + ny * this.player.radius * 0.35,
+              },
+              vel: { x: Math.cos(ang) * spd, y: Math.sin(ang) * spd },
+              radius: 2.1 + Math.random() * 2.3,
+              health: 1,
+              maxHealth: 1,
+              color: i % 3 === 0 ? '#fff4f2' : '#ff2438',
+              damage: 0,
+              active: true,
+              ttl: 14 + Math.floor(Math.random() * 8),
+          });
+      }
+      this.particles.push({
+          id: 'ring',
+          type: EntityType.PARTICLE,
+          pos: { x: this.player.pos.x, y: this.player.pos.y },
+          vel: { x: 0, y: 0 },
+          radius: this.player.radius + 4,
+          health: 1,
+          maxHealth: 14,
+          color: '#ff3044',
+          damage: 0,
+          active: true,
+          ttl: 14,
+      });
   }
 
   // --- REVISED: DAMAGE PLAYER LOGIC ---
@@ -1766,18 +1812,8 @@ export class GameEngine {
           // Ativa falha no próximo disparo
           this.systemGlitchActive = true;
 
-          this.invulnerabilityTimer = 0.4; // Short window to avoid multi-hits
-          this.dashCooldownTimer = 0; // Instant recharge for escape
-          
-          // Knockback calculation
-          const dx = this.player.pos.x - sourcePos.x;
-          const dy = this.player.pos.y - sourcePos.y;
-          const dist = Math.sqrt(dx*dx + dy*dy);
-          if (dist > 0) {
-              const force = 12;
-              this.player.vel.x = (dx / dist) * force;
-              this.player.vel.y = (dy / dist) * force;
-          }
+          this.invulnerabilityTimer = 0.4;
+          this.dashCooldownTimer = 0;
       }
 
       if (this.player.health <= 0) {
@@ -1839,8 +1875,11 @@ export class GameEngine {
       if (this.lives > 0) {
           this.lives--;
           audioManager.playCrack();
-          onLifeLost(); 
-          this.hitStopTimer = 0.2; 
+          onLifeLost();
+          this.hitStopTimer = 0.22;
+          this.hurt = 1;
+          this.hurtFlash = Math.max(this.hurtFlash, 0.55);
+          this.hurtBloom = Math.max(this.hurtBloom, HURT_BLOOM); 
           achievementManager.track('die_10', 1);
           
           if (this.lives === 0) {
@@ -1957,6 +1996,7 @@ export class GameEngine {
     this.bossMarkUntil = 0;
     this.hurt = 0;
     this.hurtFlash = 0;
+    this.hurtBloom = 0;
     this.hurtEase = 0;
     this.hurtSerious = false;
     this.hurtKickX = 0;
@@ -3561,6 +3601,7 @@ export class GameEngine {
     const step = dt / 1000;
     this.hurt = Math.max(0, this.hurt - step * 1.35);
     this.hurtFlash = Math.max(0, this.hurtFlash - step);
+    this.hurtBloom = Math.max(0, this.hurtBloom - step);
     if (hurtWas > 0.22 && this.hurt <= 0.22 && this.hurtSerious) {
         this.hurtSerious = false;
         this.hurtEase = 0.55;
@@ -4696,35 +4737,46 @@ export class GameEngine {
       this.ctx.globalCompositeOperation = 'source-over';
       this.ctx.globalAlpha = 1.0;
       const burning = this.acidContact > 0;
-      const struck = this.hurtFlash > 0.04;
+      const bruised = !this.star && this.hurtFlash > 0.02;
+      const impact = bruised && this.hurtBloom > 0.012;
+      const pulse = Math.floor(this.time / 42) % 2 === 0;
       this.ctx.fillStyle = this.star
           ? neonColor
-          : struck
+          : impact
           ? '#fff6f6'
+          : bruised
+          ? (pulse ? '#ff1c30' : '#ff5562')
           : burning
           ? (Math.floor(this.time / 70) % 2 === 0 ? '#e7d4ff' : '#ffffff')
           : (this.isDashing || this.invulnerabilityTimer > 0 ? this.colors.PLAYER_CORE : this.colors.PLAYER);
-      if (!this.star && !struck && this.invulnerabilityTimer > 0 && Math.floor(this.time / 100) % 2 === 0) {
+      if (!this.star && !bruised && this.invulnerabilityTimer > 0 && Math.floor(this.time / 100) % 2 === 0) {
           this.ctx.globalAlpha = 0.5;
       }
-      this.ctx.beginPath();
-      const wobbleX = Math.cos(this.time/150) * 3;
-      const wobbleY = Math.sin(this.time/150) * 3;
-      const rx = this.isDashing ? this.player.radius * 2.0 : this.player.radius+wobbleX;
-      const ry = this.isDashing ? this.player.radius * 0.5 : this.player.radius+wobbleY;
+      const dent = !this.isDashing && bruised ? Math.min(0.32, this.hurt * 0.5) : 0;
+      const wobbleX = this.isDashing || bruised ? 0 : Math.cos(this.time / 150) * 3;
+      const wobbleY = this.isDashing || bruised ? 0 : Math.sin(this.time / 150) * 3;
+      const rx = this.isDashing ? this.player.radius * 2.0 : (this.player.radius + wobbleX) * (1 - dent);
+      const ry = this.isDashing ? this.player.radius * 0.5 : (this.player.radius + wobbleY) * (1 + dent * 0.72);
       this.ctx.save();
       this.ctx.translate(this.player.pos.x, this.player.pos.y);
       if (this.isDashing) {
-          const angle = Math.atan2(this.player.vel.y, this.player.vel.x);
-          this.ctx.rotate(angle);
+          this.ctx.rotate(Math.atan2(this.player.vel.y, this.player.vel.x));
+      } else if (dent > 0.02) {
+          this.ctx.rotate(this.hurtAngle);
       }
-      this.ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI*2);
+      this.ctx.beginPath();
+      this.ctx.ellipse(0, 0, Math.max(4, rx), Math.max(4, ry), 0, 0, Math.PI * 2);
+      this.ctx.fill();
+      if (bruised && !impact) {
+          this.ctx.strokeStyle = 'rgba(255, 236, 236, 0.9)';
+          this.ctx.lineWidth = 2.6;
+          this.ctx.stroke();
+      }
+      this.ctx.fillStyle = this.star ? '#ffffff' : impact ? '#ffffff' : bruised ? '#ffe8ea' : this.colors.PLAYER_CORE;
+      this.ctx.beginPath();
+      this.ctx.arc(0, 0, this.player.radius * 0.4 * (impact ? 0.72 : 1), 0, Math.PI * 2);
       this.ctx.fill();
       this.ctx.restore();
-      this.ctx.fillStyle = this.star ? '#ffffff' : this.colors.PLAYER_CORE;
-      this.ctx.beginPath();
-      this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius*0.4, 0, Math.PI*2);
-      this.ctx.fill();
       if (this.star) {
           this.ctx.strokeStyle = neon[(Math.floor(this.time / 46) + 2) % neon.length];
           this.ctx.lineWidth = 3;
@@ -4732,11 +4784,17 @@ export class GameEngine {
           this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius + 12 + Math.sin(this.time / 40) * 3, 0, Math.PI * 2);
           this.ctx.stroke();
       }
-      if (this.hurt > 0.18) {
-          this.ctx.strokeStyle = `rgba(255, 84, 72, ${Math.min(1, this.hurt)})`;
-          this.ctx.lineWidth = 3;
+      if (this.hurt > 0.12) {
+          const a = Math.min(1, this.hurt);
+          this.ctx.strokeStyle = `rgba(255, 244, 242, ${0.9 * a})`;
+          this.ctx.lineWidth = 4.5;
           this.ctx.beginPath();
-          this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius + 11, this.hurtAngle - 0.6, this.hurtAngle + 0.6);
+          this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius + 8, this.hurtAngle - 0.85, this.hurtAngle + 0.85);
+          this.ctx.stroke();
+          this.ctx.strokeStyle = `rgba(255, 36, 52, ${0.95 * a})`;
+          this.ctx.lineWidth = 2.2;
+          this.ctx.beginPath();
+          this.ctx.arc(this.player.pos.x, this.player.pos.y, this.player.radius + 14, this.hurtAngle - 0.45, this.hurtAngle + 0.45);
           this.ctx.stroke();
       }
       if (burning) {
@@ -4917,6 +4975,17 @@ export class GameEngine {
           this.ctx.strokeStyle = p.color;
           this.ctx.lineWidth = 1.7;
           this.ctx.stroke();
+          this.ctx.restore();
+      } else if (p.id === 'membrane') {
+          const life = Math.max(0, (p.ttl || 0) / 18);
+          this.ctx.save();
+          this.ctx.translate(p.pos.x, p.pos.y);
+          this.ctx.rotate(Math.atan2(p.vel.y, p.vel.x));
+          this.ctx.globalAlpha = Math.min(1, life * 1.35);
+          this.ctx.fillStyle = p.color;
+          this.ctx.beginPath();
+          this.ctx.ellipse(0, 0, p.radius * 1.7, p.radius * 0.42, 0, 0, Math.PI * 2);
+          this.ctx.fill();
           this.ctx.restore();
       } else if (p.id === 'star_ghost') {
           this.ctx.save();
@@ -5444,7 +5513,7 @@ export class GameEngine {
           const veil = this.ctx.createRadialGradient(w * 0.5, h * 0.5, reach * 0.42, w * 0.5, h * 0.5, reach);
           veil.addColorStop(0, 'rgba(120, 0, 16, 0)');
           veil.addColorStop(0.7, `rgba(120, 0, 16, ${0.04 * edge})`);
-          veil.addColorStop(1, `rgba(86, 0, 14, ${0.5 * edge})`);
+          veil.addColorStop(1, `rgba(86, 0, 14, ${0.62 * edge})`);
           this.ctx.fillStyle = veil;
           this.ctx.fillRect(0, 0, w, h);
           const cx = w * 0.5 + Math.cos(this.hurtAngle) * w * 0.4;
@@ -5452,11 +5521,12 @@ export class GameEngine {
           this.ctx.save();
           this.ctx.translate(cx, cy);
           this.ctx.rotate(this.hurtAngle);
-          this.ctx.fillStyle = `rgba(255, 76, 64, ${0.28 * edge})`;
+          this.ctx.fillStyle = `rgba(255, 48, 42, ${Math.min(0.92, 0.78 * edge)})`;
           this.ctx.beginPath();
-          this.ctx.moveTo(16, 0);
-          this.ctx.lineTo(-8, 11);
-          this.ctx.lineTo(-8, -11);
+          this.ctx.moveTo(36, 0);
+          this.ctx.lineTo(-18, 22);
+          this.ctx.lineTo(-6, 0);
+          this.ctx.lineTo(-18, -22);
           this.ctx.closePath();
           this.ctx.fill();
           this.ctx.restore();
