@@ -817,7 +817,7 @@ export const Game: React.FC = () => {
                 }
                 setHeartbreak({ index, dx, dy });
                 if (heartTimer.current) window.clearTimeout(heartTimer.current);
-                heartTimer.current = window.setTimeout(() => setHeartbreak(null), 1500);
+                heartTimer.current = window.setTimeout(() => setHeartbreak(null), 1700);
             },
             handleBossSpawn
           );
@@ -1471,8 +1471,17 @@ export const Game: React.FC = () => {
             100% { opacity: 0; }
         }
         @keyframes life-cut {
-            0% { opacity: 0.92; }
+            0% { opacity: 0.96; }
+            16% { opacity: 0.2; }
+            34% { opacity: 0.9; }
             100% { opacity: 0; }
+        }
+        @keyframes life-slash {
+            0% { opacity: 0; transform: rotate(-8deg) scaleX(0.15); }
+            18% { opacity: 1; transform: rotate(-8deg) scaleX(1); }
+            42% { opacity: 0.35; }
+            58% { opacity: 0.95; }
+            100% { opacity: 0; transform: rotate(-8deg) scaleX(1); }
         }
         .life-stage {
             position: absolute;
@@ -1492,8 +1501,20 @@ export const Game: React.FC = () => {
             position: absolute;
             inset: 0;
             pointer-events: none;
-            background: radial-gradient(circle, rgba(255, 248, 248, 0.72) 0%, rgba(255, 36, 48, 0.28) 38%, rgba(70, 0, 8, 0.5) 100%);
-            animation: life-cut 0.48s ease-out forwards;
+            background: radial-gradient(circle, rgba(255, 248, 248, 0.78) 0%, rgba(255, 36, 48, 0.34) 34%, rgba(40, 0, 6, 0.62) 100%);
+            animation: life-cut 1.05s ease-out forwards;
+        }
+        .life-slash {
+            position: absolute;
+            left: -8%;
+            top: 46%;
+            width: 116%;
+            height: 14px;
+            pointer-events: none;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.95) 12%, #ff2a36 50%, rgba(255, 255, 255, 0.95) 88%, transparent);
+            box-shadow: 0 0 28px rgba(255, 32, 48, 0.95), 0 0 70px rgba(255, 20, 36, 0.55);
+            transform-origin: center;
+            animation: life-slash 0.9s ease-out forwards;
         }
         .life-lost-label {
             position: absolute;
@@ -1819,6 +1840,7 @@ export const Game: React.FC = () => {
       {heartbreak && (
           <div className="absolute inset-0 z-[150] pointer-events-none overflow-hidden">
               <div className="life-cut" />
+              <div className="life-slash" />
               <div className="life-stage">
                   <div
                       className="life-flight"

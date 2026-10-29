@@ -301,6 +301,7 @@ export class OrganDirector {
     private bandY = 540;
     private bandHalf = 380;
     private coughPlayer = false;
+    private coughTick = false;
     private coughBosses = new Set<string>();
     private oxygenClock = 10;
     private streaks: { x: number; y: number; vx: number; vy: number; life: number; max: number; bend: number }[] = [];
@@ -508,6 +509,7 @@ export class OrganDirector {
         this.streaks = [];
         this.streams = [];
         this.coughPlayer = false;
+        this.coughTick = false;
         this.coughBosses.clear();
     }
 
@@ -1225,6 +1227,11 @@ export class OrganDirector {
             this.wind.x = 1.6;
             this.wind.y = (this.bandY - hooks.player.pos.y) * 0.004;
             this.puff(7.2, 0, 0.55, true);
+            if (!this.coughTick && this.lungT <= 0.4) {
+                this.coughTick = true;
+                audioManager.playCoughWarn({ x: CANVAS_WIDTH * 0.72, y: this.bandY }, true);
+                buzz('warn');
+            }
             if (this.lungT <= 0) {
                 this.lungPhase = 'blast';
                 this.lungT = 0.72;
@@ -1254,9 +1261,12 @@ export class OrganDirector {
             const room = CANVAS_HEIGHT - this.bandHalf * 2;
             this.bandY = this.bandHalf + Math.random() * Math.max(1, room);
             this.coughPlayer = false;
+            this.coughTick = false;
             this.coughBosses.clear();
             this.say('ALERT_COUGH', '#ff5a6a');
             audioManager.playBreath('in', { x: CANVAS_WIDTH * 0.7, y: this.bandY });
+            audioManager.playCoughWarn({ x: CANVAS_WIDTH * 0.7, y: this.bandY });
+            buzz('warn');
             audioManager.lungPush(-0.05);
             return;
         }

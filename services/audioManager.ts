@@ -117,6 +117,7 @@ export class AudioManager {
   private starStep = 0;
   private starNext = 0;
   private starWarm = 0;
+  private lifeMute = 0;
   private killStreak = 0;
   private starKillAt = 0;
   private starBurst = 0;
@@ -253,6 +254,7 @@ export class AudioManager {
       if (this.starOn || this.starHeld) return;
       if (this.ctx.currentTime < this.starWarm) return;
       const now = this.ctx.currentTime;
+      if (now < this.lifeMute) return;
       const low = healthRatio < 0.3;
       const hurt = low ? 1 - Math.max(0, healthRatio) / 0.3 : 0;
       let cutoff = 20000;
@@ -642,7 +644,7 @@ export class AudioManager {
   }
 
   private starLevel(): number {
-      return Math.max(0.001, Math.max(0, Math.min(1, this.settings.music)) * 1.6 * 1.12);
+      return Math.max(0.001, Math.max(0, Math.min(1, this.settings.music)) * 1.6 * 0.68);
   }
 
   private applyCoinLevel(now: number) {
@@ -756,7 +758,7 @@ export class AudioManager {
       if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
       const dest = this.sfxOut(at, 0.36);
       const t = this.ctx.currentTime;
-      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone(t + i * 0.042, f, 0.11, 'triangle', 0.05, 3400, dest));
+      [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => this.tone(t + i * 0.042, f, 0.11, 'triangle', 0.03, 3400, dest));
   }
 
   private silenceStar(at: number) {
@@ -1252,6 +1254,40 @@ export class AudioManager {
       osc.start(t);
       osc.stop(t + dur + 0.02);
   }
+  /**
+   * A tosse avisa antes de estourar. O primeiro chamado sobe a pressão.
+   * O segundo, perto do fim, é mais curto: sai agora.
+   */
+  public playCoughWarn(at?: { x: number; y: number } | null, soon = false) {
+      if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+      const dest = this.sfxOut(at, soon ? 0.28 : 0.55);
+      const t = this.ctx.currentTime;
+      if (soon) {
+          this.puff(0.08, 860, 0.2, t, dest);
+          this.tone(t, 262, 0.11, 'triangle', 0.07, 1100, dest);
+          this.tone(t + 0.06, 349, 0.09, 'sine', 0.05, 1400, dest);
+          return;
+      }
+      this.puff(0.46, 520, 0.1, t, dest);
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      const f = this.ctx.createBiquadFilter();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(118, t);
+      osc.frequency.exponentialRampToValueAtTime(310, t + 0.5);
+      f.type = 'lowpass';
+      f.frequency.setValueAtTime(980, t);
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(0.05, t + 0.38);
+      g.gain.linearRampToValueAtTime(0.0001, t + 0.52);
+      osc.connect(f);
+      f.connect(g);
+      g.connect(dest);
+      osc.start(t);
+      osc.stop(t + 0.54);
+      this.tone(t + 0.1, 196, 0.14, 'sine', 0.05, 800, dest);
+      this.tone(t + 0.28, 262, 0.12, 'sine', 0.045, 900, dest);
+  }
   public playCough(at?: { x: number; y: number } | null) {
       const dest = this.sfxOut(at);
       this.puff(0.12, 420, 0.28, undefined, dest);
@@ -1264,6 +1300,49 @@ export class AudioManager {
       window.setTimeout(() => this.playBubble(at), 150);
       if (!this.ctx || !this.sfxGain) return;
       this.tone(this.ctx.currentTime, 70, 0.28, 'sine', 0.16, 220, this.sfxOut(at));
+  }
+  /**
+   * Uma vida saiu. Dois tombos na faixa que o celular toca, com um rasgo
+   * no meio. A música abaixa um instante e volta: o plantão não para.
+   */
+  public playLifeLost(at?: { x: number; y: number } | null) {
+      if (!this.ctx || !this.sfxGain || this.ctx.state !== 'running') return;
+      const t = this.ctx.currentTime;
+      const dest = at ? this.sfxOut(at, 0.7) : this.sfxGain;
+      if (this.starOn && this.starBus) {
+          const cur = Math.max(0.0001, this.starBus.gain.value);
+          this.starBus.gain.cancelScheduledValues(t);
+          this.starBus.gain.setValueAtTime(cur, t);
+          this.starBus.gain.linearRampToValueAtTime(Math.max(0.0001, cur * 0.42), t + 0.03);
+          this.starBus.gain.linearRampToValueAtTime(this.starLevel(), t + 0.48);
+      } else if (this.musicBed && !this.starHeld) {
+          const cur = Math.max(0.0001, this.musicBed.gain.value);
+          this.musicBed.gain.cancelScheduledValues(t);
+          this.musicBed.gain.setValueAtTime(cur, t);
+          this.musicBed.gain.linearRampToValueAtTime(0.34, t + 0.03);
+          this.musicBed.gain.linearRampToValueAtTime(1, t + 0.58);
+          this.lifeMute = t + 0.62;
+          this.lastDuck = 1;
+      }
+      const fall = (when: number, from: number, to: number, peak: number, dur: number) => {
+          if (!this.ctx) return;
+          const osc = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(from, when);
+          osc.frequency.exponentialRampToValueAtTime(Math.max(90, to), when + dur);
+          g.gain.setValueAtTime(0.0008, when);
+          g.gain.exponentialRampToValueAtTime(peak, when + 0.012);
+          g.gain.exponentialRampToValueAtTime(0.0008, when + dur);
+          osc.connect(g);
+          g.connect(dest);
+          osc.start(when);
+          osc.stop(when + dur + 0.02);
+      };
+      this.puff(0.1, 3200, 0.34, t, dest);
+      fall(t, 740, 240, 0.2, 0.26);
+      this.puff(0.08, 1900, 0.22, t + 0.28, dest);
+      fall(t + 0.28, 560, 180, 0.16, 0.32);
   }
   public playCrack() {
       if (!this.ctx || !this.sfxGain) return;

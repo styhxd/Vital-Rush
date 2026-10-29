@@ -28,7 +28,7 @@ const NODE_LEAVE = { x: 0, y: 142, w: 196, h: 42 };
 /** O nódulo aberto ocupa a arena o bastante para o dedo acertar o que está escrito nele. */
 const NODE_OPEN = 2.05;
 /** O que a moeda paga de DNA, em relação ao que pagava. A bolsa da onda multiplica por cima. */
-const COIN_WORTH = 0.4;
+const COIN_WORTH = 0.46;
 const NODE_WIND = 0.46;
 
 export interface BossCard {
@@ -90,7 +90,7 @@ function campaignPressure(waveIndex: number): number {
 // Onda 1 entrega menos. O peso sobe devagar: a árvore não fecha no meio da campanha.
 function dnaPurse(waveIndex: number): number {
     const t = Math.min(1, Math.max(0, waveIndex) / 24);
-    return 0.56 + Math.pow(t, 1.35) * 1.12;
+    return 0.63 + Math.pow(t, 1.35) * 1.16;
 }
 
 // O mesmo chefe anda e ataca mais conforme a onda sobe. Onda 1 fica em 86% do passo escrito; a 30, em 118%.
@@ -246,6 +246,7 @@ export class GameEngine {
   private hurtBloom = 0;
   private hurtEase = 0;
   private lifeCut = 0;
+  private lifeRumble = 0;
   private hurtSerious = false;
   private hurtKickX = 0;
   private hurtKickY = 0;
@@ -795,11 +796,15 @@ export class GameEngine {
       const inward = Math.atan2(toCy, toCx);
       const edge = Math.min(pos.x, pos.y, CANVAS_WIDTH - pos.x, CANVAS_HEIGHT - pos.y);
       const pull = edge < 280 ? (1 - edge / 280) * 0.85 : 0;
+      // Shiny e leucógeno soltam o carpete no chão. Enquanto voa, o ímã não pega.
+      const loft = carpet || this.star;
       for (let i = 0; i < shards; i++) {
           let ang = (i / shards) * Math.PI * 2 + Math.random() * 0.4;
           if (pull > 0) ang += Math.atan2(Math.sin(inward - ang), Math.cos(inward - ang)) * pull;
           const burst = shards > 50;
-          const kick = (burst ? 3.6 : 2.05) + Math.random() * (burst ? 5.2 : shards > 20 ? 3.1 : 2.2);
+          const kick = loft
+              ? 9 + Math.random() * 11
+              : (burst ? 3.6 : 2.05) + Math.random() * (burst ? 5.2 : shards > 20 ? 3.1 : 2.2);
           const share = base + (leftover > 0 ? 1 : 0);
           if (leftover > 0) leftover--;
           this.entities.push({
@@ -814,6 +819,7 @@ export class GameEngine {
               drag: 0.05,
               value: Math.max(1, share),
               isElite: elite || carpet,
+              ttl: loft ? 0.72 : undefined,
           });
       }
   }
@@ -1904,7 +1910,7 @@ export class GameEngine {
 
           const shiny = target.id.startsWith('shiny_');
           if (shiny) {
-              // A fortuna fica no chão. O ímã não puxa: a graça é passar por cima.
+              // A fortuna cai no chão e espera. Passar por cima e puxar é que é a graça.
               const jackpot = Math.max(1, Math.floor(target.value || 1));
               this.spillCoins({ x: target.pos.x, y: target.pos.y }, jackpot, 72, true, 48, true);
               audioManager.playPowerUp(target.pos);
@@ -1915,7 +1921,7 @@ export class GameEngine {
           const oldShards = Math.min(gross, Math.min(6, Math.max(3, Math.ceil(gross / 12))));
           const purse = dnaPurse(this.currentWaveIndex);
           const total = Math.max(1, Math.round(gross * COIN_WORTH * purse));
-          const want = Math.min(22, total, Math.max(4, Math.round(4 + Math.sqrt(total) * 1.25)));
+          const want = Math.min(25, total, Math.max(5, Math.round(5 + Math.sqrt(total) * 1.38)));
           const energyBudget = oldShards * (target.isElite ? 12 : 3);
           this.spillCoins(target.pos, total, want, !!target.isElite, energyBudget);
           }
@@ -2052,7 +2058,7 @@ export class GameEngine {
           const purse = dnaPurse(this.currentWaveIndex);
           const gross = Math.max(4, Math.ceil((e.value || 10) * 1.2));
           const total = Math.max(2, Math.round(gross * COIN_WORTH * purse * 1.2));
-          const want = Math.min(10, Math.max(5, Math.round(4 + Math.sqrt(total) * 0.9)));
+          const want = Math.min(12, Math.max(6, Math.round(5 + Math.sqrt(total))));
           this.spillCoins(e.pos, total, want, true, 5);
           const sparks = this.isLowQuality ? 4 : 9;
           for (let i = 0; i < sparks; i++) {
@@ -2084,15 +2090,17 @@ export class GameEngine {
   public handlePlayerDeath(onGameOver: () => void, onLifeLost: () => void, currentStats: PlayerStats) {
       if (this.lives > 0) {
           this.lives--;
-          audioManager.playCrack();
+          audioManager.playLifeLost(this.player.pos);
+          buzz('life');
           onLifeLost();
           this.hitStopTimer = 0;
           this.hurt = 1;
           this.lifeCut = 1;
-          this.hurtFlash = Math.max(this.hurtFlash, 0.9);
-          this.hurtBloom = 0.18;
-          this.hurtKickX *= 2.1;
-          this.hurtKickY *= 2.1; 
+          this.lifeRumble = 34;
+          this.hurtFlash = Math.max(this.hurtFlash, 1.15);
+          this.hurtBloom = 0.24;
+          this.hurtKickX *= 2.6;
+          this.hurtKickY *= 2.6; 
           achievementManager.track('die_10', 1);
           
           if (this.lives === 0) {
@@ -2121,9 +2129,11 @@ export class GameEngine {
               this.spawnText(this.player.pos, this.t('MSG_CRITICAL'), '#ff0000', 50);
               this.shakeIntensity = Math.max(this.shakeIntensity, 34);
               this.ripMembrane(0, -1, 2);
+              this.ripMembrane(1, 0, 2);
               const rings = [
-                  { color: '#fff6f6', radius: this.player.radius + 6, ttl: 16 },
-                  { color: '#ff2438', radius: this.player.radius + 18, ttl: 26 },
+                  { color: '#fff6f6', radius: this.player.radius + 6, ttl: 18 },
+                  { color: '#ff2438', radius: this.player.radius + 18, ttl: 28 },
+                  { color: '#ffd0d4', radius: this.player.radius + 34, ttl: 36 },
               ];
               for (const ring of rings) {
                   this.particles.push({
@@ -2136,7 +2146,7 @@ export class GameEngine {
                       damage: 0, active: true, ttl: ring.ttl,
                   });
               }
-              const drops = this.isLowQuality ? 8 : 16;
+              const drops = this.isLowQuality ? 12 : 26;
               for (let i = 0; i < drops; i++) {
                   const angle = (i / drops) * Math.PI * 2;
                   const speed = 7 + (i % 3) * 3;
@@ -2225,6 +2235,7 @@ export class GameEngine {
     this.hurtBloom = 0;
     this.hurtEase = 0;
     this.lifeCut = 0;
+    this.lifeRumble = 0;
     this.hurtSerious = false;
     this.hurtKickX = 0;
     this.hurtKickY = 0;
@@ -3687,6 +3698,11 @@ export class GameEngine {
           }
         }
       } else if (e.type === EntityType.DNA_FRAGMENT) {
+        const pad = 48;
+        if (e.pos.x < pad) { e.pos.x = pad; if (e.vel.x < 0) e.vel.x *= -0.45; }
+        if (e.pos.x > CANVAS_WIDTH - pad) { e.pos.x = CANVAS_WIDTH - pad; if (e.vel.x > 0) e.vel.x *= -0.45; }
+        if (e.pos.y < pad) { e.pos.y = pad; if (e.vel.y < 0) e.vel.y *= -0.45; }
+        if (e.pos.y > CANVAS_HEIGHT - pad) { e.pos.y = CANVAS_HEIGHT - pad; if (e.vel.y > 0) e.vel.y *= -0.45; }
         if ((e.ttl ?? 0) > 0) e.ttl = Math.max(0, (e.ttl ?? 0) - dtSeconds);
         if (this.player.active) {
           const dx = this.player.pos.x - e.pos.x;
@@ -3695,8 +3711,9 @@ export class GameEngine {
           const reeling = e.angle === 1;
           const airborne = (e.ttl ?? 0) > 0;
           const touching = !airborne && dist < this.player.radius + e.radius + 10;
-          const magnet = !airborne && !this.coinCascade && dist < (this.star ? 980 : stats.magnetRadius);
-          if (magnet || reeling || touching) {
+          const magnetReach = stats.magnetRadius * (this.star ? 1.15 : 1);
+          const magnet = !airborne && !this.coinCascade && dist < magnetReach;
+          if (!airborne && (magnet || reeling || touching)) {
             const speed = reeling ? Math.max(28, e.orbitOffset || 28) : (this.star ? 54 : 28);
             // Sem o teto, o vácuo do fim da onda passa do corpo e a moeda
             // fica orbitando colada no personagem até ele se mexer.
@@ -3852,7 +3869,9 @@ export class GameEngine {
         audioManager.playHurtClear(this.player.pos);
     }
     this.hurtEase = Math.max(0, this.hurtEase - step * 1.6);
-    this.lifeCut = Math.max(0, this.lifeCut - step * 1.25);
+    this.lifeCut = Math.max(0, this.lifeCut - step * 0.46);
+    this.lifeRumble *= 0.972;
+    if (this.lifeRumble < 0.35) this.lifeRumble = 0;
     this.compactInactive(this.entities);
     this.forgetPhased();
   }
@@ -5230,9 +5249,10 @@ export class GameEngine {
 
     this.ctx.save();
     
-    if (this.shakeIntensity > 0 || Math.abs(this.hurtKickX) > 0.2 || Math.abs(this.hurtKickY) > 0.2) {
-      const sx = (Math.random() - 0.5) * this.shakeIntensity + this.hurtKickX;
-      const sy = (Math.random() - 0.5) * this.shakeIntensity + this.hurtKickY;
+    if (this.shakeIntensity > 0 || this.lifeRumble > 0.4 || Math.abs(this.hurtKickX) > 0.2 || Math.abs(this.hurtKickY) > 0.2) {
+      const amp = this.shakeIntensity + this.lifeRumble;
+      const sx = (Math.random() - 0.5) * amp + this.hurtKickX;
+      const sy = (Math.random() - 0.5) * amp + this.hurtKickY;
       this.ctx.translate(sx, sy);
     }
 
@@ -5886,10 +5906,39 @@ export class GameEngine {
           veil.addColorStop(1, `rgba(86, 0, 14, ${0.62 * edge})`);
           this.ctx.fillStyle = veil;
           this.ctx.fillRect(0, 0, w, h);
-          if (this.lifeCut > 0.62) {
-              const flash = (this.lifeCut - 0.62) / 0.38;
-              this.ctx.fillStyle = `rgba(255, 244, 244, ${0.42 * flash})`;
-              this.ctx.fillRect(0, 0, w, h);
+          if (this.lifeCut > 0.04) {
+              const cut = this.lifeCut;
+              const beat = (cut > 0.9 ? (cut - 0.9) / 0.1 : 0)
+                  + (cut < 0.8 && cut > 0.66 ? (cut - 0.66) / 0.14 : 0);
+              if (beat > 0.02) {
+                  this.ctx.fillStyle = `rgba(255, 244, 244, ${0.5 * Math.min(1, beat)})`;
+                  this.ctx.fillRect(0, 0, w, h);
+              }
+              const age = 1 - cut;
+              this.ctx.save();
+              this.ctx.strokeStyle = `rgba(255, 246, 246, ${Math.max(0, 0.85 - age * 1.7)})`;
+              this.ctx.lineWidth = 10;
+              this.ctx.beginPath();
+              this.ctx.arc(w * 0.5, h * 0.5, age * Math.max(w, h) * 0.95, 0, Math.PI * 2);
+              this.ctx.stroke();
+              if (cut < 0.8) {
+                  const age2 = 0.8 - cut;
+                  this.ctx.strokeStyle = `rgba(255, 48, 58, ${Math.max(0, 0.7 - age2 * 2.2)})`;
+                  this.ctx.lineWidth = 7;
+                  this.ctx.beginPath();
+                  this.ctx.arc(w * 0.5, h * 0.5, age2 * Math.max(w, h) * 1.15, 0, Math.PI * 2);
+                  this.ctx.stroke();
+              }
+              this.ctx.translate(w * 0.5, h * 0.47);
+              this.ctx.rotate(-0.12);
+              const slash = cut > 0.72 ? Math.min(1, (cut - 0.72) / 0.28) : 0;
+              this.ctx.globalAlpha = slash * 0.92;
+              this.ctx.fillStyle = '#fff7f7';
+              this.ctx.fillRect(-w * 0.62, -2.2, w * 1.24, 4);
+              this.ctx.globalAlpha = slash * 0.5;
+              this.ctx.fillStyle = '#ff2436';
+              this.ctx.fillRect(-w * 0.62, 5, w * 1.24, 11);
+              this.ctx.restore();
           }
           const cx = w * 0.5 + Math.cos(this.hurtAngle) * w * 0.4;
           const cy = h * 0.5 + Math.sin(this.hurtAngle) * h * 0.38;

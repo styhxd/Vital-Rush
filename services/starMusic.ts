@@ -95,7 +95,7 @@ function voice(
 
 export function playStarFanfare(ctx: BaseAudioContext, dest: AudioNode, time: number) {
     const notes = [0, 4, 7, 12, 16, 19].map((n) => semi(n + 12));
-    notes.forEach((f, i) => voice(ctx, dest, time + i * 0.022, f, 0.09, 'sawtooth', 0.11, 4200));
+    notes.forEach((f, i) => voice(ctx, dest, time + i * 0.022, f, 0.09, 'sawtooth', 0.06, 4200));
 }
 
 export function playStarDown(ctx: BaseAudioContext, dest: AudioNode, time: number) {
@@ -225,7 +225,7 @@ export function playStarKill(ctx: BaseAudioContext, duck: GainNode, sfx: AudioNo
     sub.frequency.setValueAtTime(180, time);
     sub.frequency.exponentialRampToValueAtTime(38, time + 0.1);
     subG.gain.setValueAtTime(0.0001, time);
-    subG.gain.exponentialRampToValueAtTime(0.55, time + 0.006);
+    subG.gain.exponentialRampToValueAtTime(0.34, time + 0.006);
     subG.gain.exponentialRampToValueAtTime(0.0001, time + 0.11);
     sub.connect(subG);
     subG.connect(sfx);
@@ -238,7 +238,7 @@ export function playStarKill(ctx: BaseAudioContext, duck: GainNode, sfx: AudioNo
     bp.type = 'bandpass';
     bp.frequency.setValueAtTime(1700, time);
     bp.Q.setValueAtTime(1.2, time);
-    const nG = env(ctx, sfx, time, 0.06, 0.32);
+    const nG = env(ctx, sfx, time, 0.06, 0.2);
     src.connect(bp);
     bp.connect(nG);
     src.start(time);
@@ -247,6 +247,6 @@ export function playStarKill(ctx: BaseAudioContext, duck: GainNode, sfx: AudioNo
     const note = semi(LADDER[Math.min(streak, LADDER.length - 1)]);
     [1, 1.25, 2].forEach((harmonic, idx) => {
         const when = time + idx * 0.016;
-        voice(ctx, sfx, when, note * harmonic, 0.16, idx === 1 ? 'square' : 'sawtooth', 0.1 - idx * 0.02, 3600);
+        voice(ctx, sfx, when, note * harmonic, 0.16, idx === 1 ? 'square' : 'sawtooth', 0.07 - idx * 0.015, 3600);
     });
 }

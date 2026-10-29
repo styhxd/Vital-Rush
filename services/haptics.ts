@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
-export type Buzz = 'boom' | 'thud' | 'tap' | 'sting' | 'nick';
+export type Buzz = 'boom' | 'thud' | 'tap' | 'sting' | 'nick' | 'warn' | 'life';
 
 let lastBody = 0;
 let lastNick = 0;
@@ -14,6 +14,14 @@ export function buzz(kind: Buzz) {
     } else if (kind === 'tap' || kind === 'sting') {
         if (now - lastBody < 280) return;
         lastBody = now;
+    }
+    if (kind === 'life') {
+        void pulseLife();
+        return;
+    }
+    if (kind === 'warn') {
+        void pulseWarn();
+        return;
     }
     if (Capacitor.isNativePlatform()) {
         const pulse = kind === 'boom'
@@ -29,8 +37,46 @@ export function buzz(kind: Buzz) {
     vibrateWeb(kind);
 }
 
+function wait(ms: number) {
+    return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+/** Dois baques e um resto. A vida saiu, o plantão não parou. */
+async function pulseLife() {
+    if (!Capacitor.isNativePlatform()) {
+        vibrateWeb('life');
+        return;
+    }
+    try {
+        await Haptics.vibrate({ duration: 48 });
+        await wait(88);
+        await Haptics.vibrate({ duration: 64 });
+        await wait(96);
+        await Haptics.impact({ style: ImpactStyle.Heavy });
+    } catch {
+        vibrateWeb('life');
+    }
+}
+
+/** Aviso curto, dois toques. Não é golpe. */
+async function pulseWarn() {
+    if (!Capacitor.isNativePlatform()) {
+        vibrateWeb('warn');
+        return;
+    }
+    try {
+        await Haptics.impact({ style: ImpactStyle.Light });
+        await wait(78);
+        await Haptics.impact({ style: ImpactStyle.Medium });
+    } catch {
+        vibrateWeb('warn');
+    }
+}
+
 function vibrateWeb(kind: Buzz) {
-    const pattern = kind === 'boom' ? [0, 28, 36, 90]
+    const pattern = kind === 'life' ? [0, 46, 80, 58, 110, 32]
+        : kind === 'warn' ? [0, 20, 72, 26]
+        : kind === 'boom' ? [0, 28, 36, 90]
         : kind === 'thud' ? [0, 22, 28, 64]
         : kind === 'sting' ? [0, 18]
         : kind === 'nick' ? [0, 16]
