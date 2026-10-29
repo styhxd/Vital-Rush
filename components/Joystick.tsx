@@ -118,7 +118,7 @@ export const Joystick: React.FC<JoystickProps> = ({ onMove }) => {
       ref={zoneRef}
       data-stick=""
       className="absolute top-0 left-0 bottom-0 z-50 touch-none select-none"
-      style={{ width: '64%' }}
+      style={{ width: 'min(64%, calc(100% - 210px))' }}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}

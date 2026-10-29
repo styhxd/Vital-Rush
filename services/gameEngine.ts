@@ -2280,7 +2280,9 @@ export class GameEngine {
 
   public triggerSurge(stats: PlayerStats, force: boolean = false) {
     if (this.star && !force) return;
-    if (force || this.energy >= stats.maxEnergy) {
+    // O HUD arredonda. 99.6 aparece cheio e o botão acende; o pulso tem que sair.
+    const meterFull = Math.round(this.energy) >= Math.round(Math.max(1, stats.maxEnergy));
+    if (force || meterFull) {
       if (!force) this.energy = 0;
       this.surgeActive = true;
       this.deathSurgeActive = force; 

@@ -93,11 +93,12 @@ export const INITIAL_STATS = {
 // O Normal de hoje é o Expert antigo com o Titã Blindado já no corpo dos bichos.
 // Easy ficou com o Normal de antes. Hard e Expert sobem a partir daí.
 // crowd maior = mais espaço entre spawns. bulk = tamanho.
+// O golpe e o tempo de vida dos bichos ficam. A sala só respira um pouco.
 export const DIFFICULTY_MODIFIERS = {
-  [Difficulty.EASY]: { hp: 1, dmg: 1, speed: 0.86, score: 1, crowd: 1, cap: 16, bulk: 1 },
-  [Difficulty.NORMAL]: { hp: 3.7, dmg: 1.65, speed: 0.78, score: 1.4, crowd: 1.13, cap: 20, bulk: 1.16 },
-  [Difficulty.HARD]: { hp: 4.9, dmg: 2.15, speed: 0.88, score: 1.6, crowd: 1.02, cap: 26, bulk: 1.22 },
-  [Difficulty.APEX]: { hp: 6.4, dmg: 2.7, speed: 0.98, score: 1.85, crowd: 0.92, cap: 30, bulk: 1.28 },
+  [Difficulty.EASY]: { hp: 1, dmg: 1, speed: 0.82, score: 1, crowd: 1.06, cap: 15, bulk: 1 },
+  [Difficulty.NORMAL]: { hp: 3.7, dmg: 1.65, speed: 0.74, score: 1.4, crowd: 1.2, cap: 19, bulk: 1.16 },
+  [Difficulty.HARD]: { hp: 4.9, dmg: 2.15, speed: 0.84, score: 1.6, crowd: 1.08, cap: 25, bulk: 1.22 },
+  [Difficulty.APEX]: { hp: 6.4, dmg: 2.7, speed: 0.93, score: 1.85, crowd: 0.98, cap: 29, bulk: 1.28 },
 };
 
 export const PATIENT_NAMES: Record<Language, { first: string[]; last: string[] }> = {

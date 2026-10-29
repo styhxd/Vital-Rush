@@ -650,7 +650,8 @@ export class AudioManager {
   private applyCoinLevel(now: number) {
       if (!this.coinBus || !this.ctx) return;
       const sfx = Math.max(0, Math.min(1, this.settings.sfx)) * 1.34;
-      const coin = sfx * (this.starOn ? 1.62 : 1);
+      // O tilintar estava um pouco abaixo da cama. Sobe só o bastante para sentar na música.
+      const coin = sfx * (this.starOn ? 1.62 : 1) * 1.32;
       this.coinBus.gain.cancelScheduledValues(now);
       this.coinBus.gain.setValueAtTime(Math.max(0.0001, coin), now);
       if (this.coinEchoGain) {

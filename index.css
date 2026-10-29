@@ -55,8 +55,15 @@
 .pad:not(.is-hot) { opacity: 0.58; }
 .pad.is-hot { opacity: 1; }
 .pad:disabled { cursor: default; }
+.pad { touch-action: none; -webkit-tap-highlight-color: transparent; }
 .pad-dash { width: 70px; height: 70px; }
-.pad-pulse { width: 88px; height: 88px; }
+.pad-pulse { width: 88px; height: 88px; overflow: visible; }
+.pad-pulse::after {
+  content: "";
+  position: absolute;
+  inset: -14px;
+  border-radius: inherit;
+}
 .pad-dash.is-hot {
   border-color: #e7fbff;
   box-shadow:

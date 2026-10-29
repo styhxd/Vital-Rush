@@ -475,9 +475,9 @@ export const Game: React.FC = () => {
 
   const triggerUltimate = useCallback(() => {
     if (engineRef.current && gameState === GameState.PLAYING && !isPaused) {
-      engineRef.current.triggerSurge(stats);
+      engineRef.current.triggerSurge(statsRef.current);
     }
-  }, [gameState, isPaused, stats]);
+  }, [gameState, isPaused]);
 
   const triggerDash = useCallback(() => {
     if (engineRef.current && gameState === GameState.PLAYING && !isPaused) {
@@ -536,7 +536,7 @@ export const Game: React.FC = () => {
     const advanceChart = (e: Event) => {
       if (isPaused) return;
       const node = e.target;
-      if (node instanceof Element && node.closest('.lab-screen, .serum-screen, .lab-card')) return;
+      if (node instanceof Element && node.closest('.lab-screen, .serum-screen, .lab-card, .pad')) return;
       const eng = engineRef.current;
       if (!eng) return;
       if (eng.advanceBossCard()) {
@@ -2089,14 +2089,15 @@ export const Game: React.FC = () => {
                      <div className="pad-slot">
                          <span className="pad-name">{t('SURGE_READY')}</span>
                          <button
+                            type="button"
                             aria-label={t('SURGE_READY')}
-                            onTouchStart={(e) => {
+                            aria-disabled={uiData.star || uiData.energy < uiData.maxEnergy}
+                            onPointerDown={(e) => {
+                                if (e.pointerType === 'mouse' && e.button !== 0) return;
                                 e.preventDefault();
                                 e.stopPropagation();
                                 triggerUltimate();
                             }}
-                            onClick={!isMobile ? triggerUltimate : undefined}
-                            disabled={uiData.star || uiData.energy < uiData.maxEnergy}
                             className={`pad pad-pulse ${!uiData.star && uiData.energy >= uiData.maxEnergy ? 'is-hot' : ''} ${isPlatinum ? 'is-gold' : ''}`}
                          >
                              <PadMark kind="pulse" />
