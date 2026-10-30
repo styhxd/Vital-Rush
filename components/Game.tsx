@@ -8,7 +8,7 @@ import { buzz, crownBuzz } from '../services/haptics';
 import { bossById } from '../services/bosses';
 import { achievementManager } from '../services/achievementManager';
 import { GameState, PlayerStats, Upgrade, Language, Difficulty, PatientProfile, ViralStrain, Achievement, ThemePalette, EntityType } from '../types';
-import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES, ADRENALINE_MAX_DURATION, CANVAS_WIDTH, CANVAS_HEIGHT } from '../constants';
+import { INITIAL_STATS, UPGRADES, WAVES, TEXTS, PATIENT_NAMES, COLORS_DEFAULT, COLORS_PLATINUM, ACHIEVEMENTS_LIST, INITIAL_LIVES, ADRENALINE_MAX_DURATION, CANVAS_WIDTH, CANVAS_HEIGHT, pricedUpgrade } from '../constants';
 import { CANON_ROUTE, randomRoute } from '../services/casebook';
 import { postRun } from '../services/board';
 import { Joystick } from './Joystick';
@@ -1133,7 +1133,8 @@ export const Game: React.FC = () => {
       const level = levelRef.current[upgradeId] ?? 0;
       if (level >= upgState.maxLevel) return false;
 
-      const cost = Math.floor(upgState.baseCost * Math.pow(upgState.costMultiplier, level));
+      const cleared = engineRef.current.currentWaveIndex;
+      const cost = pricedUpgrade(upgState.baseCost, upgState.costMultiplier, level, cleared);
       if (!free && engineRef.current.biomass < cost) return false;
 
       const prevStats = {...statsRef.current};
@@ -1147,8 +1148,9 @@ export const Game: React.FC = () => {
           levelRef.current = { ...levelRef.current, [upgradeId]: nextLevel };
 
           const eng = engineRef.current;
+          const gained = Math.max(0, newStats.maxHealth - prevStats.maxHealth);
           eng.player.maxHealth = newStats.maxHealth;
-          eng.player.health = Math.min(eng.player.health, newStats.maxHealth);
+          eng.player.health = Math.min(newStats.maxHealth, eng.player.health + gained);
           if (eng.energy > newStats.maxEnergy) eng.energy = newStats.maxEnergy;
           if (eng.player.maxHealth >= 200) achievementManager.track('max_hp_200', Math.floor(eng.player.maxHealth));
           setStats(newStats);
@@ -1192,7 +1194,8 @@ export const Game: React.FC = () => {
   const buyUpgrade = (upgradeId: string) => {
       const current = UPGRADES.find(u => u.id === upgradeId);
       const level = levelRef.current[upgradeId] ?? 0;
-      const cost = current ? Math.floor(current.baseCost * Math.pow(current.costMultiplier, level)) : 0;
+      const cleared = engineRef.current?.currentWaveIndex ?? -1;
+      const cost = current ? pricedUpgrade(current.baseCost, current.costMultiplier, level, cleared) : 0;
       const willMax = !!current && level + 1 >= current.maxLevel;
       const ok = grantUpgrade(upgradeId, false);
       setLabPulse({ id: upgradeId, kind: ok ? (willMax ? 'max' : 'ok') : 'no', token: Date.now(), cost });
@@ -2387,6 +2390,7 @@ export const Game: React.FC = () => {
             <BioLab
               upgrades={upgrades}
               biomass={uiData.biomass}
+              clearedIndex={engineRef.current?.currentWaveIndex ?? -1}
               language={language}
               t={t}
               pulse={labPulse}

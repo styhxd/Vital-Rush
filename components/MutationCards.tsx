@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Upgrade, Language, Difficulty } from '../types';
-import { upgradeBlurb } from '../constants';
+import { upgradeBlurb, pricedUpgrade } from '../constants';
 
 const CARD_BG = new URL('../src/assets/cards/card-bg.webp', import.meta.url).href;
 
@@ -44,7 +44,11 @@ export function serumWindowMs(difficulty: Difficulty): number {
 
 export function serumWeight(u: Upgrade): number {
     const rarity = u.rarity === 'LEGENDARY' ? 0.035 : u.rarity === 'EPIC' ? 0.12 : u.rarity === 'RARE' ? 0.34 : 1;
-    const heal = u.id === 'membrane' || u.id === 'lifesteal' ? 0.28 : 1;
+    const heal = u.id === 'membrane'
+        ? (u.level === 0 ? 16 : 0.85)
+        : u.id === 'lifesteal'
+            ? (u.level === 0 ? 1.8 : 0.7)
+            : 1;
     return rarity * heal * (1.2 - (u.level / u.maxLevel) * 0.4);
 }
 
@@ -68,8 +72,8 @@ export function rollSerumOffers(upgrades: Upgrade[]): string[] {
     return picked;
 }
 
-export function upgradeCost(upgrade: Upgrade): number {
-    return Math.floor(upgrade.baseCost * Math.pow(upgrade.costMultiplier, upgrade.level));
+export function upgradeCost(upgrade: Upgrade, clearedIndex = -1): number {
+    return pricedUpgrade(upgrade.baseCost, upgrade.costMultiplier, upgrade.level, clearedIndex);
 }
 
 type Pulse = { id: string; kind: 'ok' | 'no' | 'max'; token: number; cost: number } | null;
@@ -188,6 +192,7 @@ const MutationCard: React.FC<CardProps> = ({
 type LabProps = {
     upgrades: Upgrade[];
     biomass: number;
+    clearedIndex: number;
     language: Language;
     t: (key: string) => string;
     pulse: Pulse;
@@ -195,7 +200,7 @@ type LabProps = {
     onClose: () => void;
 };
 
-export const BioLab: React.FC<LabProps> = ({ upgrades, biomass, language, t, pulse, onBuy, onClose }) => {
+export const BioLab: React.FC<LabProps> = ({ upgrades, biomass, clearedIndex, language, t, pulse, onBuy, onClose }) => {
     const [tick, setTick] = useState(false);
     const [showHint, setShowHint] = useState(false);
     const [rail, setRail] = useState({ show: false, thumb: 0.3, top: 0 });
@@ -252,7 +257,7 @@ export const BioLab: React.FC<LabProps> = ({ upgrades, biomass, language, t, pul
             <div className={`lab-tray ${showHint ? 'has-more' : ''}`}>
                 <div className="lab-grid" ref={scrollerRef}>
                     {upgrades.map((upgrade) => {
-                        const cost = upgradeCost(upgrade);
+                        const cost = upgradeCost(upgrade, clearedIndex);
                         const canAfford = biomass >= cost;
                         return (
                             <MutationCard

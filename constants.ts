@@ -316,7 +316,7 @@ export const TEXTS: TranslationMap = {
     NODE_LET: "LET GO TO STOP",
     NODE_FULL: "HEALTH IS FULL",
     NODE_EMPTY: "NO DNA LEFT",
-    NODE_RATE: "DNA  →  1 health",
+    NODE_RATE: "DNA  →  +",
     NODE_USE: "USE",
     NODE_CLIMB: "COSTS MORE",
     NODE_REST: "HOLD TO REST",
@@ -404,7 +404,7 @@ export const TEXTS: TranslationMap = {
     UP_MITOSIS_NAME: "RAPID MITOSIS",
     UP_MITOSIS_DESC: "Fire speed 7% faster",
     UP_MEMBRANE_NAME: "TITANIUM MEMBRANE",
-    UP_MEMBRANE_DESC: "+8% max HP. 1 back every 11s. The shield cuts 4% of a hit",
+    UP_MEMBRANE_DESC: "+12% max HP. 5 back every 11s. The shield cuts 5% of a hit",
     UP_ENZYME_NAME: "HYPER ENZYMES",
     UP_ENZYME_DESC: "+8% damage",
     UP_MULTISHOT_NAME: "ADAPTIVE SPLIT",
@@ -642,7 +642,7 @@ export const TEXTS: TranslationMap = {
     NODE_LET: "SOLTE PARA PARAR",
     NODE_FULL: "VIDA CHEIA",
     NODE_EMPTY: "SEM DNA",
-    NODE_RATE: "DNA  →  1 de vida",
+    NODE_RATE: "DNA  →  +",
     NODE_USE: "USO",
     NODE_CLIMB: "MAIS CARO",
     NODE_REST: "SEGURE PARA DESCANSAR",
@@ -730,7 +730,7 @@ export const TEXTS: TranslationMap = {
     UP_MITOSIS_NAME: "MITOSE RÁPIDA",
     UP_MITOSIS_DESC: "Velocidade de disparo 7% maior",
     UP_MEMBRANE_NAME: "MEMBRANA DE TITÂNIO",
-    UP_MEMBRANE_DESC: "+8% de vida. Volta 1 a cada 11s. O escudo segura 4% do dano",
+    UP_MEMBRANE_DESC: "+12% de vida. Volta 5 a cada 11s. O escudo segura 5% do dano",
     UP_ENZYME_NAME: "HIPER ENZIMAS",
     UP_ENZYME_DESC: "+8% de dano",
     UP_MULTISHOT_NAME: "DIVISÃO ADAPTATIVA",
@@ -968,7 +968,7 @@ export const TEXTS: TranslationMap = {
     NODE_LET: "SUELTA PARA PARAR",
     NODE_FULL: "VIDA LLENA",
     NODE_EMPTY: "SIN ADN",
-    NODE_RATE: "ADN  →  1 de vida",
+    NODE_RATE: "ADN  →  +",
     NODE_USE: "USO",
     NODE_CLIMB: "MÁS CARO",
     NODE_REST: "MANTÉN PARA DESCANSAR",
@@ -1056,7 +1056,7 @@ export const TEXTS: TranslationMap = {
     UP_MITOSIS_NAME: "MITOSIS RÁPIDA",
     UP_MITOSIS_DESC: "Velocidad de disparo un 7% mayor",
     UP_MEMBRANE_NAME: "MEMBRANA DE TITANIO",
-    UP_MEMBRANE_DESC: "+8% de vida. Vuelve 1 cada 11s. El escudo aguanta un 4% del golpe",
+    UP_MEMBRANE_DESC: "+12% de vida. Vuelve 5 cada 11s. El escudo aguanta un 5% del golpe",
     UP_ENZYME_NAME: "HIPER ENZIMAS",
     UP_ENZYME_DESC: "+8% de daño",
     UP_MULTISHOT_NAME: "DIVISIÓN ADAPTATIVA",
@@ -1197,6 +1197,12 @@ const cardNum = (n: number, lang: Language) => {
 };
 
 /** Texto do card no nível que o jogador já tem. Nível 1 mostra o bônus de um passo; o 2 soma os dois. */
+function stackedPercent(mult: number, ranks: number): number {
+  let value = 100;
+  for (let i = 0; i < ranks; i++) value = Math.floor(value * mult);
+  return value - 100;
+}
+
 export function upgradeBlurb(id: string, level: number, lang: Language): string {
   const r = cardRank(level);
   const shots = r === 1
@@ -1213,9 +1219,10 @@ export function upgradeBlurb(id: string, level: number, lang: Language): string 
     return `+${8 * r}% de dano`;
   }
   if (id === 'membrane') {
-    if (lang === 'EN') return `+${8 * r}% max HP. ${r} back every 11s. The shield cuts ${4 * r}% of a hit`;
-    if (lang === 'ES') return `+${8 * r}% de vida. Vuelve ${r} cada 11s. El escudo aguanta un ${4 * r}% del golpe`;
-    return `+${8 * r}% de vida. Volta ${r} a cada 11s. O escudo segura ${4 * r}% do dano`;
+    const hp = stackedPercent(1.12, r);
+    if (lang === 'EN') return `+${hp}% max HP. ${5 * r} back every 11s. The shield cuts ${5 * r}% of a hit`;
+    if (lang === 'ES') return `+${hp}% de vida. Vuelve ${5 * r} cada 11s. El escudo aguanta un ${5 * r}% del golpe`;
+    return `+${hp}% de vida. Volta ${5 * r} a cada 11s. O escudo segura ${5 * r}% do dano`;
   }
   if (id === 'multishot') {
     if (lang === 'EN') return `+${r} ${shots}. If they all land, the damage goes up ${18 * r}%`;
@@ -1276,6 +1283,19 @@ export function upgradeBlurb(id: string, level: number, lang: Language): string 
   return '';
 }
 
+// O molar (ondas 1 a 6) cobra o preço de tabela. Depois a loja infla, no mesmo espírito
+// do Brotato: o passo seguinte custa mais, e a árvore não fecha na onda 17.
+export function shopTariff(clearedIndex: number): number {
+  const wave = Math.max(0, clearedIndex + 1);
+  if (wave <= 6) return 1;
+  const n = wave - 6;
+  return 1 + Math.pow(n / 24, 1.15) * 1.05;
+}
+
+export function pricedUpgrade(baseCost: number, costMultiplier: number, level: number, clearedIndex: number): number {
+  return Math.max(1, Math.floor(baseCost * Math.pow(costMultiplier, level) * shopTariff(clearedIndex)));
+}
+
 export const UPGRADES: Upgrade[] = [
   {
     id: 'mitosis',
@@ -1304,15 +1324,15 @@ export const UPGRADES: Upgrade[] = [
     nameKey: 'UP_MEMBRANE_NAME',
     descKey: 'UP_MEMBRANE_DESC',
     rarity: 'LEGENDARY',
-    baseCost: 980,
-    costMultiplier: 1.66,
+    baseCost: 200,
+    costMultiplier: 1.72,
     level: 0,
     maxLevel: 6,
     apply: (s) => ({
       ...s,
-      maxHealth: Math.floor(s.maxHealth * 1.08),
-      regen: s.regen + 1,
-      guard: s.guard + 0.04,
+      maxHealth: Math.floor(s.maxHealth * 1.12),
+      regen: s.regen + 5,
+      guard: s.guard + 0.05,
     })
   },
   {

@@ -22,13 +22,15 @@ import { bossFor, drawBossShape, mutationFrom } from './bosses';
 import { OrganDirector, cellBudget, cellColor, cellRises, organBg, rollCellStyle } from './organDirector';
 const BOSS_GRACE = 1.15;
 /** Primeira cura do linfonodo. Cada uso sobe este preço. */
-const NODE_BASE = 64;
+const NODE_BASE = 52;
 const NODE_REST = { x: 0, y: -6, w: 124, h: 112 };
 const NODE_LEAVE = { x: 0, y: 142, w: 196, h: 42 };
 /** O nódulo aberto ocupa a arena o bastante para o dedo acertar o que está escrito nele. */
 const NODE_OPEN = 2.05;
 /** O que a moeda paga de DNA, em relação ao que pagava. A bolsa da onda multiplica por cima. */
 const COIN_WORTH = 0.46;
+/** O chefe continua o maior prêmio da noite, mas não compra o laboratório inteiro. */
+const BOSS_PURSE = 0.74;
 const NODE_WIND = 0.46;
 
 export interface BossCard {
@@ -81,16 +83,22 @@ function wavesPastTheWall(waveIndex: number): number {
     return Math.max(0, waveIndex - CAMPAIGN_LAST_INDEX);
 }
 
-// 0 na onda 1, 1 na onda 30. A vida dos inimigos no máximo triplica, não decuplica.
+// 0 na onda 1, 1 na onda 30.
 function campaignPressure(waveIndex: number): number {
     const t = Math.min(Math.max(waveIndex, 0), CAMPAIGN_LAST_INDEX) / CAMPAIGN_LAST_INDEX;
     return Math.pow(t, 1.15);
 }
 
-// Onda 1 entrega menos. O peso sobe devagar: a árvore não fecha no meio da campanha.
+// A onda 1 usa 55% da rampa antiga: o bicho morre e a moeda existe.
+// A onda 30 a rampa volta inteira. O golpe não entra nessa conta.
+function trashBody(pressure: number): number {
+    const full = 1 + pressure * 2.35;
+    const ease = 0.55 + 0.45 * Math.pow(pressure, 0.72);
+    return full * ease;
+}
 function dnaPurse(waveIndex: number): number {
-    const t = Math.min(1, Math.max(0, waveIndex) / 24);
-    return 0.63 + Math.pow(t, 1.35) * 1.16;
+    const t = Math.min(1, Math.max(0, waveIndex) / 29);
+    return 0.96 - t * 0.1;
 }
 
 // O mesmo chefe anda e ataca mais conforme a onda sobe. Onda 1 fica em 86% do passo escrito; a 30, em 118%.
@@ -133,6 +141,7 @@ interface BoothCoin {
 interface BoothDeal {
   age: number;
   price: number;
+  heal: number;
   paid: number;
   granted: boolean;
   grantAt: number;
@@ -286,8 +295,25 @@ export class GameEngine {
       this.nodeFeed = true;
   }
 
+  private nodeChunk(): number {
+      return Math.max(12, Math.round(this.player.maxHealth * 0.14));
+  }
+
+  private nodeHeal(): number {
+      const chunk = this.nodeChunk();
+      const missing = this.player.maxHealth - this.player.health;
+      if (missing >= chunk || missing <= 0) return chunk;
+      return Math.max(1, Math.ceil(missing));
+  }
+
   private nodePrice(): number {
-      return Math.max(NODE_BASE, Math.round(NODE_BASE * this.nodeTariff));
+      const n = Math.max(0, this.currentWaveIndex - 5);
+      const waveMark = 1 + n * 0.04;
+      const full = Math.max(40, Math.round(NODE_BASE * this.nodeTariff * waveMark));
+      const chunk = this.nodeChunk();
+      const heal = this.nodeHeal();
+      if (heal >= chunk) return full;
+      return Math.max(8, Math.round(full * heal / chunk));
   }
 
   public lymphPads(): { rest: { x: number; y: number; w: number; h: number }; leave: { x: number; y: number; w: number; h: number } } | null {
@@ -333,7 +359,7 @@ export class GameEngine {
   private bossSnapAt = 0;
   private bossBombDue = 0;
   /** O linfonodo cruza a arena. Não espera a onda anterior ao chefe. */
-  private nodePass = 96; 
+  private nodePass = 52; 
   
   public isLowQuality: boolean = false; 
   public forceHighQuality: boolean = false;
@@ -510,7 +536,8 @@ export class GameEngine {
           speed *= 0.85;
       }
 
-      hp *= (1 + pressure * 2.35) * Math.pow(1.04, pastTheWall);
+      // Onda 1: 55% da rampa antiga, para a moeda existir. Onda 30: a rampa inteira.
+      hp *= trashBody(pressure) * Math.pow(1.04, pastTheWall);
       dmg *= (1 + pressure * 0.75) * Math.pow(1.025, pastTheWall);
       val *= 1 + pressure * 0.9;
 
@@ -998,6 +1025,7 @@ export class GameEngine {
 
   private beginDeal() {
       const price = this.nodePrice();
+      const heal = this.nodeHeal();
       const depart = 0.3;
       const flight = 0.46;
       const coins: BoothCoin[] = [];
@@ -1014,6 +1042,7 @@ export class GameEngine {
       this.deal = {
           age: 0,
           price,
+          heal,
           paid: 0,
           granted: false,
           grantAt: -1,
@@ -1042,8 +1071,10 @@ export class GameEngine {
       if (!d.granted && d.age >= enter) {
           d.granted = true;
           d.grantAt = d.age;
-          this.player.health = Math.min(this.player.maxHealth, this.player.health + 1);
-          this.nodeTariff *= 1.06;
+          const room = Math.max(0, this.player.maxHealth - this.player.health);
+          const give = Math.min(d.heal, room);
+          if (give > 0) this.player.health += give;
+          this.nodeTariff *= 1.34;
           this.lymphPricePop = 1;
           audioManager.playMend();
           const tip = this.boothTip;
@@ -1253,7 +1284,7 @@ export class GameEngine {
       this.ctx.font = '700 17px "Chakra Petch", sans-serif';
       const hot = Math.round(214 - heat * 55);
       this.ctx.fillStyle = pop > 0.2 ? '#fff6d4' : `rgb(255, ${hot}, 128)`;
-      this.ctx.fillText(`${price}  ${this.t('NODE_RATE')}`, 0, 0);
+      this.ctx.fillText(`${price}  ${this.t('NODE_RATE')} ${this.nodeHeal()}`, 0, 0);
       this.ctx.restore();
 
       let note = '';
@@ -1920,7 +1951,8 @@ export class GameEngine {
           const gross = Math.max(1, Math.ceil((target.value || 10) * Math.min(3, comboPower) * dnaYield));
           const oldShards = Math.min(gross, Math.min(6, Math.max(3, Math.ceil(gross / 12))));
           const purse = dnaPurse(this.currentWaveIndex);
-          const total = Math.max(1, Math.round(gross * COIN_WORTH * purse));
+          const bossCut = target.type === EntityType.BOSS ? BOSS_PURSE : 1;
+          const total = Math.max(1, Math.round(gross * COIN_WORTH * purse * bossCut));
           const want = Math.min(25, total, Math.max(5, Math.round(5 + Math.sqrt(total) * 1.38)));
           const energyBudget = oldShards * (target.isElite ? 12 : 3);
           this.spillCoins(target.pos, total, want, !!target.isElite, energyBudget);
@@ -3123,7 +3155,7 @@ export class GameEngine {
                   this.nodePass -= dtSeconds;
                   if (this.nodePass <= 0) {
                       this.spawnLymph();
-                      this.nodePass = 200 + Math.random() * 80;
+                      this.nodePass = 170 + Math.random() * 60;
                   }
               }
           }
@@ -3339,7 +3371,10 @@ export class GameEngine {
       if (this.leechLock > 0) this.leechLock -= dtSeconds;
       this.regenTimer += safeDt;
       if (this.regenTimer > 11000 && stats.regen > 0) {
+        const before = this.player.health;
         this.player.health = Math.min(this.player.health + stats.regen, this.player.maxHealth);
+        const got = Math.round(this.player.health - before);
+        if (got > 0) this.spawnText(this.player.pos, `+${got}`, '#7dffb0', 18);
         this.regenTimer = 0;
       }
       
@@ -4099,7 +4134,10 @@ export class GameEngine {
   }
 
   private spawnLymph() {
-      const y = 150 + Math.random() * (CANVAS_HEIGHT - 300);
+      const first = this.nodeVisits === 0 && this.nodeTariff < 1.05;
+      const y = first
+          ? Math.max(160, Math.min(CANVAS_HEIGHT - 160, this.player.pos.y + (Math.random() - 0.5) * 90))
+          : 150 + Math.random() * (CANVAS_HEIGHT - 300);
       this.entities.push({
           id: `lymphpass_${Date.now()}`,
           type: EntityType.LYMPH_NODE,
@@ -4120,7 +4158,8 @@ export class GameEngine {
       const anchor = e.value || e.pos.y;
       const amp = e.damage || 0;
       const phase = this.time / 260 + (e.orbitOffset || 0);
-      e.pos.x -= 3.15 * tick;
+      const firstPass = this.nodeVisits === 0 && this.nodeTariff < 1.05;
+      e.pos.x -= (firstPass ? 1.65 : 3.15) * tick;
       e.pos.y = anchor + Math.sin(phase) * amp + Math.sin(this.time / 130 + 1.4) * amp * 0.22;
       if (!this.isLowQuality && Math.random() < 0.55) {
           this.particles.push({
