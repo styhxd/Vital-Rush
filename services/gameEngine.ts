@@ -89,6 +89,23 @@ function campaignPressure(waveIndex: number): number {
     return Math.pow(t, 1.15);
 }
 
+// A onda 15 (índice 14) ainda é a porta. Até lá o plantão cabe em três vidas.
+// Depois a sala sobe de propósito: a vida extra, por anúncio ou pelo jogo pago,
+// é o que vai segurar a queda. Sem esse alívio, o corredor de verdade começa aqui.
+const DOOR_WAVE = 14;
+
+function doorHeat(waveIndex: number): number {
+    const wave = Math.max(0, waveIndex);
+    if (wave <= 8) return 1;
+    if (wave <= DOOR_WAVE) {
+        const u = (wave - 8) / (DOOR_WAVE - 8);
+        return 1 + u * 0.12;
+    }
+    const span = Math.max(1, CAMPAIGN_LAST_INDEX - DOOR_WAVE);
+    const u = Math.min(1, (wave - DOOR_WAVE) / span);
+    return 1.12 + Math.pow(u, 0.82) * 0.38;
+}
+
 // A onda 1 usa 55% da rampa antiga: o bicho morre e a moeda existe.
 // A onda 30 a rampa volta inteira. O golpe não entra nessa conta.
 function trashBody(pressure: number): number {
@@ -104,13 +121,17 @@ function dnaPurse(waveIndex: number): number {
 // O mesmo chefe anda e ataca mais conforme a onda sobe. Onda 1 fica em 86% do passo escrito; a 30, em 118%.
 function bossPace(waveIndex: number): number {
     const pressure = campaignPressure(waveIndex);
-    return 0.86 + pressure * 0.32 + Math.min(0.1, wavesPastTheWall(waveIndex) * 0.008);
+    const heat = doorHeat(waveIndex);
+    const step = 0.86 + pressure * 0.32 + Math.min(0.1, wavesPastTheWall(waveIndex) * 0.008);
+    return step * (1 + Math.max(0, heat - 1) * 0.22);
 }
 
 // Acima de 1 o chefe espera mais entre golpes. Onda 1 é 14% mais lenta; a 30, 8% mais rápida.
 function bossHaste(waveIndex: number): number {
     const pressure = campaignPressure(waveIndex);
-    return 1.14 - pressure * 0.22 - Math.min(0.06, wavesPastTheWall(waveIndex) * 0.005);
+    const heat = doorHeat(waveIndex);
+    const wait = 1.14 - pressure * 0.22 - Math.min(0.06, wavesPastTheWall(waveIndex) * 0.005);
+    return wait / (1 + Math.max(0, heat - 1) * 0.18);
 }
 
 const GRID_CELL_SIZE = 150;
@@ -537,8 +558,10 @@ export class GameEngine {
       }
 
       // Onda 1: 55% da rampa antiga, para a moeda existir. Onda 30: a rampa inteira.
-      hp *= trashBody(pressure) * Math.pow(1.04, pastTheWall);
-      dmg *= (1 + pressure * 0.75) * Math.pow(1.025, pastTheWall);
+      // O calor da porta só aperta de verdade depois da onda 15.
+      const heat = doorHeat(this.currentWaveIndex);
+      hp *= trashBody(pressure) * Math.pow(1.04, pastTheWall) * heat;
+      dmg *= (1 + pressure * 0.75) * Math.pow(1.025, pastTheWall) * heat;
       val *= 1 + pressure * 0.9;
 
       this.entities.push({
@@ -579,7 +602,7 @@ export class GameEngine {
   private detonateMine(mine: Entity, stats: PlayerStats, power: number, hooks?: { over: () => void; lost: () => void }) {
       const kind = this.mineKind(mine);
       const cyan = kind === 'cyan';
-      const radius = cyan ? 350 : kind === 'leash' ? 168 : kind === 'bile' ? 96 : kind === 'mark' ? 120 : kind === 'iris' ? 300 : 240;
+      const radius = cyan ? 350 : kind === 'leash' ? 168 : kind === 'bile' ? 84 + Math.random() * 40 : kind === 'mark' ? 120 : kind === 'iris' ? 300 : 240;
       const color = kind === 'leash' ? 'rgba(192, 132, 252, 0.72)'
           : kind === 'bile' ? 'rgba(182, 232, 106, 0.55)'
           : kind === 'mark' ? 'rgba(255, 224, 138, 0.72)'
@@ -625,22 +648,17 @@ export class GameEngine {
               radius: 4, health: 1, maxHealth: 1, color: spark, damage: 0, active: true, ttl: 28,
           });
       }
-      if (kind === 'leash') {
-          const boss = this.entities.find(e => e.active && e.type === EntityType.BOSS);
-          const at = boss ? { x: (mine.pos.x + boss.pos.x) * 0.5, y: (mine.pos.y + boss.pos.y) * 0.5 } : mine.pos;
-          this.bossLeash = { x: at.x, y: at.y, until: this.time + 4200, reach: 168 };
-      } else if (kind === 'mark') {
-          this.bossMarkUntil = this.time + 5600;
-      } else if (kind === 'bile') {
-          const bite = 1.15;
-          this.player.health = Math.max(0, this.player.health - bite);
-          this.sessionStats.damageTaken += bite;
-          this.invulnerabilityTimer = Math.max(this.invulnerabilityTimer, 0.28);
-          this.sting(bite, mine.pos, 1);
-          this.spawnText(this.player.pos, `-${bite.toFixed(1)}`, '#d6ff8a', 26);
-          if (this.player.health <= 0 && hooks) this.handlePlayerDeath(hooks.over, hooks.lost, stats);
-      }
       const r2 = radius * radius;
+      const boss = this.chief();
+      // O círculo desenhado é o alcance. Fora dele, o chefe não leva o efeito.
+      const bossInside = !!boss && distSq(boss.pos, mine.pos) < r2;
+      if (kind === 'leash') {
+          if (bossInside) this.bossLeash = { x: mine.pos.x, y: mine.pos.y, until: this.time + 4200, reach: radius };
+      } else if (kind === 'mark') {
+          if (bossInside) this.bossMarkUntil = this.time + 5600;
+      } else if (kind === 'bile') {
+          this.spillBile(mine.pos, radius);
+      }
       if (kind === 'leash' || kind === 'mark' || kind === 'bile') return;
       for (const victim of this.entities) {
           if (!(this.isEnemy(victim.type) || victim.type === EntityType.BOSS) || !victim.active) continue;
@@ -698,6 +716,27 @@ export class GameEngine {
       this.bossBombDue = 6.2 + Math.random() * 2;
       const cycle = ['leash', 'amber', 'mark', 'bile'] as const;
       this.spawnMine(cycle[Math.floor(this.bossClock / 8) % cycle.length]);
+  }
+
+  /** A bile do chefe é a mesma poça do fígado. O dano fica onde ela estourou. */
+  private spillBile(at: Vector2, radius: number) {
+      const ttl = 7.5;
+      this.entities.push({
+          id: `bile_${Date.now()}_${Math.random()}`,
+          type: EntityType.ACID_POOL,
+          pos: { x: at.x, y: at.y },
+          vel: { x: 0, y: 0 },
+          radius,
+          angle: radius,
+          health: 1,
+          maxHealth: 1,
+          color: '#c6e04a',
+          damage: 0,
+          active: true,
+          ttl,
+          value: ttl,
+          drag: 0.4,
+      });
   }
 
   private openLymph() {
@@ -1691,8 +1730,9 @@ export class GameEngine {
       mutation.acidTimer *= haste;
       const pastTheWall = wavesPastTheWall(this.currentWaveIndex);
       const pressure = campaignPressure(this.currentWaveIndex);
-      const hp = 1200 * spec.hp * this.difficultyMods.hp * (1 + pressure * 2.6) * Math.pow(1.05, pastTheWall);
-      const dmg = 28 * this.difficultyMods.dmg * (1 + pressure * 0.7) * Math.pow(1.03, pastTheWall);
+      const heat = doorHeat(this.currentWaveIndex);
+      const hp = 1200 * spec.hp * this.difficultyMods.hp * (1 + pressure * 2.6) * Math.pow(1.05, pastTheWall) * heat;
+      const dmg = 28 * this.difficultyMods.dmg * (1 + pressure * 0.7) * Math.pow(1.03, pastTheWall) * heat;
 
       this.entities.push({
           id: `boss_${spec.id}_${Date.now()}`,
@@ -2520,16 +2560,19 @@ export class GameEngine {
           const dx = e.pos.x - live.x;
           const dy = e.pos.y - live.y;
           const dist = Math.hypot(dx, dy) || 1;
-          if (dist > live.reach) {
-              e.pos.x = live.x + (dx / dist) * live.reach;
-              e.pos.y = live.y + (dy / dist) * live.reach;
-              const outward = (e.vel.x * dx + e.vel.y * dy) / dist;
-              if (outward > 0) {
-                  e.vel.x -= (dx / dist) * outward;
-                  e.vel.y -= (dy / dist) * outward;
+          // Longe do círculo, a coleira não puxa o chefe até ela.
+          if (dist <= live.reach * 1.65) {
+              if (dist > live.reach) {
+                  e.pos.x = live.x + (dx / dist) * live.reach;
+                  e.pos.y = live.y + (dy / dist) * live.reach;
+                  const outward = (e.vel.x * dx + e.vel.y * dy) / dist;
+                  if (outward > 0) {
+                      e.vel.x -= (dx / dist) * outward;
+                      e.vel.y -= (dy / dist) * outward;
+                  }
               }
+              if (m.dashTimer < 0.4) m.dashTimer = 0.4;
           }
-          if (m.dashTimer < 0.4) m.dashTimer = 0.4;
       }
       if (this.time > this.bossMarkUntil) return;
       const drag = dtSeconds * 0.45;
@@ -3085,6 +3128,11 @@ export class GameEngine {
               const swarm = this.swarmHere();
               let spawnEvery = config.spawnRate * spawnRateMod * crowd;
               let cap = foeCap;
+              if (this.currentWaveIndex > DOOR_WAVE) {
+                  const climb = Math.min(1, (this.currentWaveIndex - DOOR_WAVE) / (CAMPAIGN_LAST_INDEX - DOOR_WAVE));
+                  spawnEvery *= 1 - climb * 0.16;
+                  cap += Math.round(climb * 3);
+              }
               if (swarm) {
                   spawnEvery *= 0.4;
                   cap = Math.min(58, Math.round(foeCap * 2.4));
@@ -3701,7 +3749,8 @@ export class GameEngine {
                 if (this.patient.strain === ViralStrain.TITAN) speed *= 0.75;
                 if (e.type === EntityType.VIRUS) speed *= 0.82;
                 if (e.isElite) speed *= 0.72;
-                if (e.type === EntityType.FUNGI) speed = 0.16; 
+                if (e.type === EntityType.FUNGI) speed = 0.16;
+                speed *= 1 + Math.max(0, doorHeat(this.currentWaveIndex) - 1) * 0.4; 
 
                 if (!e.id.startsWith('shiny_') && e.type !== EntityType.BOSS && (e.stun ?? 0) <= 0) {
                     const aim = this.foeAim(e);
@@ -3725,7 +3774,7 @@ export class GameEngine {
                  } else if (this.invulnerabilityTimer <= 0 && !this.isDashing) {
                      if (stats.thorns > 0) this.damageEnemy(e, stats.thorns, false, stats);
                      let damage = e.isElite ? 2.5 : 0.6;
-                     damage *= this.difficultyMods.dmg;
+                     damage *= this.difficultyMods.dmg * doorHeat(this.currentWaveIndex);
                      if (e.type === EntityType.BOSS) damage = Math.max(3, e.damage * 0.11);
                      if (e.type === EntityType.VIRUS) damage = Math.max(damage, e.damage * (e.isElite ? 0.62 : 0.55));
                      // Damage from enemy collision uses protection logic

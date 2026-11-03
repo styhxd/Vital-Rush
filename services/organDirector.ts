@@ -735,7 +735,7 @@ export class OrganDirector {
         }
         this.slowInPlaque(hooks);
         const bossUp = hooks.entities.some(e => e.active && e.type === EntityType.BOSS);
-        if (!bossUp) this.meltInBile(dt, hooks);
+        this.meltInBile(dt, hooks);
 
         if (this.bitePhase === 'snap' && !this.biteHit && this.biteT <= 0.86) {
             this.biteHit = true;
@@ -1483,9 +1483,9 @@ export class OrganDirector {
         if (tickEnemies) this.bileEnemyCue = 0.35;
         for (const e of hooks.entities) {
             if (!e.active || !this.isFoe(e.type)) continue;
-            if (!this.insideAny(e.pos, e.radius * 0.35, pools)) continue;
-            if (e.type === EntityType.BOSS) continue;
-            if (tickEnemies) hooks.strike(e, 26);
+            const boss = e.type === EntityType.BOSS;
+            if (!this.insideAny(e.pos, boss ? e.radius * 0.12 : e.radius * 0.35, pools)) continue;
+            if (tickEnemies) hooks.strike(e, boss ? 14 : 26);
         }
         let playerIn = false;
         if (this.insideAny(hooks.player.pos, hooks.player.radius * 0.5, pools)) {
